@@ -7,7 +7,7 @@ render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_toon, specular_toon
 const vec2 D1 = vec2(0.8, 0.6);
 const vec2 D2 = vec2(-0.5, 0.866);
 const vec2 D3 = vec2(0.9, -0.436);
-const float TEXELS = 8.0;
+const float TEXELS = 32.0;
 
 uniform sampler2D depth_map : filter_linear, repeat_disable;
 uniform vec4 map_rect = vec4(-170.0, -200.0, 340.0, 240.0);
@@ -57,8 +57,10 @@ void fragment() {
 	float stripe = step(0.88, fract(p.y * 0.9 + rip * 2.2 + wave_time * 0.08));
 	float sparkle = stripe * step(0.6, rip) * (0.4 + amp * 10.0) * smoothstep(4.0, 12.0, length(VERTEX));   // none right under your feet
 	// Rain rings: pixel dots popping on the surface.
-	float rnd = fract(sin(dot(floor(p * 2.0), vec2(12.9898, 78.233))) * 43758.5453);
-	float drop = rain * step(0.985, fract(rnd + wave_time * 0.9));
+	// Rain: tiny drops (a few centimetres) popping up for a moment where they hit.
+	vec2 dcell = floor(wpos.xz * 48.0);
+	float rnd = fract(sin(dot(dcell, vec2(12.9898, 78.233))) * 43758.5453);
+	float drop = rain * step(0.996, fract(rnd + wave_time * 1.7)) * smoothstep(1.5, 4.0, length(VERTEX));
 	// Foam where the water meets the shore.
 	float foam = step(d, 0.04 + 0.025 * sin(wave_time * 1.5 + p.x * 0.7)) * step(0.68, texture(foam_noise, p * 1.3 + vec2(wave_time * 0.03)).r);
 

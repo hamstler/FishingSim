@@ -361,6 +361,7 @@ public partial class FishingRod : Node3D
     // ------------------------------------------------------------------ main loop
     public override void _PhysicsProcess(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("rod");
         if (_bobber == null)
             return;
         float dt = (float)delta;

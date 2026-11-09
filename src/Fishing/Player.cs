@@ -84,6 +84,7 @@ public partial class Player : CharacterBody3D
 
     public override void _PhysicsProcess(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("player");
         var dir = Vector2.Zero;
         if (Input.IsKeyPressed(Key.W)) dir.Y -= 1f;
         if (Input.IsKeyPressed(Key.S)) dir.Y += 1f;
@@ -97,6 +98,7 @@ public partial class Player : CharacterBody3D
         v.Y = IsOnFloor() ? 0f : v.Y - Gravity * (float)delta;
         Velocity = v;
         MoveAndSlide();
+        TryStepUp(new Vector3(move.X, 0f, move.Z) * speed * (float)delta);
         var p = Position;
         p.X = Math.Clamp(p.X, -BoundsX, BoundsX);
         p.Z = Math.Clamp(p.Z, BoundsZMin, BoundsZMax);
@@ -113,6 +115,29 @@ public partial class Player : CharacterBody3D
         }
         Position = p;
         Animate((float)delta);
+    }
+
+    /// <summary>Highest ledge (m) the angler steps onto without jumping: pier deck, door steps, kerbs.</summary>
+    public const float StepHeight = 0.8f;
+
+    /// <summary>
+    /// Walking into a low ledge (for example the pier deck from the sand beside it) lifts the angler onto it, as long as
+    /// there is room above it and the ledge is not taller than <see cref="StepHeight"/>.
+    /// </summary>
+    private void TryStepUp(Vector3 motion)
+    {
+        if (motion.LengthSquared() < 1e-8f || !IsOnWall())
+            return;
+        var start = GlobalTransform;
+        var up = Vector3.Up * StepHeight;
+        if (TestMove(start, up))
+            return;                                   // no headroom
+        var raised = start.Translated(up);
+        var ahead = motion.Normalized() * MathF.Max(motion.Length(), 0.12f);
+        if (TestMove(raised, ahead))
+            return;                                   // still blocked: it is a real wall
+        GlobalTransform = raised.Translated(ahead);
+        MoveAndCollide(Vector3.Down * (StepHeight + 0.05f));
     }
 
     private void Animate(float dt)

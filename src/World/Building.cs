@@ -47,6 +47,7 @@ public partial class Building : Node3D
 
     public override void _Process(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("building");
         foreach (var s in _spinners)
             s.RotateZ((float)delta * 0.5f);
         if (_night <= 0.02f)

@@ -71,8 +71,8 @@ public static class GraphicsQuality
     /// <summary>Screen pixels per world-image pixel (the pixel-art scale): bigger = chunkier and faster.</summary>
     public static int PixelSize => Level switch
     {
-        QualityLevel.Low => 3,
-        _ => 2,
+        QualityLevel.Low => 2,
+        _ => 1,      // native resolution: small, sharp pixels; the pixel-art look comes from textures, palette and outlines
     };
 
     /// <summary>Distance (m) between grass clumps.</summary>

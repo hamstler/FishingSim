@@ -141,6 +141,7 @@ public partial class Hud : CanvasLayer
 
     public override void _Process(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("hud");
         if (_rod == null || _rod.Loadout == null)
             return;
         float dt = (float)delta;

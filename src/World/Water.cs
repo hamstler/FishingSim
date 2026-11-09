@@ -51,6 +51,7 @@ public partial class Water : MeshInstance3D
 
     public override void _Process(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("water");
         _waveTime += (float)delta;
         PushParameters();
     }

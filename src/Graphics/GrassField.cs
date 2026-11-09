@@ -50,11 +50,27 @@ public partial class GrassField : Node3D
 
     public override void _Process(double delta)
     {
+        using var perfScope = Perf.Scope("grass");
         if (!IsInstanceValid(_follow))
             return;
         var p = new Vector2(_follow.GlobalPosition.X, _follow.GlobalPosition.Z);
         if (p.DistanceTo(_centre) > RecenterDistance)
-            Build(p);
+        {
+            _centre = p;
+            // The very first field is built at once; later ones are spread over a few frames (no hitch while walking).
+            if (_instance.Multimesh == null)
+                Build(p);
+            else
+                _job = BuildSteps(p).GetEnumerator();
+        }
+        if (_job != null)
+        {
+            long start = System.Diagnostics.Stopwatch.GetTimestamp();
+            long budget = System.Diagnostics.Stopwatch.Frequency / 500;     // ~2 ms per frame
+            while (_job != null && System.Diagnostics.Stopwatch.GetTimestamp() - start < budget)
+                if (!_job.MoveNext())
+                    _job = null;
+        }
     }
 
     private static float Hash(int x, int z, int k)
@@ -69,15 +85,24 @@ public partial class GrassField : Node3D
         }
     }
 
-    /// <summary>Places the clumps around <paramref name="centre"/>.</summary>
+    private System.Collections.Generic.IEnumerator<bool>? _job;
+
+    /// <summary>Places the clumps around <paramref name="centre"/> right away.</summary>
     public void Build(Vector2 centre)
+    {
+        _job = null;
+        foreach (var _ in BuildSteps(centre)) { }
+    }
+
+    /// <summary>The build, one row of the grid per step; the new field replaces the old one only when complete.</summary>
+    private System.Collections.Generic.IEnumerable<bool> BuildSteps(Vector2 centre)
     {
         _centre = centre;
         float radius = GraphicsQuality.GrassRadius;
         if (radius <= 0f || Renderer.IsHeadless)
         {
             _instance.Multimesh = null;
-            return;
+            yield break;
         }
         float spacing = GraphicsQuality.GrassSpacing;
         var loc = _bed.Location;
@@ -115,6 +140,7 @@ public partial class GrassField : Node3D
                 float tone = (Hash(ix, iz, 7) - 0.5f) * 0.12f;
                 colors.Add(new Color(c.R * 1.05f + tone, c.G * 1.08f + tone, c.B + tone * 0.5f));
             }
+            yield return true;
         }
         var mm = new MultiMesh
         {

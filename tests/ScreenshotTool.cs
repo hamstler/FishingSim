@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
@@ -102,6 +103,48 @@ public partial class ScreenshotTool : Node
                 rod.ForceLand(carp, 4.7f);
                 frames = 3;
             }
+        }
+        else if (mode == 15)
+        {
+            // A full-power cast: is the float visible far out?
+            rod.CastNow(1f);
+            for (int i = 0; i < 240 && rod.State != RodState.Waiting; i++)
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            for (int i = 0; i < 60; i++)
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            GD.Print($"FLOAT at {main.Player.Camera.GlobalPosition.DistanceTo(rod.Bobber.GlobalPosition):0.0} m");
+        }
+        else if (mode == 14)
+        {
+            // Fish line-up: several species side by side in front of the camera (art review).
+            string[] ids = { "okon", "szczupak", "pstrag", "karp", "lin", "karas", "ukleja", "wzdrega", "sandacz", "jesiotr", "sum", "palia" };
+            for (int i = 0; i < ids.Length; i++)
+            {
+                var sp = GD.Load<FishSpecies>($"res://data/fish/{ids[i]}.tres");
+                var model = FishModel.Create(sp, sp.MinWeight + (sp.MaxWeight - sp.MinWeight) * 0.3f);
+                float fit = 0.42f / model.Length;
+                model.Scale = Vector3.One * fit;
+                model.Wiggle = 0f;
+                model.Position = new Vector3(-0.75f + (i % 3) * 0.75f, 0.55f - (i / 3) * 0.37f, -1.6f);
+                model.RotationDegrees = new Vector3(0, -90f, 0);
+                main.Player.Camera.AddChild(model);
+            }
+            main.Player.Rig.Visible = false;
+            main.Player.Body.Visible = false;
+        }
+        else if (mode == 13)
+        {
+            // Performance probe: walk along the shore for a while and report the slowest script frames.
+            var times = new List<double>();
+            Input.ParseInputEvent(new InputEventKey { Keycode = Key.W, PhysicalKeycode = Key.W, Pressed = true });
+            for (int i = 0; i < 90; i++)
+            {
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                times.Add(Performance.GetMonitor(Performance.Monitor.TimeProcess) * 1000.0 + Performance.GetMonitor(Performance.Monitor.TimePhysicsProcess) * 1000.0);
+            }
+            Input.ParseInputEvent(new InputEventKey { Keycode = Key.W, PhysicalKeycode = Key.W, Pressed = false });
+            times.Sort();
+            GD.Print($"PERF frames={times.Count} median={times[times.Count / 2]:0.0}ms p95={times[(int)(times.Count * 0.95)]:0.0}ms max={times[^1]:0.0}ms over50={times.Count(x => x > 50)} pos={main.Player.GlobalPosition}\n{FishingSim.Graphics.Perf.Report()}");
         }
         else if (mode == 12)
         {

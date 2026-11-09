@@ -47,7 +47,7 @@ public partial class FishPopulation : Node3D
     public float VisibleDepth { get; set; } = BaseVisibleDepth;
 
     /// <summary>Colour the water casts on fish below the surface (set per map).</summary>
-    public Color Tint { get; set; } = new(0.42f, 0.5f, 0.46f);
+    public Color Tint { get; set; } = new(0.72f, 0.82f, 0.8f);
 
     public IReadOnlyList<FishAgent> Agents => _model.Agents;
 
@@ -235,6 +235,7 @@ public partial class FishPopulation : Node3D
 
     public override void _PhysicsProcess(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("fish");
         if (_watcher == null || !IsInstanceValid(_watcher))
             return;
         float dt = (float)delta;

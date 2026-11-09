@@ -244,6 +244,7 @@ public partial class Main : Node3D
 
     public override void _Process(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("main");
         bool still = new Vector2(Player.Velocity.X, Player.Velocity.Z).Length() < 0.1f;
         bool canRest = Rod.State == RodState.Waiting && still && _gear.Has(AccessoryKind.Chair) && Tournaments.Active == null;
         _restTimer = canRest ? _restTimer + (float)delta : 0f;

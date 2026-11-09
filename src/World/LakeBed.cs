@@ -227,6 +227,7 @@ public partial class LakeBed : Node3D
 
     public override void _Process(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("lakebed");
         _time += (float)delta;
         if (_terrainMaterial != null)
         {

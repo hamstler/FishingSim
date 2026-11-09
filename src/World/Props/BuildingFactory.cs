@@ -63,7 +63,7 @@ public static class BuildingFactory
                 break;
             case BuildingKind.Market:
                 // A bigger, red-roofed stall with stock piled around it. TODO (docs/ROZWOJ.md): market hall with NPC traders.
-                FishStall(b, new Color(0.62f, 0.18f, 0.16f));
+                FishStall(b, new Color(0.62f, 0.18f, 0.16f), "TARG RYBNY");
                 Crates(b, new Vector3(3.2f, 0, 3.4f), 3);
                 Barrel(b, new Vector3(-3.0f, 0, 3.4f));
                 Barrel(b, new Vector3(-2.3f, 0, 3.7f));
@@ -180,19 +180,32 @@ public static class BuildingFactory
         parent.AddChild(body);
     }
 
-    private static void Label(Node3D parent, string text, Vector3 pos, float pixelSize = 0.011f, int fontSize = 64, Color? color = null)
+    /// <summary>
+    /// Text painted on a sign board of <paramref name="board"/> size (m): the letters are scaled to fit inside it with a
+    /// margin (at most 78% of the width and 55% of the height), whatever the length of the text.
+    /// </summary>
+    public static float FitPixelSize(string text, Vector2 board, int fontSize = 64)
+    {
+        var size = ThemeDB.FallbackFont.GetStringSize(text, HorizontalAlignment.Left, -1, fontSize);
+        if (size.X <= 0f || size.Y <= 0f)
+            return 0.01f;
+        return MathF.Min(board.X * 0.78f / size.X, board.Y * 0.55f / size.Y);
+    }
+
+    private static void Label(Node3D parent, string text, Vector3 pos, Vector2 board, int fontSize = 64, Color? color = null)
     {
         parent.AddChild(new Label3D
         {
             Text = text,
             Position = pos,
-            PixelSize = pixelSize,
+            PixelSize = FitPixelSize(text, board, fontSize),
             FontSize = fontSize,
-            OutlineSize = 6,
+            OutlineSize = 3,
             Modulate = color ?? new Color(0.98f, 0.93f, 0.8f),
             OutlineModulate = new Color(0.05f, 0.04f, 0.03f),
             DoubleSided = false,
             AlphaCut = Label3D.AlphaCutMode.Discard,
+            TextureFilter = BaseMaterial3D.TextureFilterEnum.Nearest,
         });
     }
 
@@ -258,8 +271,9 @@ public static class BuildingFactory
         if (s.Sign != null)
         {
             float signY = s.Awning ? 3.55f : 3.05f;
-            Box(b, new Vector3(s.Sign.Length * 0.22f + 0.8f, 0.7f, 0.12f), new Vector3(0, signY, front + 0.12f), Flat(new Color(0.16f, 0.12f, 0.09f), 0.9f));
-            Label(b, s.Sign, new Vector3(0, signY, front + 0.2f), 0.0095f, 60);
+            var board = new Vector2(Math.Min(s.Sign.Length * 0.2f + 0.8f, s.W * 0.7f), 0.7f);
+            Box(b, new Vector3(board.X, board.Y, 0.12f), new Vector3(0, signY, front + 0.12f), Flat(new Color(0.16f, 0.12f, 0.09f), 0.9f));
+            Label(b, s.Sign, new Vector3(0, signY, front + 0.2f), board);
         }
         var lamp = new OmniLight3D
         {
@@ -401,7 +415,7 @@ public static class BuildingFactory
         Box(b, new Vector3(1.2f, 1.1f, 0.1f), new Vector3(0, h + 1.2f, d / 2f + 0.1f), Flat(new Color(0.1f, 0.08f, 0.07f)));
     }
 
-    private static void FishStall(Building b, Color awningColor)
+    private static void FishStall(Building b, Color awningColor, string sign = "SKUP RYB")
     {
         var wood = Wood(new Color(0.65f, 0.5f, 0.36f));
         var awning = Roof(awningColor);
@@ -446,7 +460,7 @@ public static class BuildingFactory
             });
         // sign on the front beam
         Box(b, new Vector3(3.6f, 0.75f, 0.12f), new Vector3(0, 3.55f, d / 2f + 0.3f), Flat(new Color(0.16f, 0.12f, 0.09f), 0.9f));
-        Label(b, "SKUP RYB", new Vector3(0, 3.55f, d / 2f + 0.38f), 0.011f, 64);
+        Label(b, sign, new Vector3(0, 3.55f, d / 2f + 0.38f), new Vector2(3.6f, 0.75f));
         var lamp = new OmniLight3D { LightColor = new Color(1f, 0.78f, 0.45f), OmniRange = 9f, LightEnergy = 0f, Position = new Vector3(0, 2.8f, 2.2f) };
         b.AddChild(lamp);
         b.AddLight(lamp);
@@ -495,7 +509,7 @@ public static class BuildingFactory
         // Signpost with the destinations.
         Box(b, new Vector3(0.18f, 3f, 0.18f), new Vector3(2.4f, 1.5f, 1.2f), dark);
         Box(b, new Vector3(1.7f, 0.45f, 0.08f), new Vector3(2.4f, 2.7f, 1.26f), wood);
-        Label(b, "ŁOWISKA", new Vector3(2.4f, 2.7f, 1.32f), 0.007f, 56, new Color(0.15f, 0.1f, 0.05f));
+        Label(b, "ŁOWISKA", new Vector3(2.4f, 2.7f, 1.32f), new Vector2(1.7f, 0.45f), 64, new Color(0.15f, 0.1f, 0.05f));
     }
 
     private static void Windmill(Building b)
@@ -582,9 +596,9 @@ public static class BuildingFactory
         var wood = Wood(new Color(0.6f, 0.45f, 0.32f));
         Cyl(b, 0.09f, 0.11f, 2.8f, new Vector3(0, 1.4f, 0), wood, 8);
         Box(b, new Vector3(1.7f, 0.4f, 0.07f), new Vector3(0.25f, 2.35f, 0.08f), Painted(new Color(0.85f, 0.8f, 0.65f)), new Vector3(0, 0, 4f));
-        Label(b, "WIOSKA >", new Vector3(0.25f, 2.35f, 0.125f), 0.0085f, 48, new Color(0.1f, 0.08f, 0.06f));
+        Label(b, "WIOSKA >", new Vector3(0.25f, 2.35f, 0.125f), new Vector2(1.7f, 0.4f), 64, new Color(0.1f, 0.08f, 0.06f));
         Box(b, new Vector3(1.7f, 0.4f, 0.07f), new Vector3(-0.25f, 1.8f, 0.08f), Painted(new Color(0.85f, 0.8f, 0.65f)), new Vector3(0, 0, -3f));
-        Label(b, "< POMOST", new Vector3(-0.25f, 1.8f, 0.125f), 0.0085f, 48, new Color(0.1f, 0.08f, 0.06f));
+        Label(b, "< POMOST", new Vector3(-0.25f, 1.8f, 0.125f), new Vector2(1.7f, 0.4f), 64, new Color(0.1f, 0.08f, 0.06f));
     }
 
     private static void Fence(Building b, float length)

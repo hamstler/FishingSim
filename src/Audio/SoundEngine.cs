@@ -61,6 +61,7 @@ public partial class SoundEngine : Node
 
     public override void _Process(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("sound");
         if (_rod == null)
             return;
         UpdateLevels((float)delta);

@@ -6,8 +6,8 @@ shader_type canvas_item;
 uniform vec2 src_size = vec2(426.0, 240.0);
 uniform float levels = 32.0;
 uniform float dither = 0.45;
-uniform float outline = 0.32;
-uniform float edge_threshold = 0.14;
+uniform float outline = 0.28;
+uniform float edge_threshold = 0.2;
 uniform float saturation = 1.12;
 
 float bayer4(vec2 p) {

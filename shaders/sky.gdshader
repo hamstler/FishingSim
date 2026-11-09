@@ -16,7 +16,8 @@ uniform float exposure = 0.1;
 
 uniform sampler2D cloud_noise : repeat_enable, filter_linear_mipmap;
 uniform float cloud_cover : hint_range(0, 1) = 0.3;
-uniform float cloud_time = 0.0;
+// Cloud drift (seconds), a global parameter so updating it does not re-bake the sky radiance.
+global uniform float cloud_drift;
 uniform float night : hint_range(0, 1) = 0.0;
 uniform vec3 night_color : source_color = vec3(0.004, 0.006, 0.014);
 
@@ -97,7 +98,7 @@ void sky() {
 
 	// Cloud layer: a flat sheet projected onto the dome, lit by the sun with a silver lining.
 	if (EYEDIR.y > 0.0 && !AT_CUBEMAP_PASS) {
-		vec2 uv = EYEDIR.xz / (EYEDIR.y + 0.08) * 0.08 + vec2(cloud_time * 0.004, cloud_time * 0.0017);
+		vec2 uv = EYEDIR.xz / (EYEDIR.y + 0.08) * 0.08 + vec2(cloud_drift * 0.004, cloud_drift * 0.0017);
 		float density = clouds(uv);
 		float shade = clouds(uv + sun_dir.xz * 0.02);     // denser towards the sun = darker base
 		vec3 lit = vec3(1.0, 0.97, 0.94) * mix(0.25, 1.05, sun_up) * LIGHT0_COLOR;

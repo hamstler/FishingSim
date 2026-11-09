@@ -205,6 +205,10 @@ public sealed class GearSuite : ITestSuite
             swim.Step(1f / 30f, threat, 5f);
         t.Check(swim.Agents.Average(a => Vector2.Distance(a.Position, threat)) > d0, "a running angler scares the fish away");
 
+        t.Section("float visibility");
+        t.Check(Bobber.VisualScale(3f) == 1f && Bobber.VisualScale(30f) > 4f && Bobber.VisualScale(500f) <= 7f,
+            "the float is drawn bigger far away so it stays visible (1x near, ~5x at 30 m, capped)");
+
         t.Section("procedural sound");
         float Energy(FishingSim.Core.Audio.Synth syn, int n)
         {

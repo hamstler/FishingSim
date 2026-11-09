@@ -12,7 +12,8 @@ Pure logic in src/Core (injected IRng); data as .tres resources; saves via Syste
 
 ## Art direction
 - Medieval pixel art 3D: low-res SubViewport + nearest upscale + palette/dither/outline post (src/Graphics/PixelArtView, shaders/pixel_post).
-- Materials: nearest-filtered 32px procedural textures, toon diffuse (BuildingFactory.Pixel); shaders sky/terrain/water/foliage/grass in shaders/.
+- Native resolution on Medium+ (PixelSize 1); the look comes from nearest-filtered 256px/2m procedural textures, toon diffuse (BuildingFactory.Pixel), palette/outline post. Fish skins: src/Graphics/FishSkin.
+- Performance: never set sky material params or move the sun every frame (re-bakes radiance); cloud drift is the global shader param `cloud_drift`. Profile with FISHSIM_PERF=1 and screenshot mode 13.
 - Quality presets in src/Graphics/GraphicsQuality (pause menu button); PixelArtView is skipped headless, so tests do not cover it.
 
 ## Known issues

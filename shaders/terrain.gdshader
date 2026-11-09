@@ -1,10 +1,10 @@
 shader_type spatial;
 // Pixel-art terrain: the vertex colour carries the biome (grass, sand, path, snow) at map scale; this shader adds
-// texel-sized detail on a world grid (16 texels per metre): grass/soil speckle, rock on steep slopes, wet sand at
+// texel-sized detail on a world grid (64 texels per metre): grass/soil speckle, rock on steep slopes, wet sand at
 // the waterline and blocky caustics on the lake bottom. Banded (toon) lighting. Works in world space (no UVs).
 render_mode cull_disabled, diffuse_toon, specular_disabled;
 
-const float TEXELS = 16.0;
+const float TEXELS = 64.0;
 
 uniform sampler2D noise_tex : repeat_enable, filter_nearest_mipmap;
 uniform sampler2D detail_normal : hint_normal, repeat_enable, filter_nearest_mipmap;

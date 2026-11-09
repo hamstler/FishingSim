@@ -56,7 +56,7 @@ public partial class FishModel : Node3D
             {
                 float ang = Mathf.Tau * j / Segments;
                 float sn = MathF.Sin(ang);
-                st.SetColor(sp.BackColor.Lerp(sp.BellyColor, 1f - SmoothStep(-0.35f, 0.35f, sn)));
+                st.SetUV(new Vector2(t, 1f - (sn * 0.5f + 0.5f)));   // U nose->tail, V back->belly (no seam)
                 st.AddVertex(new Vector3(MathF.Cos(ang) * width * 0.5f * f, sn * depth * 0.5f * f, z));
             }
         }
@@ -73,12 +73,15 @@ public partial class FishModel : Node3D
             }
         }
         st.GenerateNormals();
+        // Pixel-art skin (FishSkin): species colours and markings, read with nearest filtering.
         var bodyMaterial = new StandardMaterial3D
         {
-            VertexColorUseAsAlbedo = true,
-            VertexColorIsSrgb = true,
-            Roughness = 0.4f,
-            Metallic = 0.15f,
+            AlbedoTexture = Graphics.FishSkin.For(sp),
+            TextureFilter = BaseMaterial3D.TextureFilterEnum.Nearest,
+            DiffuseMode = BaseMaterial3D.DiffuseModeEnum.Toon,
+            SpecularMode = BaseMaterial3D.SpecularModeEnum.Toon,
+            Roughness = 0.35f,
+            Metallic = 0.1f,
             CullMode = BaseMaterial3D.CullModeEnum.Disabled,
         };
         AddChild(new MeshInstance3D { Mesh = st.Commit(), MaterialOverride = bodyMaterial });
@@ -87,10 +90,11 @@ public partial class FishModel : Node3D
         {
             VertexColorUseAsAlbedo = true,
             VertexColorIsSrgb = true,
+            DiffuseMode = BaseMaterial3D.DiffuseModeEnum.Toon,
             Roughness = 0.7f,
             CullMode = BaseMaterial3D.CullModeEnum.Disabled,
         };
-        Color fin = sp.FinColor;
+        Color fin = Graphics.FishSkin.Vivid(sp.FinColor, 1.5f);
 
         // --- tail fin on its own pivot so it can beat ---
         _tail = new Node3D { Position = new Vector3(0, 0, zTail) };
@@ -127,15 +131,24 @@ public partial class FishModel : Node3D
         fst.GenerateNormals();
         AddChild(new MeshInstance3D { Mesh = fst.Commit(), MaterialOverride = finMaterial });
 
-        // --- eyes ---
-        var eyeMaterial = new StandardMaterial3D { AlbedoColor = new Color(0.03f, 0.03f, 0.03f), Roughness = 0.2f };
+        // --- eyes: golden iris with a black pupil ---
+        var irisMaterial = new StandardMaterial3D { AlbedoColor = new Color(0.95f, 0.78f, 0.25f), Roughness = 0.3f, DiffuseMode = BaseMaterial3D.DiffuseModeEnum.Toon };
+        var pupilMaterial = new StandardMaterial3D { AlbedoColor = new Color(0.02f, 0.02f, 0.02f), Roughness = 0.1f };
+        float er = MathF.Max(depth * 0.075f, 0.004f);
         foreach (float sx in new[] { -1f, 1f })
         {
+            var eyePos = new Vector3(sx * width * 0.5f * Profile(0.09f) * 0.85f, depth * 0.1f, ZAt(0.09f));
             AddChild(new MeshInstance3D
             {
-                Mesh = new SphereMesh { Radius = depth * 0.06f, Height = depth * 0.12f, RadialSegments = 8, Rings = 4 },
-                MaterialOverride = eyeMaterial,
-                Position = new Vector3(sx * width * 0.5f * Profile(0.09f) * 0.85f, depth * 0.1f, ZAt(0.09f)),
+                Mesh = new SphereMesh { Radius = er, Height = er * 2f, RadialSegments = 8, Rings = 4 },
+                MaterialOverride = irisMaterial,
+                Position = eyePos,
+            });
+            AddChild(new MeshInstance3D
+            {
+                Mesh = new SphereMesh { Radius = er * 0.55f, Height = er * 1.1f, RadialSegments = 8, Rings = 4 },
+                MaterialOverride = pupilMaterial,
+                Position = eyePos + new Vector3(sx * er * 0.6f, 0f, er * 0.1f),
             });
         }
     }
@@ -150,6 +163,7 @@ public partial class FishModel : Node3D
     }
 
     private List<StandardMaterial3D>? _underwater;
+    private Color _underwaterColor = new(-1, -1, -1, -1);
 
     /// <summary>
     /// Switches the fish to its under-the-surface look: tinted by the water and drawn after the (transparent, non
@@ -173,13 +187,19 @@ public partial class FishModel : Node3D
                 _underwater.Add(m);
             }
         }
-        float a = 0.25f + Math.Clamp(clarity, 0f, 1f) * 0.7f;
+        // Quantised: touching a material uploads it to the GPU, so only do it when the look really changes.
+        float a = MathF.Round((0.25f + Math.Clamp(clarity, 0f, 1f) * 0.7f) * 20f) / 20f;
+        var c = new Color(tint.R, tint.G, tint.B, a);
+        if (c == _underwaterColor)
+            return;
+        _underwaterColor = c;
         foreach (var m in _underwater)
-            m.AlbedoColor = new Color(tint.R, tint.G, tint.B, a);
+            m.AlbedoColor = c;
     }
 
     public override void _Process(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("fishmodel");
         _time += (float)delta;
         if (_tail != null)
             _tail.Rotation = new Vector3(0f, MathF.Sin(_time * 9f) * 0.45f * Wiggle, 0f);

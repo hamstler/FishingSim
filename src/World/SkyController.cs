@@ -148,6 +148,7 @@ public partial class SkyController : Node
 
     public override void _Process(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("sky");
         if (World == null)
             return;
         float dt = (float)delta;
@@ -178,9 +179,27 @@ public partial class SkyController : Node
         return (Keys[0].Top, Keys[0].Horizon);
     }
 
+    private (float Hour, float Cloud, float Rain, float Fog) _applied = (float.NaN, 0f, 0f, 0f);
+
     private void Apply()
     {
-        float hour = World?.Hour ?? 12f;
+        // Clouds drift through a global shader parameter: it moves the visible sky every frame without making Godot
+        // re-bake the sky's lighting (radiance) cubemap, which is what caused periodic hitches.
+        RenderingServer.GlobalShaderParameterSet("cloud_drift", _cloudTime);
+        if (Follow != null)
+        {
+            _stars.GlobalPosition = Follow.GlobalPosition;
+            _rainFx.GlobalPosition = new Vector3(Follow.GlobalPosition.X, 12f, Follow.GlobalPosition.Z);
+        }
+
+        // Everything else (sun, sky colours, fog) only changes in steps: 2 game minutes (0.5 degree of sun) or a
+        // noticeable change of the weather. Moving the sun or touching the sky material every frame re-bakes the sky.
+        float hourStep = MathF.Floor((World?.Hour ?? 12f) * 30f) / 30f;
+        var state = (hourStep, MathF.Round(_cloud * 50f) / 50f, MathF.Round(_rain * 50f) / 50f, FogBoost);
+        if (state.Equals(_applied))
+            return;
+        _applied = state;
+        float hour = hourStep;
         float el = MathF.Sin((hour - 6f) / 24f * Mathf.Tau);
         float elDeg = Mathf.RadToDeg(MathF.Asin(Math.Clamp(el, -1f, 1f)));
         float day = Math.Clamp(el * 2.2f + 0.25f, 0f, 1f);
@@ -191,7 +210,6 @@ public partial class SkyController : Node
         hor = hor.Lerp(grey * 1.05f, _cloud * 0.85f);
         float night = Math.Clamp(-el * 3f, 0f, 1f);
         _skyMaterial.SetShaderParameter("cloud_cover", Math.Clamp(0.22f + _cloud * 0.78f, 0f, 1f));
-        _skyMaterial.SetShaderParameter("cloud_time", MathF.Floor(_cloudTime * 4f) / 4f);
         _skyMaterial.SetShaderParameter("night", night);
         // Haze: more Mie scattering in rain and mist.
         _skyMaterial.SetShaderParameter("turbidity", 4f + _cloud * 6f + _rain * 20f + FogBoost * 2000f);
@@ -218,11 +236,6 @@ public partial class SkyController : Node
         _env.VolumetricFogDensity = 0.003f + _cloud * 0.004f + _rain * 0.01f + FogBoost * 2f;
 
         _starMaterial.SetShaderParameter("night", Math.Clamp(-el * 3f, 0f, 1f) * (1f - _cloud));
-        if (Follow != null)
-        {
-            _stars.GlobalPosition = Follow.GlobalPosition;
-            _rainFx.GlobalPosition = new Vector3(Follow.GlobalPosition.X, 12f, Follow.GlobalPosition.Z);
-        }
         _rainFx.Emitting = _rain > 0.02f;
         _rainFx.AmountRatio = Math.Clamp(_rain, 0.05f, 1f);
     }

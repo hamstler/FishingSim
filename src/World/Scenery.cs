@@ -48,6 +48,7 @@ public partial class Scenery : Node3D
 
     public override void _Process(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("scenery");
         _time += (float)delta;
         if (_world == null)
             return;
