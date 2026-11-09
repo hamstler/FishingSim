@@ -72,7 +72,7 @@ public partial class Main : Node3D
         Player = new Player { Position = Player.SpawnPoint, Bed = _lake };
         AddChild(Player);
 
-        _sky = new SkyController { World = _world, Water = _water, Follow = Player.Camera };
+        _sky = new SkyController { World = _world, Water = _water, Follow = Player.Camera, Bed = _lake };
         AddChild(_sky);
 
         var bobber = new Bobber { WaterY = WaterY, WaterHeight = _water.HeightAt };
@@ -90,6 +90,10 @@ public partial class Main : Node3D
         Rod.Setup(new RodDependencies(
             Player.Camera, Player.RodTip, Player.Rig, bobber, species, _loadout, _profile, _world, _lake, WaterY, _gear));
         Player.ActionSource = () => ActionFor(Rod.State);
+
+        var grass = new Graphics.GrassField();
+        grass.Setup(_lake, Player);
+        AddChild(grass);
 
         Fish = new FishPopulation();
         Fish.Setup(_lake, Player, species, WaterY);
