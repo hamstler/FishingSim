@@ -230,7 +230,17 @@ public static class FishSkin
             _sheen = new Color(0.86f, 0.9f, 0.95f).Lerp(_belly.Lightened(0.15f), 1f - style.Silver);
             _flankH = 1.3f * MathF.Max(sp.BodyDepth, 0.06f);
             _seed = (uint)Math.Abs(sp.SpeciesName.GetHashCode());
+            var body = Fishing.FishBody.Of(sp);
+            _eyeU = body.EyeAt;
+            _eyeV = 0.5f + 0.5f * Math.Clamp(body.EyeHigh, -0.6f, 0.85f);
+            _eyeR = body.Eye * 0.5f;
+            _mouth = Fishing.FishBody.MouthOf(sp);
+            _ventralMouth = body.Snout > 1f || body.BellyFlat >= 0.4f && body.Snout >= 0.5f;
+            _headEnd = Math.Clamp(body.EyeAt + 0.075f + 0.04f * MathF.Min(body.Snout, 1.5f), 0.14f, 0.28f);
         }
+
+        private readonly float _eyeU, _eyeV, _eyeR, _mouth, _headEnd;
+        private readonly bool _ventralMouth;
 
         public (Color Colour, float Bump) At(float u, float v, float texel)
         {
@@ -245,17 +255,54 @@ public static class FishSkin
             c = c.Lerp(_sheen, sheenBand * 0.55f);
             c = c.Lerp(_belly.Lightened(0.1f), Smooth(0.3f, 0f, v) * 0.4f);       // white throat and belly
 
-            // --- head: smooth skin, darker crown, gill cover ---
-            float headEnd = 0.17f + 0.015f * MathF.Sin(v * 6f);
+            // --- head: smooth skin, darker crown, the gill cover as a raised plate, the eye socket, nostrils, mouth ---
+            float headEnd = _headEnd + 0.015f * MathF.Sin(v * 6f);
             bool head = u < headEnd;
             if (head)
             {
                 c = c.Darkened(Smooth(0.6f, 1f, v) * 0.12f);
-                float gill = MathF.Abs(u - (headEnd - 0.012f));
-                float edge = MathF.Exp(-MathF.Pow(gill / 0.004f, 2f)) * Smooth(0.15f, 0.35f, v) * Smooth(0.95f, 0.75f, v);
-                c = c.Darkened(edge * 0.4f);
-                c = c.Lightened(MathF.Exp(-MathF.Pow((u - 0.12f) / 0.035f, 2f)) * Smooth(0.25f, 0.55f, v) * 0.12f * (0.4f + _s.Silver));
-                bump -= edge * 0.6f;
+                float gill = u - (headEnd - 0.012f);
+                float side = Smooth(0.15f, 0.35f, v) * Smooth(0.95f, 0.75f, v);
+                float edge = MathF.Exp(-MathF.Pow(gill / 0.004f, 2f)) * side;
+                c = c.Darkened(edge * 0.45f);
+                // The gill cover: a smooth plate, raised and catching the light, ending in the dark gill slit.
+                float plate = Smooth(headEnd - 0.075f, headEnd - 0.03f, u) * Smooth(0f, -0.004f, gill) * side;
+                c = c.Lightened(plate * 0.1f * (0.4f + _s.Silver));
+                bump += plate * 0.5f - edge * 0.9f;
+                // The preopercle: a fine curved groove in front of the plate.
+                float pre = MathF.Abs(u - (headEnd - 0.05f + 0.06f * (v - 0.45f) * (v - 0.45f)));
+                float preLine = MathF.Exp(-MathF.Pow(pre / 0.0025f, 2f)) * side * 0.8f;
+                c = c.Darkened(preLine * 0.25f);
+                bump -= preLine * 0.4f;
+                c = c.Lightened(MathF.Exp(-MathF.Pow((u - (headEnd - 0.05f)) / 0.035f, 2f)) * Smooth(0.25f, 0.55f, v) * 0.1f * (0.4f + _s.Silver));
+            }
+            // Eye socket: a darker ring of skin and a raised rim around the eye.
+            float eyeD = new Vector2(X - _eyeU, (v - _eyeV) * _flankH).Length() / MathF.Max(_eyeR, 0.004f);
+            if (eyeD < 1.8f)
+            {
+                float ring = Smooth(1.0f, 1.15f, eyeD) * Smooth(1.75f, 1.3f, eyeD);
+                c = c.Darkened(ring * 0.25f);
+                bump += ring * 0.5f;
+            }
+            // Nostrils: two small pits between the eye and the snout.
+            foreach (var (nu, nv) in new[] { (_eyeU * 0.55f, _eyeV + 0.03f), (_eyeU * 0.68f, _eyeV + 0.035f) })
+            {
+                float nd = new Vector2(X - nu, (v - nv) * _flankH).Length();
+                float pit = Smooth(0.0045f, 0.002f, nd);
+                c = c.Darkened(pit * 0.6f);
+                bump -= pit * 0.7f;
+            }
+            // Mouth: the gape runs back from the tip of the snout, with paler lips along it.
+            if (u < _mouth + 0.01f)
+            {
+                float k = Math.Clamp(u / MathF.Max(_mouth, 0.01f), 0f, 1f);
+                float mouthV = _ventralMouth ? 0.18f + 0.02f * k : 0.47f - 0.07f * k;
+                float md = MathF.Abs(v - mouthV) * _flankH;
+                float fade = Smooth(_mouth + 0.01f, _mouth - 0.005f, u);
+                float gape = Smooth(0.004f, 0.0015f, md) * fade;
+                float lips = Smooth(0.011f, 0.005f, md) * (1f - gape) * fade;
+                c = c.Lightened(lips * 0.18f).Darkened(gape * 0.7f);
+                bump += lips * 0.6f - gape * 1.0f;
             }
 
             // --- scales ---

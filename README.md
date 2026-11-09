@@ -12,6 +12,8 @@
 
 **Modele ryb:** każdy gatunek ma własną budowę (`src/Fishing/FishBody.cs`): wysokość i szerokość ciała, garb, płaski brzuch, długość pyska, szeroka lub płaska głowa, trzon ogonowy, kształt ogona (od zaokrąglonego po głęboko wcięty i rekinowy u jesiotrów), rodzaj płetwy grzbietowej (miękka, kolczasta, żagiel lipienia, długa karpia, ciągła węgorza, kolce ciernika), płetwa tłuszczowa, wąsy i oko dopasowane do głowy.
 
+**Ryby z bliska:** ryba na haku, w dłoni i w atlasie ma skórę 4096×2048 z mapą wypukłości łusek, płetwy malowane promień po promieniu (przezroczysta błona, postrzępiona krawędź, wzory gatunku: czarna plama okonia, cętki szczupaka, białe krawędzie płetw pstrąga, żagiel lipienia), szparę pyska z wargami, nozdrza, wypukłą pokrywę skrzelową, oczodół i oko z kolorową tęczówką pod błyszczącą rogówką. Całe ciało z płetwami wygina się jedną falą podczas pływania (shadery `fish_body`/`fish_fin`).
+
 **Tekstury QHD:** tekstury świata mają 1024 px na 2 m i filtrowanie anizotropowe; malują się wielowątkowo i są zapisywane w pamięci podręcznej (`user://texcache`). Okno startuje zmaksymalizowane, a świat renderuje się w natywnej rozdzielczości.
 
 **Minimalistyczny interfejs:** podczas zwykłego rozglądania na ekranie jest tylko mała kropka celownika. Stan wędki i cienki pasek napięcia pojawiają się w trakcie łowienia, sakiewka i siatka na chwilę po zmianie, a sprzęt na chwilę po przełączeniu. Tab pokazuje wszystko naraz, H sterowanie.

@@ -19,7 +19,7 @@ Pure logic in src/Core (injected IRng); data as .tres resources; saves via Syste
 - No GPUParticles: rain is a MultiMesh + shaders/rain.gdshader (GPU particles with motion vectors crashed Godot 4.3 when two viewports drew them).
 - Rod: src/Core/Physics/RodBendModel drives RodRig.SetJointAngles (RodData.Action).
 - Quality presets in src/Graphics/GraphicsQuality (pause menu button): High (default) = SSAO + volumetric fog + TAA; SSIL, SSR, MSAA and 4 shadow splits only on Ultra; SDFGI off.
-- Fish models: src/Fishing/FishBody (per-species build table) + FishModel (lofted, cached per species at unit length, scaled). Screenshot mode 21 = side views of 20 species per page (arg = page). Light skins are pre-painted in parallel when a lake is stocked.
+- Fish models: src/Fishing/FishBody (per-species build table, iris colours, mouth size) + FishModel (lofted with a rounded nose cap, cached per species at unit length, scaled). Close-up (detailed) fish use shaders/fish_body + fish_fin (one swimming wave from fish_bend.gdshaderinc, instance uniforms wiggle_amount/swim_phase), painted fins (Graphics/FinPainter: rays, membrane, markings), iris discs (EyePainter) under a cornea; head details (mouth, nostrils, gill cover, eye socket) are painted into FishSkin. Screenshot mode 22 = studio close-up (arg = species index, also writes *_head.png). Screenshot mode 21 = side views of 20 species per page (arg = page). Light skins are pre-painted in parallel when a lake is stocked.
 
 ## Game rules worth knowing
 - Day 06-18 lasts 40 real minutes, night 20 (src/Core/DayClock); WorldState.TimeScale is the stool speed-up.

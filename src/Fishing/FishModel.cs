@@ -59,9 +59,11 @@ public partial class FishModel : Node3D
     /// <summary>The lofted shape of a species at unit length, shared by every fish of that species.</summary>
     private sealed class Shape
     {
-        public ArrayMesh Body = null!, Fins = null!, Tail = null!;
+        public ArrayMesh Body = null!, Tail = null!;
+        public readonly Dictionary<Graphics.FinKind, ArrayMesh> FinMeshes = new();
         public ArrayMesh? Barbels;
         public SphereMesh EyeMesh = null!, PupilMesh = null!;
+        public ArrayMesh IrisDisc = null!;
         public float TailZ;
         public Vector3 EyePos;
         public float EyeRadius, EyeHeadHeight, MaxHeight, MaxWidth;
@@ -74,6 +76,9 @@ public partial class FishModel : Node3D
         private readonly FishBody _b;
         private readonly float _k;           // scales the envelopes to the species' body depth
         private readonly float _eh, _ew;
+
+        /// <summary>Where the body rings start: blunt heads begin with a wider ring that the nose cap rounds off.</summary>
+        public float NoseStart => 0.03f * (1f - 0.75f * MathF.Min(_b.Snout, 1.2f) / 1.2f) + 0.004f;
 
         public Profile(FishBody b, float depth)
         {
@@ -139,10 +144,27 @@ public partial class FishModel : Node3D
         float nb = 2f + 4f * b.BellyFlat;                 // flatter belly = squarer lower half of the cross-section
         var st = new SurfaceTool();
         st.Begin(Mesh.PrimitiveType.Triangles);
-        for (int i = 0; i <= rings; i++)
+        // The nose: a few rings of a smooth dome in front of the first body ring (no point, no knob).
+        int capRings = detailed ? 8 : 3;
+        float t0 = prof.NoseStart;
+        float noseTop = prof.Top(t0), noseBottom = prof.Bottom(t0), noseHalf = prof.HalfWidth(t0);
+        float noseLen = 0.6f * MathF.Max(MathF.Max(noseTop, noseBottom), noseHalf);
+        int totalRings = capRings + rings;
+        (float Top, float Bottom, float Half, float Z, float U) Ring(int i)
         {
-            float t = 0.5f - 0.5f * MathF.Cos(MathF.PI * i / rings);
-            float top = prof.Top(t), bottom = prof.Bottom(t), half = prof.HalfWidth(t);
+            if (i < capRings)
+            {
+                float phi = MathF.PI * 0.5f * i / capRings;                   // 0 at the very tip
+                float k = MathF.Sin(phi);
+                return (noseTop * k, noseBottom * k, noseHalf * k, Z(t0) + noseLen * MathF.Cos(phi), t0 * k * k);
+            }
+            float tt = 0.5f - 0.5f * MathF.Cos(MathF.PI * (i - capRings) / rings);
+            float t = t0 + (1f - t0) * tt;
+            return (prof.Top(t), prof.Bottom(t), prof.HalfWidth(t), Z(t), t);
+        }
+        for (int i = 0; i <= totalRings; i++)
+        {
+            var (top, bottom, half, zr, t) = Ring(i);
             shape.MaxHeight = MathF.Max(shape.MaxHeight, top + bottom);
             shape.MaxWidth = MathF.Max(shape.MaxWidth, 2f * half);
             for (int j = 0; j < segs; j++)
@@ -153,9 +175,10 @@ public partial class FishModel : Node3D
                 float x = half * MathF.Sign(c) * MathF.Pow(MathF.Abs(c), 2f / n);
                 float y = (s >= 0f ? top : bottom) * MathF.Sign(s) * MathF.Pow(MathF.Abs(s), 2f / n);
                 st.SetUV(new Vector2(t, 1f - (s * 0.5f + 0.5f)));   // U nose->tail, V back->belly (both flanks share it)
-                st.AddVertex(new Vector3(x, y, Z(t)));
+                st.AddVertex(new Vector3(x, y, zr));
             }
         }
+        rings = totalRings;
         for (int i = 0; i < rings; i++)
             for (int j = 0; j < segs; j++)
             {
@@ -173,6 +196,7 @@ public partial class FishModel : Node3D
             st.AddIndex(rings * segs + (j + 1) % segs);
         }
         st.GenerateNormals();
+        st.GenerateTangents();          // the skin's normal map needs them
         shape.Body = st.Commit();
 
         // Fin vertex colours: a darker base fading to a lighter, translucent edge (tinted by the material's fin colour).
@@ -182,16 +206,48 @@ public partial class FishModel : Node3D
         float depth = shape.MaxHeight;
         int steps = detailed ? 14 : 5;
 
-        // --- fins (vertex colour = gradient from base to tip; the material tints them with the species' fin colour) ---
-        var fst = new SurfaceTool();
-        fst.Begin(Mesh.PrimitiveType.Triangles);
-        void Strip(Func<float, Vector3> baseAt, Func<float, Vector3> tipAt, int n)
+        // --- fins: per kind (each gets its own painted texture on close-up fish), with UVs U along the base and V from
+        // the base (0) to the edge (1); split into rows so they bend smoothly with the swimming wave ---
+        var finTools = new Dictionary<Graphics.FinKind, SurfaceTool>();
+        SurfaceTool FinSt(Graphics.FinKind kind)
+        {
+            var key = detailed ? kind : Graphics.FinKind.Dorsal;      // light fish: all fins in one mesh
+            if (!finTools.TryGetValue(key, out var tool))
+            {
+                tool = new SurfaceTool();
+                tool.Begin(Mesh.PrimitiveType.Triangles);
+                finTools[key] = tool;
+            }
+            return tool;
+        }
+        int rows = detailed ? 4 : 1;
+        void Vtx(SurfaceTool tool, Vector3 p, float u, float v)
+        {
+            tool.SetUV(new Vector2(u, v));
+            tool.SetColor(white.Lerp(tipC, v));
+            tool.AddVertex(p);
+        }
+        void Sheet(SurfaceTool tool, Func<float, Vector3> baseAt, Func<float, Vector3> tipAt, int n)
         {
             for (int k = 0; k < n; k++)
-            {
-                float a0 = (float)k / n, a1 = (float)(k + 1) / n;
-                Quad(fst, baseAt(a0), baseAt(a1), tipAt(a1), tipAt(a0), white, white, tipC, tipC);
-            }
+                for (int r = 0; r < rows; r++)
+                {
+                    float a0 = (float)k / n, a1 = (float)(k + 1) / n, v0 = (float)r / rows, v1 = (float)(r + 1) / rows;
+                    Vector3 P(float a, float v) => baseAt(a).Lerp(tipAt(a), v);
+                    Vtx(tool, P(a0, v0), a0, v0); Vtx(tool, P(a1, v0), a1, v0); Vtx(tool, P(a1, v1), a1, v1);
+                    Vtx(tool, P(a0, v0), a0, v0); Vtx(tool, P(a1, v1), a1, v1); Vtx(tool, P(a0, v1), a0, v1);
+                }
+        }
+        void Fan(SurfaceTool tool, Vector3 root, Func<float, Vector3> edgeAt, int n)
+        {
+            for (int k = 0; k < n; k++)
+                for (int r = 0; r < rows; r++)
+                {
+                    float a0 = (float)k / n, a1 = (float)(k + 1) / n, v0 = (float)r / rows, v1 = (float)(r + 1) / rows;
+                    Vector3 P(float a, float v) => root.Lerp(edgeAt(a), v);
+                    Vtx(tool, P(a0, v0), a0, v0); Vtx(tool, P(a1, v1), a1, v1); Vtx(tool, P(a1, v0), a1, v0);
+                    Vtx(tool, P(a0, v0), a0, v0); Vtx(tool, P(a0, v1), a0, v1); Vtx(tool, P(a1, v1), a1, v1);
+                }
         }
         float dAt = b.DorsalAt >= 0f ? b.DorsalAt : Math.Clamp(sp.DorsalPos, 0.25f, 0.8f);
         float d0 = Math.Clamp(dAt - b.DorsalLength / 2f, 0.12f, 0.95f), d1 = Math.Clamp(dAt + b.DorsalLength / 2f, 0.15f, 0.99f);
@@ -199,7 +255,7 @@ public partial class FishModel : Node3D
         Func<float, float> dorsalShape = b.Dorsal switch
         {
             DorsalKind.Spiny => a => a < 0.5f
-                ? (0.7f + 0.3f * MathF.Abs(MathF.Sin(a * MathF.PI * 9f))) * MathF.Sin(MathF.PI * MathF.Pow(a / 0.5f, 0.7f))
+                ? (0.75f + 0.25f * MathF.Abs(MathF.Sin(a * MathF.PI * 9f))) * MathF.Sin(MathF.PI * MathF.Pow(a / 0.5f, 0.7f))
                 : 0.8f * MathF.Sin(MathF.PI * MathF.Pow((a - 0.5f) / 0.5f, 0.6f)) + 0.12f,
             DorsalKind.Sail => a => MathF.Pow(MathF.Max(MathF.Sin(MathF.PI * MathF.Pow(a, 0.5f)), 0f), 0.45f),
             DorsalKind.Long => a => a < 0.15f ? 0.4f + 0.6f * a / 0.15f : 1f - 0.6f * (a - 0.15f) / 0.85f,
@@ -207,28 +263,37 @@ public partial class FishModel : Node3D
             DorsalKind.Continuous => a => 0.85f * MathF.Sin(MathF.PI * 0.5f * MathF.Min(a * 5f, 1f)),
             _ => a => MathF.Sin(MathF.PI * MathF.Pow(a, 0.6f)),
         };
+        var dorsalKind = b.Dorsal switch
+        {
+            DorsalKind.Spiny => Graphics.FinKind.SpinyDorsal,
+            DorsalKind.Sail => Graphics.FinKind.Sail,
+            DorsalKind.Continuous => Graphics.FinKind.Continuous,
+            DorsalKind.Spines => Graphics.FinKind.SpinyDorsal,
+            _ => Graphics.FinKind.Dorsal,
+        };
         if (b.Dorsal == DorsalKind.Spines)
         {
             // Stickleback: free spines on the back, each with a little membrane.
             int count = b.DorsalLength > 0.5f ? 9 : 3;
+            var tool = FinSt(dorsalKind);
             for (int k = 0; k < count; k++)
             {
                 float t = Mathf.Lerp(d0, d1, count == 1 ? 0.5f : (float)k / (count - 1));
                 var root = TopAt(t);
                 float h = dh * (count == 3 && k == 2 ? 0.5f : 1f);
-                Tri(fst, root, root + new Vector3(0, 0, -0.02f), root + new Vector3(0, h, -0.01f), white, white, white);
+                Vtx(tool, root, 0.02f, 0f); Vtx(tool, root + new Vector3(0, 0, -0.02f), 0.06f, 0f); Vtx(tool, root + new Vector3(0, h, -0.01f), 0.04f, 1f);
             }
         }
         else
         {
             float dEnd = b.Dorsal == DorsalKind.Continuous ? 0.995f : d1;
-            Strip(a => TopAt(Mathf.Lerp(d0, dEnd, a)),
+            Sheet(FinSt(dorsalKind), a => TopAt(Mathf.Lerp(d0, dEnd, a)),
                 a => TopAt(Mathf.Lerp(d0, dEnd, a)) + new Vector3(0f, dh * dorsalShape(a), -0.25f * dh * dorsalShape(a)),
                 b.Dorsal is DorsalKind.Spiny or DorsalKind.Continuous ? steps * 2 : steps);
         }
         if (b.Adipose)
         {
-            Strip(a => TopAt(Mathf.Lerp(0.84f, 0.9f, a)),
+            Sheet(FinSt(Graphics.FinKind.Adipose), a => TopAt(Mathf.Lerp(0.84f, 0.9f, a)),
                 a => TopAt(Mathf.Lerp(0.84f, 0.9f, a)) + new Vector3(0f, 0.12f * depth * MathF.Sin(MathF.PI * MathF.Pow(a, 0.7f)), -0.02f * a),
                 steps / 2 + 2);
         }
@@ -236,39 +301,43 @@ public partial class FishModel : Node3D
         float an0 = Math.Clamp(b.AnalAt - b.AnalLength / 2f, 0.4f, 0.95f);
         float an1 = b.Dorsal == DorsalKind.Continuous ? 0.995f : Math.Clamp(b.AnalAt + b.AnalLength / 2f, 0.45f, 0.98f);
         float ah = 0.24f * depth * (b.Dorsal == DorsalKind.Continuous ? 1.2f : 1f);
-        Strip(a => BottomAt(Mathf.Lerp(an0, an1, a)),
+        Sheet(FinSt(b.Dorsal == DorsalKind.Continuous ? Graphics.FinKind.Continuous : Graphics.FinKind.Anal),
+            a => BottomAt(Mathf.Lerp(an0, an1, a)),
             a => BottomAt(Mathf.Lerp(an0, an1, a)) + new Vector3(0f, -ah * MathF.Sin(MathF.PI * MathF.Pow(a, 0.55f)), -0.2f * ah * a),
             b.AnalLength > 0.2f ? steps * 2 : steps);
         // Paired fins: pelvics under the belly, pectorals behind the gill cover (huge fans on sculpins).
+        int fanSteps = detailed ? 10 : 3;
         foreach (float sx in new[] { -1f, 1f })
         {
             float tp = 0.46f;
             var pb = new Vector3(sx * prof.HalfWidth(tp) * 0.45f, -prof.Bottom(tp) * 0.9f, Z(tp));
             float ps = 0.2f * depth;
-            Tri(fst, pb, pb + new Vector3(0, 0, -0.06f), pb + new Vector3(sx * ps * 0.5f, -ps, -0.07f), white, white, tipC);
-            Tri(fst, pb, pb + new Vector3(sx * ps * 0.5f, -ps, -0.07f), pb + new Vector3(sx * ps * 0.2f, -ps * 0.7f, 0.0f), white, tipC, tipC);
+            Fan(FinSt(Graphics.FinKind.Pelvic), pb,
+                a => pb + new Vector3(sx * ps * (0.25f + 0.3f * a), -ps * (0.75f + 0.25f * MathF.Sin(MathF.PI * a)), -0.02f - 0.06f * a),
+                fanSteps);
 
             float tq = Math.Clamp(b.EyeAt + 0.13f, 0.15f, 0.35f);
             float qs = 0.22f * depth * b.PectoralSize;
             var qb = new Vector3(sx * prof.HalfWidth(tq) * 0.85f, -prof.Bottom(tq) * 0.35f, Z(tq));
-            for (int k = 0; k < 4; k++)
-            {
-                float a0 = k / 4f, a1 = (k + 1) / 4f;
-                Vector3 Edge(float a) => qb + new Vector3(sx * qs * (0.5f + 0.4f * a), -qs * (0.6f - 0.5f * a), -qs * (0.5f + 0.9f * MathF.Sin(MathF.PI * a * 0.9f)));
-                Tri(fst, qb, Edge(a0), Edge(a1), white, tipC, tipC);
-            }
+            Fan(FinSt(Graphics.FinKind.Pectoral), qb,
+                a => qb + new Vector3(sx * qs * (0.5f + 0.4f * a), -qs * (0.6f - 0.5f * a), -qs * (0.5f + 0.9f * MathF.Sin(MathF.PI * a * 0.9f))),
+                fanSteps);
         }
-        fst.GenerateNormals();
-        shape.Fins = fst.Commit();
+        foreach (var (kind, tool) in finTools)
+        {
+            tool.GenerateNormals();
+            shape.FinMeshes[kind] = tool.Commit();
+        }
 
-        // --- tail fin (on its own pivot so it can beat) ---
+        // --- tail fin: light fish beat it on a pivot; close-up fish bend it with the body (absolute z) ---
         var tst = new SurfaceTool();
         tst.Begin(Mesh.PrimitiveType.Triangles);
         float tailLen = 1f - BodyFraction;
         float tailH = b.TailSize * MathF.Min(depth, 0.3f);
         float ped = prof.Top(1f);
-        int tSteps = detailed ? 20 : 8;
-        Vector3 TailRoot(float a) => new(0f, Mathf.Lerp(ped, -prof.Bottom(1f), a) * 0.95f, 0.004f);
+        float zBase = detailed ? Z(1f) : 0f;
+        int tSteps = detailed ? 24 : 8;
+        Vector3 TailRoot(float a) => new(0f, Mathf.Lerp(ped, -prof.Bottom(1f), a) * 0.95f, zBase + 0.004f);
         Vector3 TailEdge(float a)
         {
             float fork = b.TailFork;
@@ -281,13 +350,9 @@ public partial class FishModel : Node3D
                 len *= up;
                 y *= Mathf.Lerp(1f, 0.75f, (up - 1f) / MathF.Max(b.TailUpper - 1f, 0.01f));
             }
-            return new Vector3(0f, y, -len);
+            return new Vector3(0f, y, zBase - len);
         }
-        for (int k = 0; k < tSteps; k++)
-        {
-            float a0 = (float)k / tSteps, a1 = (float)(k + 1) / tSteps;
-            Quad(tst, TailRoot(a0), TailRoot(a1), TailEdge(a1), TailEdge(a0), white, white, tipC, tipC);
-        }
+        Sheet(tst, TailRoot, TailEdge, tSteps);
         tst.GenerateNormals();
         shape.Tail = tst.Commit();
 
@@ -303,7 +368,17 @@ public partial class FishModel : Node3D
                     var root = new Vector3(sx * prof.HalfWidth(t) * (0.5f + 0.25f * pair), -prof.Bottom(t) * (0.3f + 0.25f * pair), Z(t));
                     float len = b.BarbelLength * (pair == 0 ? 1f : 0.55f);
                     var dir = new Vector3(sx * (0.35f + 0.2f * pair), -0.7f, 0.25f - 0.35f * pair).Normalized();
-                    Thread(bst, root, root + dir * len + new Vector3(0, -len * 0.25f, 0), 0.0035f, detailed ? 6 : 3);
+                    // A fleshy barbel: thin, drooping and curling back along its length.
+                    var p0 = root;
+                    int segsB = detailed ? 4 : 1;
+                    for (int k = 0; k < segsB; k++)
+                    {
+                        float f0 = (float)k / segsB, f1 = (float)(k + 1) / segsB;
+                        var bend = new Vector3(0f, -0.35f * f1 * f1, -0.45f * f1 * f1) * len;
+                        var p1 = root + dir * len * f1 + bend;
+                        Thread(bst, p0, p1, 0.0022f * (1f - 0.7f * f0), detailed ? 6 : 3, 1f - 0.7f * f1 / MathF.Max(1f - 0.7f * f0, 0.01f));
+                        p0 = p1;
+                    }
                 }
             bst.GenerateNormals();
             shape.Barbels = bst.Commit();
@@ -316,6 +391,8 @@ public partial class FishModel : Node3D
         r = MathF.Min(r, 0.3f * (headTop + headBottom));
         r = MathF.Min(r, 0.6f * prof.HalfWidth(te));
         float ey = b.EyeHigh >= 0f ? headTop * Math.Clamp(b.EyeHigh, 0f, 0.85f) : -headBottom * Math.Clamp(-b.EyeHigh, 0f, 0.6f);
+        // Keep the whole eye on the side of the head, so it never pokes over the crown (or shows through a narrow head).
+        ey = Math.Clamp(ey, -(headBottom - 1.15f * r), headTop - 1.15f * r);
         float rel = ey >= 0f ? ey / MathF.Max(headTop, 1e-4f) : -ey / MathF.Max(headBottom, 1e-4f);
         float ex = prof.HalfWidth(te) * MathF.Sqrt(MathF.Max(1f - rel * rel, 0.05f)) * 0.96f;
         shape.EyePos = new Vector3(ex, ey, Z(te));
@@ -323,6 +400,32 @@ public partial class FishModel : Node3D
         int eyeSeg = detailed ? 20 : 8;
         shape.EyeMesh = new SphereMesh { Radius = r, Height = r * 2f, RadialSegments = eyeSeg, Rings = eyeSeg / 2 };
         shape.PupilMesh = new SphereMesh { Radius = r * 0.55f, Height = r * 1.1f, RadialSegments = eyeSeg, Rings = eyeSeg / 2 };
+        // The iris disc (right eye; the left one is mirrored): it faces outwards and slightly up, set a touch into
+        // the head, with the texture's +U pointing to the snout so the pupil's notch faces forwards.
+        // Surface normal at the eye from the slope of the head: the head widens towards the tail, so it faces forwards a bit.
+        float dW = (prof.HalfWidth(te + 0.01f) - prof.HalfWidth(te - 0.01f)) / (0.02f * bodyLen);
+        float dH = ((ey >= 0f ? prof.Top(te + 0.01f) - prof.Top(te - 0.01f) : prof.Bottom(te - 0.01f) - prof.Bottom(te + 0.01f)) / (0.02f * bodyLen));
+        var normal = new Vector3(1f, 0.5f * rel * MathF.Sign(ey), dW * 0.9f + MathF.Abs(rel) * dH * 0.2f).Normalized();
+        var right = new Vector3(0f, 0f, 1f);
+        right = (right - normal * right.Dot(normal)).Normalized();
+        var upAxis = normal.Cross(right);
+        var dst = new SurfaceTool();
+        dst.Begin(Mesh.PrimitiveType.Triangles);
+        int discSeg = 40;
+        var centre = normal * r * 0.2f;
+        for (int k = 0; k < discSeg; k++)
+        {
+            float a0 = Mathf.Tau * k / discSeg, a1 = Mathf.Tau * (k + 1) / discSeg;
+            foreach (var (ang, isCentre) in new[] { (0f, true), (a0, false), (a1, false) })
+            {
+                var uv = isCentre ? new Vector2(0.5f, 0.5f) : new Vector2(0.5f + 0.5f * MathF.Cos(ang), 0.5f - 0.5f * MathF.Sin(ang));
+                var pos = isCentre ? centre + normal * r * 0.05f : centre + (right * MathF.Cos(ang) + upAxis * MathF.Sin(ang)) * r * 0.95f;
+                dst.SetUV(uv);
+                dst.SetNormal(normal);
+                dst.AddVertex(pos);
+            }
+        }
+        shape.IrisDisc = dst.Commit();
         shape.EyeHeadHeight = headTop + headBottom;
         return shape;
     }
@@ -352,6 +455,21 @@ public partial class FishModel : Node3D
         MaxWidth = shape.MaxWidth * Length;
 
         var style = Graphics.FishSkin.StyleOf(sp);
+        var fin = Graphics.FishSkin.Vivid(sp.FinColor, 1.4f);
+        if (_detailed)
+            BuildDetailed(sp, shape, unit, style, fin);
+        else
+            BuildLight(sp, shape, unit, style, fin);
+        if (shape.Barbels != null)
+        {
+            var barbel = new StandardMaterial3D { AlbedoColor = Graphics.FishSkin.Vivid(sp.BellyColor).Lerp(fin, 0.4f).Darkened(0.2f), Roughness = 0.45f };
+            unit.AddChild(new MeshInstance3D { Mesh = shape.Barbels, MaterialOverride = barbel });
+        }
+    }
+
+    /// <summary>Fish swimming in the lake: standard materials, all fins in one mesh, the tail on a beating pivot.</summary>
+    private void BuildLight(FishSpecies sp, Shape shape, Node3D unit, Graphics.SkinStyle style, Color fin)
+    {
         _bodyMaterial = new StandardMaterial3D
         {
             AlbedoTexture = Graphics.FishSkin.For(sp),
@@ -361,19 +479,9 @@ public partial class FishModel : Node3D
             Roughness = 0.34f,
             Metallic = 0.1f + 0.35f * style.Silver,
             MetallicSpecular = 0.6f,
-            ClearcoatEnabled = _detailed,
-            Clearcoat = 0.55f,
-            ClearcoatRoughness = 0.18f,
             CullMode = BaseMaterial3D.CullModeEnum.Disabled,
         };
         unit.AddChild(new MeshInstance3D { Mesh = shape.Body, MaterialOverride = _bodyMaterial });
-        if (_detailed)
-        {
-            Graphics.FishSkin.Prewarm(sp);
-            TryUpgradeSkin();
-        }
-
-        var fin = Graphics.FishSkin.Vivid(sp.FinColor, 1.4f);
         var finMaterial = new StandardMaterial3D
         {
             VertexColorUseAsAlbedo = true,
@@ -383,33 +491,102 @@ public partial class FishModel : Node3D
             Transparency = BaseMaterial3D.TransparencyEnum.AlphaDepthPrePass,
             CullMode = BaseMaterial3D.CullModeEnum.Disabled,
         };
-        unit.AddChild(new MeshInstance3D { Mesh = shape.Fins, MaterialOverride = finMaterial });
+        foreach (var mesh in shape.FinMeshes.Values)
+            unit.AddChild(new MeshInstance3D { Mesh = mesh, MaterialOverride = finMaterial });
         _tail = new Node3D { Position = new Vector3(0f, 0f, shape.TailZ) };
         unit.AddChild(_tail);
         _tail.AddChild(new MeshInstance3D { Mesh = shape.Tail, MaterialOverride = finMaterial });
-        if (shape.Barbels != null)
-        {
-            var barbel = new StandardMaterial3D { AlbedoColor = Graphics.FishSkin.Vivid(sp.BellyColor).Lerp(fin, 0.4f).Darkened(0.2f), Roughness = 0.5f };
-            unit.AddChild(new MeshInstance3D { Mesh = shape.Barbels, MaterialOverride = barbel });
-        }
 
         // Eyes: golden iris and a black pupil, flattened so they sit in the head instead of bulging out of it.
-        var irisMaterial = IrisMaterial;
-        var pupilMaterial = PupilMaterial;
         float r = shape.EyeRadius;
-        var eyeMesh = shape.EyeMesh;
-        var pupilMesh = shape.PupilMesh;
         foreach (float sx in new[] { -1f, 1f })
         {
             var p = shape.EyePos with { X = shape.EyePos.X * sx };
-            unit.AddChild(new MeshInstance3D { Mesh = eyeMesh, MaterialOverride = irisMaterial, Position = p, Scale = new Vector3(0.45f, 1f, 1f) });
+            unit.AddChild(new MeshInstance3D { Mesh = shape.EyeMesh, MaterialOverride = IrisMaterial, Position = p, Scale = new Vector3(0.45f, 1f, 1f) });
             unit.AddChild(new MeshInstance3D
             {
-                Mesh = pupilMesh, MaterialOverride = pupilMaterial,
+                Mesh = shape.PupilMesh, MaterialOverride = PupilMaterial,
                 Position = p + new Vector3(sx * r * 0.32f, 0f, r * 0.05f), Scale = new Vector3(0.45f, 1f, 1f),
             });
         }
     }
+
+    private static Shader? _bodyShader, _finShader;
+    private ShaderMaterial? _bodyShaderMaterial;
+    private readonly List<GeometryInstance3D> _swimmers = new();
+    private float _sentWiggle = -1f;
+
+    /// <summary>
+    /// Close-up fish: the body and every fin bend with one swimming wave (shaders/fish_body, fish_fin), each fin wears
+    /// its painted texture (rays, translucent membrane, markings), and the eyes are an iris disc under a glossy cornea.
+    /// </summary>
+    private void BuildDetailed(FishSpecies sp, Shape shape, Node3D unit, Graphics.SkinStyle style, Color fin)
+    {
+        _bodyShader ??= GD.Load<Shader>("res://shaders/fish_body.gdshader");
+        _finShader ??= GD.Load<Shader>("res://shaders/fish_fin.gdshader");
+        _bodyShaderMaterial = new ShaderMaterial { Shader = _bodyShader };
+        _bodyShaderMaterial.SetShaderParameter("albedo_tex", Graphics.FishSkin.For(sp));
+        _bodyShaderMaterial.SetShaderParameter("metallic", 0.1f + 0.35f * style.Silver);
+        float phase = (float)(GD.Randf() * Mathf.Tau);
+        void Swimmer(GeometryInstance3D g)
+        {
+            g.SetInstanceShaderParameter("swim_phase", phase);
+            _swimmers.Add(g);
+        }
+        var body = new MeshInstance3D { Mesh = shape.Body, MaterialOverride = _bodyShaderMaterial };
+        unit.AddChild(body);
+        Swimmer(body);
+        Graphics.FishSkin.Prewarm(sp);
+        Graphics.FinPainter.Prewarm(sp);
+        TryUpgradeSkin();
+
+        foreach (var (kind, mesh) in shape.FinMeshes)
+        {
+            var m = new ShaderMaterial { Shader = _finShader };
+            m.SetShaderParameter("fin_tex", Graphics.FinPainter.For(sp, kind));
+            m.SetShaderParameter("flutter", kind is Graphics.FinKind.Pectoral or Graphics.FinKind.Pelvic ? 1f : 0f);
+            var mi = new MeshInstance3D { Mesh = mesh, MaterialOverride = m };
+            unit.AddChild(mi);
+            Swimmer(mi);
+        }
+        var tailMaterial = new ShaderMaterial { Shader = _finShader };
+        tailMaterial.SetShaderParameter("fin_tex", Graphics.FinPainter.For(sp, Graphics.FinKind.Caudal));
+        var tail = new MeshInstance3D { Mesh = shape.Tail, MaterialOverride = tailMaterial };
+        unit.AddChild(tail);
+        Swimmer(tail);
+
+        // Eyes: the painted iris on a disc set into the head, under a clear, glossy cornea.
+        var irisMaterial = new StandardMaterial3D
+        {
+            AlbedoTexture = Graphics.EyePainter.For(FishBody.IrisOf(sp)),
+            TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
+            Roughness = 0.35f,
+            Transparency = BaseMaterial3D.TransparencyEnum.AlphaScissor,
+            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+        };
+        foreach (float sx in new[] { -1f, 1f })
+        {
+            var p = shape.EyePos with { X = shape.EyePos.X * sx };
+            unit.AddChild(new MeshInstance3D { Mesh = shape.IrisDisc, MaterialOverride = irisMaterial, Position = p, Scale = new Vector3(sx, 1f, 1f) });
+            unit.AddChild(new MeshInstance3D
+            {
+                Mesh = shape.EyeMesh, MaterialOverride = CorneaMaterial,
+                Position = p + new Vector3(sx * shape.EyeRadius * 0.08f, 0f, 0f), Scale = new Vector3(0.5f, 1.04f, 1.04f),
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            });
+        }
+    }
+
+    private static readonly StandardMaterial3D CorneaMaterial = new()
+    {
+        AlbedoColor = new Color(0.9f, 0.95f, 1f, 0.08f),
+        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+        Roughness = 0.02f,
+        MetallicSpecular = 1f,
+        ClearcoatEnabled = true,
+        Clearcoat = 1f,
+        ClearcoatRoughness = 0.02f,
+    };
 
     private static readonly StandardMaterial3D IrisMaterial = new()
     {
@@ -435,7 +612,7 @@ public partial class FishModel : Node3D
     }
 
     /// <summary>A thin tapering tube (a barbel).</summary>
-    private static void Thread(SurfaceTool st, Vector3 from, Vector3 to, float radius, int sides)
+    private static void Thread(SurfaceTool st, Vector3 from, Vector3 to, float radius, int sides, float taper = 0.3f)
     {
         var axis = (to - from).Normalized();
         var side = axis.Cross(Vector3.Up).LengthSquared() > 1e-4f ? axis.Cross(Vector3.Up).Normalized() : Vector3.Right;
@@ -445,20 +622,27 @@ public partial class FishModel : Node3D
             float a0 = Mathf.Tau * k / sides, a1 = Mathf.Tau * (k + 1) / sides;
             var o0 = (side * MathF.Cos(a0) + up * MathF.Sin(a0)) * radius;
             var o1 = (side * MathF.Cos(a1) + up * MathF.Sin(a1)) * radius;
-            Quad(st, from + o0, from + o1, to + o1 * 0.3f, to + o0 * 0.3f, Colors.White, Colors.White, Colors.White, Colors.White);
+            Quad(st, from + o0, from + o1, to + o1 * taper, to + o0 * taper, Colors.White, Colors.White, Colors.White, Colors.White);
         }
     }
 
     /// <summary>Puts the detailed skin and its normal map on once they have been painted (in the background).</summary>
     private void TryUpgradeSkin()
     {
-        if (_skinUpgraded || _species == null || _bodyMaterial == null)
+        if (_skinUpgraded || _species == null || (_bodyMaterial == null && _bodyShaderMaterial == null))
             return;
         var skin = Graphics.FishSkin.TryDetailed(_species);
         if (skin is not { } pair)
             return;
         _skinUpgraded = true;
-        _bodyMaterial.AlbedoTexture = pair.Albedo;
+        if (_bodyShaderMaterial != null)
+        {
+            _bodyShaderMaterial.SetShaderParameter("albedo_tex", pair.Albedo);
+            _bodyShaderMaterial.SetShaderParameter("normal_tex", pair.Normal);
+            _bodyShaderMaterial.SetShaderParameter("use_normal", true);
+            return;
+        }
+        _bodyMaterial!.AlbedoTexture = pair.Albedo;
         _bodyMaterial.NormalEnabled = true;
         _bodyMaterial.NormalTexture = pair.Normal;
         _bodyMaterial.NormalScale = 0.8f;
@@ -511,6 +695,12 @@ public partial class FishModel : Node3D
             TryUpgradeSkin();
         if (_tail != null)
             _tail.Rotation = new Vector3(0f, MathF.Sin(_time * 9f) * 0.45f * Wiggle, 0f);
+        if (_swimmers.Count > 0 && MathF.Abs(Wiggle - _sentWiggle) > 0.01f)
+        {
+            _sentWiggle = Wiggle;
+            foreach (var g in _swimmers)
+                g.SetInstanceShaderParameter("wiggle_amount", Wiggle);
+        }
         Rotation = new Vector3(Rotation.X, Rotation.Y, MathF.Sin(_time * 4.5f) * 0.04f * Wiggle);
     }
 }

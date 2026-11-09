@@ -64,6 +64,29 @@ public sealed class GearSuite : ITestSuite
         t.Check(builds["Leszcz"].H > builds["Szczupak"].H * 1.8f && builds["Węgorz"].W > builds["Leszcz"].W * 2.5f
                 && builds["Karaś złocisty"].H > builds["Płoć"].H * 1.4f && builds["Sum"].W > builds["Karp"].W,
             $"bodies differ: a bream is deep and flat, a pike long, an eel round (H/L bream {builds["Leszcz"].H:0.00}, pike {builds["Szczupak"].H:0.00}; W/H eel {builds["Węgorz"].W:0.00}, bream {builds["Leszcz"].W:0.00})");
+        // Close-up detail: painted fins with rays and a translucent membrane, the iris, a swimming shader.
+        var perch = catalogue.First(sp => sp.SpeciesName == "Okoń");
+        var spiny = FishingSim.Graphics.FinPainter.Paint(perch, FishingSim.Graphics.FinKind.SpinyDorsal, 256, 128);
+        int clear = 0, translucent = 0, dark = 0;
+        for (int y = 0; y < 128; y += 2)
+            for (int x = 0; x < 256; x += 2)
+            {
+                var px = spiny.GetPixel(x, y);
+                if (px.A < 0.05f) clear++;
+                else if (px.A < 0.9f) translucent++;
+                if (px.A > 0.3f && px.R + px.G + px.B < 0.4f) dark++;
+            }
+        t.Check(clear > 100 && translucent > 1000 && dark > 50,
+            $"a perch's spiny dorsal has a ragged edge, a see-through membrane and its black spot ({clear} clear, {translucent} translucent, {dark} dark samples)");
+        var iris = FishingSim.Graphics.EyePainter.For(FishingSim.Fishing.FishBody.IrisOf(catalogue.First(sp => sp.SpeciesName == "Płoć"))).GetImage();
+        var pupil = iris.GetPixel(128, 128);
+        var irisRing = iris.GetPixel(128 + 85, 128);
+        t.Check(pupil.R < 0.05f && irisRing.R > irisRing.B * 2f, "a roach's eye: black pupil in a red iris");
+        var close = FishingSim.Fishing.FishModel.Create(perch, 0.5f, detailed: true);
+        int shaded = close.FindChildren("*", nameof(MeshInstance3D), true, false).OfType<MeshInstance3D>().Count(m => m.MaterialOverride is ShaderMaterial);
+        t.Check(shaded >= 6, $"a close-up perch swims with its body and {shaded - 1} fins bending together (shader materials)");
+        close.Free();
+
         var homeless = catalogue.Where(s => maps.All(m => m.AbundanceOf(s.SpeciesName) <= 0f)).Select(s => s.SpeciesName).ToList();
         t.Check(homeless.Count == 0, $"every species lives on at least one map {string.Join(", ", homeless)}");
         var picky = catalogue.Where(s => baits.All(b => s.AffinityFor(b) <= 0f)).Select(s => s.SpeciesName).ToList();

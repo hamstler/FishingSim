@@ -132,8 +132,8 @@ public sealed record FishBody
         ["Różanka"] = DeepCyprinid with { Width = 0.35f, Hump = 0.3f, Peduncle = 0.2f, TailFork = 0.6f, TailSize = 0.9f, AnalLength = 0.16f, Eye = 0.07f },
         ["Szczupak"] = new FishBody
         {
-            Width = 0.62f, PeakAt = 0.55f, Hump = 0f, Snout = 1f, FlatHead = 0.55f, Peduncle = 0.36f, TailFork = 0.45f, TailSize = 1f,
-            DorsalAt = 0.8f, DorsalLength = 0.12f, DorsalHeight = 0.3f, AnalAt = 0.81f, AnalLength = 0.1f, Eye = 0.03f, EyeAt = 0.16f, EyeHigh = 0.6f,
+            Width = 0.62f, PeakAt = 0.55f, Hump = 0f, Snout = 0.72f, FlatHead = 0.62f, Peduncle = 0.36f, TailFork = 0.45f, TailSize = 1f,
+            DorsalAt = 0.8f, DorsalLength = 0.12f, DorsalHeight = 0.3f, AnalAt = 0.81f, AnalLength = 0.1f, Eye = 0.03f, EyeAt = 0.16f, EyeHigh = 0.45f,
         },
         ["Okoń"] = Percid,
         ["Jazgarz"] = Percid with { Hump = 0.25f, Snout = 0.35f, Eye = 0.055f },
@@ -196,6 +196,36 @@ public sealed record FishBody
     };
 
     public static FishBody Of(FishSpecies sp) => Bodies.TryGetValue(sp.SpeciesName, out var b) ? b : Cyprinid;
+
+    /// <summary>Iris colours that anglers know a fish by (red-eyed roach and tench, golden perch, glassy zander).</summary>
+    private static readonly Dictionary<string, Godot.Color> Irises = new()
+    {
+        ["Płoć"] = new(0.86f, 0.16f, 0.1f), ["Wzdręga"] = new(0.95f, 0.45f, 0.12f), ["Lin"] = new(0.85f, 0.2f, 0.12f),
+        ["Jaź"] = new(0.92f, 0.8f, 0.35f), ["Orfa"] = new(0.95f, 0.75f, 0.3f), ["Kleń"] = new(0.8f, 0.6f, 0.3f),
+        ["Okoń"] = new(0.95f, 0.65f, 0.15f), ["Jazgarz"] = new(0.6f, 0.45f, 0.5f), ["Bass wielkogębowy"] = new(0.85f, 0.35f, 0.15f),
+        ["Sandacz"] = new(0.78f, 0.8f, 0.72f), ["Sandacz wołżański"] = new(0.78f, 0.8f, 0.72f),
+        ["Szczupak"] = new(0.92f, 0.82f, 0.3f), ["Karp"] = new(0.9f, 0.7f, 0.25f), ["Sazan"] = new(0.9f, 0.7f, 0.25f),
+        ["Karp lustrzeń"] = new(0.9f, 0.7f, 0.25f), ["Karaś złocisty"] = new(0.9f, 0.72f, 0.3f),
+        ["Leszcz"] = new(0.55f, 0.55f, 0.55f), ["Krąp"] = new(0.85f, 0.75f, 0.6f), ["Sum"] = new(0.4f, 0.38f, 0.32f),
+        ["Węgorz"] = new(0.75f, 0.72f, 0.6f), ["Miętus"] = new(0.6f, 0.55f, 0.4f),
+        ["Pstrąg potokowy"] = new(0.85f, 0.7f, 0.4f), ["Łosoś"] = new(0.8f, 0.8f, 0.78f), ["Lipień"] = new(0.85f, 0.75f, 0.55f),
+        ["Boleń"] = new(0.85f, 0.85f, 0.75f), ["Ukleja"] = new(0.88f, 0.88f, 0.85f), ["Sielawa"] = new(0.85f, 0.85f, 0.8f),
+    };
+
+    public static Godot.Color IrisOf(FishSpecies sp) => Irises.TryGetValue(sp.SpeciesName, out var c) ? c : new Godot.Color(0.82f, 0.72f, 0.42f);
+
+    /// <summary>Length of the mouth gape along the head (fraction of the body): big for predators, small for bream.</summary>
+    private static readonly Dictionary<string, float> Mouths = new()
+    {
+        ["Szczupak"] = 0.11f, ["Sum"] = 0.1f, ["Bass wielkogębowy"] = 0.1f, ["Sandacz"] = 0.085f, ["Sandacz wołżański"] = 0.07f,
+        ["Okoń"] = 0.07f, ["Boleń"] = 0.07f, ["Kleń"] = 0.06f, ["Głowacica"] = 0.09f, ["Łosoś"] = 0.08f, ["Troć jeziorowa"] = 0.08f,
+        ["Troć wędrowna"] = 0.08f, ["Pstrąg potokowy"] = 0.075f, ["Pstrąg tęczowy"] = 0.075f, ["Pstrąg źródlany"] = 0.075f,
+        ["Palia"] = 0.07f, ["Miętus"] = 0.08f, ["Węgorz"] = 0.05f, ["Sumik karłowaty"] = 0.08f, ["Sumik kanałowy"] = 0.08f,
+        ["Babka bycza"] = 0.07f, ["Głowacz białopłetwy"] = 0.08f, ["Głowacz pręgopłetwy"] = 0.08f, ["Tołpyga pstra"] = 0.08f,
+        ["Tołpyga biała"] = 0.07f, ["Leszcz"] = 0.03f, ["Krąp"] = 0.03f, ["Karp"] = 0.035f, ["Karaś złocisty"] = 0.03f,
+    };
+
+    public static float MouthOf(FishSpecies sp) => Mouths.TryGetValue(sp.SpeciesName, out var m) ? m : 0.045f;
 
     /// <summary>Species with a body shape of their own (for tests).</summary>
     public static bool HasOwnShape(FishSpecies sp) => Bodies.ContainsKey(sp.SpeciesName);
