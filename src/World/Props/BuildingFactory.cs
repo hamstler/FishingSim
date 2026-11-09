@@ -101,41 +101,52 @@ public static class BuildingFactory
     }
 
     // ------------------------------------------------------------------ materials
-    private static StandardMaterial3D Painted(Color color) => new()
+    /// <summary>Pixel-art look: nearest-filtered textures, banded (toon) light, no shiny highlights.</summary>
+    public static StandardMaterial3D Pixel(StandardMaterial3D m, bool shiny = false)
     {
-        AlbedoTexture = Textures.PlanksPainted(), AlbedoColor = color, Uv1Triplanar = true, Uv1Scale = Vector3.One * 0.9f, Roughness = 0.85f,
-    };
+        m.TextureFilter = BaseMaterial3D.TextureFilterEnum.NearestWithMipmaps;
+        m.DiffuseMode = BaseMaterial3D.DiffuseModeEnum.Toon;
+        m.SpecularMode = shiny ? BaseMaterial3D.SpecularModeEnum.Toon : BaseMaterial3D.SpecularModeEnum.Disabled;
+        return m;
+    }
 
-    private static StandardMaterial3D Wood(Color tint) => new()
+    private static StandardMaterial3D Textured(Texture2D tex, Color tint, float roughness = 0.9f) => Pixel(new StandardMaterial3D
     {
-        AlbedoTexture = Textures.Planks(), AlbedoColor = tint, Uv1Triplanar = true, Uv1Scale = Vector3.One, Roughness = 0.9f,
-    };
+        AlbedoTexture = tex, AlbedoColor = tint, Uv1Triplanar = true, Uv1Scale = Vector3.One * Textures.TriplanarScale, Roughness = roughness,
+    });
 
-    private static StandardMaterial3D Roof(Color color) => new()
-    {
-        AlbedoTexture = Textures.Shingles(), AlbedoColor = color, Uv1Triplanar = true, Uv1Scale = Vector3.One * 0.7f,
-        Roughness = 0.85f, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-    };
+    private static StandardMaterial3D Painted(Color color) => Textured(Textures.PlanksPainted(), color, 0.85f);
 
-    private static StandardMaterial3D Stone(Color tint) => new()
-    {
-        AlbedoTexture = Textures.Stone(), AlbedoColor = tint, Uv1Triplanar = true, Uv1Scale = Vector3.One * 0.6f, Roughness = 1f,
-    };
+    /// <summary>Lime plaster between the timbers; the house colour only tints it lightly.</summary>
+    private static StandardMaterial3D Plaster(Color tint) => Textured(Textures.Plaster(), new Color(0.95f, 0.92f, 0.85f).Lerp(tint, 0.3f));
 
-    private static StandardMaterial3D Flat(Color color, float roughness = 0.8f, float metallic = 0f) => new()
+    private static StandardMaterial3D Wood(Color tint) => Textured(Textures.Planks(), tint);
+
+    /// <summary>Dark oak beams of the timber frame.</summary>
+    private static StandardMaterial3D Timber() => Textured(Textures.Planks(), new Color(0.55f, 0.42f, 0.32f));
+
+    /// <summary>Thatch, straw-gold with a hint of the roof colour.</summary>
+    private static StandardMaterial3D Roof(Color color)
     {
-        AlbedoColor = color, Roughness = roughness, Metallic = metallic,
-    };
+        var m = Textured(Textures.Shingles(), new Color(0.86f, 0.74f, 0.5f).Lerp(color, 0.2f), 1f);
+        m.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+        return m;
+    }
+
+    private static StandardMaterial3D Stone(Color tint) => Textured(Textures.Stone(), tint, 1f);
+
+    private static StandardMaterial3D Flat(Color color, float roughness = 0.8f, float metallic = 0f) =>
+        Pixel(new StandardMaterial3D { AlbedoColor = color, Roughness = roughness, Metallic = metallic }, metallic > 0.3f);
 
     private static StandardMaterial3D Glass(Building b)
     {
-        var m = new StandardMaterial3D
+        var m = Pixel(new StandardMaterial3D
         {
-            AlbedoColor = new Color(0.55f, 0.72f, 0.82f),
-            Roughness = 0.2f,
+            AlbedoColor = new Color(0.16f, 0.14f, 0.12f),     // dark small panes by day, warm candle light at night
+            Roughness = 0.6f,
             EmissionEnabled = false,
-            Emission = new Color(1f, 0.78f, 0.4f),
-        };
+            Emission = new Color(1f, 0.72f, 0.35f),
+        });
         b.AddGlow(m);
         return m;
     }
@@ -191,8 +202,9 @@ public static class BuildingFactory
 
     private static void House(Building b, HouseStyle s)
     {
-        var wallMat = s.PaintedWall ? Painted(s.Wall) : Wood(s.Wall * 1.9f);
-        var trim = Flat(new Color(0.93f, 0.9f, 0.82f), 0.7f);
+        // Medieval timber-framed house: plaster panels between dark oak beams, thatched roof, stone plinth.
+        var wallMat = s.PaintedWall ? Plaster(s.Wall) : Wood(s.Wall * 1.9f);
+        var trim = Timber();
         var dark = Wood(new Color(0.55f, 0.42f, 0.3f));
         var glass = Glass(b);
 
@@ -200,10 +212,12 @@ public static class BuildingFactory
         Box(b, new Vector3(s.W + 0.3f, 0.5f, s.D + 0.3f), new Vector3(0, 0.25f, 0), Stone(new Color(0.8f, 0.78f, 0.74f)));
         Box(b, new Vector3(s.W, s.H, s.D), new Vector3(0, s.H / 2f + 0.15f, 0), wallMat);
         Collider(b, new Vector3(s.W + 0.3f, s.H + 0.4f, s.D + 0.3f), new Vector3(0, (s.H + 0.4f) / 2f, 0));
-        // corner trim
+        // corner posts
         foreach (float sx in new[] { -1f, 1f })
             foreach (float sz in new[] { -1f, 1f })
-                Box(b, new Vector3(0.22f, s.H, 0.22f), new Vector3(sx * s.W / 2f, s.H / 2f + 0.15f, sz * s.D / 2f), trim);
+                Box(b, new Vector3(0.26f, s.H, 0.26f), new Vector3(sx * s.W / 2f, s.H / 2f + 0.15f, sz * s.D / 2f), trim);
+        if (s.PaintedWall)
+            TimberFrame(b, s, trim);
 
         AddRoof(b, s.W, s.D, s.H + 0.15f, s.RoofH, 0.6f, Roof(s.RoofColor));
 
@@ -224,6 +238,10 @@ public static class BuildingFactory
             Window(b, glass, trim, new Vector3(s.W / 2f + 0.02f, wy, 0f), 90f);
             Window(b, glass, trim, new Vector3(-s.W / 2f - 0.02f, wy, 0f), -90f);
         }
+
+        if (s.Windows >= 1)
+            foreach (float x in frontX)
+                Shutters(b, dark, new Vector3(x, wy, s.D / 2f + 0.06f));
 
         if (s.Chimney)
         {
@@ -250,6 +268,43 @@ public static class BuildingFactory
         };
         b.AddChild(lamp);
         b.AddLight(lamp);
+    }
+
+    /// <summary>Sill, rail and plate beams on all four walls, posts beside the door, and diagonal braces on the sides.</summary>
+    private static void TimberFrame(Building b, HouseStyle s, StandardMaterial3D timber)
+    {
+        const float t = 0.2f;
+        float hw = s.W / 2f + 0.03f, hd = s.D / 2f + 0.03f;
+        foreach (float y in new[] { 0.6f, 2.8f, s.H + 0.05f })
+        {
+            if (y > s.H + 0.1f)
+                continue;
+            Box(b, new Vector3(s.W, t, t), new Vector3(0, y, hd), timber);
+            Box(b, new Vector3(s.W, t, t), new Vector3(0, y, -hd), timber);
+            Box(b, new Vector3(t, t, s.D), new Vector3(hw, y, 0), timber);
+            Box(b, new Vector3(t, t, s.D), new Vector3(-hw, y, 0), timber);
+        }
+        // Posts flanking the door and in the middle of the back wall.
+        foreach (float x in new[] { -(DoorWidth / 2f + 0.3f), DoorWidth / 2f + 0.3f })
+            Box(b, new Vector3(t, s.H, t), new Vector3(x, s.H / 2f + 0.15f, hd), timber);
+        Box(b, new Vector3(t, s.H, t), new Vector3(0, s.H / 2f + 0.15f, -hd), timber);
+        // Diagonal braces at the ends of the side walls (clear of the side window in the middle).
+        float run = Math.Min(1.5f, s.D / 2f - 0.9f);
+        float rise = 2.2f;
+        float len = MathF.Sqrt(run * run + rise * rise), ang = MathF.Atan2(run, rise);
+        foreach (float sx in new[] { -1f, 1f })
+            foreach (float sz in new[] { -1f, 1f })
+            {
+                var pos = new Vector3(sx * hw, 0.6f + rise / 2f, sz * (hd - run / 2f - 0.1f));
+                Box(b, new Vector3(t, len, t), pos, timber, new Vector3(-Mathf.RadToDeg(ang) * sz, 0, 0));
+            }
+    }
+
+    /// <summary>A pair of plank shutters, opened flat against the wall either side of a window.</summary>
+    private static void Shutters(Building b, StandardMaterial3D wood, Vector3 pos)
+    {
+        foreach (float sx in new[] { -1f, 1f })
+            Box(b, new Vector3(0.55f, 1.15f, 0.06f), pos + new Vector3(sx * 0.95f, 0f, 0f), wood);
     }
 
     private static void Window(Building b, StandardMaterial3D glass, StandardMaterial3D trim, Vector3 pos, float yawDeg)
@@ -449,13 +504,17 @@ public static class BuildingFactory
         b.AddChild(body);
     }
 
+    /// <summary>A wooden post with an iron arm and a hanging lantern (lit at night).</summary>
     private static void Lamp(Building b)
     {
-        var metal = Flat(new Color(0.15f, 0.16f, 0.18f), 0.45f, 0.7f);
-        Cyl(b, 0.06f, 0.1f, 3.6f, new Vector3(0, 1.8f, 0), metal, 8);
-        Box(b, new Vector3(0.5f, 0.1f, 0.5f), new Vector3(0, 3.65f, 0), metal);
-        Box(b, new Vector3(0.36f, 0.42f, 0.36f), new Vector3(0, 3.9f, 0), Glass(b));
-        Cyl(b, 0f, 0.36f, 0.25f, new Vector3(0, 4.22f, 0), metal, 4);
+        var wood = Timber();
+        var iron = Flat(new Color(0.12f, 0.11f, 0.1f), 0.6f, 0.5f);
+        Box(b, new Vector3(0.22f, 3.4f, 0.22f), new Vector3(0, 1.7f, 0), wood);
+        Box(b, new Vector3(0.9f, 0.1f, 0.1f), new Vector3(0.38f, 3.3f, 0), iron);
+        Box(b, new Vector3(0.05f, 0.25f, 0.05f), new Vector3(0.75f, 3.15f, 0), iron);
+        Box(b, new Vector3(0.34f, 0.42f, 0.34f), new Vector3(0.75f, 2.82f, 0), Glass(b));
+        Box(b, new Vector3(0.42f, 0.08f, 0.42f), new Vector3(0.75f, 3.06f, 0), iron);
+        Box(b, new Vector3(0.38f, 0.06f, 0.38f), new Vector3(0.75f, 2.58f, 0), iron);
     }
 
     private static void Bench(Building b)

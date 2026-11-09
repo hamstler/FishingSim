@@ -96,19 +96,20 @@ public static class ProceduralTextures
         string key = needles ? "needles" : "leaves";
         if (Cache.TryGetValue(key, out var t))
             return t;
-        const int size = 256;
+        // Small on purpose: read with nearest filtering, every leaf is a few chunky pixels.
+        const int size = 64;
         var img = Image.CreateEmpty(size, size, false, Image.Format.Rgba8);
         img.Fill(new Color(0.8f, 0.9f, 0.72f, 0f));
         var rng = new RandomNumberGenerator { Seed = needles ? 21UL : 12UL };
         var c = new Vector2(size / 2f, size / 2f);
         if (!needles)
         {
-            for (int i = 0; i < 95; i++)
+            for (int i = 0; i < 70; i++)
             {
-                float r = MathF.Sqrt(rng.Randf()) * size * 0.42f;
+                float r = MathF.Sqrt(rng.Randf()) * size * 0.44f;
                 float a = rng.Randf() * Mathf.Tau;
                 var p = c + new Vector2(MathF.Cos(a), MathF.Sin(a)) * r;
-                float len = rng.RandfRange(13f, 24f), wid = len * rng.RandfRange(0.38f, 0.5f);
+                float len = rng.RandfRange(5f, 8f), wid = len * rng.RandfRange(0.45f, 0.6f);
                 float ang = a + rng.RandfRange(-0.8f, 0.8f);
                 float shade = rng.RandfRange(0.55f, 1f);
                 var tint = new Color(0.88f * shade, 1f * shade, 0.78f * shade);
@@ -120,10 +121,10 @@ public static class ProceduralTextures
             for (int b = 0; b < 9; b++)
             {
                 float a = rng.Randf() * Mathf.Tau;
-                var start = c + new Vector2(MathF.Cos(a), MathF.Sin(a)) * rng.RandfRange(0f, 30f);
+                var start = c + new Vector2(MathF.Cos(a), MathF.Sin(a)) * rng.RandfRange(0f, 7f);
                 var dir = new Vector2(MathF.Cos(a + rng.RandfRange(-0.4f, 0.4f)), MathF.Sin(a + rng.RandfRange(-0.4f, 0.4f)));
-                float branchLen = rng.RandfRange(60f, 100f);
-                for (float s = 0; s < branchLen; s += 2.2f)
+                float branchLen = rng.RandfRange(16f, 26f);
+                for (float s = 0; s < branchLen; s += 1.5f)
                 {
                     var p = start + dir * s;
                     float shade = rng.RandfRange(0.55f, 1f);
@@ -131,7 +132,7 @@ public static class ProceduralTextures
                     foreach (float side in new[] { -1f, 1f })
                     {
                         var n = new Vector2(-dir.Y, dir.X) * side;
-                        var tip = p + (n * 0.9f + dir * 0.45f).Normalized() * rng.RandfRange(9f, 15f);
+                        var tip = p + (n * 0.9f + dir * 0.45f).Normalized() * rng.RandfRange(3f, 5f);
                         Line(img, p, tip, tint);
                     }
                 }

@@ -72,8 +72,10 @@ Kolejność według wartości dla gracza; każdy punkt ma już miejsce w struktu
    (szybszy czas), wiadro (żywotność żywca), zanęta.
 6. **Wypuszczanie ryb na żądanie** i limity ochronne (wymiar i okres ochronny), mandat od strażnika.
 7. **Świat.** Łódź, więcej map, płynne przejścia między łowiskami pieszo zamiast przystanku, NPC wędkarze.
-8. **Grafika.** Odtworzenie utraconego pakietu realizmu (`src/Graphics`, shadery terenu/nieba/wody, patrz `CLAUDE.md`),
-   kaustyki i prawdziwe załamanie światła w wodzie (bufor głębi), LOD dla ryb.
+8. **Grafika (medieval pixel art 3D).** Gotowe: potok niskiej rozdzielczości z paletą, ditheringiem i konturami,
+   pixelowe tekstury, oświetlenie toon, szachulec i strzechy, latarnie, niebo z chmurami, pasmowa woda, drzewa
+   z kart liści, trawa na wietrze. Dalej: pikselowa czcionka HUD, średniowieczne nazwy (grosze zamiast zł,
+   „kramarz" zamiast sklepu), wóz zamiast przystanku, migotanie pochodni, ręcznie rysowane sprite'y ikon sprzętu.
 
 ## Testy
 Zestaw `gear` (`tests/GearSuite.cs`) sprawdza targ, siatki, podbieraki, akcesoria, zapis, animację ciała, pływanie

@@ -14,8 +14,8 @@ namespace FishingSim.UI;
 /// </summary>
 public partial class Hud : CanvasLayer
 {
-    private static readonly Color PanelFill = new(0.04f, 0.08f, 0.12f, 0.66f);
-    private static readonly Color PanelBorder = new(0.3f, 0.45f, 0.6f, 0.6f);
+    private static readonly Color PanelFill = new(0.13f, 0.09f, 0.05f, 0.72f);
+    private static readonly Color PanelBorder = new(0.6f, 0.45f, 0.22f, 0.75f);
 
     private FishingRod _rod = null!;
     private TournamentManager _tournaments = null!;
@@ -38,10 +38,10 @@ public partial class Hud : CanvasLayer
         _interactions = interactions;
     }
 
-    private PanelContainer Panel(Node parent, Color? fill = null, Color? border = null, int radius = 8, int margin = 10)
+    private PanelContainer Panel(Node parent, Color? fill = null, Color? border = null, int radius = 0, int margin = 10)
     {
         var p = new PanelContainer();
-        p.AddThemeStyleboxOverride("panel", UITheme.Box(fill ?? PanelFill, border ?? PanelBorder, radius, 1, margin));
+        p.AddThemeStyleboxOverride("panel", UITheme.Box(fill ?? PanelFill, border ?? PanelBorder, radius, 2, margin));
         parent.AddChild(p);
         return p;
     }
@@ -79,7 +79,7 @@ public partial class Hud : CanvasLayer
         Anchor(left, 0, 0, 0, 0, 14, 14, 330, 0);
         var statusBox = new VBoxContainer();
         Panel(left).AddChild(statusBox);
-        _status = MakeLabel(statusBox, 21, new Color(0.75f, 0.92f, 1f));
+        _status = MakeLabel(statusBox, 21, new Color(1f, 0.86f, 0.5f));
         _stats = MakeLabel(statusBox, 15);
         var playerBox = new VBoxContainer();
         Panel(left).AddChild(playerBox);
@@ -95,18 +95,18 @@ public partial class Hud : CanvasLayer
         AddChild(right);
         Anchor(right, 1, 0, 1, 0, -344, 14, -14, 0);
         _world = MakeLabel(Panel(right), 15);
-        _tackle = MakeLabel(Panel(right), 14, new Color(0.85f, 0.92f, 1f));
+        _tackle = MakeLabel(Panel(right), 14, new Color(0.96f, 0.9f, 0.76f));
         _devPanel = Panel(right, new Color(0.12f, 0.1f, 0.02f, 0.8f), new Color(0.8f, 0.7f, 0.2f, 0.8f));
         _dev = MakeLabel(_devPanel, 14, new Color(1f, 0.9f, 0.3f));
 
         // banner
-        _bannerPanel = Panel(this, new Color(0.03f, 0.06f, 0.1f, 0.78f), new Color(0.45f, 0.7f, 0.9f, 0.9f), 10, 14);
+        _bannerPanel = Panel(this, new Color(0.12f, 0.08f, 0.05f, 0.85f), new Color(0.85f, 0.65f, 0.3f, 0.9f), 0, 14);
         Anchor(_bannerPanel, 0.5f, 0, 0.5f, 0, -300, 110, 300, 0);
         _banner = MakeLabel(_bannerPanel, 28);
         _banner.HorizontalAlignment = HorizontalAlignment.Center;
 
         // prompt shown at a shop door
-        _promptPanel = Panel(this, new Color(0.03f, 0.06f, 0.1f, 0.82f), new Color(0.95f, 0.8f, 0.3f, 0.9f), 10, 12);
+        _promptPanel = Panel(this, new Color(0.12f, 0.08f, 0.05f, 0.88f), new Color(0.95f, 0.8f, 0.3f, 0.9f), 0, 12);
         Anchor(_promptPanel, 0.5f, 1, 0.5f, 1, -260, -170, 260, -140);
         _prompt = MakeLabel(_promptPanel, 20, new Color(1f, 0.93f, 0.6f));
         _prompt.HorizontalAlignment = HorizontalAlignment.Center;
@@ -122,7 +122,7 @@ public partial class Hud : CanvasLayer
         _gauge = new TensionGauge { Rod = _rod };
         Anchor(_gauge, 0.5f, 1, 0.5f, 1, -210, -78, 210, -50);
         AddChild(_gauge);
-        var caption = MakeLabel(this, 13, new Color(0.8f, 0.9f, 1f, 0.8f));
+        var caption = MakeLabel(this, 13, new Color(0.96f, 0.9f, 0.76f, 0.8f));
         caption.Text = "NAPIĘCIE ŻYŁKI (biała kreska = hamulec)";
         caption.HorizontalAlignment = HorizontalAlignment.Center;
         Anchor(caption, 0.5f, 1, 0.5f, 1, -210, -100, 210, -80);

@@ -68,6 +68,14 @@ public static class GraphicsQuality
         _ => 40f,
     };
 
+    /// <summary>Screen pixels per world-image pixel (the pixel-art scale): bigger = chunkier and faster.</summary>
+    public static int PixelSize => Level switch
+    {
+        QualityLevel.Low => 4,
+        QualityLevel.Ultra => 2,
+        _ => 3,
+    };
+
     /// <summary>Distance (m) between grass clumps.</summary>
     public static float GrassSpacing => Level >= QualityLevel.Ultra ? 0.42f : 0.5f;
 

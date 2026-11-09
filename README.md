@@ -1,5 +1,7 @@
 # Fishing Sim (RF4-like), wersja C#
 
+**Styl graficzny: medieval pixel art 3D.** Świat 3D jest renderowany w niskiej rozdzielczości i powiększany bez wygładzania, z ograniczoną paletą, ditheringiem i konturami (`src/Graphics/PixelArtView.cs`, `shaders/pixel_post.gdshader`), a HUD zostaje ostry. Wioska jest średniowieczna: domy z szachulcem i strzechą, latarnie na drewnianych słupach, drewniana wędka. Tekstury to proceduralny pixel art 32×32 z filtrowaniem nearest, a oświetlenie jest pasmowe (toon). Jakość grafiki (wielkość piksela, cienie, trawa, efekty) zmienia się w menu pauzy.
+
 Symulator wędkarski w Godot 4.3 (.NET) napisany w całości w C#. Poza kodem są tylko dwa shadery (`shaders/*.gdshader`: woda i gwiazdy), bo shadery w Godocie piszą się w jego własnym języku, oraz pliki scen i danych (`.tscn`, `.tres`).
 
 ## Wymagania i uruchomienie

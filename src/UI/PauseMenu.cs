@@ -58,6 +58,12 @@ public partial class PauseMenu : CanvasLayer
         box.AddChild(_warning);
         AddButton(box, "Wznów", Resume);
         AddButton(box, "Zmień mapę", ChangeMap);
+        var quality = new Button { CustomMinimumSize = new Vector2(0, 46) };
+        void ShowQuality() => quality.Text =
+            $"Grafika: {Graphics.GraphicsQuality.Title(Graphics.GraphicsQuality.Level)} (piksel x{Graphics.GraphicsQuality.PixelSize})";
+        ShowQuality();
+        quality.Pressed += () => { Graphics.GraphicsQuality.Cycle(); ShowQuality(); };
+        box.AddChild(quality);
         AddButton(box, "Wyloguj", Logout);
         AddButton(box, "Wyjdź z gry", Quit);
     }

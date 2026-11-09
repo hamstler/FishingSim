@@ -32,8 +32,8 @@ public partial class FirstPersonBody : Node3D
 
     public override void _Ready()
     {
-        var sleeve = new StandardMaterial3D { AlbedoColor = new Color(0.22f, 0.3f, 0.22f), Roughness = 0.95f };
-        var skin = new StandardMaterial3D { AlbedoColor = new Color(0.86f, 0.66f, 0.52f), Roughness = 0.7f };
+        var sleeve = World.Props.BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = new Color(0.36f, 0.26f, 0.16f), Roughness = 0.95f });   // wool tunic
+        var skin = World.Props.BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = new Color(0.86f, 0.66f, 0.52f), Roughness = 0.7f });
         _rightArm = Part(new CylinderMesh { TopRadius = 0.04f, BottomRadius = 0.05f, Height = 1f, RadialSegments = 10 }, sleeve);
         _leftArm = Part(new CylinderMesh { TopRadius = 0.04f, BottomRadius = 0.05f, Height = 1f, RadialSegments = 10 }, sleeve);
         _rightHand = Part(new SphereMesh { Radius = 0.042f, Height = 0.075f, RadialSegments = 10, Rings = 6 }, skin);

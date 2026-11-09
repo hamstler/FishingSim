@@ -1,7 +1,7 @@
 shader_type spatial;
 // Grass blades: colour from the terrain under them (instance colour), darker at the root, lighter and more
 // translucent at the tips, bending in gusts of wind. UV.y runs from 0 at the root to 1 at the tip.
-render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
+render_mode cull_disabled, diffuse_toon, specular_disabled;
 
 uniform sampler2D gust_noise : repeat_enable, filter_linear_mipmap;
 uniform float wind = 0.3;
@@ -28,8 +28,7 @@ void vertex() {
 
 void fragment() {
 	vec3 base = srgb_to_linear(COLOR.rgb);
-	ALBEDO = base * mix(0.45, 1.15, tip);
+	ALBEDO = base * (0.5 + 0.65 * floor(tip * 3.0) / 2.0);   // three flat bands, root to tip
 	BACKLIGHT = base * 0.6 * tip;
 	ROUGHNESS = 0.7;
-	SPECULAR = 0.3;
 }

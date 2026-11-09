@@ -91,6 +91,9 @@ public partial class Main : Node3D
             Player.Camera, Player.RodTip, Player.Rig, bobber, species, _loadout, _profile, _world, _lake, WaterY, _gear));
         Player.ActionSource = () => ActionFor(Rod.State);
 
+        // Medieval pixel-art look: the world is drawn at low resolution and scaled up (HUD stays sharp).
+        AddChild(new Graphics.PixelArtView(Player.Camera));
+
         var grass = new Graphics.GrassField();
         grass.Setup(_lake, Player);
         AddChild(grass);

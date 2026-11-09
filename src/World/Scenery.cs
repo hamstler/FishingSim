@@ -64,14 +64,14 @@ public partial class Scenery : Node3D
     // ------------------------------------------------------------------ pier
     private void BuildPier()
     {
-        var wood = new StandardMaterial3D
+        var wood = BuildingFactory.Pixel(new StandardMaterial3D
         {
             AlbedoTexture = Textures.Planks(),
             Uv1Triplanar = true,
-            Uv1Scale = Vector3.One,
+            Uv1Scale = Vector3.One * Textures.TriplanarScale,
             Roughness = 0.9f,
-        };
-        var dark = new StandardMaterial3D { AlbedoColor = new Color(0.22f, 0.15f, 0.09f), Roughness = 0.95f };
+        });
+        var dark = BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = new Color(0.22f, 0.15f, 0.09f), Roughness = 0.95f });
 
         var body = new StaticBody3D { CollisionLayer = 1, Position = new Vector3(0, 0.95f, 1) };
         var deckSize = new Vector3(3, 0.2f, 10);
@@ -230,13 +230,13 @@ public partial class Scenery : Node3D
         Track(inst);
     }
 
-    private static StandardMaterial3D VertexColorMaterial() => new()
+    private static StandardMaterial3D VertexColorMaterial() => BuildingFactory.Pixel(new StandardMaterial3D
     {
         VertexColorUseAsAlbedo = true,
         VertexColorIsSrgb = true,
         Roughness = 1f,
         CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-    };
+    });
 
     private static Color Tint(Color c, float t) => new(c.R + t, c.G + t, c.B + t);
 

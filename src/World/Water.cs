@@ -32,15 +32,8 @@ public partial class Water : MeshInstance3D
         Position = new Vector3(0, 0, -80);
         CustomAabb = new Aabb(new Vector3(-160, -1, -160), new Vector3(320, 2, 320));
         CastShadow = ShadowCastingSetting.Off;
-        // Forward+ gets the realistic water (refraction, absorption); the OpenGL backend keeps the simple one.
-        bool simple = Graphics.Renderer.IsCompatibility;
-        _material = new ShaderMaterial { Shader = GD.Load<Shader>(simple ? "res://shaders/water_simple.gdshader" : "res://shaders/water.gdshader") };
-        if (!simple)
-        {
-            _material.SetShaderParameter("normal_a", Graphics.ProceduralTextures.Noise(31, 0.012f, 512, true, 6f));
-            _material.SetShaderParameter("normal_b", Graphics.ProceduralTextures.Noise(47, 0.03f, 256, true, 4f));
-            _material.SetShaderParameter("foam_noise", Graphics.ProceduralTextures.Noise(53, 0.02f, 256));
-        }
+        _material = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/water.gdshader") };
+        _material.SetShaderParameter("foam_noise", Graphics.ProceduralTextures.Noise(53, 0.02f, 256));
         MaterialOverride = _material;
         PushParameters();
     }
