@@ -4,9 +4,9 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Okulary polaryzacyjne"
+DisplayName = "Kapelusz z szerokim rondem"
 Kind = 0
 Power = 12.0
-Description = "Zmniejszają odblaski: ryby widać dalej i głębiej."
+Description = "Cień ronda tłumi odblaski: ryby widać dalej i głębiej."
 Price = 70
 RequiredLevel = 1

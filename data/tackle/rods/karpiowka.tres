@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Karpiówka 3.6lb"
+DisplayName = "Dębowa tyka na karpie"
 CastMult = 1.15
 MaxLoad = 12.0
 ShockAbsorb = 0.12

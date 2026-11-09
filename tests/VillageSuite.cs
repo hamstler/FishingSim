@@ -191,7 +191,7 @@ public sealed class VillageSuite : ITestSuite
         await Physics(t, 30);
         t.Check(Mathf.Abs(player.GlobalPosition.X - tackle.GlobalPosition.X) < 1f && player.IsOnFloor(), "the player can stand anywhere on the land, far from the pier");
         t.Check(interactions.Current == tackle, "standing at the tackle shop door offers the shop");
-        t.Check(tackle.Prompt.Contains("Sklep wędkarski"), $"the prompt names the shop ({tackle.Prompt})");
+        t.Check(tackle.Prompt.Contains("Kram wędkarski"), $"the prompt names the shop ({tackle.Prompt})");
 
         player.GlobalPosition = new Vector3(tackle.GlobalPosition.X + 25f, tackle.GlobalPosition.Y + 0.6f, tackle.GlobalPosition.Z + 20f);
         await Physics(t, 20);
@@ -222,7 +222,7 @@ public sealed class VillageSuite : ITestSuite
             shop.Close();
             spot.Free();
         }
-        var office = new Interactable { Kind = InteractKind.Office, Title = "Biuro zawodów" };
+        var office = new Interactable { Kind = InteractKind.Office, Title = "Gildia wędkarzy" };
         interactions.Activate(office);
         t.Check(ui.Visible && ui.CurrentTab == 3 && !shop.Visible, "the tournament office opens the tournaments tab");
         ui.Close();

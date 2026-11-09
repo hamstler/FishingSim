@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Krzesełko wędkarskie"
+DisplayName = "Zydel wędkarski"
 Kind = 3
 Power = 1.0
 Description = "Odpoczynek nad wodą (w planach: szybszy upływ czasu)."

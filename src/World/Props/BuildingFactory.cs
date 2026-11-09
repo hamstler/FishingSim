@@ -16,13 +16,13 @@ public static class BuildingFactory
 
     public static string TitleFor(BuildingKind kind) => kind switch
     {
-        BuildingKind.Tackle => "Sklep wędkarski",
-        BuildingKind.General => "Sklep wędkarski i przynęty",
-        BuildingKind.Bait => "Sklep z przynętami",
+        BuildingKind.Tackle => "Kram wędkarski",
+        BuildingKind.General => "Kram wędkarski i przynęty",
+        BuildingKind.Bait => "Kram z przynętami",
         BuildingKind.FishBuyer => "Skup ryb",
         BuildingKind.Market => "Targ rybny",
-        BuildingKind.Office => "Biuro zawodów",
-        BuildingKind.BusStop => "Przystanek",
+        BuildingKind.Office => "Gildia wędkarzy",
+        BuildingKind.BusStop => "Postój wozów",
         _ => "",
     };
 
@@ -32,11 +32,11 @@ public static class BuildingFactory
         switch (spec.Kind)
         {
             case BuildingKind.Tackle:
-                House(b, new HouseStyle(9f, 6.5f, 3.5f, 2.5f, new Color(0.38f, 0.56f, 0.72f), true, new Color(0.62f, 0.22f, 0.16f), 3, true, true, "SKLEP WĘDKARSKI"));
+                House(b, new HouseStyle(9f, 6.5f, 3.5f, 2.5f, new Color(0.38f, 0.56f, 0.72f), true, new Color(0.62f, 0.22f, 0.16f), 3, true, true, "KRAM WĘDKARSKI"));
                 Barrel(b, new Vector3(-2.6f, 0, 3.9f)); Crates(b, new Vector3(2.8f, 0, 4.0f), 2); RodRack(b, new Vector3(-4.52f, 0, 0.5f));
                 break;
             case BuildingKind.General:
-                House(b, new HouseStyle(8.5f, 6.5f, 3.4f, 2.4f, new Color(0.55f, 0.42f, 0.28f), false, new Color(0.30f, 0.36f, 0.42f), 3, true, true, "SKLEP WĘDKARSKI"));
+                House(b, new HouseStyle(8.5f, 6.5f, 3.4f, 2.4f, new Color(0.55f, 0.42f, 0.28f), false, new Color(0.30f, 0.36f, 0.42f), 3, true, true, "KRAM I PRZYNĘTY"));
                 Barrel(b, new Vector3(-2.5f, 0, 3.9f)); Crates(b, new Vector3(2.7f, 0, 4.0f), 3); RodRack(b, new Vector3(-4.27f, 0, 0.5f));
                 break;
             case BuildingKind.Bait:
@@ -44,7 +44,7 @@ public static class BuildingFactory
                 Barrel(b, new Vector3(-2.0f, 0, 3.3f)); Barrel(b, new Vector3(-2.7f, 0, 3.0f)); Crates(b, new Vector3(2.2f, 0, 3.3f), 2);
                 break;
             case BuildingKind.Office:
-                House(b, new HouseStyle(8.5f, 6.2f, 3.3f, 2.2f, new Color(0.9f, 0.9f, 0.84f), true, new Color(0.2f, 0.36f, 0.62f), 3, false, true, "BIURO ZAWODÓW"));
+                House(b, new HouseStyle(8.5f, 6.2f, 3.3f, 2.2f, new Color(0.9f, 0.9f, 0.84f), true, new Color(0.2f, 0.36f, 0.62f), 3, false, true, "GILDIA WĘDKARZY"));
                 Flag(b, new Vector3(4.3f, 0, 3.6f));
                 break;
             case BuildingKind.House:
@@ -452,22 +452,50 @@ public static class BuildingFactory
         b.AddLight(lamp);
     }
 
+    /// <summary>The coaching stop: a covered wagon waiting by a signpost (travel to another fishing ground).</summary>
     private static void BusStop(Building b)
     {
-        var wood = Wood(new Color(0.6f, 0.45f, 0.32f));
-        var roof = Roof(new Color(0.3f, 0.34f, 0.4f));
-        foreach (float sx in new[] { -1.5f, 1.5f })
+        var wood = Wood(new Color(0.62f, 0.46f, 0.3f));
+        var dark = Timber();
+        var iron = Flat(new Color(0.14f, 0.13f, 0.12f), 0.6f, 0.5f);
+        var canvas = Textured(Textures.Plaster(), new Color(0.88f, 0.84f, 0.72f));
+        canvas.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+
+        // Wagon bed with plank sides, parked along X behind the sign.
+        var wagon = new Node3D { Position = new Vector3(-0.4f, 0f, -1.2f) };
+        b.AddChild(wagon);
+        Box(wagon, new Vector3(2.8f, 0.14f, 1.4f), new Vector3(0, 0.95f, 0), wood);
+        foreach (float sz in new[] { -0.68f, 0.68f })
+            Box(wagon, new Vector3(2.8f, 0.45f, 0.08f), new Vector3(0, 1.24f, sz), wood);
+        foreach (float sx in new[] { -1.38f, 1.38f })
+            Box(wagon, new Vector3(0.08f, 0.45f, 1.4f), new Vector3(sx, 1.24f, 0), wood);
+        // Canvas cover on hoops.
+        for (int i = 0; i < 3; i++)
         {
-            Cyl(b, 0.08f, 0.08f, 2.6f, new Vector3(sx, 1.3f, -0.9f), wood, 8);
-            Cyl(b, 0.08f, 0.08f, 2.6f, new Vector3(sx, 1.3f, 0.9f), wood, 8);
+            float x = -0.95f + i * 0.95f;
+            var hoop = Cyl(wagon, 0.72f, 0.72f, 0.06f, new Vector3(x, 1.5f, 0), dark, 12);
+            hoop.RotationDegrees = new Vector3(0, 0, 90f);
         }
-        Box(b, new Vector3(3.6f, 0.14f, 2.4f), new Vector3(0, 2.65f, 0), roof, new Vector3(-8f, 0, 0));
-        Box(b, new Vector3(3.0f, 1.4f, 0.1f), new Vector3(0, 1.4f, -1.0f), Painted(new Color(0.45f, 0.55f, 0.62f)));
-        Box(b, new Vector3(2.6f, 0.1f, 0.6f), new Vector3(0, 0.55f, -0.65f), wood);
-        Collider(b, new Vector3(3.2f, 2.6f, 0.4f), new Vector3(0, 1.3f, -1.0f));
-        Cyl(b, 0.05f, 0.05f, 3.4f, new Vector3(2.4f, 1.7f, 1.4f), Flat(new Color(0.25f, 0.27f, 0.3f), 0.4f, 0.6f), 8);
-        Box(b, new Vector3(1.6f, 0.5f, 0.06f), new Vector3(2.4f, 3.2f, 1.4f), Flat(new Color(0.15f, 0.35f, 0.7f), 0.5f));
-        Label(b, "ŁOWISKA", new Vector3(2.4f, 3.2f, 1.44f), 0.007f, 56, Colors.White);
+        var cover = Cyl(wagon, 0.74f, 0.74f, 2.5f, new Vector3(0, 1.5f, 0), canvas, 12);
+        cover.RotationDegrees = new Vector3(0, 0, 90f);
+        cover.Scale = new Vector3(1f, 1f, 0.95f);
+        // Wheels with iron tyres, axles and the shaft for the horse.
+        foreach (float sx in new[] { -0.95f, 0.95f })
+            foreach (float sz in new[] { -0.8f, 0.8f })
+            {
+                var wheel = Cyl(wagon, 0.48f, 0.48f, 0.1f, new Vector3(sx, 0.48f, sz), dark, 10);
+                wheel.RotationDegrees = new Vector3(90f, 0, 0);
+                var tyre = Cyl(wagon, 0.5f, 0.5f, 0.06f, new Vector3(sx, 0.48f, sz * 1.02f), iron, 10);
+                tyre.RotationDegrees = new Vector3(90f, 0, 0);
+            }
+        foreach (float sz in new[] { -0.3f, 0.3f })
+            Box(wagon, new Vector3(1.8f, 0.08f, 0.08f), new Vector3(2.2f, 0.7f, sz), dark, new Vector3(0, 0, -12f));
+        Collider(wagon, new Vector3(3.0f, 1.9f, 1.6f), new Vector3(0, 1.0f, 0));
+
+        // Signpost with the destinations.
+        Box(b, new Vector3(0.18f, 3f, 0.18f), new Vector3(2.4f, 1.5f, 1.2f), dark);
+        Box(b, new Vector3(1.7f, 0.45f, 0.08f), new Vector3(2.4f, 2.7f, 1.26f), wood);
+        Label(b, "ŁOWISKA", new Vector3(2.4f, 2.7f, 1.32f), 0.007f, 56, new Color(0.15f, 0.1f, 0.05f));
     }
 
     private static void Windmill(Building b)

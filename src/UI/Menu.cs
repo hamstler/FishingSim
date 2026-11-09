@@ -170,7 +170,7 @@ public partial class Menu : Control
         var profile = Profile.LoadFor(Session.Username);
         var head = new Label
         {
-            Text = $"Witaj, {Session.Username}  |  poziom {profile.Level}  |  {profile.Money} zł\nWybierz łowisko",
+            Text = $"Witaj, {Session.Username}  |  poziom {profile.Level}  |  {profile.Money} gr\nWybierz łowisko",
             HorizontalAlignment = HorizontalAlignment.Center,
         };
         head.AddThemeFontSizeOverride("font_size", 22);

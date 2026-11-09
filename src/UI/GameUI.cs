@@ -318,7 +318,7 @@ public partial class GameUI : CanvasLayer
         side.AddChild(title);
         side.AddChild(new Label
         {
-            Text = "Czerwona kreska: pomost\nŻółta strzałka: Ty\nBiały punkt: spławik\nKwadraty: sklepy i przystanek\nKręgi: odległość od Ciebie",
+            Text = "Czerwona kreska: pomost\nŻółta strzałka: Ty\nBiały punkt: spławik\nKwadraty: kramy i postój wozów\nKręgi: odległość od Ciebie",
             Modulate = new Color(1, 1, 1, 0.75f),
         });
         var gradient = new Gradient();
@@ -489,7 +489,7 @@ public partial class GameUI : CanvasLayer
     private void RefreshJournal()
     {
         float totalKg = _profile.Journal.Sum(e => e.Weight);
-        _journalHead.Text = $"Poziom {_profile.Level} (XP {_profile.Xp} / {_profile.XpToNext}) | złowione ryby: {_profile.TotalCatches} | w dzienniku: {totalKg:0.0} kg | {_profile.Money} zł";
+        _journalHead.Text = $"Poziom {_profile.Level} (XP {_profile.Xp} / {_profile.XpToNext}) | złowione ryby: {_profile.TotalCatches} | w dzienniku: {totalKg:0.0} kg | {_profile.Money} gr";
 
         ClearChildren(_journalList);
         if (_profile.Journal.Count == 0)

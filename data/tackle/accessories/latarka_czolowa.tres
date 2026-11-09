@@ -4,9 +4,9 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Latarka czołowa"
+DisplayName = "Latarnia z łojówką"
 Kind = 1
 Power = 1.0
-Description = "Światło w nocy."
+Description = "Światło po zmroku."
 Price = 45
 RequiredLevel = 1

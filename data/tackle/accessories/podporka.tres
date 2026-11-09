@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Podpórka pod wędkę"
+DisplayName = "Rozwidlony kij-podpórka"
 Kind = 2
 Power = 1.0
 Description = "Odłożenie wędki podczas czekania (w planach: kilka wędek naraz)."

@@ -74,8 +74,9 @@ Kolejność według wartości dla gracza; każdy punkt ma już miejsce w struktu
 7. **Świat.** Łódź, więcej map, płynne przejścia między łowiskami pieszo zamiast przystanku, NPC wędkarze.
 8. **Grafika (medieval pixel art 3D).** Gotowe: potok niskiej rozdzielczości z paletą, ditheringiem i konturami,
    pixelowe tekstury, oświetlenie toon, szachulec i strzechy, latarnie, niebo z chmurami, pasmowa woda, drzewa
-   z kart liści, trawa na wietrze. Dalej: pikselowa czcionka HUD, średniowieczne nazwy (grosze zamiast zł,
-   „kramarz" zamiast sklepu), wóz zamiast przystanku, migotanie pochodni, ręcznie rysowane sprite'y ikon sprzętu.
+   z kart liści, trawa na wietrze. Zrobione też: minimalistyczny HUD, grosze, kramy, gildia, wóz na postoju,
+   migoczące światła, ostre (niewygładzane) fonty. Dalej: prawdziwa pikselowa czcionka (plik .ttf/.fnt),
+   ikony sprzętu jako sprite'y, minimalistyczne ekrany sklepu i ekwipunku.
 
 ## Testy
 Zestaw `gear` (`tests/GearSuite.cs`) sprawdza targ, siatki, podbieraki, akcesoria, zapis, animację ciała, pływanie

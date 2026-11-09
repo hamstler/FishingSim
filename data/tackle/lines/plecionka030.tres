@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Plecionka 0.30 mm"
+DisplayName = "Plecionka lniana"
 Strength = 13.0
 Visibility = 1.1
 Price = 220

@@ -1,8 +1,10 @@
 # Fishing Sim (RF4-like), wersja C#
 
-**Styl graficzny: medieval pixel art 3D.** Świat 3D jest renderowany w niskiej rozdzielczości i powiększany bez wygładzania, z ograniczoną paletą, ditheringiem i konturami (`src/Graphics/PixelArtView.cs`, `shaders/pixel_post.gdshader`), a HUD zostaje ostry. Wioska jest średniowieczna: domy z szachulcem i strzechą, latarnie na drewnianych słupach, drewniana wędka. Tekstury to proceduralny pixel art 32×32 z filtrowaniem nearest, a oświetlenie jest pasmowe (toon). Jakość grafiki (wielkość piksela, cienie, trawa, efekty) zmienia się w menu pauzy.
+**Styl graficzny: medieval pixel art 3D.** Świat 3D jest renderowany w niskiej rozdzielczości i powiększany bez wygładzania, z ograniczoną paletą, ditheringiem i konturami (`src/Graphics/PixelArtView.cs`, `shaders/pixel_post.gdshader`), a HUD zostaje ostry. Wioska jest średniowieczna: domy z szachulcem i strzechą, latarnie na drewnianych słupach, drewniana wędka. Tekstury to proceduralny pixel art 32×32 z filtrowaniem nearest, a oświetlenie jest pasmowe (toon). Jakość grafiki (wielkość piksela, cienie, trawa, efekty) zmienia się w menu pauzy. Waluta to grosze (gr), sklepy to kramy, turnieje prowadzi gildia wędkarzy, a na inne łowisko jedzie się wozem.
 
-Symulator wędkarski w Godot 4.3 (.NET) napisany w całości w C#. Poza kodem są tylko dwa shadery (`shaders/*.gdshader`: woda i gwiazdy), bo shadery w Godocie piszą się w jego własnym języku, oraz pliki scen i danych (`.tscn`, `.tres`).
+**Minimalistyczny interfejs:** podczas zwykłego rozglądania na ekranie jest tylko mała kropka celownika. Stan wędki i cienki pasek napięcia pojawiają się w trakcie łowienia, sakiewka i siatka na chwilę po zmianie, a sprzęt na chwilę po przełączeniu. Tab pokazuje wszystko naraz, H sterowanie.
+
+Symulator wędkarski w Godot 4.3 (.NET) napisany w całości w C#. Poza kodem są shadery (`shaders/*.gdshader`: niebo, woda, teren, liście, trawa, gwiazdy, efekt pikseli), bo shadery w Godocie piszą się w jego własnym języku, oraz pliki scen i danych (`.tscn`, `.tres`).
 
 ## Wymagania i uruchomienie
 - **Godot 4.3 w wersji .NET (Mono)** i **.NET SDK 8**.
@@ -19,23 +21,24 @@ Symulator wędkarski w Godot 4.3 (.NET) napisany w całości w C#. Poza kodem s�
 | Kółko myszy | hamulec |
 | 1-5 (Shift = wstecz) | wędka, kołowrotek, żyłka, hak, przynęta (tylko przed rzutem) |
 | I / M / J / T | ekwipunek, mapa, dziennik, turnieje |
-| E | wejście do sklepu, biura zawodów lub przystanku (przy drzwiach budynku) |
+| E | wejście do kramu, gildii, na targ lub na postój wozów (przy drzwiach budynku) |
 | Shift | bieg |
-| Esc | menu pauzy (wznów, zmień mapę, wyloguj, wyjdź) |
-| H | ukryj pomoc |
-| F1 | konsola deweloperska: F2 natychmiastowe branie, F3 nieśmiertelna żyłka, F4 gatunek, F5 reset rzutu, F6 przynęty, F7 +3 godz., F8 pogoda, F9 reset postępu, F10 +1000 zł |
+| Esc | menu pauzy (wznów, zmień mapę, jakość grafiki, wyloguj, wyjdź) |
+| Tab (przytrzymaj) | stan: godzina, pogoda, łowisko, sakiewka, siatka, sprzęt |
+| H | sterowanie |
+| F1 | konsola deweloperska: F2 natychmiastowe branie, F3 nieśmiertelna żyłka, F4 gatunek, F5 reset rzutu, F6 przynęty, F7 +3 godz., F8 pogoda, F9 reset postępu, F10 +1000 gr |
 
 ## Świat
 - **Cała mapa jest do chodzenia:** brzeg, wzgórza, wioska. Wchodzić można tylko w płytką wodę (do 0,5 m), a pomost jest jednym z miejsc do łowienia. Łowić można z dowolnego miejsca na brzegu.
 - **Cztery zróżnicowane mapy** (`data/locations/*.tres`), każda z własnym biomem (kolory terenu i wody, mgła, wysokość wzgórz, gatunki i gęstość drzew, krzewy, kwiaty, trzciny, skały) i własną wioską:
-  - *Jezioro Zielone*: las mieszany (dąb, brzoza, świerk), wioska z sklepem wędkarskim, sklepem z przynętami, skupem ryb, biurem zawodów i przystankiem.
+  - *Jezioro Zielone*: las mieszany (dąb, brzoza, świerk), wioska z kramem wędkarskim, kramem z przynętami, skupem ryb, targiem rybnym, gildią wędkarzy i postojem wozów.
   - *Zatoka Szuwarowa*: mokradło, wierzby, gęste trzciny, mgła, chata wędkarza, skup ryb, łodzie na brzegu.
   - *Staw Karpiowy* (poziom 3): łąka z kwiatami, gospodarstwo z wiatrakiem, stodołą i stogami siana.
   - *Górskie Jezioro* (poziom 4): sosny, skały, wysokie wzgórza ze śniegiem, górska chata.
-- **Budynki** (`src/World/Props/BuildingFactory.cs`, wszystko z prymitywów): sklepy, domy, stodoła, wiatrak z obracającymi się skrzydłami, skup ryb ze stoiskiem i suszarnią, biuro z flagą, przystanek, latarnie, ławki, łodzie, płoty, skrzynie i beczki. Okna i latarnie świecą po zmroku.
-- **Sklepy to budynki:** podejdź do drzwi i naciśnij E. Sklep wędkarski pokazuje sprzęt (wędki, kołowrotki, żyłki, haki, siatki, podbieraki, akcesoria), sklep z przynętami przynęty, skup ryb sprzedaż po stałej cenie, targ rybny (Jezioro Zielone) sprzedaż po cenach dnia z premią za świeże i trofeowe ryby, przystanek zmianę łowiska, biuro zawodów turnieje (zakładka T działa też z daleka).
+- **Budynki** (`src/World/Props/BuildingFactory.cs`, wszystko z prymitywów): kramy i domy z szachulcem i strzechą, stodoła, wiatrak z obracającymi się skrzydłami, skup ryb ze stoiskiem i suszarnią, gildia z chorągwią, wóz z plandeką przy drogowskazie, latarnie na słupach (migoczą po zmroku), ławki, łodzie, płoty, skrzynie i beczki. Okna i latarnie świecą po zmroku.
+- **Kramy to budynki:** podejdź do drzwi i naciśnij E. Kram wędkarski sprzedaje sprzęt (wędki, kołowrotki, linki, haczyki, siatki, kasarki, akcesoria), kram z przynętami przynęty, skup ryb kupuje po stałej cenie, targ rybny (Jezioro Zielone) płaci według cen dnia z premią za świeże i trofeowe ryby, na postoju wozów zmienia się łowisko, a gildia wędkarzy prowadzi turnieje (zakładka T działa też z daleka).
 - **Siatka i podbierak:** siatka ma limit ryb i kilogramów (pełna = ryba wypuszczona), a ryby tracą w niej kondycję. Duże ryby bez odpowiedniego podbieraka często spadają przy wyjmowaniu.
-- **Ryby widać w wodzie:** ławice pływają przy brzegu i uciekają przed biegnącym wędkarzem. Okulary polaryzacyjne pokazują je dalej i głębiej.
+- **Ryby widać w wodzie:** ławice pływają przy brzegu i uciekają przed biegnącym wędkarzem. Kapelusz z szerokim rondem (mniej odblasków) pokazuje je dalej i głębiej.
 - **Tylko widok z oczu wędkarza:** kołysanie głowy w rytm kroków, oddech, widoczne ręce na wędce i kołowrotku.
 - Plan dalszej rozbudowy: [`docs/ROZWOJ.md`](docs/ROZWOJ.md).
 - **Dodawanie budynków:** wpis `"rodzaj,x,z[,obrót]"` w polu `Buildings` łowiska (np. `"tackle,-22,24"`). Budynki same obracają się twarzą do placu, teren pod nimi jest wyrównywany, a do drzwi prowadzi ścieżka.

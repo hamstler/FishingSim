@@ -65,7 +65,7 @@ public partial class TournamentManager : Node
         if (_rod.Profile.Level < data.RequiredLevel)
             return $"Wymagany poziom {data.RequiredLevel}";
         if (_rod.Profile.Money < data.EntryFee)
-            return $"Za mało pieniędzy (wpisowe {data.EntryFee} zł)";
+            return $"Za mało pieniędzy (wpisowe {data.EntryFee} gr)";
         int location = _rod.Lake.Locations.FindIndex(l => l.DisplayName == data.LocationName);
         if (location < 0)
             return "Brak łowiska tego turnieju";

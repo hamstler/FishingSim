@@ -74,10 +74,10 @@ public partial class TournamentTab : HBoxContainer
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
             Modulate = new Color(1, 1, 1, 0.75f),
         });
-        string prizes = string.Join(" / ", data.PrizeMoney.Select(p => $"{p} zł"));
+        string prizes = string.Join(" / ", data.PrizeMoney.Select(p => $"{p} gr"));
         box.AddChild(new Label
         {
-            Text = $"{data.LocationName} | poziom {data.RequiredLevel} | {data.DurationMinutes:0} min | liczy się {data.CountedFish} najcięższych ryb\nWpisowe {data.EntryFee} zł | nagrody: {prizes}",
+            Text = $"{data.LocationName} | poziom {data.RequiredLevel} | {data.DurationMinutes:0} min | liczy się {data.CountedFish} najcięższych ryb\nWpisowe {data.EntryFee} gr | nagrody: {prizes}",
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
         });
         var best = _profile.TournamentHistory.Where(t => t.Name == data.DisplayName).OrderBy(t => t.Rank).FirstOrDefault();
@@ -85,7 +85,7 @@ public partial class TournamentTab : HBoxContainer
             box.AddChild(new Label { Text = $"Twój najlepszy wynik: {best.Rank}. miejsce ({best.Score:0.00} kg)", Modulate = new Color(0.6f, 0.9f, 0.6f) });
 
         string? why = _manager.CanStart(data);
-        var button = new Button { Text = why == null ? $"Start (wpisowe {data.EntryFee} zł)" : why, Disabled = why != null, CustomMinimumSize = new Vector2(0, 38) };
+        var button = new Button { Text = why == null ? $"Start (wpisowe {data.EntryFee} gr)" : why, Disabled = why != null, CustomMinimumSize = new Vector2(0, 38) };
         button.Pressed += () =>
         {
             string? error = _manager.Start(data);
@@ -117,7 +117,7 @@ public partial class TournamentTab : HBoxContainer
         }
         _right.AddChild(new Label { Text = $"Zwycięstwa: {_profile.TournamentWins} | udziały: {_profile.TournamentHistory.Count}", Modulate = new Color(1, 1, 1, 0.75f) });
         foreach (var t in Enumerable.Reverse(_profile.TournamentHistory).Take(8))
-            _right.AddChild(new Label { Text = $"{t.Name}: {t.Rank}. z {t.Entrants} | {t.Score:0.00} kg | +{t.PrizeMoney} zł, +{t.PrizeXp} XP" });
+            _right.AddChild(new Label { Text = $"{t.Name}: {t.Rank}. z {t.Entrants} | {t.Score:0.00} kg | +{t.PrizeMoney} gr, +{t.PrizeXp} XP" });
     }
 
     public static string TimeText(float seconds) => $"{(int)(seconds / 60f):00}:{(int)(seconds % 60f):00}";

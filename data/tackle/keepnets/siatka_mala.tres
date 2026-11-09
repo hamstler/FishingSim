@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Siatka 1.5 m (mała)"
+DisplayName = "Lniana siatka (mała)"
 MaxFish = 15
 MaxKg = 10.0
 ConditionLossPerHour = 0.05

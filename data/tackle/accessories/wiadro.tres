@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Wiadro na żywce"
+DisplayName = "Dębowe wiadro na żywce"
 Kind = 4
 Power = 1.0
 Description = "Żywce dłużej żyją (w planach)."

@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Podbierak karpiowy 100 cm"
+DisplayName = "Wielki kasarek karpiowy"
 MaxWeight = 25.0
 Reach = 2.5
 Price = 240

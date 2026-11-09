@@ -15,7 +15,7 @@ public partial class Interactable : Node3D
     public string Prompt => Kind switch
     {
         InteractKind.Office => $"E - {Title} (zapisy na zawody)",
-        InteractKind.BusStop => $"E - {Title} (zmiana łowiska)",
+        InteractKind.BusStop => $"E - {Title} (podróż na inne łowisko)",
         InteractKind.FishBuyer => $"E - {Title} (sprzedaj ryby)",
         InteractKind.Market => $"E - {Title} (ceny dnia, premia za trofea)",
         _ => $"E - {Title}",

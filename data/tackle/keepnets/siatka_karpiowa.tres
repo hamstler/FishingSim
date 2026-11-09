@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Siatka karpiowa 4 m (bezwęzłowa)"
+DisplayName = "Wiklinowy sadz na karpie"
 MaxFish = 40
 MaxKg = 60.0
 ConditionLossPerHour = 0.02

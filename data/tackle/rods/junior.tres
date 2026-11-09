@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Patyk Junior 2.1m"
+DisplayName = "Leszczynowy kij 2 m"
 CastMult = 0.75
 MaxLoad = 4.0
 ShockAbsorb = 0.3

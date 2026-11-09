@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Hak #2 (mały)"
+DisplayName = "Kuty haczyk #2 (mały)"
 Size = 2.0
 Price = 8
 RequiredLevel = 1

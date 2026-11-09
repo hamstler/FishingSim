@@ -87,7 +87,7 @@ public sealed class FishMarket
     /// <summary>Tired or dead fish from a poor keepnet are worth less: 30% at condition 0, 100% when fresh.</summary>
     public static float ConditionMultiplier(float condition) => 0.3f + 0.7f * Math.Clamp(condition, 0f, 1f);
 
-    /// <summary>Price the market would pay for a fish right now (zł).</summary>
+    /// <summary>Price the market would pay for a fish right now (gr).</summary>
     public int Quote(FishLot lot)
     {
         float price = lot.Weight * lot.BasePricePerKg * Premium
