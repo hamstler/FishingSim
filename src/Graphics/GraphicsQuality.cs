@@ -76,6 +76,13 @@ public static class GraphicsQuality
     /// <summary>Distance (m) between grass clumps.</summary>
     public static float GrassSpacing => Level >= QualityLevel.Ultra ? 0.42f : 0.5f;
 
+    /// <summary>
+    /// The Nordic (Valheim-like) finish, the game's only look: light-catching fog with sun shafts, bloom on bright
+    /// water and sky, ambient occlusion, and a grade that pushes shadows towards teal and highlights towards warm gold.
+    /// Costly screen-space effects are kept for Ultra so the default (High) runs smoothly at QHD:
+    /// Low = AO off, no fog volume; Medium = AO + volumetric fog; High = + more fog detail;
+    /// Ultra = + indirect light (SSIL) and screen-space reflections.
+    /// </summary>
     public static void ApplyEnvironment(Godot.Environment env)
     {
         var q = Level;
@@ -83,52 +90,16 @@ public static class GraphicsQuality
         env.TonemapWhite = 6f;
 
         env.SsaoEnabled = q >= QualityLevel.Medium;
-        env.SsaoRadius = 1.2f;
-        env.SsaoIntensity = 1.6f;
-        env.SsaoDetail = 0.6f;
-        env.SsilEnabled = q >= QualityLevel.High;
-        env.SsilRadius = 4f;
-        env.SsilIntensity = 0.8f;
-        env.SsrEnabled = q >= QualityLevel.High;
-        env.SsrMaxSteps = 48;
-        env.SdfgiEnabled = q >= QualityLevel.Ultra;
-        env.SdfgiUseOcclusion = true;
-        env.SdfgiCascades = 4;
-
-        env.GlowEnabled = q >= QualityLevel.Medium;
-        env.GlowIntensity = 0.6f;
-        env.GlowBloom = 0.04f;
-        env.GlowHdrThreshold = 1.1f;
-        env.GlowBlendMode = Godot.Environment.GlowBlendModeEnum.Softlight;
-
-        // Light shafts and depth haze; the plain distance fog (SkyController) stays on every level.
-        env.VolumetricFogEnabled = q >= QualityLevel.High;
-        env.VolumetricFogDensity = 0.004f;
-        env.VolumetricFogAnisotropy = 0.7f;
-        env.VolumetricFogLength = 90f;
-        env.VolumetricFogAlbedo = new Color(0.9f, 0.93f, 1f);
-        env.VolumetricFogGIInject = 0.6f;
-
-        env.AdjustmentEnabled = true;
-        env.AdjustmentContrast = 1.04f;
-        env.AdjustmentSaturation = 1.06f;
-        ApplyNordic(env, q);
-    }
-
-    /// <summary>
-    /// The Nordic (Valheim-like) finish, the game's only look: thick light-catching fog with sun shafts, bloom on bright water and sky, deep ambient
-    /// occlusion, and a grade that pushes shadows towards teal and highlights towards warm gold.
-    /// </summary>
-    private static void ApplyNordic(Godot.Environment env, QualityLevel q)
-    {
-        env.TonemapMode = Godot.Environment.ToneMapper.Aces;
-        env.TonemapWhite = 6f;
-        env.SsaoEnabled = q >= QualityLevel.Low;
         env.SsaoRadius = 1.8f;
         env.SsaoIntensity = 2.4f;
         env.SsaoPower = 1.4f;
-        env.SsilEnabled = q >= QualityLevel.Medium;
+        env.SsaoDetail = 0.5f;
+        env.SsilEnabled = q >= QualityLevel.Ultra;
+        env.SsilRadius = 4f;
         env.SsilIntensity = 1.1f;
+        env.SsrEnabled = q >= QualityLevel.Ultra;
+        env.SsrMaxSteps = 40;
+        env.SdfgiEnabled = false;                       // far too expensive for what it adds outdoors
 
         env.GlowEnabled = true;
         env.GlowIntensity = 0.7f;
@@ -139,11 +110,12 @@ public static class GraphicsQuality
 
         env.VolumetricFogEnabled = q >= QualityLevel.Medium;
         env.VolumetricFogAnisotropy = 0.82f;
-        env.VolumetricFogLength = 140f;
+        env.VolumetricFogLength = q >= QualityLevel.High ? 140f : 90f;
         env.VolumetricFogDetailSpread = 1.5f;
         env.VolumetricFogAlbedo = new Color(0.86f, 0.9f, 0.96f);
         env.VolumetricFogGIInject = 1f;
 
+        env.AdjustmentEnabled = true;
         env.AdjustmentContrast = 1.12f;
         env.AdjustmentSaturation = 1.1f;
         env.AdjustmentColorCorrection = NordicGrade();
@@ -170,12 +142,8 @@ public static class GraphicsQuality
     public static void ApplyViewport(Viewport vp)
     {
         var q = Level;
-        vp.Msaa3D = q switch
-        {
-            QualityLevel.Ultra => Viewport.Msaa.Msaa4X,
-            QualityLevel.High => Viewport.Msaa.Msaa2X,
-            _ => Viewport.Msaa.Disabled,
-        };
+        // TAA alone smooths edges well at QHD; MSAA on top only on Ultra.
+        vp.Msaa3D = q == QualityLevel.Ultra ? Viewport.Msaa.Msaa2X : Viewport.Msaa.Disabled;
         vp.UseTaa = q >= QualityLevel.High;
         vp.ScreenSpaceAA = q <= QualityLevel.Medium ? Viewport.ScreenSpaceAAEnum.Fxaa : Viewport.ScreenSpaceAAEnum.Disabled;
         vp.UseDebanding = q >= QualityLevel.Medium;
@@ -185,15 +153,15 @@ public static class GraphicsQuality
     public static void ApplySun(DirectionalLight3D sun)
     {
         var q = Level;
-        sun.DirectionalShadowMode = q >= QualityLevel.High
+        sun.DirectionalShadowMode = q >= QualityLevel.Ultra
             ? DirectionalLight3D.ShadowMode.Parallel4Splits
             : DirectionalLight3D.ShadowMode.Parallel2Splits;
         sun.DirectionalShadowMaxDistance = q switch
         {
             QualityLevel.Low => 50f,
-            QualityLevel.Medium => 90f,
-            QualityLevel.High => 140f,
-            _ => 220f,
+            QualityLevel.Medium => 80f,
+            QualityLevel.High => 120f,
+            _ => 200f,
         };
         sun.ShadowBlur = 1.2f;
         sun.ShadowNormalBias = 1.2f;

@@ -6,9 +6,9 @@ render_mode cull_disabled, diffuse_toon, specular_disabled;
 
 const float TEXELS = 64.0;
 
-uniform sampler2D noise_tex : repeat_enable, filter_nearest_mipmap;
-uniform sampler2D detail_normal : hint_normal, repeat_enable, filter_nearest_mipmap;
-uniform sampler2D caustics_tex : repeat_enable, filter_nearest_mipmap;
+uniform sampler2D noise_tex : repeat_enable, filter_linear_mipmap_anisotropic;
+uniform sampler2D detail_normal : hint_normal, repeat_enable, filter_linear_mipmap_anisotropic;
+uniform sampler2D caustics_tex : repeat_enable, filter_linear_mipmap_anisotropic;
 uniform vec3 rock_color : source_color = vec3(0.42, 0.40, 0.37);
 uniform vec3 soil_color : source_color = vec3(0.30, 0.23, 0.15);
 uniform float time = 0.0;

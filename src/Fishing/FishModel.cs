@@ -61,6 +61,7 @@ public partial class FishModel : Node3D
     {
         public ArrayMesh Body = null!, Fins = null!, Tail = null!;
         public ArrayMesh? Barbels;
+        public SphereMesh EyeMesh = null!, PupilMesh = null!;
         public float TailZ;
         public Vector3 EyePos;
         public float EyeRadius, EyeHeadHeight, MaxHeight, MaxWidth;
@@ -319,6 +320,9 @@ public partial class FishModel : Node3D
         float ex = prof.HalfWidth(te) * MathF.Sqrt(MathF.Max(1f - rel * rel, 0.05f)) * 0.96f;
         shape.EyePos = new Vector3(ex, ey, Z(te));
         shape.EyeRadius = r;
+        int eyeSeg = detailed ? 20 : 8;
+        shape.EyeMesh = new SphereMesh { Radius = r, Height = r * 2f, RadialSegments = eyeSeg, Rings = eyeSeg / 2 };
+        shape.PupilMesh = new SphereMesh { Radius = r * 0.55f, Height = r * 1.1f, RadialSegments = eyeSeg, Rings = eyeSeg / 2 };
         shape.EyeHeadHeight = headTop + headBottom;
         return shape;
     }
@@ -390,12 +394,11 @@ public partial class FishModel : Node3D
         }
 
         // Eyes: golden iris and a black pupil, flattened so they sit in the head instead of bulging out of it.
-        var irisMaterial = new StandardMaterial3D { AlbedoColor = new Color(0.9f, 0.72f, 0.25f), Roughness = 0.2f, Metallic = 0.3f, ClearcoatEnabled = true, Clearcoat = 1f };
-        var pupilMaterial = new StandardMaterial3D { AlbedoColor = new Color(0.01f, 0.01f, 0.01f), Roughness = 0.05f, ClearcoatEnabled = true, Clearcoat = 1f };
-        int eyeSeg = _detailed ? 20 : 8;
+        var irisMaterial = IrisMaterial;
+        var pupilMaterial = PupilMaterial;
         float r = shape.EyeRadius;
-        var eyeMesh = new SphereMesh { Radius = r, Height = r * 2f, RadialSegments = eyeSeg, Rings = eyeSeg / 2 };
-        var pupilMesh = new SphereMesh { Radius = r * 0.55f, Height = r * 1.1f, RadialSegments = eyeSeg, Rings = eyeSeg / 2 };
+        var eyeMesh = shape.EyeMesh;
+        var pupilMesh = shape.PupilMesh;
         foreach (float sx in new[] { -1f, 1f })
         {
             var p = shape.EyePos with { X = shape.EyePos.X * sx };
@@ -407,6 +410,16 @@ public partial class FishModel : Node3D
             });
         }
     }
+
+    private static readonly StandardMaterial3D IrisMaterial = new()
+    {
+        AlbedoColor = new Color(0.9f, 0.72f, 0.25f), Roughness = 0.2f, Metallic = 0.3f, ClearcoatEnabled = true, Clearcoat = 1f,
+    };
+
+    private static readonly StandardMaterial3D PupilMaterial = new()
+    {
+        AlbedoColor = new Color(0.01f, 0.01f, 0.01f), Roughness = 0.05f, ClearcoatEnabled = true, Clearcoat = 1f,
+    };
 
     private static void Tri(SurfaceTool st, Vector3 a, Vector3 b, Vector3 c, Color ca, Color cb, Color cc)
     {
@@ -491,6 +504,8 @@ public partial class FishModel : Node3D
 
     public override void _Process(double delta)
     {
+        if (!Visible)
+            return;                     // hidden fish in the lake cost nothing
         _time += (float)delta;
         if (_detailed && !_skinUpgraded)
             TryUpgradeSkin();

@@ -93,6 +93,22 @@ public static class FishSkin
             Math.Clamp(l + (c.B - l) * saturation, 0f, 1f));
     }
 
+    /// <summary>
+    /// Paints the light skins of many species at once on worker threads (when a lake is stocked), so the first fish
+    /// of a species to swim into view does not stall a frame while its skin is painted.
+    /// </summary>
+    public static void PrewarmLight(IEnumerable<FishSpecies> species)
+    {
+        var todo = new List<FishSpecies>();
+        foreach (var sp in species)
+            if (!Light.ContainsKey(sp.SpeciesName) && todo.TrueForAll(t => t.SpeciesName != sp.SpeciesName))
+                todo.Add(sp);
+        var images = new Image[todo.Count];
+        Parallel.For(0, todo.Count, i => images[i] = PaintImages(todo[i], LightWidth, LightHeight, normals: false).Albedo);
+        for (int i = 0; i < todo.Count; i++)
+            Light[todo[i].SpeciesName] = ImageTexture.CreateFromImage(images[i]);
+    }
+
     /// <summary>The light skin for fish swimming in the lake (and the icons).</summary>
     public static ImageTexture For(FishSpecies sp)
     {

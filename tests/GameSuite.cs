@@ -124,8 +124,8 @@ public sealed class GameSuite : ITestSuite
         t.Check(minimap != null && minimap.AnchorLeft == 1f && minimap.OffsetTop > 0f && minimap.OffsetTop < 40f,
             "the minimap and clock sit in the top-right corner");
         var mc = new Vector2(10f, -20f);
-        t.Check(Minimap.ToMap(mc, mc) == new Vector2(Minimap.Size / 2f, Minimap.Size / 2f)
-                && MathF.Abs(Minimap.ToMap(mc + new Vector2(Minimap.ViewMetres / 2f, 0f), mc).X - Minimap.Size) < 0.01f,
+        t.Check(Minimap.ToMap(mc, mc) == new Vector2(Minimap.MapSize / 2f, Minimap.MapSize / 2f)
+                && MathF.Abs(Minimap.ToMap(mc + new Vector2(Minimap.ViewMetres / 2f, 0f), mc).X - Minimap.MapSize) < 0.01f,
             $"the minimap is centred on the angler and shows {Minimap.ViewMetres:0} m across");
 
         t.Section("pause menu");

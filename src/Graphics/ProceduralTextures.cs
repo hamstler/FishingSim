@@ -96,8 +96,9 @@ public static class ProceduralTextures
         string key = needles ? "needles" : "leaves";
         if (Cache.TryGetValue(key, out var t))
             return t;
-        // Small on purpose: read with nearest filtering, every leaf is a few chunky pixels.
-        const int size = 256;
+        // 512 px per cluster: crisp leaves and needles at QHD (k scales the original 256-pixel design).
+        const int size = 512;
+        const float k = size / 256f;
         var img = Image.CreateEmpty(size, size, false, Image.Format.Rgba8);
         img.Fill(new Color(0.8f, 0.9f, 0.72f, 0f));
         var rng = new RandomNumberGenerator { Seed = needles ? 21UL : 12UL };
@@ -109,7 +110,7 @@ public static class ProceduralTextures
                 float r = MathF.Sqrt(rng.Randf()) * size * 0.44f;
                 float a = rng.Randf() * Mathf.Tau;
                 var p = c + new Vector2(MathF.Cos(a), MathF.Sin(a)) * r;
-                float len = rng.RandfRange(11f, 18f), wid = len * rng.RandfRange(0.42f, 0.55f);
+                float len = rng.RandfRange(11f, 18f) * k, wid = len * rng.RandfRange(0.42f, 0.55f);
                 float ang = a + rng.RandfRange(-0.8f, 0.8f);
                 float shade = rng.RandfRange(0.55f, 1f);
                 var tint = new Color(0.88f * shade, 1f * shade, 0.78f * shade);
@@ -121,10 +122,10 @@ public static class ProceduralTextures
             for (int b = 0; b < 16; b++)
             {
                 float a = rng.Randf() * Mathf.Tau;
-                var start = c + new Vector2(MathF.Cos(a), MathF.Sin(a)) * rng.RandfRange(0f, 28f);
+                var start = c + new Vector2(MathF.Cos(a), MathF.Sin(a)) * rng.RandfRange(0f, 28f) * k;
                 var dir = new Vector2(MathF.Cos(a + rng.RandfRange(-0.4f, 0.4f)), MathF.Sin(a + rng.RandfRange(-0.4f, 0.4f)));
-                float branchLen = rng.RandfRange(64f, 104f);
-                for (float s = 0; s < branchLen; s += 1.6f)
+                float branchLen = rng.RandfRange(64f, 104f) * k;
+                for (float s = 0; s < branchLen; s += 1.6f * k * 0.75f)
                 {
                     var p = start + dir * s;
                     float shade = rng.RandfRange(0.55f, 1f);
@@ -132,7 +133,7 @@ public static class ProceduralTextures
                     foreach (float side in new[] { -1f, 1f })
                     {
                         var n = new Vector2(-dir.Y, dir.X) * side;
-                        var tip = p + (n * 0.9f + dir * 0.45f).Normalized() * rng.RandfRange(10f, 16f);
+                        var tip = p + (n * 0.9f + dir * 0.45f).Normalized() * rng.RandfRange(10f, 16f) * k;
                         Line(img, p, tip, tint);
                     }
                 }
@@ -194,7 +195,7 @@ public static class ProceduralTextures
         if (Cache.TryGetValue(key, out var t))
             return t;
         var noise = new FastNoiseLite { Seed = 5, Frequency = 0.05f, FractalOctaves = 4 };
-        const int w = 128, h = 256;
+        const int w = 256, h = 512;
         var img = Image.CreateEmpty(w, h, false, Image.Format.Rgb8);
         for (int y = 0; y < h; y++)
         {
@@ -202,9 +203,9 @@ public static class ProceduralTextures
             {
                 // Stretched noise along the trunk gives furrows; wrap X so the cylinder has no seam.
                 float ang = x / (float)w * Mathf.Tau;
-                float n = noise.GetNoise3D(MathF.Cos(ang) * 14f, y * 0.15f, MathF.Sin(ang) * 14f);
+                float n = noise.GetNoise3D(MathF.Cos(ang) * 14f, y * 0.075f, MathF.Sin(ang) * 14f);
                 float furrow = 0.55f + 0.45f * MathF.Tanh(n * 3f);
-                float fine = noise.GetNoise2D(x * 3f, y * 3f) * 0.08f;
+                float fine = noise.GetNoise2D(x * 1.5f, y * 1.5f) * 0.08f;
                 float v = Math.Clamp(furrow + fine, 0f, 1f);
                 img.SetPixel(x, y, new Color(0.62f * v, 0.58f * v, 0.52f * v));
             }

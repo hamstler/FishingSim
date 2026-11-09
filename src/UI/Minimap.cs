@@ -13,7 +13,7 @@ namespace FishingSim.UI;
 /// </summary>
 public partial class Minimap : Control
 {
-    public const float Size = 190f;
+    public const float MapSize = 190f;
 
     /// <summary>Metres shown across the map.</summary>
     public const float ViewMetres = 120f;
@@ -60,7 +60,7 @@ public partial class Minimap : Control
 
     /// <summary>World (x, z) to a point on the minimap, given the centre of the view.</summary>
     public static Vector2 ToMap(Vector2 world, Vector2 centre) =>
-        new Vector2(Size / 2f, Size / 2f) + (world - centre) * (Size / ViewMetres);
+        new Vector2(MapSize / 2f, MapSize / 2f) + (world - centre) * (MapSize / ViewMetres);
 
     public override void _Draw()
     {
@@ -68,7 +68,7 @@ public partial class Minimap : Control
             return;
         EnsureTerrain();
         var centre = new Vector2(_player.GlobalPosition.X, _player.GlobalPosition.Z);
-        var box = new Rect2(0, 0, Size, Size);
+        var box = new Rect2(0, 0, MapSize, MapSize);
 
         // Frame and terrain.
         DrawRect(box.Grow(5f), new Color(0.08f, 0.05f, 0.03f, 0.9f));
@@ -85,8 +85,8 @@ public partial class Minimap : Control
             if (clipped.Size.X > 0f && clipped.Size.Y > 0f)
             {
                 var dst = new Rect2(
-                    (clipped.Position - src.Position) / src.Size * Size,
-                    clipped.Size / src.Size * Size);
+                    (clipped.Position - src.Position) / src.Size * MapSize,
+                    clipped.Size / src.Size * MapSize);
                 DrawTextureRectRegion(_terrain, dst, clipped, new Color(1, 1, 1, 0.95f));
             }
         }
@@ -107,7 +107,7 @@ public partial class Minimap : Control
         }
 
         // Float and line.
-        var me = new Vector2(Size / 2f, Size / 2f);
+        var me = new Vector2(MapSize / 2f, MapSize / 2f);
         if (_rod.State is RodState.Waiting or RodState.Nibble or RodState.Bite or RodState.Fight or RodState.Close)
         {
             var b = ToMap(new Vector2(_rod.Bobber.GlobalPosition.X, _rod.Bobber.GlobalPosition.Z), centre);
@@ -123,9 +123,9 @@ public partial class Minimap : Control
         var perp = new Vector2(-dir.Y, dir.X);
         DrawColoredPolygon(new[] { me + dir * 9f, me - dir * 5f + perp * 5.5f, me - dir * 2f, me - dir * 5f - perp * 5.5f }, new Color(1f, 0.88f, 0.3f));
         DrawPolyline(new[] { me + dir * 9f, me - dir * 5f + perp * 5.5f, me - dir * 2f, me - dir * 5f - perp * 5.5f, me + dir * 9f }, new Color(0.1f, 0.06f, 0.03f), 1.2f);
-        DrawString(font, new Vector2(Size / 2f - 4f, 12f), "N", HorizontalAlignment.Left, -1, 12, Ink);
+        DrawString(font, new Vector2(MapSize / 2f - 4f, 12f), "N", HorizontalAlignment.Left, -1, 12, Ink);
 
-        DrawClock(new Vector2(0f, Size + 12f), font);
+        DrawClock(new Vector2(0f, MapSize + 12f), font);
     }
 
     private static Vector2 Clamp(Vector2 p, Rect2 box) =>
@@ -153,12 +153,12 @@ public partial class Minimap : Control
         float until = DayClock.RealSecondsUntil(world.Hour, day ? DayClock.NightStart : DayClock.DayStart) / Math.Max(world.TimeScale, 1f);
         string next = day ? "do zmroku" : "do świtu";
         var x = c.X + r + 10f;
-        float width = Size - (x - at.X);
+        float width = MapSize - (x - at.X);
         DrawString(font, new Vector2(x, c.Y - 6f), world.TimeText, HorizontalAlignment.Left, -1, 20, Ink);
         string weather = !day && world.Weather == Core.Weather.Clear ? "Pogodnie" : world.Weather.DisplayName();
         DrawString(font, new Vector2(x, c.Y + 9f), weather, HorizontalAlignment.Left, width, 12, new Color(Ink, 0.8f));
         DrawString(font, new Vector2(x, c.Y + 23f), $"{MathF.Ceiling(until / 60f):0} min {next}", HorizontalAlignment.Left, width, 12,
             day ? new Color(1f, 0.85f, 0.5f, 0.85f) : new Color(0.75f, 0.82f, 1f, 0.85f));
-        DrawString(font, new Vector2(at.X, c.Y + r + 22f), _rod.Lake.Location.DisplayName, HorizontalAlignment.Left, Size, 13, new Color(Ink, 0.75f));
+        DrawString(font, new Vector2(at.X, c.Y + r + 22f), _rod.Lake.Location.DisplayName, HorizontalAlignment.Left, MapSize, 13, new Color(Ink, 0.75f));
     }
 }

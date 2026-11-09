@@ -6,7 +6,13 @@
 
 **Ryby:** 66 gatunków (rodzime i zadomowione), każdy z nazwą łacińską i opisem. Skóry są malowane w kodzie piksel po pikselu: łuski z ciemnymi krawędziami, linia boczna, pokrywa skrzelowa, plamki z obwódkami, pręgi, marmurkowanie, lustra karpia, tarczki jesiotra, plus mapa normalnych. Ryba na haku, w dłoni i w atlasie dostaje skórę 4096×2048 (2048×1024 na niskiej jakości), ryby w wodzie 512×256. **Atlas ryb** jest w menu głównym i w menu pauzy: obracający się model 3D, opis, wagi, cena, przynęty, głębokość, pora i łowiska, wyszukiwarka i filtr łowiska.
 
-**Hol:** ryba walczy od zacięcia (pierwszy odjazd z mocnym zrywem), świeża trzyma się głęboko i wychodzi do powierzchni dopiero zmęczona, szarpie łbem, a szczupaki, bolenie, pstrągi i łososie wyskakują z wody. Gdy hamulec oddaje linkę, kręcenie korbką nic nie daje. Startowy zestaw jest słaby (kij 2,4 kg, hamulec 2 kg), więc już płoć wyraźnie go obciąża.
+**Hol:** ryba ma prawdziwą pozycję, kierunek i prędkość: płynie najwyżej z prędkością zrywu wynikającą z długości ciała (płoć ok. 1 m/s, duży karp czy szczupak 3 m/s), skręca z ograniczoną szybkością i kołysze się na napiętej lince jak wahadło, zamiast przeskakiwać. Linkę zabiera tylko wtedy, gdy przeciąga hamulec, a wędkarz zyskuje linkę powoli, póki ryba ciągnie. Walka zaczyna się od pierwszego odjazdu zaraz po zacięciu, wędka szarpie przy każdym zrywie, a zmęczenie zależy od tego, jak mocno ryba walczy z hamulcem. Płoć to ok. pół minuty, karp 12 kg ok. 2 minuty na sprzęcie karpiowym (na teleskopie wyciąga całą linkę). Startowy zestaw jest słaby (kij 2,4 kg, hamulec 2 kg).
+
+**Zniszczony sprzęt:** złamana wędka znika z ekwipunku i z ręki, przy zerwanej żyłce przepada haczyk, a gdy ryba wyciągnie całą linkę, przepada żyłka. Bez kompletnego zestawu nie da się zarzucić. W kramie wędkarskim można odebrać darmowy zestaw, ale tylko wtedy, gdy brakujących części nie da się kupić za pieniądze z sakiewki.
+
+**Modele ryb:** każdy gatunek ma własną budowę (`src/Fishing/FishBody.cs`): wysokość i szerokość ciała, garb, płaski brzuch, długość pyska, szeroka lub płaska głowa, trzon ogonowy, kształt ogona (od zaokrąglonego po głęboko wcięty i rekinowy u jesiotrów), rodzaj płetwy grzbietowej (miękka, kolczasta, żagiel lipienia, długa karpia, ciągła węgorza, kolce ciernika), płetwa tłuszczowa, wąsy i oko dopasowane do głowy.
+
+**Tekstury QHD:** tekstury świata mają 1024 px na 2 m i filtrowanie anizotropowe; malują się wielowątkowo i są zapisywane w pamięci podręcznej (`user://texcache`). Okno startuje zmaksymalizowane, a świat renderuje się w natywnej rozdzielczości.
 
 **Minimalistyczny interfejs:** podczas zwykłego rozglądania na ekranie jest tylko mała kropka celownika. Stan wędki i cienki pasek napięcia pojawiają się w trakcie łowienia, sakiewka i siatka na chwilę po zmianie, a sprzęt na chwilę po przełączeniu. Tab pokazuje wszystko naraz, H sterowanie.
 

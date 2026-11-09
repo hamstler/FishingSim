@@ -106,8 +106,12 @@ Kolejność według wartości dla gracza; każdy punkt ma już miejsce w struktu
 10. **Ryby.** Zrobione: 66 gatunków z opisami, szczegółowe skóry (`Graphics/FishSkin`, malowane w tle wątkami),
     atlas w menu (`UI/FishAtlas`). Dalej: osobne tekstury płetw z promieniami, pyski i wąsy jako siatki.
 
+11. **Realizm i wydajność.** Zrobione: hol na fizyce położenia i prędkości ryby, modele ryb per gatunek, niszczenie
+    sprzętu z darmowym zestawem dla bez grosza, tekstury 1024 px z pamięcią podręczną, lżejszy preset Wysoka
+    (SSIL, SSR, MSAA tylko na Ultra), wcześniejsze malowanie skór i materiałów ryb (bez przycięć).
+
 ## Testy
-Wszystkie zestawy razem: `godot --headless --path . res://tests/run_tests.tscn` (423 sprawdzenia). Zestaw `gear` (`tests/GearSuite.cs`) sprawdza targ, siatki, podbieraki, akcesoria, zapis, animację ciała, pływanie
+Wszystkie zestawy razem: `godot --headless --path . res://tests/run_tests.tscn` (447 sprawdzeń). Zestaw `gear` (`tests/GearSuite.cs`) sprawdza targ, siatki, podbieraki, akcesoria, zapis, animację ciała, pływanie
 ryb i ich obecność w grze, brania od widocznych ryb, dźwięk, akcesoria, atlas oraz balans 66 gatunków (każdy da się złowić i wyholować). Uruchomienie:
 ```
 FISHSIM_NO_SAVE=1 godot --headless --path . res://tests/run_tests.tscn -- gear

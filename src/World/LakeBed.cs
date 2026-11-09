@@ -255,8 +255,8 @@ public partial class LakeBed : Node3D
         if (_terrainMaterial != null)
             return _terrainMaterial;
         _terrainMaterial = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/terrain.gdshader") };
-        _terrainMaterial.SetShaderParameter("noise_tex", Graphics.ProceduralTextures.Noise(17, 0.02f, 512));
-        _terrainMaterial.SetShaderParameter("detail_normal", Graphics.ProceduralTextures.Noise(23, 0.03f, 512, true, 10f));
+        _terrainMaterial.SetShaderParameter("noise_tex", Graphics.ProceduralTextures.Noise(17, 0.01f, 1024));
+        _terrainMaterial.SetShaderParameter("detail_normal", Graphics.ProceduralTextures.Noise(23, 0.015f, 1024, true, 10f));
         _terrainMaterial.SetShaderParameter("caustics_tex", Graphics.ProceduralTextures.Caustics());
         return _terrainMaterial;
     }

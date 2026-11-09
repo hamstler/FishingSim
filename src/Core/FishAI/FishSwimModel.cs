@@ -148,11 +148,21 @@ public sealed class FishSwimModel
     /// Advances every fish. <paramref name="threat"/> is the angler's position on the ground and
     /// <paramref name="threatSpeed"/> how fast they move (running on the shore spooks fish further away).
     /// </summary>
+    private readonly Dictionary<int, List<FishAgent>> _bySchool = new();
+
     public void Step(float dt, Vector2 threat, float threatSpeed)
     {
         if (dt <= 0f)
             return;
         float spook = SpookRadius * (0.5f + MathF.Min(threatSpeed / 3f, 1.5f));
+        // Shoal-mates are looked up per school, not across the whole lake (150 fish: 150 x school size, not 150²).
+        _bySchool.Clear();
+        foreach (var a in _agents)
+        {
+            if (!_bySchool.TryGetValue(a.School, out var list))
+                _bySchool[a.School] = list = new List<FishAgent>();
+            list.Add(a);
+        }
         foreach (var a in _agents)
         {
             if (a.Hooked)
@@ -164,9 +174,9 @@ public sealed class FishSwimModel
             // Shoal with nearby fish of the same school (cohesion + alignment + separation).
             Vector2 centre = Vector2.Zero, heading = Vector2.Zero, push = Vector2.Zero;
             int mates = 0;
-            foreach (var b in _agents)
+            foreach (var b in _bySchool[a.School])
             {
-                if (ReferenceEquals(a, b) || b.School != a.School)
+                if (ReferenceEquals(a, b))
                     continue;
                 var d = b.Position - a.Position;
                 float dist = d.Length();

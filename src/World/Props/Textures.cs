@@ -1,23 +1,29 @@
 using System;
+using System.Threading.Tasks;
 using Godot;
 
 namespace FishingSim.World.Props;
 
 /// <summary>
-/// Pixel-art textures for the medieval village (boards, plaster, thatch, fieldstone), generated at start-up and read
-/// with nearest filtering. Each tile is <see cref="Size"/>² pixels covering 2 m, i.e. fine pixel detail (128 px/m)
-/// rather than chunky blocks. Built from byte arrays, so generation stays fast.
+/// High-resolution textures for the medieval village (boards, plaster, thatch, fieldstone): each tile is
+/// <see cref="Size"/>² pixels covering 2 m (512 px per metre, sharp at QHD), read with trilinear anisotropic filtering.
+/// They are painted from byte arrays on worker threads with a tiling value noise of their own, and kept in a disk
+/// cache (user://texcache) so later launches load them instead of painting them again.
 /// </summary>
 public static class Textures
 {
-    public const int Size = 256;
+    public const int Size = 1024;
+
+    /// <summary>Scale of the original 256-pixel designs: every distance in pixels is multiplied by this.</summary>
+    private const float S = Size / 256f;
 
     /// <summary>Texture repeats per metre for triplanar mapping (one tile = 2 m).</summary>
     public const float TriplanarScale = 0.5f;
 
-    private static ImageTexture? _planks, _shingles, _planksPainted, _stone, _plaster;
+    /// <summary>Bump when a texture design changes, so stale cached images are repainted.</summary>
+    private const int CacheVersion = 2;
 
-    private static readonly FastNoiseLite Grain = new() { Seed = 3, Frequency = 0.05f, FractalOctaves = 3 };
+    private static ImageTexture? _planks, _shingles, _planksPainted, _stone, _plaster;
 
     private sealed class Canvas
     {
@@ -33,165 +39,231 @@ public static class Textures
             Data[i + 2] = (byte)(Math.Clamp(b, 0f, 1f) * 255f);
         }
 
-        public ImageTexture Texture()
+        public float Red(int x, int y) => Data[(((y % Size) + Size) % Size * Size + ((x % Size) + Size) % Size) * 3] / 255f;
+
+        public Image Image()
         {
-            var img = Image.CreateFromData(Size, Size, false, Image.Format.Rgb8, Data);
-            img.GenerateMipmaps();
-            return ImageTexture.CreateFromImage(img);
+            var img = Godot.Image.CreateFromData(Size, Size, false, Godot.Image.Format.Rgb8, Data);
+            return img;
         }
     }
 
-    /// <summary>Seamless noise in [-1, 1] on the tile.</summary>
-    private static float Tile(float x, float y, float scale, int seed)
-    {
-        float a = x / Size * Mathf.Tau, b = y / Size * Mathf.Tau;
-        Grain.Seed = seed;
-        return Grain.GetNoise3D(MathF.Cos(a) * scale, MathF.Sin(a) * scale + MathF.Cos(b) * scale, MathF.Sin(b) * scale);
-    }
+    private static string CachePath(string name) => $"user://texcache/{name}_{Size}_v{CacheVersion}.png";
 
-    /// <summary>Horizontal boards with wavy grain, knots and dark seams.</summary>
-    public static ImageTexture Planks()
+    /// <summary>Loads a cached texture, or paints it and stores it in the cache.</summary>
+    private static ImageTexture Cached(string name, Func<Canvas> paint)
     {
-        if (_planks != null)
-            return _planks;
-        var c = new Canvas();
-        var rng = new RandomNumberGenerator { Seed = 7 };
-        const int boards = 7, bh = Size / boards + 1;
-        for (int b = 0; b < boards; b++)
+        string path = CachePath(name);
+        Image? img = null;
+        if (FileAccess.FileExists(path))
         {
-            float tone = rng.RandfRange(0.82f, 1.08f);
-            float kx = rng.RandfRange(0f, Size), ky = b * bh + bh * 0.5f;
-            int joint = rng.RandiRange(20, Size - 20);
-            for (int y = b * bh; y < Math.Min((b + 1) * bh, Size); y++)
+            img = Godot.Image.LoadFromFile(path);
+            if (img != null && (img.GetWidth() != Size || img.GetHeight() != Size))
+                img = null;
+            img?.Convert(Godot.Image.Format.Rgb8);
+        }
+        if (img == null)
+        {
+            img = paint().Image();
+            if (!OS.HasEnvironment("FISHSIM_NO_CACHE"))
             {
-                for (int x = 0; x < Size; x++)
-                {
-                    int ly = y - b * bh;
-                    // Grain lines bend around the knot.
-                    float dk = MathF.Sqrt((x - kx) * (x - kx) * 0.15f + (y - ky) * (y - ky));
-                    float wave = MathF.Sin((y + Tile(x, y, 2f, b) * 6f + 40f / (dk + 4f)) * 1.3f);
-                    float v = tone * (0.9f + 0.08f * wave + 0.05f * Tile(x, y, 6f, 10 + b));
-                    if (dk < 4f) v *= 0.55f;                                    // knot
-                    if (ly == 0) v *= 0.45f; else if (ly == 1) v *= 0.7f;       // seam
-                    else if (ly == 2) v *= 1.1f;                                 // lit edge
-                    if (Math.Abs(x - joint) < 1 && b % 2 == 0) v *= 0.5f;        // butt joint
-                    c.Set(x, y, 0.52f * v, 0.36f * v, 0.22f * v);
-                }
+                DirAccess.MakeDirRecursiveAbsolute("user://texcache");
+                img.SavePng(path);
             }
         }
-        _planks = c.Texture();
-        return _planks;
+        img.GenerateMipmaps();
+        return ImageTexture.CreateFromImage(img);
+    }
+
+    // ------------------------------------------------------------------ tiling value noise (thread-safe)
+    private static float Hash(int x, int y, int seed)
+    {
+        unchecked
+        {
+            uint h = (uint)(x * 73856093) ^ (uint)(y * 19349663) ^ (uint)(seed * 83492791);
+            h ^= h >> 13;
+            h *= 0x5bd1e995;
+            h ^= h >> 15;
+            return (h & 0xFFFF) / 65535f;
+        }
+    }
+
+    /// <summary>Value noise with <paramref name="cells"/> cells across the tile, wrapping at the edges.</summary>
+    private static float Periodic(float x, float y, int cells, int seed)
+    {
+        float fx = x / Size * cells, fy = y / Size * cells;
+        int ix = (int)MathF.Floor(fx), iy = (int)MathF.Floor(fy);
+        float tx = fx - ix, ty = fy - iy;
+        tx = tx * tx * (3f - 2f * tx);
+        ty = ty * ty * (3f - 2f * ty);
+        int x0 = ((ix % cells) + cells) % cells, x1 = (x0 + 1) % cells;
+        int y0 = ((iy % cells) + cells) % cells, y1 = (y0 + 1) % cells;
+        float a = Hash(x0, y0, seed), b = Hash(x1, y0, seed), c = Hash(x0, y1, seed), d = Hash(x1, y1, seed);
+        return a + (b - a) * tx + (c - a) * ty + (a - b - c + d) * tx * ty;
+    }
+
+    /// <summary>Seamless fractal noise in [-1, 1] on the tile; <paramref name="scale"/> ~ features across the tile / 4.</summary>
+    private static float Tile(float x, float y, float scale, int seed)
+    {
+        int c = Math.Max(2, (int)(scale * 4f));
+        float n = Periodic(x, y, c, seed) * 0.55f + Periodic(x, y, c * 2, seed + 1) * 0.3f + Periodic(x, y, c * 4, seed + 2) * 0.15f;
+        return n * 2f - 1f;
+    }
+
+    private static void Rows(Action<int> row) => Parallel.For(0, Size, row);
+
+    // ------------------------------------------------------------------ textures
+    /// <summary>Horizontal boards with wavy grain, knots and dark seams.</summary>
+    public static ImageTexture Planks() => _planks ??= Cached("planks", PaintPlanks);
+
+    private static Canvas PaintPlanks()
+    {
+        var c = new Canvas();
+        var rng = new RandomNumberGenerator { Seed = 7 };
+        const int boards = 7;
+        int bh = Size / boards + 1;
+        var tone = new float[boards];
+        var kx = new float[boards];
+        var joint = new int[boards];
+        for (int b = 0; b < boards; b++)
+        {
+            tone[b] = rng.RandfRange(0.82f, 1.08f);
+            kx[b] = rng.RandfRange(0f, Size);
+            joint[b] = rng.RandiRange((int)(20 * S), (int)(Size - 20 * S));
+        }
+        Rows(y =>
+        {
+            int b = Math.Min(y / bh, boards - 1);
+            int ly = y - b * bh;
+            float ky = b * bh + bh * 0.5f;
+            for (int x = 0; x < Size; x++)
+            {
+                // Grain lines bend around the knot.
+                float dk = MathF.Sqrt((x - kx[b]) * (x - kx[b]) * 0.15f + (y - ky) * (y - ky)) / S;
+                float wave = MathF.Sin((y / S + Tile(x, y, 2f, b) * 6f + 40f / (dk + 4f)) * 1.3f);
+                float fine = Tile(x, y, 24f, 50 + b) * 0.03f;                // fibres between the grain lines
+                float v = tone[b] * (0.9f + 0.08f * wave + 0.05f * Tile(x, y, 6f, 10 + b) + fine);
+                if (dk < 4f) v *= 0.55f + 0.1f * (dk / 4f);                  // knot
+                if (ly < S) v *= 0.45f; else if (ly < 2f * S) v *= 0.7f;    // seam
+                else if (ly < 3f * S) v *= 1.1f;                              // lit edge
+                if (Math.Abs(x - joint[b]) < S && b % 2 == 0) v *= 0.5f;     // butt joint
+                c.Set(x, y, 0.52f * v, 0.36f * v, 0.22f * v);
+            }
+        });
+        return c;
     }
 
     /// <summary>The same boards in light grey, so a material colour can stain them.</summary>
-    public static ImageTexture PlanksPainted()
+    public static ImageTexture PlanksPainted() => _planksPainted ??= Cached("planks_painted", () =>
     {
-        if (_planksPainted != null)
-            return _planksPainted;
-        var src = Planks().GetImage();
-        src.ClearMipmaps();
+        var src = PaintPlanks();
         var c = new Canvas();
-        for (int y = 0; y < Size; y++)
+        Rows(y =>
+        {
             for (int x = 0; x < Size; x++)
             {
-                float v = Math.Clamp(src.GetPixel(x, y).R * 1.85f, 0f, 1f);
+                float v = Math.Clamp(src.Red(x, y) * 1.85f, 0f, 1f);
                 c.Set(x, y, v, v, v);
             }
-        _planksPainted = c.Texture();
-        return _planksPainted;
-    }
+        });
+        return c;
+    });
 
     /// <summary>Lime plaster for the timber-framed walls: off-white, mottled, with a few hairline cracks.</summary>
-    public static ImageTexture Plaster()
+    public static ImageTexture Plaster() => _plaster ??= Cached("plaster", () =>
     {
-        if (_plaster != null)
-            return _plaster;
         var c = new Canvas();
-        var rng = new RandomNumberGenerator { Seed = 3 };
-        for (int y = 0; y < Size; y++)
+        Rows(y =>
+        {
             for (int x = 0; x < Size; x++)
             {
-                float v = 0.92f + 0.04f * Tile(x, y, 3f, 21) + 0.03f * Tile(x, y, 12f, 22) + rng.RandfRange(-0.012f, 0.012f);
+                float v = 0.92f + 0.04f * Tile(x, y, 3f, 21) + 0.03f * Tile(x, y, 12f, 22) + (Hash(x, y, 23) - 0.5f) * 0.024f;
                 c.Set(x, y, v, v * 0.98f, v * 0.93f);
             }
+        });
+        var rng = new RandomNumberGenerator { Seed = 3 };
         for (int k = 0; k < 4; k++)
         {
             float x = rng.RandfRange(0, Size), y = rng.RandfRange(0, Size), dir = rng.RandfRange(0, Mathf.Tau);
-            for (int i = 0; i < 40; i++)
+            for (int i = 0; i < 40 * S; i++)
             {
-                dir += rng.RandfRange(-0.5f, 0.5f);
+                dir += rng.RandfRange(-0.5f, 0.5f) / MathF.Sqrt(S);
                 x += MathF.Cos(dir);
                 y += MathF.Sin(dir);
                 c.Set((int)x, (int)y, 0.7f, 0.68f, 0.64f);
+                c.Set((int)x + 1, (int)y, 0.8f, 0.78f, 0.74f);
             }
         }
-        _plaster = c.Texture();
-        return _plaster;
-    }
+        return c;
+    });
 
     /// <summary>Thatch: layered rows of straw, each made of individual stalks with shadow under the row above.</summary>
-    public static ImageTexture Shingles()
+    public static ImageTexture Shingles() => _shingles ??= Cached("thatch", () =>
     {
-        if (_shingles != null)
-            return _shingles;
         var c = new Canvas();
-        var rng = new RandomNumberGenerator { Seed = 11 };
-        const int rows = 8, rh = Size / rows;
-        for (int r = 0; r < rows; r++)
+        const int rows = 8;
+        int rh = Size / rows;
+        Rows(y =>
         {
+            int r = Math.Min(y / rh, rows - 1), ly = y - r * rh;
             for (int x = 0; x < Size; x++)
             {
-                float stalk = rng.RandfRange(0.78f, 1.12f);
-                int len = rng.RandiRange(rh - 8, rh + 2);
-                for (int ly = 0; ly < rh; ly++)
-                {
-                    int y = r * rh + ly;
-                    float v = stalk * (0.7f + 0.35f * ly / rh) * (0.95f + 0.05f * Tile(x, y, 8f, 31));
-                    if (ly >= len) v *= 0.5f;          // gap where the stalk ends
-                    if (ly < 3) v *= 0.55f + ly * 0.12f; // shadow under the row above
-                    c.Set(x, y, v, v * 0.88f, v * 0.62f);
-                }
+                // Each stalk is about S pixels wide, with its own tone and length.
+                int stalkId = x / Math.Max((int)(S * 0.75f), 1);
+                float stalk = 0.78f + 0.34f * Hash(stalkId, r, 31);
+                int len = rh - (int)((2f + 8f * Hash(stalkId, r, 32)) * S);
+                float edge = 1f - 0.25f * MathF.Abs(MathF.Sin(MathF.PI * (x % Math.Max((int)(S * 0.75f), 1)) / MathF.Max(S * 0.75f, 1f) + 0.5f));
+                float v = stalk * edge * (0.7f + 0.35f * ly / rh) * (0.95f + 0.05f * Tile(x, y, 8f, 33));
+                if (ly >= len) v *= 0.5f;                            // gap where the stalk ends
+                if (ly < 3f * S) v *= 0.55f + ly / (3f * S) * 0.36f;  // shadow under the row above
+                c.Set(x, y, v, v * 0.88f, v * 0.62f);
             }
-        }
-        _shingles = c.Texture();
-        return _shingles;
-    }
+        });
+        return c;
+    });
 
     /// <summary>Rough fieldstones with dark mortar: rows of irregular, rounded stones with lit tops.</summary>
-    public static ImageTexture Stone()
+    public static ImageTexture Stone() => _stone ??= Cached("stone", () =>
     {
-        if (_stone != null)
-            return _stone;
         var c = new Canvas();
-        var rng = new RandomNumberGenerator { Seed = 5 };
-        for (int y = 0; y < Size; y++)
+        Rows(y =>
+        {
             for (int x = 0; x < Size; x++)
-                c.Set(x, y, 0.22f, 0.21f, 0.2f);                               // mortar
-        const int rows = 6, rh = Size / rows;
+            {
+                float m = 0.21f + 0.03f * Tile(x, y, 20f, 40);                // gritty mortar
+                c.Set(x, y, m, m * 0.97f, m * 0.92f);
+            }
+        });
+        var rng = new RandomNumberGenerator { Seed = 5 };
+        const int rows = 6;
+        int rh = Size / rows;
         for (int r = 0; r < rows; r++)
         {
-            int x = -rng.RandiRange(0, 30);
+            int x = -rng.RandiRange(0, (int)(30 * S));
             while (x < Size)
             {
-                int w = rng.RandiRange(28, 60);
-                int h = rh - rng.RandiRange(3, 8);
+                int w = rng.RandiRange((int)(28 * S), (int)(60 * S));
+                int h = rh - rng.RandiRange((int)(3 * S), (int)(8 * S));
                 float tone = rng.RandfRange(0.62f, 1.0f);
                 float cx = x + w * 0.5f, cy = r * rh + rh * 0.5f;
-                for (int py = r * rh; py < (r + 1) * rh; py++)
-                    for (int px = x; px < x + w; px++)
+                int x0 = x, row = r;
+                Parallel.For(r * rh, (r + 1) * rh, py =>
+                {
+                    for (int px = x0; px < x0 + w; px++)
                     {
-                        float dx = (px - cx) / (w * 0.5f - 2f), dy = (py - cy) / (h * 0.5f);
+                        float dx = (px - cx) / (w * 0.5f - 2f * S), dy = (py - cy) / (h * 0.5f);
                         float d = dx * dx * dx * dx + dy * dy * dy * dy;      // rounded rectangle
                         if (d > 1f)
                             continue;
                         float light = 1f - 0.25f * dy - 0.15f * d;             // lit from above
-                        float v = tone * light * (0.92f + 0.08f * Tile(px, py, 10f, 41 + r));
+                        float grain = Tile(px, py, 10f, 41 + row) * 0.08f + Tile(px, py, 40f, 60 + row) * 0.04f;
+                        float v = tone * light * (0.92f + grain);
                         c.Set(px, py, 0.62f * v, 0.6f * v, 0.56f * v);
                     }
-                x += w + rng.RandiRange(2, 4);
+                });
+                x += w + rng.RandiRange((int)(2 * S), (int)(4 * S));
             }
         }
-        _stone = c.Texture();
-        return _stone;
-    }
+        return c;
+    });
 }

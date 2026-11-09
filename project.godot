@@ -11,6 +11,9 @@ config/features=PackedStringArray("4.3", "C#")
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
+window/size/mode=2
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 
 [dotnet]
 
@@ -19,6 +22,9 @@ project/assembly_name="FishingSim"
 [rendering]
 
 environment/defaults/default_clear_color=Color(0.5, 0.7, 0.9, 1)
+textures/default_filters/anisotropic_filtering_level=4
+environment/ssao/quality=1
+environment/ssil/quality=1
 
 [gui]
 

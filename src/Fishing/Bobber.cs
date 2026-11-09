@@ -74,7 +74,7 @@ public partial class Bobber : RigidBody3D
         EmissionEnabled = true,
         Emission = color,
         EmissionEnergyMultiplier = glow,
-        TextureFilter = BaseMaterial3D.TextureFilterEnum.Nearest,
+        TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
     };
 
     /// <summary>
