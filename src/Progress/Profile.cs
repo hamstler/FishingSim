@@ -168,13 +168,18 @@ public sealed class Profile
         return paid;
     }
     /// <summary>Adds a landed fish to the keepnet and the journal, awards XP and checks for records and level-ups.</summary>
-    public CatchResult AddCatch(FishSpecies species, float weight, CatchContext? context = null)
+    /// <summary>
+    /// Records a landed fish: counts, journal, records and XP. With <paramref name="toKeepnet"/> it also goes straight
+    /// into the keepnet (when there is room); without it the angler decides afterwards (<see cref="Keep"/> or
+    /// <see cref="Release"/>).
+    /// </summary>
+    public CatchResult AddCatch(FishSpecies species, float weight, CatchContext? context = null, bool toKeepnet = true)
     {
         string name = species.SpeciesName;
         int xpGain = Progression.FishXp(species, weight);
         int value = Progression.FishValue(species, weight);
-        bool released = !KeepnetFits(weight);
-        if (!released)
+        bool released = toKeepnet && !KeepnetFits(weight);
+        if (toKeepnet && !released)
             Keepnet.Add(new CatchRecord(name, weight, value, 1f, weight < species.LegalWeight));
         CatchCounts[name] = CatchCounts.GetValueOrDefault(name) + 1;
         TotalCatches++;
@@ -317,6 +322,25 @@ public sealed class Profile
 
     /// <summary>XP for putting a fish back.</summary>
     public const int ReleaseXp = 3;
+
+    /// <summary>Puts a landed fish into the keepnet. Null on success, otherwise why not (a full keepnet).</summary>
+    public string? Keep(FishSpecies species, float weight)
+    {
+        if (!KeepnetFits(weight))
+            return KeepnetLimit is { } net && Keepnet.Count >= net.MaxFish
+                ? "Siatka pełna: wypuść rybę albo sprzedaj połów"
+                : "Ryba nie zmieści się w siatce: jest za ciężka na tę siatkę";
+        Keepnet.Add(new CatchRecord(species.SpeciesName, weight, Progression.FishValue(species, weight), 1f, weight < species.LegalWeight));
+        Changed?.Invoke();
+        return null;
+    }
+
+    /// <summary>Puts a landed fish back into the water (a little XP for sportsmanship).</summary>
+    public void Release()
+    {
+        GainXp(ReleaseXp);
+        Changed?.Invoke();
+    }
 
     /// <summary>
     /// Puts the most recently kept fish back into the water (it must be the last one in the keepnet). Gives a little XP.

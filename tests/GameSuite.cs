@@ -217,8 +217,20 @@ public sealed class GameSuite : ITestSuite
         rod.LiftOverride = false;
         rod.ReelOverride = false;
         t.Check(rod.State == RodState.Landed && profile.TotalCatches == fishBefore + 1, "the fish is landed and added to the profile");
-        t.Check(profile.Journal.Count > 0 && profile.Journal[^1].Location == "Zatoka Szuwarowa" && profile.Journal[^1].Bait != null, "the journal notes where and on what it was caught");
         t.Check(rod.BannerText.Contains("XP"), "the banner reports the XP gained");
+        var hud = main.GetChildren().OfType<Hud>().First();
+        int netBeforeChoice = profile.Keepnet.Count;
+        await t.NextFrame();
+        t.Check(rod.AwaitingDecision && hud.CatchPanel.Visible && profile.Keepnet.Count == netBeforeChoice,
+            "a panel asks where the fish goes; it is not in the keepnet yet");
+        await t.Seconds(1.5);
+        t.Check(rod.State == RodState.Landed && rod.AwaitingDecision, "the fish waits in the hand until the angler decides");
+        hud.CatchPanel.KeepButton.EmitSignal(BaseButton.SignalName.Pressed);
+        await t.NextFrame();
+        await t.NextFrame();
+        t.Check(!rod.AwaitingDecision && profile.Keepnet.Count == netBeforeChoice + 1 && !hud.CatchPanel.Visible,
+            $"\"Do siatki\" puts it into the keepnet and closes the panel (awaiting {rod.AwaitingDecision}, net {profile.Keepnet.Count}/{netBeforeChoice}, visible {hud.CatchPanel.Visible}, banner {rod.BannerText})");
+        t.Check(profile.Journal.Count > 0 && profile.Journal[^1].Location == "Zatoka Szuwarowa" && profile.Journal[^1].Bait != null, "the journal notes where and on what it was caught");
         t.Check(baitBefore >= 0 && rod.Tension == 0f, "tension is cleared after the fight");
         rod.ResetToIdle();
 
@@ -226,7 +238,9 @@ public sealed class GameSuite : ITestSuite
         var carp = GD.Load<FishSpecies>("res://data/fish/karp.tres");
         int money0 = profile.Money;
         rod.ForceLand(carp, 5f);
-        t.Check(rod.BannerText.Contains("rekord") && profile.Keepnet.Count >= 1, "a record fish is announced");
+        t.Check(rod.BannerText.Contains("rekord"), "a record fish is announced");
+        rod._UnhandledInput(Key(Godot.Key.E));
+        t.Check(profile.Keepnet.Count >= 1 && !rod.AwaitingDecision, "E puts the landed fish into the keepnet");
         rod.ResetToIdle();
         shop.Toggle();
         t.Check(shop.Visible && rod.InputBlocked, "B opens the shop and blocks fishing input");

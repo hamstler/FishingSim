@@ -330,8 +330,11 @@ public partial class FishingRod : Node3D
             case Key.Space:
                 TryNet();
                 break;
-            case Key.R when State == RodState.Landed && _releasable && CurrentSpecies != null:
+            case Key.R when State == RodState.Landed && AwaitingDecision:
                 ReleaseCatch();
+                break;
+            case Key.E when State == RodState.Landed && AwaitingDecision:
+                KeepCatch();
                 break;
             case Key.F2:
                 DevInstantBite = !DevInstantBite;
@@ -477,6 +480,12 @@ public partial class FishingRod : Node3D
 
     public void ResetToIdle()
     {
+        // Walking away from an undecided catch puts it back into the water.
+        if (AwaitingDecision)
+        {
+            AwaitingDecision = false;
+            Profile.Release();
+        }
         LoseBiter();
         ClearHeldFish();
         _bobber.Stow();
@@ -906,8 +915,10 @@ public partial class FishingRod : Node3D
         var context = new CatchContext(
             Lake.Location.DisplayName, Loadout.Bait.DisplayName, Loadout.Hook.DisplayName,
             MathF.Round(CurrentDepth() * 10f) / 10f, World.TimeText);
-        var result = Profile.AddCatch(species, CurrentWeight, context);
-        _releasable = !result.Released;
+        // Counts, journal, records and XP now; the keepnet only when the angler chooses (catch panel: E / R).
+        var result = Profile.AddCatch(species, CurrentWeight, context, toKeepnet: false);
+        LastCatch = result;
+        AwaitingDecision = true;
         if (_biter != null)
             Population?.Catch(_biter);
         _biter = null;
@@ -916,10 +927,6 @@ public partial class FishingRod : Node3D
             text += "\nNowy rekord gatunku!";
         if (result.LevelUp)
             text += $"\nAwans na poziom {Profile.Level}!";
-        if (result.Released)
-            text += "\nSiatka pełna: ryba wypuszczona. Sprzedaj ryby albo kup większą siatkę.";
-        else if (CurrentWeight < species.LegalWeight)
-            text += $"\nNiewymiarowa (poniżej {species.LegalWeight:0.00} kg)! Wypuść ją (R), bo strażnik ukarze.";
         ShowBanner(text, 4.5f);
         _lineOutOutsideFight = 0f;
         _fight = null;
@@ -963,7 +970,11 @@ public partial class FishingRod : Node3D
 
     private void TickResult()
     {
-        if (_stateTime > ResultSeconds)
+        // A landed fish waits in the hand for the angler's choice; after it the rod is ready again shortly.
+        if (State == RodState.Landed && AwaitingDecision)
+            return;
+        float since = State == RodState.Landed ? _stateTime - _decidedAt : _stateTime;
+        if (since > (State == RodState.Landed ? 1f : ResultSeconds))
             ResetToIdle();
     }
 
@@ -980,20 +991,50 @@ public partial class FishingRod : Node3D
         _heldFish = model;
     }
 
-    private bool _releasable;
+    /// <summary>A fish has just been landed and is held up: the catch panel asks where it goes.</summary>
+    public bool AwaitingDecision { get; private set; }
 
-    /// <summary>True right after a kept catch: R puts it back into the water.</summary>
-    public bool CanRelease => State == RodState.Landed && _releasable;
+    /// <summary>What the last landing earned (XP, record, value) for the catch panel.</summary>
+    public CatchResult LastCatch { get; private set; }
 
-    /// <summary>Puts the fish just caught back into the water (R right after landing).</summary>
+    /// <summary>Kept for compatibility: the landed fish may still go back into the water.</summary>
+    public bool CanRelease => State == RodState.Landed && AwaitingDecision;
+
+    private float _decidedAt = -1f;
+
+    /// <summary>The catch panel's "Do siatki": the fish goes into the keepnet (if it fits).</summary>
+    public bool KeepCatch()
+    {
+        if (!AwaitingDecision || CurrentSpecies == null)
+            return false;
+        string? error = Profile.Keep(CurrentSpecies, CurrentWeight);
+        if (error != null)
+        {
+            ShowBanner(error, 3f);
+            return false;
+        }
+        Decided();
+        SoundCue?.Invoke(Core.Audio.OneShot.SmallSplash, 0.5f);
+        ShowBanner($"Do siatki: {CurrentSpecies.SpeciesName} {CurrentWeight:0.00} kg", 2f);
+        return true;
+    }
+
+    /// <summary>The catch panel's "Do wody": the fish swims away (a little XP).</summary>
     public void ReleaseCatch()
     {
-        if (!CanRelease || CurrentSpecies == null || !Profile.ReleaseLast(CurrentSpecies.SpeciesName, CurrentWeight))
+        if (!AwaitingDecision || CurrentSpecies == null)
             return;
-        _releasable = false;
-        ClearHeldFish();
+        Profile.Release();
+        Decided();
         SoundCue?.Invoke(Core.Audio.OneShot.SmallSplash, 0.8f);
         ShowBanner($"Wypuszczono: {CurrentSpecies.SpeciesName} {CurrentWeight:0.00} kg (+{Profile.ReleaseXp} XP)", 2.5f);
+    }
+
+    private void Decided()
+    {
+        AwaitingDecision = false;
+        _decidedAt = _stateTime;
+        ClearHeldFish();
     }
 
     /// <summary>The landed fish shown in front of the camera (held in the left hand), or null.</summary>

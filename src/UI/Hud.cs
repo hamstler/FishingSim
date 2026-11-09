@@ -54,6 +54,10 @@ public partial class Hud : CanvasLayer
     private string _lastPurse = "", _lastTackle = "";
 
     private Minimap? _minimap;
+    private CatchPanel _catchPanel = null!;
+
+    /// <summary>The keep-or-release panel shown after a landing.</summary>
+    public CatchPanel CatchPanel => _catchPanel;
 
     public void Setup(FishingRod rod, TournamentManager tournaments, InteractionManager interactions, Node3D? player = null, Scenery? scenery = null)
     {
@@ -125,6 +129,11 @@ public partial class Hud : CanvasLayer
         _gauge = new TensionGauge { Rod = _rod };
         Anchor(_gauge, 0.5f, 1f, -GaugeHalfWidth, GaugeTop, GaugeHalfWidth, GaugeTop + GaugeHeight);
         AddChild(_gauge);
+        // After a landing: keep it or let it go (above the status line, the fish is held up in the left hand).
+        _catchPanel = new CatchPanel();
+        _catchPanel.Setup(_rod);
+        Anchor(_catchPanel, 0.5f, 1f, -320, -300, 320, -130);
+        AddChild(_catchPanel);
         _power = new ProgressBar { ShowPercentage = false, Theme = UITheme.Make() };
         Anchor(_power, 0.5f, 1f, -160, -80, 160, -72);
         AddChild(_power);
@@ -198,8 +207,6 @@ public partial class Hud : CanvasLayer
             state += $"  ·  {rod.LineOut:0} m{(rod.Lifting ? "  ·  pompowanie" : "")}";
         if (rod.State == RodState.Close && rod.HasNet)
             state += ", Spacja - kasarek";
-        if (rod.CanRelease)
-            state += "  ·  R - wypuść";
         SetText(_status, state);
         Fade(_status, fishing || details, dt);
         _gauge.Visible = fighting;

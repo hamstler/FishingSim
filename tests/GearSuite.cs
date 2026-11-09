@@ -455,15 +455,16 @@ public sealed class GearSuite : ITestSuite
         t.Check(main.Rod.Gear != null && main.Rod.Profile.KeepnetLimit != null, "the rod knows the landing net and the keepnet limits the profile");
         t.Check(main.Player.Body != null && main.Player.Camera.Current, "first-person body and camera are in place");
 
-        // Releasing a catch with R.
+        // Releasing a catch with R (the catch panel's "Do wody").
         var prof = main.Rod.Profile;
+        int netBefore = prof.Keepnet.Count;
         main.Rod.ForceLand(Species("ploc"), 0.2f);
-        int netBefore = prof.Keepnet.Count, xpBefore = prof.Xp;
+        int xpBefore = prof.Xp;
         main.Rod._UnhandledInput(new InputEventKey { Keycode = Godot.Key.R, Pressed = true });
-        t.Check(prof.Keepnet.Count == netBefore - 1 && prof.Xp == xpBefore + Profile.ReleaseXp && main.Rod.HeldFish == null,
-            "R right after landing puts the fish back (out of the keepnet, a little XP)");
-        main.Rod._UnhandledInput(new InputEventKey { Keycode = Godot.Key.R, Pressed = true });
-        t.Check(prof.Keepnet.Count == netBefore - 1, "a fish can only be released once");
+        t.Check(prof.Keepnet.Count == netBefore && prof.Xp == xpBefore + Profile.ReleaseXp && main.Rod.HeldFish == null && !main.Rod.AwaitingDecision,
+            "R after landing puts the fish back into the water (never in the keepnet, a little XP)");
+        main.Rod._UnhandledInput(new InputEventKey { Keycode = Godot.Key.E, Pressed = true });
+        t.Check(prof.Keepnet.Count == netBefore, "once decided, the fish cannot be kept as well");
         main.Rod.ResetToIdle();
 
         var market = main.Scenery.Interactables.FirstOrDefault(s => s.Kind == InteractKind.Market);
