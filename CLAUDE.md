@@ -12,7 +12,7 @@ Pure logic in src/Core (injected IRng); data as .tres resources; saves via Syste
 
 ## Art direction
 - Medieval pixel art 3D: low-res SubViewport + nearest upscale + palette/dither/outline post (src/Graphics/PixelArtView, shaders/pixel_post).
-- Two styles (pause menu "Styl", GraphicsQuality.Style): PixelArt (default, ~360 lines, warm 61-colour palette in pixel_post, illustrated sky `stylize`, no volumetric fog) and Sharp (native res).
+- Three styles (pause menu "Styl", GraphicsQuality.Style, saved as `art_style`): Nordic (default, Valheim-like: native res, crisp textures, no palette/outlines, volumetric fog with sun shafts, AO, bloom, teal-shadow/warm-light grade in GraphicsQuality.ApplyNordic, moonlit ambient in SkyController), PixelArt (~360 lines, warm 61-colour palette in pixel_post, illustrated sky `stylize`, no volumetric fog) and Sharp (native res).
 - Outlines: full-screen depth/normal pass shaders/outline.gdshader on the pixel camera (Forward+ only).
 - Textures: nearest-filtered 256px/2m procedural, toon diffuse (BuildingFactory.Pixel). Fish skins: src/Graphics/FishSkin. Decor: pier festoon lights (Scenery.BuildStringLights), golden fish signs, Graphics/Gulls.
 - Performance: never set sky material params or move the sun every frame (re-bakes radiance); cloud drift is the global shader param `cloud_drift`. Profile with FISHSIM_PERF=1 and screenshot mode 13.

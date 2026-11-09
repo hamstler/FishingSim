@@ -98,7 +98,10 @@ Kolejność według wartości dla gracza; każdy punkt ma już miejsce w struktu
    Dalej: odłożenie wędki na podpórkę i kilka wędek naraz, zanęta.
 6. **Wypuszczanie ryb na żądanie** (zrobione: R po złowieniu) i limity ochronne (zrobione: wymiar ochronny i kara strażnika; dalej: okresy ochronne) (wymiar i okres ochronny), mandat od strażnika.
 7. **Świat.** Łódź, więcej map, płynne przejścia między łowiskami pieszo zamiast przystanku, NPC wędkarze.
-8. **Grafika (medieval pixel art 3D).** Gotowe: potok niskiej rozdzielczości z paletą, ditheringiem i konturami,
+8. **Grafika.** Domyślny styl „Nordycki” (zbliżony do Valheima): pełna rozdzielczość z ostrymi, pikselowymi
+   teksturami, gęsta mgła z promieniami słońca, cienie i okluzja, bloom, chłodne cienie i ciepłe światło, jasne
+   księżycowe noce. Do wyboru w menu pauzy także pixel art i styl ostry. Dalej: gęstsze lasy, mgła w dolinach, ognisko.
+   **Medieval pixel art 3D.** Gotowe: potok niskiej rozdzielczości z paletą, ditheringiem i konturami,
    pixelowe tekstury, oświetlenie toon, szachulec i strzechy, latarnie, niebo z chmurami, pasmowa woda, drzewa
    z kart liści, trawa na wietrze. Zrobione też: minimalistyczny HUD, grosze, kramy, gildia, wóz na postoju,
    migoczące światła, ostre (niewygładzane) fonty, lżejsze menu, naturalne zachody słońca. Dalej: prawdziwa

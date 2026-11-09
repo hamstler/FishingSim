@@ -5,8 +5,12 @@ namespace FishingSim.Graphics;
 
 public enum QualityLevel { Low, Medium, High, Ultra }
 
-/// <summary>How the world is finished: chunky hand-pixelled look with a fixed palette, or sharp native resolution.</summary>
-public enum ArtStyle { PixelArt, Sharp }
+/// <summary>
+/// How the world is finished: chunky hand-pixelled look with a fixed palette, sharp native resolution, or Nordic
+/// (Valheim-like: native resolution with crisp low-res textures, heavy volumetric fog and sun shafts, strong bloom
+/// and ambient occlusion, teal shadows and warm light).
+/// </summary>
+public enum ArtStyle { PixelArt, Sharp, Nordic }
 
 /// <summary>
 /// Graphics presets: post-processing (SSAO, SSIL, SSR, SDFGI, volumetric fog, bloom), anti-aliasing, shadow range and
@@ -21,9 +25,9 @@ public static class GraphicsQuality
 
     public static event Action? Changed;
 
-    private static ArtStyle _style = ArtStyle.PixelArt;
+    private static ArtStyle _style = ArtStyle.Nordic;
 
-    /// <summary>The finish of the world image (pause menu): pixel art (default) or sharp.</summary>
+    /// <summary>The finish of the world image (pause menu): Nordic (default), pixel art or sharp.</summary>
     public static ArtStyle Style
     {
         get
@@ -34,7 +38,15 @@ public static class GraphicsQuality
         }
     }
 
-    public static string StyleTitle(ArtStyle s) => s == ArtStyle.PixelArt ? "Pixel art" : "Ostry";
+    public static string StyleTitle(ArtStyle s) => s switch
+    {
+        ArtStyle.PixelArt => "Pixel art",
+        ArtStyle.Sharp => "Ostry",
+        _ => "Nordycki",
+    };
+
+    /// <summary>True for the Valheim-like look.</summary>
+    public static bool Nordic => Style == ArtStyle.Nordic;
 
     public static void SetStyle(ArtStyle style)
     {
@@ -44,7 +56,7 @@ public static class GraphicsQuality
         Changed?.Invoke();
     }
 
-    public static void CycleStyle() => SetStyle(Style == ArtStyle.PixelArt ? ArtStyle.Sharp : ArtStyle.PixelArt);
+    public static void CycleStyle() => SetStyle((ArtStyle)(((int)Style + 1) % 3));
 
     /// <summary>Vertical resolution of the pixel-art image: each art pixel becomes several screen pixels.</summary>
     public const int PixelArtLines = 360;
@@ -87,7 +99,7 @@ public static class GraphicsQuality
             return;
         var cfg = new ConfigFile();
         cfg.SetValue("graphics", "quality", (int)_level);
-        cfg.SetValue("graphics", "style", (int)_style);
+        cfg.SetValue("graphics", "art_style", (int)_style);
         cfg.Save(ConfigPath);
     }
 
@@ -98,7 +110,8 @@ public static class GraphicsQuality
         if (cfg.Load(ConfigPath) != Error.Ok)
             return;
         _level = (QualityLevel)Math.Clamp(cfg.GetValue("graphics", "quality", (int)QualityLevel.High).AsInt32(), 0, 3);
-        _style = (ArtStyle)Math.Clamp(cfg.GetValue("graphics", "style", (int)ArtStyle.PixelArt).AsInt32(), 0, 1);
+        // "art_style" replaced "style" when the Nordic look became the default, so older configs start Nordic too.
+        _style = (ArtStyle)Math.Clamp(cfg.GetValue("graphics", "art_style", (int)ArtStyle.Nordic).AsInt32(), 0, 2);
     }
 
     /// <summary>Radius (m) of the dense grass around the player; 0 = no grass blades.</summary>
@@ -156,6 +169,61 @@ public static class GraphicsQuality
         env.AdjustmentEnabled = true;
         env.AdjustmentContrast = 1.04f;
         env.AdjustmentSaturation = 1.06f;
+        env.AdjustmentColorCorrection = null;
+        if (Style == ArtStyle.Nordic)
+            ApplyNordic(env, q);
+    }
+
+    /// <summary>
+    /// The Valheim-like finish: thick light-catching fog with sun shafts, bloom on bright water and sky, deep ambient
+    /// occlusion, and a grade that pushes shadows towards teal and highlights towards warm gold.
+    /// </summary>
+    private static void ApplyNordic(Godot.Environment env, QualityLevel q)
+    {
+        env.TonemapMode = Godot.Environment.ToneMapper.Aces;
+        env.TonemapWhite = 6f;
+        env.SsaoEnabled = q >= QualityLevel.Low;
+        env.SsaoRadius = 1.8f;
+        env.SsaoIntensity = 2.4f;
+        env.SsaoPower = 1.4f;
+        env.SsilEnabled = q >= QualityLevel.Medium;
+        env.SsilIntensity = 1.1f;
+
+        env.GlowEnabled = true;
+        env.GlowIntensity = 0.7f;
+        env.GlowStrength = 1f;
+        env.GlowBloom = 0.03f;
+        env.GlowHdrThreshold = 1.15f;
+        env.GlowBlendMode = Godot.Environment.GlowBlendModeEnum.Softlight;
+
+        env.VolumetricFogEnabled = q >= QualityLevel.Medium;
+        env.VolumetricFogAnisotropy = 0.82f;
+        env.VolumetricFogLength = 140f;
+        env.VolumetricFogDetailSpread = 1.5f;
+        env.VolumetricFogAlbedo = new Color(0.86f, 0.9f, 0.96f);
+        env.VolumetricFogGIInject = 1f;
+
+        env.AdjustmentContrast = 1.12f;
+        env.AdjustmentSaturation = 1.1f;
+        env.AdjustmentColorCorrection = NordicGrade();
+    }
+
+    private static GradientTexture1D? _nordicGrade;
+
+    /// <summary>Colour grade: luminance in, colour out (dark teal shadows, neutral mids, warm highlights).</summary>
+    private static GradientTexture1D NordicGrade()
+    {
+        if (_nordicGrade != null)
+            return _nordicGrade;
+        var g = new Gradient();
+        g.Offsets = new[] { 0f, 0.18f, 0.5f, 0.8f, 1f };
+        g.Colors = new[]
+        {
+            new Color(0.02f, 0.04f, 0.065f), new Color(0.16f, 0.2f, 0.23f), new Color(0.5f, 0.5f, 0.48f),
+            new Color(0.83f, 0.8f, 0.72f), new Color(1f, 0.98f, 0.93f),
+        };
+        _nordicGrade = new GradientTexture1D { Gradient = g, Width = 256 };
+        return _nordicGrade;
     }
 
     public static void ApplyViewport(Viewport vp)
