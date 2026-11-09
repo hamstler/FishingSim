@@ -102,12 +102,53 @@ public partial class LakeBed : Node3D
 
     public float InsideMetres(LocationData loc, float x, float z)
     {
-        float dx = x / loc.OutlineRx;
-        float dz = (z - loc.OutlineCz) / loc.OutlineRz;
-        float e = MathF.Sqrt(dx * dx + dz * dz);
+        float dx = MathF.Abs(x / loc.OutlineRx);
+        float dz = MathF.Abs((z - loc.OutlineCz) / loc.OutlineRz);
+        // Superellipse: 1 = ellipse, bigger = squarer (dug fish ponds).
+        float p = 2f * MathF.Max(loc.Squareness, 1f);
+        float e = MathF.Pow(MathF.Pow(dx, p) + MathF.Pow(dz, p), 1f / p);
         // Irregular shoreline, but exact around the pier.
         e += _noise.GetNoise2D(x * 2f, z * 2f) * 0.06f * Smooth(8f, 40f, MathF.Abs(x));
-        return (1f - e) * MathF.Min(loc.OutlineRx, loc.OutlineRz);
+        float inside = (1f - e) * MathF.Min(loc.OutlineRx, loc.OutlineRz);
+
+        // Extra bays and arms join the main lake.
+        foreach (var lobe in ShapeCache(loc).Lobes)
+        {
+            float lx = (x - lobe.X) / lobe.Z, lz = (z - lobe.Y) / lobe.W;
+            float le = MathF.Sqrt(lx * lx + lz * lz) + _noise.GetNoise2D(x * 2.3f + 50f, z * 2.3f) * 0.08f;
+            inside = MathF.Max(inside, (1f - le) * MathF.Min(lobe.Z, lobe.W));
+        }
+        // Islands cut land out of the water.
+        foreach (var island in ShapeCache(loc).Islands)
+        {
+            float d = new Vector2(x - island.X, z - island.Y).Length() + _noise.GetNoise2D(x * 4f, z * 4f + 90f) * island.Z * 0.25f;
+            inside = MathF.Min(inside, d - island.Z);
+        }
+        return inside;
+    }
+
+    private sealed record Shapes(List<Vector4> Lobes, List<Vector3> Islands);
+    private readonly Dictionary<LocationData, Shapes> _shapes = new();
+
+    private Shapes ShapeCache(LocationData loc)
+    {
+        if (_shapes.TryGetValue(loc, out var s))
+            return s;
+        s = new Shapes(new(), new());
+        foreach (var entry in loc.Lobes)
+        {
+            var n = LocationData.Numbers(entry);
+            if (n.Length >= 4)
+                s.Lobes.Add(new Vector4(n[0], n[1], n[2], n[3]));
+        }
+        foreach (var entry in loc.Islands)
+        {
+            var n = LocationData.Numbers(entry);
+            if (n.Length >= 3)
+                s.Islands.Add(new Vector3(n[0], n[1], n[2]));
+        }
+        _shapes[loc] = s;
+        return s;
     }
 
     public float DepthAt(float x, float z) => DepthAt(Location, x, z);

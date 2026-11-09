@@ -27,7 +27,28 @@ public partial class Hud : CanvasLayer
     private Label _help = null!, _hint = null!, _dev = null!, _drag = null!;
     private ProgressBar _power = null!;
     private TensionGauge _gauge = null!;
-    private Label _advice = null!;
+    private bool _dragBesideGauge = true;
+
+    private const float GaugeHalfWidth = 240f, GaugeTop = -78f, GaugeHeight = 14f;
+
+    /// <summary>The gap between the status line and the bar, reused between the bar and the drag reading.</summary>
+    private const float GaugeGap = 8f;
+
+    private void PlaceDrag(bool besideGauge)
+    {
+        _dragBesideGauge = besideGauge;
+        if (besideGauge)
+        {
+            _drag.HorizontalAlignment = HorizontalAlignment.Left;
+            float mid = GaugeTop + GaugeHeight / 2f;
+            Anchor(_drag, 0.5f, 1f, GaugeHalfWidth + GaugeGap, mid - 13f, GaugeHalfWidth + GaugeGap + 220f, mid + 13f);
+        }
+        else
+        {
+            _drag.HorizontalAlignment = HorizontalAlignment.Right;
+            Anchor(_drag, 1f, 1f, -300, -38, -16, -12);
+        }
+    }
     private bool _devOpen, _helpOpen;
     private float _purseFlash, _tackleFlash, _hintTime = 10f;
     private string _lastPurse = "", _lastTackle = "";
@@ -85,19 +106,18 @@ public partial class Hud : CanvasLayer
         // Fishing readout: state, then a thin tension bar with drag and line below it.
         _status = Text(18, Ink, HorizontalAlignment.Center);
         Anchor(_status, 0.5f, 1f, -300, -112, 300, -86);
-        // The fight bar sits in the middle of the screen, under the crosshair.
+        // The fight bar sits right under the status line ("Hol · 43 m"); during a fight the drag reading moves to
+        // its right, the same gap away.
         _gauge = new TensionGauge { Rod = _rod };
-        Anchor(_gauge, 0.5f, 0.5f, -300, 130, 300, 176);
+        Anchor(_gauge, 0.5f, 1f, -GaugeHalfWidth, GaugeTop, GaugeHalfWidth, GaugeTop + GaugeHeight);
         AddChild(_gauge);
-        _advice = Text(18, Ink, HorizontalAlignment.Center);
-        Anchor(_advice, 0.5f, 0.5f, -300, 92, 300, 116);
         _power = new ProgressBar { ShowPercentage = false, Theme = UITheme.Make() };
         Anchor(_power, 0.5f, 1f, -160, -80, 160, -72);
         AddChild(_power);
 
-        // Drag (mouse wheel) is always shown in the bottom-right corner.
+        // Drag (mouse wheel) is shown in the bottom-right corner, and next to the fight bar while fighting.
         _drag = Text(17, Ink, HorizontalAlignment.Right);
-        Anchor(_drag, 1f, 1f, -300, -38, -16, -12);
+        PlaceDrag(false);
         _purse = Text(15, new Color(Ink, 0.9f), HorizontalAlignment.Right);
         Anchor(_purse, 1f, 1f, -460, -66, -16, -40);
         _tackle = Text(14, new Color(Ink, 0.85f));
@@ -169,16 +189,8 @@ public partial class Hud : CanvasLayer
         SetText(_status, state);
         Fade(_status, fishing || details, dt);
         _gauge.Visible = fighting;
-        float reserve = Core.FightGauge.Reserve(rod.Tension, rod.EffectiveLimit);
-        SetText(_advice, fighting ? Core.FightGauge.Advice(reserve) : _advice.Text);
-        _advice.AddThemeColorOverride("font_color", Core.FightGauge.Zone(reserve) switch
-        {
-            0 => new Color(1f, 0.45f, 0.35f),
-            1 => new Color(1f, 0.7f, 0.35f),
-            2 => new Color(1f, 0.86f, 0.5f),
-            _ => new Color(0.6f, 0.95f, 0.5f),
-        });
-        Fade(_advice, fighting, dt);
+        if (fighting != _dragBesideGauge)
+            PlaceDrag(fighting);
         _power.Visible = rod.State == RodState.Charging;
         _power.Value = rod.CastPower * 100f;
 

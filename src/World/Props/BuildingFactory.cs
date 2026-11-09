@@ -9,7 +9,7 @@ namespace FishingSim.World.Props;
 /// Builds the village from primitives: shops, houses, a barn, a windmill, lamps, benches, boats, fences and so on.
 /// Every building faces +Z locally; the caller rotates and places it. Solid buildings get a collider.
 /// </summary>
-public static class BuildingFactory
+public static partial class BuildingFactory
 {
     private const float DoorWidth = 1.1f;
     private const float DoorHeight = 2.1f;

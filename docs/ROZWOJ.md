@@ -17,6 +17,7 @@ jest następne w kolejce. Zasada pozostaje ta sama co w reszcie projektu: **regu
 | Otwarty świat, chodzenie | działa | – | `data/locations/` | `World/LakeBed`, `Fishing/Player` |
 | Animacje człowieka (FPP) | działa: proceduralne | `Animation/BodyMotion.cs` | – | `Fishing/FirstPersonBody.cs` |
 | Tylko widok pierwszoosobowy | zasada projektu | – | – | `Player` ma jedną kamerę, brak trybu TPP |
+| Unikalne łowiska | działa | – | `LocationData.Squareness/Lobes/Islands/Landmarks` | `LakeBed.InsideMetres`, `Props/Landmarks.cs`, `Graphics/Postcard.cs` |
 | Ryby widoczne w wodzie | działa | `FishAI/FishSwimModel.cs` | obfitość z `LocationData` | `World/FishPopulation.cs`, `FishModel.SetUnderwater` |
 
 ## Jak to działa
@@ -52,7 +53,27 @@ wędkarzem (bieg straszy z dalszej odległości). Ryba jest rysowana, gdy jest b
 okulary polaryzacyjne dodają zasięg i głębokość oraz zmniejszają odblaski wody (`glare_cut` w shaderze).
 Ryby pod wodą są rysowane po powierzchni wody i barwione jej kolorem, więc prześwitują, a dno i pomost je zasłaniają.
 
+### Pasek walki
+Pasek leży pod napisem stanu („Hol · 43 m”), a podczas holu hamulec stoi tuż po jego prawej stronie. Pokazuje zapas
+wytrzymałości zestawu w czterech sekcjach bez napisów i przegródek: 0-10% (czerwona, 7% szerokości), 10-25% (18%),
+25-50% (25%) i 50-100% (zielona, połowa paska). Ideał to środek paska, czyli jasny pomarańcz (`Core/FightGauge`).
+
+### Każde łowisko jest inne
+- **Jezioro Zielone**: zatoka na zachodzie, długie ramię na wschodzie, wyspa z ruinami wieży, kapliczka na wzgórzu.
+- **Zatoka Szuwarowa**: trzy zatoczki, cztery trzcinowe wysepki, chata na palach w wodzie.
+- **Staw Karpiowy**: prostokątny staw (`Squareness`), osobny staw narybkowy, grobla z mnichem i szpalerem topoli, pomosty-stanowiska.
+- **Górskie Jezioro**: fiord na północ zakończony wodospadem w skalnej ścianie, skaliste wysepki.
+
+Pocztówki (`Graphics/Postcard`) mają osobną kompozycję dla każdej mapy z jej obiektami; podgląd: tryb zrzutów 17,
+kształty map z góry: tryb 18.
+
+### Deszcz
+Deszcz to `MultiMesh` animowany w `shaders/rain.gdshader`, a nie `GPUParticles3D`: cząsteczki rysowane przez dwa
+widoki naraz (widok pikselowy dzieli świat) z wektorami ruchu wywracały Godota 4.3 (`particles_get_instance_buffer_motion_vectors_offsets`).
+
 ## Dodawanie treści
+- **Kształt łowiska**: `Lobes` ("x,z,rx,rz") dokładają zatoki, `Islands` ("x,z,r") wycinają wyspy, `Squareness` > 1 robi staw prostokątny.
+- **Obiekt charakterystyczny**: wpis `"rodzaj,x,z[,obrót[,rozmiar]]"` w `Landmarks` (tower, chapel, stilthouse, dike, waterfall, rocks, platforms); budowa w `Props/Landmarks.cs`.
 - **Siatka / podbierak / akcesorium**: plik `.tres` w `data/tackle/{keepnets,landingnets,accessories}/` i ścieżka w `Progress/GearCatalog.cs`.
 - **Nowy rodzaj akcesorium**: wartość w `AccessoryKind` i jego efekt tam, gdzie działa (np. `Main.ApplyGearEffects`).
 - **Targ na innej mapie**: wpis `"market,x,z"` w `Buildings` łowiska (test `village` sprawdza, czy teren jest równy).
@@ -84,7 +105,7 @@ Kolejność według wartości dla gracza; każdy punkt ma już miejsce w struktu
    pikselowa czcionka (plik .ttf/.fnt), ikony sprzętu i ryb jako sprite'y.
 
 ## Testy
-Wszystkie zestawy razem: `godot --headless --path . res://tests/run_tests.tscn` (379 sprawdzeń). Zestaw `gear` (`tests/GearSuite.cs`) sprawdza targ, siatki, podbieraki, akcesoria, zapis, animację ciała, pływanie
+Wszystkie zestawy razem: `godot --headless --path . res://tests/run_tests.tscn` (409 sprawdzeń). Zestaw `gear` (`tests/GearSuite.cs`) sprawdza targ, siatki, podbieraki, akcesoria, zapis, animację ciała, pływanie
 ryb i ich obecność w grze, brania od widocznych ryb, dźwięk, akcesoria, atlas oraz balans 40 gatunków (każdy da się złowić i wyholować). Uruchomienie:
 ```
 FISHSIM_NO_SAVE=1 godot --headless --path . res://tests/run_tests.tscn -- gear

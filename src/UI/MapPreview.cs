@@ -15,6 +15,16 @@ public static class MapPreview
         float x1 = loc.OutlineRx + 12f;
         float z0 = loc.OutlineCz - loc.OutlineRz - 12f;
         float z1 = 16f;
+        // Bays and arms beyond the main ellipse.
+        foreach (var entry in loc.Lobes)
+        {
+            var n = LocationData.Numbers(entry);
+            if (n.Length < 4)
+                continue;
+            x0 = MathF.Min(x0, n[0] - n[2] - 8f);
+            x1 = MathF.Max(x1, n[0] + n[2] + 8f);
+            z0 = MathF.Min(z0, n[1] - n[3] - 8f);
+        }
         // Include the village: every building and the plaza, with a margin.
         foreach (var spec in loc.BuildingSpecs())
         {

@@ -27,7 +27,7 @@ public partial class SkyController : Node
     private float _cloudTime;
     private DirectionalLight3D _sun = null!;
     private DirectionalLight3D _moon = null!;
-    private GpuParticles3D _rainFx = null!;
+    private MultiMeshInstance3D _rainFx = null!;
     private MeshInstance3D _stars = null!;
     private ShaderMaterial _starMaterial = null!;
     private float _cloud;
@@ -114,39 +114,43 @@ public partial class SkyController : Node
         AddChild(_stars);
     }
 
+    /// <summary>Most drops at full rain; light rain shows a share of them.</summary>
+    public const int RainDrops = 7000;
+
+    /// <summary>
+    /// Rain is a MultiMesh animated in shaders/rain.gdshader, not GPUParticles3D: particles drawn by two viewports
+    /// (the pixel-art view shares the world) with motion vectors crash Godot 4.3
+    /// ("particles_get_instance_buffer_motion_vectors_offsets: Parameter particles is null").
+    /// </summary>
     private void BuildRain()
     {
-        var drops = new QuadMesh
+        var rng = new RandomNumberGenerator { Seed = 77 };
+        var mm = new MultiMesh
         {
-            Size = new Vector2(0.008f, 0.4f),
-            Material = new StandardMaterial3D
-            {
-                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-                AlbedoColor = new Color(0.75f, 0.82f, 0.9f, 0.45f),
-                BillboardMode = BaseMaterial3D.BillboardModeEnum.FixedY,
-            },
+            TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
+            UseCustomData = true,
+            Mesh = new QuadMesh { Size = new Vector2(0.02f, 0.45f) },
+            InstanceCount = RainDrops,
         };
-        _rainFx = new GpuParticles3D
+        for (int i = 0; i < RainDrops; i++)
         {
-            Amount = 7000,
-            Lifetime = 0.7,
-            Emitting = false,
-            VisibilityAabb = new Aabb(new Vector3(-40, -20, -40), new Vector3(80, 40, 80)),
-            ProcessMaterial = new ParticleProcessMaterial
-            {
-                EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box,
-                EmissionBoxExtents = new Vector3(22, 0.5f, 22),
-                Direction = new Vector3(0.12f, -1f, 0f),
-                Spread = 2f,
-                InitialVelocityMin = 17f,
-                InitialVelocityMax = 19f,
-                Gravity = Vector3.Zero,
-            },
-            DrawPass1 = drops,
+            mm.SetInstanceTransform(i, Transform3D.Identity);
+            mm.SetInstanceCustomData(i, new Color(rng.Randf(), rng.Randf(), rng.Randf(), 0f));
+        }
+        mm.VisibleInstanceCount = 0;
+        _rainFx = new MultiMeshInstance3D
+        {
+            Multimesh = mm,
+            MaterialOverride = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/rain.gdshader") },
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            CustomAabb = new Aabb(new Vector3(-30, -5, -30), new Vector3(60, 25, 60)),
+            Visible = false,
         };
         AddChild(_rainFx);
     }
+
+    /// <summary>Drops currently drawn (0 when it is not raining).</summary>
+    public int VisibleRainDrops => _rainFx.Visible ? _rainFx.Multimesh.VisibleInstanceCount : 0;
 
     public override void _Process(double delta)
     {
@@ -191,7 +195,7 @@ public partial class SkyController : Node
         if (Follow != null)
         {
             _stars.GlobalPosition = Follow.GlobalPosition;
-            _rainFx.GlobalPosition = new Vector3(Follow.GlobalPosition.X, 12f, Follow.GlobalPosition.Z);
+            _rainFx.GlobalPosition = new Vector3(Follow.GlobalPosition.X, 0f, Follow.GlobalPosition.Z);
         }
 
         // Everything else (sun, sky colours, fog) only changes in steps: 2 game minutes (0.5 degree of sun) or a
@@ -245,7 +249,11 @@ public partial class SkyController : Node
         _env.VolumetricFogDensity = (0.003f + _cloud * 0.004f) * haze + _rain * 0.01f + FogBoost * 2f;
 
         _starMaterial.SetShaderParameter("night", Math.Clamp(-el * 3f, 0f, 1f) * (1f - _cloud));
-        _rainFx.Emitting = _rain > 0.02f;
-        _rainFx.AmountRatio = Math.Clamp(_rain, 0.05f, 1f);
+        int drops = _rain > 0.02f ? (int)(RainDrops * Math.Clamp(_rain, 0.05f, 1f)) : 0;
+        if (drops != _rainFx.Multimesh.VisibleInstanceCount)
+        {
+            _rainFx.Multimesh.VisibleInstanceCount = drops;
+            _rainFx.Visible = drops > 0;
+        }
     }
 }

@@ -50,6 +50,21 @@ public sealed class WorldSuite : ITestSuite
         }
         t.Check(bed.AbundanceOf("Karp") == locations[bed.LocationIndex].AbundanceOf("Karp"), "abundance follows the selected location");
 
+        t.Section("every map has its own shape");
+        foreach (var loc in locations)
+        {
+            bool lobesWet = loc.Lobes.All(e => LocationData.Numbers(e) is var n && bed.DepthAt(loc, n[0], n[1]) > 0.5f);
+            bool islandsDry = loc.Islands.All(e => LocationData.Numbers(e) is var n && bed.DepthAt(loc, n[0], n[1]) == 0f && bed.HeightAt(loc, n[0], n[1]) > 0f);
+            t.Check(loc.Lobes.Length > 0 && lobesWet && islandsDry, $"{loc.DisplayName}: {loc.Lobes.Length} bays hold water, {loc.Islands.Length} islands are dry land");
+        }
+        var stawLoc = locations.First(l => l.Squareness > 1.5f);
+        // Near a corner of the bounding box: outside a round lake, inside a dug, squarish fish pond.
+        float cx = stawLoc.OutlineRx * 0.8f, cz = stawLoc.OutlineCz - stawLoc.OutlineRz * 0.8f;
+        t.Check(bed.DepthAt(stawLoc, cx, cz) > 0.5f, $"{stawLoc.DisplayName}: a square fish pond, water reaches its corners");
+        var shapes = locations.Select(l => string.Concat(Enumerable.Range(0, 64).Select(k =>
+            bed.DepthAt(l, -150f + (k % 8) * 40f, -190f + (k / 8) * 25f) > 0f ? '1' : '0'))).ToList();
+        t.Check(shapes.Distinct().Count() == shapes.Count, "no two maps share the same water outline");
+
         t.Section("location switching");
         bed.SelectInitial(0);
         int unlocked = locations.Count(l => l.RequiredLevel <= 1);

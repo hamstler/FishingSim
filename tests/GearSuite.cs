@@ -246,9 +246,9 @@ public sealed class GearSuite : ITestSuite
         t.Section("fight bar");
         t.Check(FightGauge.Reserve(0f, 6f) == 1f && FightGauge.Reserve(6f, 6f) == 0f && MathF.Abs(FightGauge.Reserve(4.5f, 6f) - 0.25f) < 1e-4f,
             "reserve = the share of the tackle's strength still unused");
-        t.Check(FightGauge.Position(0f) == 0f && MathF.Abs(FightGauge.Position(0.10f) - 0.25f) < 1e-4f && MathF.Abs(FightGauge.Position(0.25f) - 0.5f) < 1e-4f
-                && MathF.Abs(FightGauge.Position(0.5f) - 0.75f) < 1e-4f && FightGauge.Position(1f) == 1f,
-            "four equal segments: 0-10%, 10-25%, 25-50%, 50-100% of reserve");
+        t.Check(FightGauge.Position(0f) == 0f && MathF.Abs(FightGauge.Position(0.10f) - 0.07f) < 1e-4f && MathF.Abs(FightGauge.Position(0.25f) - 0.25f) < 1e-4f
+                && MathF.Abs(FightGauge.Position(0.5f) - 0.5f) < 1e-4f && FightGauge.Position(1f) == 1f,
+            "segments 7/18/25/50% wide for 0-10%, 10-25%, 25-50%, 50-100% of reserve; 25% reserve sits mid-bar");
         t.Check(FightGauge.Zone(0.05f) == 0 && FightGauge.Zone(0.2f) == 1 && FightGauge.Zone(0.3f) == 2 && FightGauge.Zone(0.8f) == 3
                 && FightGauge.Advice(0.05f).Contains("Poluzuj") && FightGauge.Advice(0.8f).Contains("dokręcić"),
             "red tells you to ease the drag, green that you can tighten it");
