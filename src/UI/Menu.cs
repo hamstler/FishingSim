@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
+using FishingSim.Graphics;
 using FishingSim.Accounts;
 using FishingSim.Data;
 using FishingSim.Progress;
@@ -58,17 +59,42 @@ public partial class Menu : Control
     // ------------------------------------------------------------------ layout
     private void BuildBackground()
     {
+        // A slideshow of painted postcards of the fishing grounds, cross-fading every few seconds.
+        foreach (var path in LakeBed.LocationPaths)
+        {
+            var loc = GD.Load<LocationData>(path);
+            if (loc == null)
+                continue;
+            _slides.Add(Postcard.For(loc, 10f));
+            _slides.Add(Postcard.For(loc, 18.5f));
+        }
+        for (int i = 0; i < 2; i++)
+        {
+            var layer = new TextureRect
+            {
+                ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered,
+                TextureFilter = TextureFilterEnum.Nearest,
+                Texture = _slides.Count > 0 ? _slides[0] : null,
+                Modulate = new Color(1, 1, 1, i == 0 ? 1f : 0f),
+            };
+            layer.SetAnchorsPreset(LayoutPreset.FullRect);
+            AddChild(layer);
+            _slideLayers[i] = layer;
+        }
+        // Darken the top and bottom a little so the title and the panels read well over the picture.
         var gradient = new Gradient();
-        gradient.SetColor(0, new Color(0.10f, 0.13f, 0.20f));   // dusk over the lake
-        gradient.SetColor(1, new Color(0.06f, 0.04f, 0.03f));
-        var background = new TextureRect
+        gradient.SetColor(0, new Color(0.05f, 0.03f, 0.02f, 0.55f));
+        gradient.AddPoint(0.35f, new Color(0f, 0f, 0f, 0f));
+        gradient.SetColor(gradient.GetPointCount() - 1, new Color(0.05f, 0.03f, 0.02f, 0.7f));
+        var shade = new TextureRect
         {
             Texture = new GradientTexture2D { Gradient = gradient, FillFrom = Vector2.Zero, FillTo = new Vector2(0, 1), Width = 4, Height = 256 },
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.Scale,
         };
-        background.SetAnchorsPreset(LayoutPreset.FullRect);
-        AddChild(background);
+        shade.SetAnchorsPreset(LayoutPreset.FullRect);
+        AddChild(shade);
 
         var title = new Label { Text = "Fishing Sim", HorizontalAlignment = HorizontalAlignment.Center };
         title.AddThemeFontSizeOverride("font_size", 64);
@@ -87,6 +113,32 @@ public partial class Menu : Control
         AddChild(_subtitle);
     }
 
+    private readonly List<ImageTexture> _slides = new();
+    private readonly TextureRect[] _slideLayers = new TextureRect[2];
+    private float _slideTime;
+    private int _slide;
+
+    public override void _Process(double delta)
+    {
+        if (_slides.Count < 2 || _slideLayers[1] == null)
+            return;
+        _slideTime += (float)delta;
+        const float hold = 6f, fade = 1.5f;
+        if (_slideTime > hold)
+        {
+            float k = Math.Clamp((_slideTime - hold) / fade, 0f, 1f);
+            _slideLayers[1].Texture = _slides[(_slide + 1) % _slides.Count];
+            _slideLayers[1].Modulate = new Color(1, 1, 1, k);
+            if (k >= 1f)
+            {
+                _slide = (_slide + 1) % _slides.Count;
+                _slideLayers[0].Texture = _slides[_slide];
+                _slideLayers[1].Modulate = new Color(1, 1, 1, 0f);
+                _slideTime = 0f;
+            }
+        }
+    }
+
     private static void Center(Control box, float width, float height)
     {
         box.AnchorLeft = box.AnchorRight = box.AnchorTop = box.AnchorBottom = 0.5f;
@@ -99,7 +151,7 @@ public partial class Menu : Control
     private void BuildLogin()
     {
         var panel = new PanelContainer();
-        Center(panel, 420, 340);
+        Center(panel, 420, 460);
         AddChild(panel);
         _loginBox = panel;
         var margin = new MarginContainer();
@@ -110,8 +162,28 @@ public partial class Menu : Control
         box.AddThemeConstantOverride("separation", 12);
         margin.AddChild(box);
 
-        var head = new Label { Text = "Logowanie" };
+        // The golden carp of the fishmongers' sign, as an emblem over the form.
+        var carp = GD.Load<FishSpecies>("res://data/fish/karp.tres");
+        var emblem = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        emblem.AddThemeConstantOverride("separation", 10);
+        box.AddChild(emblem);
+        foreach (var id in new[] { "okon", "karp", "pstrag" })
+        {
+            var sp = GD.Load<FishSpecies>($"res://data/fish/{id}.tres");
+            emblem.AddChild(new TextureRect
+            {
+                Texture = sp != null ? Icons.Fish(sp) : null,
+                CustomMinimumSize = id == "karp" ? new Vector2(150, 112) : new Vector2(96, 72),
+                ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+                TextureFilter = TextureFilterEnum.Nearest,
+                SizeFlagsVertical = SizeFlags.ShrinkCenter,
+            });
+        }
+        _ = carp;
+        var head = new Label { Text = "Logowanie", HorizontalAlignment = HorizontalAlignment.Center };
         head.AddThemeFontSizeOverride("font_size", 28);
+        head.AddThemeColorOverride("font_color", new Color(1f, 0.84f, 0.45f));
         box.AddChild(head);
         _user = new LineEdit { PlaceholderText = "Login", CustomMinimumSize = new Vector2(0, 40) };
         _user.TextSubmitted += text => _pass.GrabFocus();
@@ -213,11 +285,12 @@ public partial class Menu : Control
         margin.AddChild(box);
 
         if (!_previews.ContainsKey(index))
-            _previews[index] = MapPreview.Render(loc, 260, (int)MathF.Round(260f * MapPreview.Aspect(loc)));
+            _previews[index] = Postcard.For(loc, 10f);
         box.AddChild(new TextureRect
         {
             Texture = _previews[index],
-            CustomMinimumSize = new Vector2(270, 150),
+            CustomMinimumSize = new Vector2(270, 152),
+            TextureFilter = TextureFilterEnum.Nearest,
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered,
             Modulate = locked ? new Color(0.45f, 0.45f, 0.45f) : Colors.White,

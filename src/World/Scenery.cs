@@ -58,6 +58,8 @@ public partial class Scenery : Node3D
         if (MathF.Abs(daylight - _lastDaylight) < 0.01f)
             return;
         _lastDaylight = daylight;
+        if (_bulbs != null)
+            _bulbs.EmissionEnergyMultiplier = 0.5f + (1f - daylight) * 3f;
         foreach (var b in _buildings)
             b.SetDaylight(daylight);
     }
@@ -98,6 +100,8 @@ public partial class Scenery : Node3D
             AddBox(new Vector3(x, 1.65f, 1.5f), new Vector3(0.05f, 0.05f, 5.2f), dark);
         }
 
+        BuildStringLights(dark);
+
         // Lantern post at the shore end.
         AddBox(new Vector3(1.42f, 2.1f, 5.6f), new Vector3(0.09f, 1.9f, 0.09f), dark);
         var lampMaterial = new StandardMaterial3D
@@ -120,6 +124,59 @@ public partial class Scenery : Node3D
             OmniRange = 12f,
             Position = new Vector3(1.42f, 3f, 5.6f),
         });
+    }
+
+    private StandardMaterial3D? _bulbs;
+
+    /// <summary>
+    /// Festoon lights over the pier: two masts at the casting end and a post at the shore, ropes sagging between
+    /// them, warm bulbs every half metre. Dim by day, glowing at night.
+    /// </summary>
+    private void BuildStringLights(Material wood)
+    {
+        foreach (var (x, z, h) in new[] { (-1.42f, -3.7f, 4.4f), (1.42f, -3.7f, 4.4f), (-1.42f, 5.6f, 3.0f) })
+            AddBox(new Vector3(x, 1.05f + h / 2f, z), new Vector3(0.1f, h, 0.1f), wood);
+        var tops = new[] { new Vector3(-1.42f, 5.45f, -3.7f), new Vector3(1.42f, 5.45f, -3.7f), new Vector3(1.42f, 3.05f, 5.6f), new Vector3(-1.42f, 4.05f, 5.6f) };
+        var rope = BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = new Color(0.25f, 0.18f, 0.12f) });
+        _bulbs = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(1f, 0.86f, 0.5f),
+            EmissionEnabled = true,
+            Emission = new Color(1f, 0.72f, 0.32f),
+            EmissionEnergyMultiplier = 0.6f,
+            TextureFilter = BaseMaterial3D.TextureFilterEnum.Nearest,
+        };
+        var bulbs = new List<Transform3D>();
+        foreach (var (a, b) in new[] { (tops[0], tops[1]), (tops[1], tops[2]), (tops[0], tops[3]) })
+        {
+            const int segments = 12;
+            Vector3 Point(float t) => a.Lerp(b, t) + Vector3.Down * (0.45f * 4f * t * (1f - t));
+            for (int i = 0; i < segments; i++)
+            {
+                var p0 = Point(i / (float)segments);
+                var p1 = Point((i + 1) / (float)segments);
+                var mid = (p0 + p1) * 0.5f;
+                var dir = p1 - p0;
+                var y = dir.Normalized();
+                var x = MathF.Abs(y.Dot(Vector3.Up)) > 0.95f ? Vector3.Right : y.Cross(Vector3.Up).Normalized();
+                var zAxis = x.Cross(y).Normalized();
+                AddChild(new MeshInstance3D
+                {
+                    Mesh = new CylinderMesh { TopRadius = 0.012f, BottomRadius = 0.012f, Height = 1f, RadialSegments = 4 },
+                    MaterialOverride = rope,
+                    Transform = new Transform3D(new Basis(x, y * dir.Length(), zAxis), mid),
+                    CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+                });
+            }
+            float length = a.DistanceTo(b);
+            int count = (int)(length / 0.5f);
+            for (int i = 1; i < count; i++)
+                bulbs.Add(new Transform3D(Basis.Identity, Point(i / (float)count) + Vector3.Down * 0.07f));
+        }
+        var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = new BoxMesh { Size = new Vector3(0.09f, 0.11f, 0.09f) }, InstanceCount = bulbs.Count };
+        for (int i = 0; i < bulbs.Count; i++)
+            mm.SetInstanceTransform(i, bulbs[i]);
+        AddChild(new MultiMeshInstance3D { Multimesh = mm, MaterialOverride = _bulbs, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
     }
 
     private void AddCylinder(Vector3 pos, float radius, float height, Material mat) =>

@@ -10,3 +10,4 @@ MaxLoad = 12.0
 ShockAbsorb = 0.12
 Price = 600
 RequiredLevel = 5
+Action = 0.9

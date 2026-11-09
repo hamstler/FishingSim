@@ -205,6 +205,44 @@ public sealed class GearSuite : ITestSuite
             swim.Step(1f / 30f, threat, 5f);
         t.Check(swim.Agents.Average(a => Vector2.Distance(a.Position, threat)) > d0, "a running angler scares the fish away");
 
+        t.Section("rod bending");
+        FishingSim.Core.Physics.RodBendModel Settled(float power, float action, float load)
+        {
+            var m = new FishingSim.Core.Physics.RodBendModel(3f, power, action);
+            for (int i = 0; i < 600; i++)
+                m.Step(1f / 60f, load, 0.3f, -1f);
+            return m;
+        }
+        t.Check(MathF.Abs(Settled(7f, 0.5f, 0f).TotalBend()) < 1e-3f, "an unloaded rod is straight");
+        float b05 = MathF.Abs(Settled(7f, 0.5f, 0.5f).TotalBend()), b2 = MathF.Abs(Settled(7f, 0.5f, 2f).TotalBend()), b8 = MathF.Abs(Settled(7f, 0.5f, 8f).TotalBend());
+        t.Check(b05 < b2 && b2 < b8 && b8 < 1.35f, $"more pull bends the rod more, up to lining up with the line ({b05 * 57.3f:0}/{b2 * 57.3f:0}/{b8 * 57.3f:0} deg)");
+        t.Check(MathF.Abs(Settled(4f, 0.5f, 2f).TotalBend()) > MathF.Abs(Settled(12f, 0.5f, 2f).TotalBend()) * 1.3f, "a light rod bends more than a stiff one under the same load");
+        var fast = Settled(7f, 0.1f, 1f);
+        var slow = Settled(7f, 0.9f, 1f);
+        float ShareInTip(FishingSim.Core.Physics.RodBendModel m)
+        {
+            float tip = 0f, all = 0f;
+            for (int i = 0; i < m.Joints; i++)
+            {
+                all += MathF.Abs(m.Angles[i]);
+                if (i >= m.Joints * 2 / 3) tip += MathF.Abs(m.Angles[i]);
+            }
+            return tip / all;
+        }
+        t.Check(ShareInTip(fast) > ShareInTip(slow) * 1.25f, $"a fast rod bends mostly at the tip, a slow one through the blank ({ShareInTip(fast):0.00} vs {ShareInTip(slow):0.00})");
+        var ring = Settled(7f, 0.5f, 3f);
+        int crossings = 0;
+        float prevBend = ring.TotalBend();
+        for (int i = 0; i < 180; i++)
+        {
+            ring.Step(1f / 60f, 0f, 0f, 1f);
+            if (MathF.Sign(ring.TotalBend()) != MathF.Sign(prevBend)) crossings++;
+            prevBend = ring.TotalBend();
+        }
+        for (int i = 0; i < 300; i++)
+            ring.Step(1f / 60f, 0f, 0f, 1f);
+        t.Check(crossings >= 2 && MathF.Abs(ring.TotalBend()) < 0.01f, $"released, the blank springs back, rings and settles ({crossings} swings)");
+
         t.Section("float visibility");
         t.Check(Bobber.VisualScale(3f) == 1f && Bobber.VisualScale(30f) > 4f && Bobber.VisualScale(500f) <= 7f,
             "the float is drawn bigger far away so it stays visible (1x near, ~5x at 30 m, capped)");

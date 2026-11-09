@@ -16,6 +16,7 @@ public partial class PixelArtView : Node
     private Camera3D? _camera;
     private TextureRect? _rect;
     private ShaderMaterial? _post;
+    private MeshInstance3D? _outline;
 
     public PixelArtView(Camera3D source) => _source = source;
 
@@ -42,6 +43,16 @@ public partial class PixelArtView : Node
         AddChild(_viewport);
         _camera = new Camera3D { Current = true };
         _viewport.AddChild(_camera);
+        // Outlines: a full-screen quad in front of the pixel camera, drawn last (shaders/outline.gdshader).
+        _outline = new MeshInstance3D
+        {
+            Mesh = new QuadMesh { Size = new Vector2(2f, 2f) },
+            MaterialOverride = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/outline.gdshader"), RenderPriority = 127 },
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            ExtraCullMargin = 16384f,
+            Position = new Vector3(0, 0, -1f),
+        };
+        _camera.AddChild(_outline);
         var remote = new RemoteTransform3D { UpdateScale = false };
         _source.AddChild(remote);
         remote.RemotePath = remote.GetPathTo(_camera);
@@ -82,7 +93,16 @@ public partial class PixelArtView : Node
         if (_viewport == null || _post == null)
             return;
         var size = GetViewport().GetVisibleRect().Size;
-        int px = GraphicsQuality.PixelSize;
+        int px = GraphicsQuality.PixelSizeFor(size.Y);
+        bool pixelArt = GraphicsQuality.Style == ArtStyle.PixelArt;
+        _post.SetShaderParameter("use_palette", pixelArt);
+        _post.SetShaderParameter("outline", 0f);
+        _post.SetShaderParameter("saturation", pixelArt ? 1.18f : 1.08f);
+        if (_outline != null)
+        {
+            _outline.Visible = !Renderer.IsCompatibility;
+            ((ShaderMaterial)_outline.MaterialOverride).SetShaderParameter("strength", pixelArt ? 0.85f : 0.45f);
+        }
         var low = new Vector2I(Math.Max((int)(size.X / px), 64), Math.Max((int)(size.Y / px), 36));
         _viewport.Size = low;
         _post.SetShaderParameter("src_size", new Vector2(low.X, low.Y));

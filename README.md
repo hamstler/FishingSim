@@ -1,6 +1,8 @@
 # Fishing Sim (RF4-like), wersja C#
 
-**Styl graficzny: medieval pixel art 3D.** Świat 3D jest renderowany w niskiej rozdzielczości i powiększany bez wygładzania, z ograniczoną paletą, ditheringiem i konturami (`src/Graphics/PixelArtView.cs`, `shaders/pixel_post.gdshader`), a HUD zostaje ostry. Wioska jest średniowieczna: domy z szachulcem i strzechą, latarnie na drewnianych słupach, drewniana wędka. Tekstury to proceduralny pixel art 32×32 z filtrowaniem nearest, a oświetlenie jest pasmowe (toon). Jakość grafiki (wielkość piksela, cienie, trawa, efekty) zmienia się w menu pauzy. Waluta to grosze (gr), sklepy to kramy, turnieje prowadzi gildia wędkarzy, a na inne łowisko jedzie się wozem.
+**Styl graficzny: ilustracyjny pixel art 3D** (domyślny; w menu pauzy można przełączyć na „Ostry”): ciepła, ograniczona paleta, brązowe kontury brył, płaskie chmury, lampki nad pomostem, złote ryby na dachach skupu i targu, mewy.
+
+**Wcześniej: medieval pixel art 3D.** Świat 3D jest renderowany w niskiej rozdzielczości i powiększany bez wygładzania, z ograniczoną paletą, ditheringiem i konturami (`src/Graphics/PixelArtView.cs`, `shaders/pixel_post.gdshader`), a HUD zostaje ostry. Wioska jest średniowieczna: domy z szachulcem i strzechą, latarnie na drewnianych słupach, drewniana wędka. Tekstury to proceduralny pixel art 32×32 z filtrowaniem nearest, a oświetlenie jest pasmowe (toon). Jakość grafiki (wielkość piksela, cienie, trawa, efekty) zmienia się w menu pauzy. Waluta to grosze (gr), sklepy to kramy, turnieje prowadzi gildia wędkarzy, a na inne łowisko jedzie się wozem.
 
 **Minimalistyczny interfejs:** podczas zwykłego rozglądania na ekranie jest tylko mała kropka celownika. Stan wędki i cienki pasek napięcia pojawiają się w trakcie łowienia, sakiewka i siatka na chwilę po zmianie, a sprzęt na chwilę po przełączeniu. Tab pokazuje wszystko naraz, H sterowanie.
 
@@ -45,6 +47,9 @@ Symulator wędkarski w Godot 4.3 (.NET) napisany w całości w C#. Poza kodem s�
 - **Ryby widać w wodzie:** około 150 ryb pływa w ławicach i pojedynczo; ławice, które odpłyną daleko, wracają w okolice wędkarza, więc wokół zawsze coś pływa. Uciekają przed biegnącym wędkarzem. Kapelusz z szerokim rondem (mniej odblasków) pokazuje je dalej i głębiej.
 - **Tylko widok z oczu wędkarza:** kołysanie głowy w rytm kroków, oddech, widoczne ręce na wędce i kołowrotku.
 - **Dźwięk bez plików audio** (`src/Core/Audio/Synth.cs`, `src/Audio/SoundEngine.cs`): wiatr, chlupot wody przy brzegu, deszcz, ptaki w dzień, świerszcze nocą, kroki (inne na pomoście, inne na trawie), plusk spławika, terkot kołowrotka, jazgot hamulca, zacięcie, złowienie i zerwanie. Wszystko jest syntezowane w kodzie.
+- **Fizyka wędki:** blank z 10 sprężystych segmentów gnie się w stronę żyłki (także w bok, gdy ryba odchodzi w bok), z bezwładnością i drganiami (podgryzanie, branie, zacięcie, rzut). Każda wędka ma akcję: leszczynowy kij gnie się szczytówką, dębowa tyka całym blankiem (`src/Core/Physics/RodBendModel.cs`).
+- **Sklepy z obrazkami:** karty towarów z pikselowymi ikonami (każdy przedmiot i każda ryba ma swój obrazek, `src/Graphics/Icons.cs`), panel szczegółów z paskami parametrów porównanych z używanym sprzętem, galeria rekordów (niezłowione gatunki jako sylwetki), pocztówki łowisk na postoju wozów.
+- **Ekran logowania i wyboru łowiska:** malowane pikselowe pocztówki łowisk (`src/Graphics/Postcard.cs`) jako przenikające się tło i jako zdjęcia na kartach map.
 - **Wymiar ochronny:** najmniejsze ryby każdego gatunku są niewymiarowe. Przy złowieniu gra ostrzega, a za każdą niewymiarową rybę sprzedaną w skupie lub na targu strażnik pobiera 10 gr kary. Wypuść ją klawiszem R.
 - **Brania od widocznych ryb:** ryby, które lubią przynętę, podpływają do spławika, a bierze konkretna ryba z okolicy. Spłoszone nie biorą, zerwana ryba ucieka.
 - Plan dalszej rozbudowy: [`docs/ROZWOJ.md`](docs/ROZWOJ.md).

@@ -80,7 +80,6 @@ public partial class FishingRod : Node3D
     private float _nibbleLength;
     private float _pulseTimer;
     private float _lineOutOutsideFight;
-    private float _bend;
     private FightModel? _fight;
     private ImmediateMesh _lineMesh = null!;
     private StandardMaterial3D _lineMaterial = null!;
@@ -214,7 +213,40 @@ public partial class FishingRod : Node3D
         MaxLine = reel.LineCapacity;
         LineStrength = line.Strength;
         _lineVisibility = line.Visibility;
+        // Rated power: the rod's own limit; it reads as fully bent near that load.
+        _bendModel = new Core.Physics.RodBendModel(RodRig.Joints * RodRig.SegmentLength, rod.MaxLoad, rod.Action);
     }
+
+    private Core.Physics.RodBendModel? _bendModel;
+
+    /// <summary>The blank's bend physics (for tests and tools).</summary>
+    public Core.Physics.RodBendModel? BendModel => _bendModel;
+
+    /// <summary>
+    /// Bends the blank: the line pulls the tip towards the float (or the fish) with the current tension; with no line
+    /// out only the rod's own weight sags it a little. The bend plane follows the line, so a fish running sideways
+    /// bends the rod sideways.
+    /// </summary>
+    private void UpdateBend(float dt)
+    {
+        if (_bendModel == null || _rig == null)
+            return;
+        bool lineOut = State is RodState.Waiting or RodState.Nibble or RodState.Bite or RodState.Fight or RodState.Close;
+        float load = State is RodState.Fight or RodState.Close ? Tension
+            : lineOut ? 0.12f + (_bobber.ExtraForce > 0f ? 0.35f : 0f)
+            : 0.04f;
+        Vector3 target = lineOut ? _bobber.GlobalPosition : _rig.GlobalPosition + Vector3.Down * 10f;
+        var straightTip = new Vector3(0f, RodRig.BlankStart + _bendModel.Length, 0f);
+        var dir = (_rig.ToLocal(target) - straightTip).Normalized();
+        var perp = dir - Vector3.Up * dir.Y;
+        float side = perp.Length();
+        var axis = side > 1e-4f ? Vector3.Up.Cross(perp / side) : Vector3.Right;
+        _bendModel.Step(dt, load, dir.Y, side);
+        _rig.SetJointAngles(_bendModel.Angles, axis);
+    }
+
+    /// <summary>A kick to the blank (bites, the strike, the cast).</summary>
+    private void Twitch(float strength) => _bendModel?.Impulse(strength);
 
     /// <summary>Rough horizontal range (m) of a full-power cast from the pier with the current rod.</summary>
     public float EstimateCastRange()
@@ -383,10 +415,8 @@ public partial class FishingRod : Node3D
             case RodState.Landed:
             case RodState.Broken: TickResult(); break;
         }
-        float bendTarget = State is RodState.Fight or RodState.Close ? Math.Clamp(Tension / EffectiveLimit, 0f, 1f) : 0f;
         TickNet(dt);
-        _bend = Mathf.Lerp(_bend, bendTarget, MathF.Min(dt * 8f, 1f));
-        _rig.SetBend(_bend);
+        UpdateBend(dt);
         UpdateLine();
     }
 
@@ -461,6 +491,7 @@ public partial class FishingRod : Node3D
     // ------------------------------------------------------------------ casting
     private void Cast()
     {
+        Twitch(-3f);   // the blank whips forward as the cast is released
         var basis = _camera.GlobalTransform.Basis;
         var aim = (-basis.Z).Rotated(basis.X.Normalized(), Mathf.DegToRad(CastLoftDegrees));
         float speed = Mathf.Lerp(_castMin, _castMax, CastPower);
@@ -583,10 +614,12 @@ public partial class FishingRod : Node3D
         {
             _pulseTimer = _rng.Range(0.3f, 0.7f);
             _bobber.ApplyCentralImpulse(Vector3.Down * _bobber.Mass * 1.2f);
+            Twitch(0.6f);
         }
         if (_stateTime >= _nibbleLength)
         {
             _bobber.ExtraForce = 1.6f;
+            Twitch(1.2f);
             SetState(RodState.Bite);
         }
     }
@@ -646,6 +679,7 @@ public partial class FishingRod : Node3D
             Unbreakable = DevUnbreakable,
         };
         SoundCue?.Invoke(Core.Audio.OneShot.Strike, 1f);
+        Twitch(2.5f);
         if (_biter != null)
             Population?.Hook(_biter);
         _fishModel?.QueueFree();

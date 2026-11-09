@@ -20,6 +20,8 @@ uniform float cloud_cover : hint_range(0, 1) = 0.3;
 global uniform float cloud_drift;
 uniform float night : hint_range(0, 1) = 0.0;
 uniform vec3 night_color : source_color = vec3(0.004, 0.006, 0.014);
+/// Pixel-art style: blend the physical sky towards a clean illustrated gradient (vivid blue overhead, pale at the horizon).
+uniform float stylize = 0.0;
 
 const vec3 UP = vec3(0.0, 1.0, 0.0);
 const float SUN_ENERGY = 1000.0;
@@ -36,7 +38,9 @@ float clouds(vec2 uv) {
 		+ texture(cloud_noise, uv * 2.03 + vec2(0.31, 0.17)).r * 0.28
 		+ texture(cloud_noise, uv * 4.11 + vec2(0.71, 0.53)).r * 0.17;
 	float threshold = mix(0.72, 0.18, cloud_cover);
-	return smoothstep(threshold, threshold + 0.22, n);
+	// Crisp, flat-shaded cloud shapes (pixel-art style): three density steps instead of a soft ramp.
+	float d = smoothstep(threshold, threshold + 0.22, n);
+	return d < 0.35 ? 0.0 : (d < 0.7 ? 0.75 : 1.0);
 }
 
 void sky() {
@@ -91,6 +95,19 @@ void sky() {
 	}
 	color += night_color * night;
 
+	if (stylize > 0.0) {
+		float up = clamp(EYEDIR.y, 0.0, 1.0);
+		vec3 drawn = mix(vec3(0.42, 0.70, 0.95), vec3(0.16, 0.42, 0.82), pow(up, 0.55));
+		// Follow the brightness and the warm/cool shift of the real sky so dawn, dusk and night still work.
+		float lum_sky = dot(color, vec3(0.3, 0.59, 0.11));
+		float lum_drawn = dot(drawn, vec3(0.3, 0.59, 0.11));
+		// Keep the drawn hue: never brighten it past white (that is what turned the horizon grey).
+		// Kept below the range where ACES tone mapping bleaches colours to grey.
+		vec3 tinted = drawn * clamp(lum_sky / lum_drawn, 0.0, 0.8);
+		float day_amount = smoothstep(0.0, 0.35, sun_dir.y);
+		color = mix(color, tinted, stylize * day_amount);
+	}
+
 	// Overcast: the whole dome greys out, darker when the sun is low.
 	float lum = dot(color, vec3(0.3, 0.59, 0.11));
 	vec3 overcast = vec3(0.62, 0.65, 0.7) * max(lum * 1.1, 0.002 + 0.25 * sun_up);
@@ -106,7 +123,11 @@ void sky() {
 		base += LIGHT0_COLOR * pow(max(cos_theta, 0.0), 12.0) * (1.0 - density) * 1.5 * sun_up;
 		base = mix(base, overcast * 0.9, cloud_cover * 0.6);
 		base *= mix(1.0, 0.04, night);
-		float fade = smoothstep(0.0, 0.25, EYEDIR.y);
+		// Illustrated clouds: white tops with a soft blue shade, like a hand-pixelled sky.
+		vec3 drawn_cloud = mix(vec3(1.0, 0.99, 0.97), vec3(0.70, 0.82, 0.94), shade * 0.85) * mix(0.35, 1.0, sun_up);
+		base = mix(base, drawn_cloud, stylize * smoothstep(0.0, 0.35, sun_dir.y) * (1.0 - cloud_cover * 0.6));
+		// Near the horizon the cloud sheet is seen edge-on and averages into a grey band: fade it out there.
+		float fade = smoothstep(0.06, 0.32, EYEDIR.y);
 		color = mix(color, base * 0.9, density * fade * 0.92);
 	} else if (EYEDIR.y > 0.0) {
 		// Cubemap pass (lighting/reflections): only the average effect of the clouds.

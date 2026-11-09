@@ -178,6 +178,10 @@ public sealed class GameSuite : ITestSuite
         rod.ReelOverride = true;
         rod.DragSetting = 0.5f;
         int fishBefore = profile.TotalCatches;
+        await WaitForState(t, rod, RodState.Fight, 1);
+        for (int i = 0; i < 40; i++)
+            await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+        t.Check(rod.State != RodState.Fight || MathF.Abs(rod.BendModel!.TotalBend()) > 0.05f, $"a fish on the line bends the rod ({rod.BendModel!.TotalBend() * 57.3f:0} deg)");
         await WaitForState(t, rod, RodState.Close, 90);
         t.Check(rod.State == RodState.Close && profile.TotalCatches == fishBefore, "a beaten fish waits at the surface: it is not caught yet");
         rod._UnhandledInput(Key(Godot.Key.Space));
