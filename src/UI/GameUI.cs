@@ -267,7 +267,7 @@ public partial class GameUI : CanvasLayer
             _slotPrev[s].Disabled = !idle;
             _slotNext[s].Disabled = !idle;
         }
-        string weak = _rod.LineStrength <= _rod.RodMaxLoad ? "żyłka" : "wędka";
+        string weak = _rod.LineStrength <= _rod.RodMaxLoad ? "linka" : "wędka";
         _summary.Text = $"Najsłabsze ogniwo: {weak}, limit {_rod.EffectiveLimit:0.0} kg. Maks. hamulec {_rod.DragMax:0.0} kg. "
             + $"Zasięg rzutu do ok. {_rod.EstimateCastRange():0} m."
             + (idle ? "" : "\nSprzęt można zmieniać tylko między rzutami.");

@@ -20,8 +20,8 @@ public static class TackleSlotExtensions
     {
         TackleSlot.Rod => "Wędka",
         TackleSlot.Reel => "Kołowrotek",
-        TackleSlot.Line => "Żyłka",
-        TackleSlot.Hook => "Hak",
+        TackleSlot.Line => "Linka",
+        TackleSlot.Hook => "Haczyk",
         _ => "Przynęta",
     };
 }

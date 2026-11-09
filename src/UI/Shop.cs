@@ -20,8 +20,8 @@ public partial class Shop : CanvasLayer
 {
     private static readonly (string Key, string Title)[] TabDefinitions =
     {
-        ("rod", "Wędki"), ("reel", "Kołowrotki"), ("line", "Żyłki"), ("hook", "Haki"),
-        ("keepnet", "Siatki"), ("landingnet", "Podbieraki"), ("accessory", "Akcesoria"),
+        ("rod", "Wędki"), ("reel", "Kołowrotki"), ("line", "Linki"), ("hook", "Haczyki"),
+        ("keepnet", "Siatki"), ("landingnet", "Kasarki"), ("accessory", "Akcesoria"),
         ("bait", "Przynęty"), ("fish", "Ryby"), ("market", "Targ"), ("records", "Rekordy"), ("travel", "Łowiska"),
     };
 

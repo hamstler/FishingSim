@@ -642,10 +642,10 @@ public partial class FishingRod : Node3D
         switch (outcome)
         {
             case FightOutcome.LineBroke:
-                BreakLine(RodMaxLoad < LineStrength ? "Wędka się złamała!" : "Żyłka pękła!");
+                BreakLine(RodMaxLoad < LineStrength ? "Wędka się złamała!" : "Linka pękła!");
                 return;
             case FightOutcome.SpooledOut:
-                BreakLine("Ryba wyciągnęła całą żyłkę!");
+                BreakLine("Ryba wyciągnęła całą linkę!");
                 return;
             case FightOutcome.Landed:
                 EnterClose();

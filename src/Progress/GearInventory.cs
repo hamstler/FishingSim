@@ -20,7 +20,7 @@ public static class GearSlotExtensions
     public static string Title(this GearSlot slot) => slot switch
     {
         GearSlot.Keepnet => "Siatki",
-        GearSlot.LandingNet => "Podbieraki",
+        GearSlot.LandingNet => "Kasarki",
         _ => "Akcesoria",
     };
 
