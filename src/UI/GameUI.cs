@@ -504,6 +504,8 @@ public partial class GameUI : CanvasLayer
         }
 
         ClearChildren(_speciesList);
+        int known = _rod.Species.Count(sp => _profile.CatchCounts.GetValueOrDefault(sp.SpeciesName) > 0);
+        _speciesList.AddChild(new Label { Text = $"Atlas ryb: poznane {known} z {_rod.Species.Count} gatunków", Modulate = new Color(1f, 0.85f, 0.5f) });
         foreach (var sp in _rod.Species)
         {
             var entries = _profile.Journal.Where(e => e.Species == sp.SpeciesName).ToList();
@@ -513,7 +515,7 @@ public partial class GameUI : CanvasLayer
                 string favourite = entries.GroupBy(e => e.Bait ?? "?").OrderByDescending(g => g.Count()).First().Key;
                 float record = _profile.Records.GetValueOrDefault(sp.SpeciesName);
                 label.Text = $"{sp.SpeciesName}\n   w dzienniku: {entries.Count} szt., razem {entries.Sum(e => e.Weight):0.0} kg\n"
-                    + $"   rekord: {record:0.00} kg | najlepsza przynęta: {favourite}";
+                    + $"   rekord: {record:0.00} kg | najlepsza przynęta: {favourite}\n   {SpeciesTips(sp)}";
             }
             else
             {
@@ -522,5 +524,22 @@ public partial class GameUI : CanvasLayer
             }
             _speciesList.AddChild(label);
         }
+    }
+
+    private static readonly (string Id, string Name)[] BaitNames =
+    {
+        ("worm", "robak"), ("maggot", "czerwie"), ("insect", "koniki"), ("bread", "chleb"),
+        ("corn", "pszenica"), ("boilie", "kulka"), ("livebait", "żywiec"),
+    };
+
+    /// <summary>What the angler has learned about a species once caught: baits it takes, depth and best time.</summary>
+    public static string SpeciesTips(FishSpecies sp)
+    {
+        var baits = BaitNames.Where(b => sp.AffinityFor(b.Id) >= 0.8f).OrderByDescending(b => sp.AffinityFor(b.Id)).Select(b => b.Name).ToList();
+        string when = sp.NightActivity > sp.DayActivity * 1.2f ? "nocą"
+            : sp.TwilightBonus >= 1.5f ? "o świcie i zmierzchu"
+            : sp.DayActivity > sp.NightActivity * 2f ? "za dnia"
+            : "o każdej porze";
+        return $"bierze na: {(baits.Count > 0 ? string.Join(", ", baits) : "-")} | {sp.MinDepth:0.#}-{sp.MaxDepth:0.#} m | najlepiej {when}";
     }
 }

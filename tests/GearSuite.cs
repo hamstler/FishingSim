@@ -97,6 +97,11 @@ public sealed class GearSuite : ITestSuite
         }
         t.Check(unlandable.Count == 0, $"every species of a typical size can be landed on the best gear {string.Join(", ", unlandable)}");
 
+        string pikeTips = FishingSim.UI.GameUI.SpeciesTips(catalogue.First(sp => sp.SpeciesName == "Szczupak"));
+        string eelTips = FishingSim.UI.GameUI.SpeciesTips(catalogue.First(sp => sp.SpeciesName == "Węgorz"));
+        t.Check(pikeTips.Contains("żywiec") && !pikeTips.Contains("pszenica") && eelTips.Contains("nocą"),
+            $"the fish atlas gives sensible tips ({pikeTips}; {eelTips})");
+
         t.Section("fish market");
         var market = new FishMarket();
         var lot = new FishLot("Karp", 5f, 25f, 12f);
