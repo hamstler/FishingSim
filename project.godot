@@ -1,0 +1,21 @@
+; Engine configuration file.
+config_version=5
+
+[application]
+
+config/name="Fishing Sim (RF4-like)"
+run/main_scene="res://menu.tscn"
+config/features=PackedStringArray("4.3", "C#")
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+
+[dotnet]
+
+project/assembly_name="FishingSim"
+
+[rendering]
+
+environment/defaults/default_clear_color=Color(0.5, 0.7, 0.9, 1)

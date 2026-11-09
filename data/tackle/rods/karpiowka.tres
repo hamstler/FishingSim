@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Karpiówka 3.6lb"
+CastMult = 1.15
+MaxLoad = 12.0
+ShockAbsorb = 0.12
+Price = 600
+RequiredLevel = 5

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="TournamentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Tournaments/TournamentData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Poranny Puchar Płoci"
+Description = "Szybkie zawody na Jeziorze Zielonym: liczy się suma pięciu najcięższych ryb. Dobre na rozgrzewkę."
+LocationName = "Jezioro Zielone"
+RequiredLevel = 1
+EntryFee = 10
+DurationMinutes = 6.0
+CountedFish = 5
+BotCount = 5
+BotSkillMin = 0.25
+BotSkillMax = 0.65
+PrizeMoney = PackedInt32Array(120, 60, 30)
+PrizeXp = PackedInt32Array(60, 30, 15)

@@ -1,0 +1,16 @@
+using Godot;
+
+namespace FishingSim.Data;
+
+[GlobalClass]
+public partial class RodData : TackleItem
+{
+    /// <summary>Multiplies cast speed (range).</summary>
+    [Export] public float CastMult { get; set; } = 1f;
+
+    /// <summary>Load (kg) above which the rod breaks.</summary>
+    [Export] public float MaxLoad { get; set; } = 7f;
+
+    /// <summary>How much of a sudden burst the rod absorbs (0..0.5).</summary>
+    [Export(PropertyHint.Range, "0,0.5")] public float ShockAbsorb { get; set; } = 0.2f;
+}

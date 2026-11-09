@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="FishSpecies" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/FishSpecies.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+SpeciesName = "Karp"
+MinWeight = 2.0
+MaxWeight = 15.0
+Rarity = 1.0
+PullFactor = 1.5
+Aggression = 0.8
+StaminaDrain = 0.12
+MouthSize = 7.0
+BaitAffinity = {"worm": 0.6, "corn": 1.5, "bread": 0.4, "boilie": 2.0, "livebait": 0.0}
+MinDepth = 1.0
+MaxDepth = 6.0
+DayActivity = 1.0
+NightActivity = 0.8
+TwilightBonus = 1.3
+WeatherPref = {"clear": 1.0, "cloudy": 1.2, "rain": 0.9}
+RunLengthMult = 1.5
+BurstMult = 1.3
+BurstRate = 0.8
+LengthRef = 0.42
+BodyDepth = 0.28
+DorsalPos = 0.45
+BackColor = Color(0.4, 0.33, 0.15, 1)
+BellyColor = Color(0.85, 0.75, 0.45, 1)
+FinColor = Color(0.5, 0.38, 0.2, 1)
+PricePerKg = 25.0

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="TournamentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Tournaments/TournamentData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Karpiowy Maraton"
+Description = "Najdłuższe zawody na Stawie Karpiowym: cztery najcięższe ryby i najlepsi rywale."
+LocationName = "Staw Karpiowy"
+RequiredLevel = 3
+EntryFee = 50
+DurationMinutes = 8.0
+CountedFish = 4
+BotCount = 7
+BotSkillMin = 0.45
+BotSkillMax = 0.85
+PrizeMoney = PackedInt32Array(600, 300, 150)
+PrizeXp = PackedInt32Array(220, 110, 50)

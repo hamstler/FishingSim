@@ -1,0 +1,61 @@
+using Godot;
+using Godot.Collections;
+
+namespace FishingSim.Data;
+
+/// <summary>Data-only description of a fish species. Add a species by adding a .tres in data/fish/.</summary>
+[GlobalClass]
+public partial class FishSpecies : Resource
+{
+    // --- identity & size ---
+    [Export] public string SpeciesName { get; set; } = "";
+    [Export] public float MinWeight { get; set; } = 0.1f;
+    [Export] public float MaxWeight { get; set; } = 0.9f;
+
+    /// <summary>Relative bite chance.</summary>
+    [Export] public float Rarity { get; set; } = 1f;
+
+    // --- fight ---
+    /// <summary>Peak pull (kg-force) = PullFactor * weight^0.7.</summary>
+    [Export] public float PullFactor { get; set; } = 1f;
+    [Export(PropertyHint.Range, "0,1")] public float Aggression { get; set; } = 0.5f;
+    [Export] public float StaminaDrain { get; set; } = 0.12f;
+    [Export] public float RunLengthMult { get; set; } = 1f;
+    [Export] public float BurstMult { get; set; } = 1.5f;
+    [Export] public float BurstRate { get; set; } = 1f;
+
+    // --- habitat & feeding ---
+    /// <summary>Hook size (1..10) this species takes best.</summary>
+    [Export] public float MouthSize { get; set; } = 5f;
+
+    /// <summary>Bait id -> multiplier (a missing id means the species never takes it).</summary>
+    [Export] public Dictionary BaitAffinity { get; set; } = new();
+    [Export] public float MinDepth { get; set; } = 0.5f;
+    [Export] public float MaxDepth { get; set; } = 6f;
+    [Export] public float DayActivity { get; set; } = 1f;
+    [Export] public float NightActivity { get; set; } = 0.5f;
+    [Export] public float TwilightBonus { get; set; } = 1.3f;
+
+    /// <summary>Weather key ("clear", "cloudy", "rain") -> bite multiplier.</summary>
+    [Export] public Dictionary WeatherPref { get; set; } = new();
+
+    // --- look ---
+    /// <summary>Body length (m) of a 1 kg fish; scales with weight^0.33.</summary>
+    [Export] public float LengthRef { get; set; } = 0.35f;
+    [Export] public float BodyDepth { get; set; } = 0.26f;
+    [Export] public float DorsalPos { get; set; } = 0.5f;
+    [Export] public Color BackColor { get; set; } = new(0.35f, 0.4f, 0.3f);
+    [Export] public Color BellyColor { get; set; } = new(0.85f, 0.85f, 0.8f);
+    [Export] public Color FinColor { get; set; } = new(0.6f, 0.4f, 0.3f);
+
+    // --- economy ---
+    [Export] public float PricePerKg { get; set; } = 5f;
+
+    /// <summary>Affinity for a bait id (0 when the species ignores it).</summary>
+    public float AffinityFor(string baitId) =>
+        BaitAffinity.TryGetValue(baitId, out var v) ? v.AsSingle() : 0f;
+
+    /// <summary>Weather multiplier for a weather key (1 when unspecified).</summary>
+    public float WeatherMultiplier(string weatherKey) =>
+        WeatherPref.TryGetValue(weatherKey, out var v) ? v.AsSingle() : 1f;
+}

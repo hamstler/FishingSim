@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="LocationData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/LocationData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Jezioro Zielone"
+OutlineCz = -75.0
+OutlineRx = 120.0
+OutlineRz = 77.0
+Slope = 0.15
+MaxDepth = 8.0
+HolePos = Vector2(12, -40)
+HoleDepth = 4.0
+HoleRadius = 9.0
+BarPos = Vector2(-8, -22)
+BarHeight = 1.5
+BarRadius = 6.0
+Abundance = {"Płoć": 1.2, "Leszcz": 1.0, "Karp": 0.6, "Szczupak": 0.8}
+RequiredLevel = 1
+Description = "Duże jezioro z głębokim dołem i podwodną górką. Dobre na początek, dużo płoci i leszczy."
+GrassColor = Color(0.26, 0.42, 0.15, 1)
+DarkGrassColor = Color(0.14, 0.28, 0.11, 1)
+SandColor = Color(0.55, 0.48, 0.32, 1)
+PathColor = Color(0.48, 0.38, 0.25, 1)
+WaterShallowColor = Color(0.04, 0.26, 0.26, 1)
+WaterDeepColor = Color(0.01, 0.07, 0.11, 1)
+FogBoost = 0.0
+HillScale = 1.0
+TreeDensity = 1.0
+TreeMix = {"oak": 1.0, "birch": 0.8, "spruce": 0.7, "pine": 0.1}
+BushDensity = 1.0
+FlowerDensity = 1.0
+ReedDensity = 1.0
+RockDensity = 0.5
+PlazaCenter = Vector2(0, 28)
+Buildings = PackedStringArray("tackle,-22,24", "bait,-10,40", "fishbuyer,12,40", "office,24,22", "busstop,7,13", "house,-40,44", "house,38,46", "lamp,0,12", "lamp,0,20", "lamp,0,34", "lamp,-12,28", "lamp,12,28", "bench,-5,17", "bench,5,17", "crates,-15,33", "crates,17,33", "signpost,0,9", "boat,-38,3,70", "fence,-34,52,0", "fence,24,54,0")

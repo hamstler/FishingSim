@@ -1,0 +1,226 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Godot;
+using FishingSim.Core;
+using FishingSim.Data;
+
+namespace FishingSim.Progress;
+
+/// <summary>A fish in the keepnet, waiting to be sold.</summary>
+public sealed record CatchRecord(string Species, float Weight, int Value);
+
+/// <summary>One line of the fishing journal.</summary>
+public sealed record JournalEntry(
+    string Species,
+    float Weight,
+    string? Location = null,
+    string? Bait = null,
+    string? Hook = null,
+    float? Depth = null,
+    string? Hour = null);
+
+/// <summary>Optional details recorded with a catch.</summary>
+public sealed record CatchContext(string? Location = null, string? Bait = null, string? Hook = null, float? Depth = null, string? Hour = null);
+
+/// <summary>A finished tournament in the player's history.</summary>
+public sealed record TournamentRecord(string Name, int Rank, int Entrants, float Score, int PrizeMoney, int PrizeXp);
+
+/// <summary>Result of landing a fish.</summary>
+public readonly record struct CatchResult(bool Record, bool LevelUp, int Xp, int Value);
+
+/// <summary>Player progression: money, XP/level, owned tackle, bait stock, keepnet, records and journal.</summary>
+public sealed class Profile
+{
+    public const int StartMoney = 60;
+    public const int JournalLimit = 300;
+    public const string SaveDir = "user://saves";
+    public const string LegacySavePath = "user://save.json";
+
+    public event Action? Changed;
+    public event Action<int>? LevelUp;
+
+    public string Username { get; set; } = "admin";
+    public string Path { get; set; } = LegacySavePath;
+
+    public int Money { get; set; }
+    public int Xp { get; set; }
+    public int Level { get; set; } = 1;
+    public int TotalCatches { get; set; }
+    public int LocationIdx { get; set; }
+    public float Hour { get; set; } = 7f;
+
+    public List<CatchRecord> Keepnet { get; set; } = new();
+    public List<JournalEntry> Journal { get; set; } = new();
+    public List<TournamentRecord> TournamentHistory { get; set; } = new();
+    public Dictionary<string, float> Records { get; set; } = new();
+    public Dictionary<string, int> CatchCounts { get; set; } = new();
+    public Dictionary<string, List<string>> Owned { get; set; } = new();
+    public Dictionary<string, int> BaitCounts { get; set; } = new();
+    public Dictionary<string, string> Equipped { get; set; } = new();
+
+    public Profile() => Reset();
+
+    /// <summary>Raises <see cref="Changed"/> (UI refresh, autosave).</summary>
+    public void NotifyChanged() => Changed?.Invoke();
+
+    public void Reset()
+    {
+        Money = StartMoney;
+        Xp = 0;
+        Level = 1;
+        TotalCatches = 0;
+        LocationIdx = 0;
+        Hour = 7f;
+        Keepnet = new();
+        Journal = new();
+        TournamentHistory = new();
+        Records = new();
+        CatchCounts = new();
+        Owned = new()
+        {
+            ["rod"] = new() { "junior" },
+            ["reel"] = new() { "mlynek1000" },
+            ["line"] = new() { "zylka025" },
+            ["hook"] = new() { "hak5" },
+        };
+        BaitCounts = new() { ["worm"] = 20, ["bread"] = 10 };
+        Equipped = new()
+        {
+            ["rod"] = "junior", ["reel"] = "mlynek1000", ["line"] = "zylka025", ["hook"] = "hak5", ["bait"] = "worm",
+        };
+    }
+
+    // ------------------------------------------------------------------ economy
+    public int XpToNext => Progression.XpForLevel(Level + 1);
+
+    public bool Owns(TackleSlot slot, string id) => Owned.TryGetValue(slot.Key(), out var ids) && ids.Contains(id);
+
+    public int KeepnetValue => Keepnet.Sum(f => f.Value);
+
+    public float KeepnetWeight => Keepnet.Sum(f => f.Weight);
+
+    /// <summary>Adds a landed fish to the keepnet and the journal, awards XP and checks for records and level-ups.</summary>
+    public CatchResult AddCatch(FishSpecies species, float weight, CatchContext? context = null)
+    {
+        string name = species.SpeciesName;
+        int xpGain = Progression.FishXp(species, weight);
+        int value = Progression.FishValue(species, weight);
+        Keepnet.Add(new CatchRecord(name, weight, value));
+        CatchCounts[name] = CatchCounts.GetValueOrDefault(name) + 1;
+        TotalCatches++;
+
+        var c = context ?? new CatchContext();
+        Journal.Add(new JournalEntry(name, weight, c.Location, c.Bait, c.Hook, c.Depth, c.Hour));
+        if (Journal.Count > JournalLimit)
+            Journal.RemoveRange(0, Journal.Count - JournalLimit);
+
+        bool record = weight > Records.GetValueOrDefault(name);
+        if (record)
+            Records[name] = weight;
+
+        bool leveled = GainXp(xpGain);
+        Changed?.Invoke();
+        return new CatchResult(record, leveled, xpGain, value);
+    }
+
+    /// <summary>Adds XP and levels up as often as needed. Returns true when at least one level was gained.</summary>
+    private bool GainXp(int amount)
+    {
+        Xp += amount;
+        bool leveled = false;
+        while (Xp >= Progression.XpForLevel(Level + 1))
+        {
+            Level++;
+            leveled = true;
+            LevelUp?.Invoke(Level);
+        }
+        return leveled;
+    }
+
+    public int TournamentWins => TournamentHistory.Count(t => t.Rank == 1);
+
+    /// <summary>Pays out a tournament result and records it in the history. Returns true when it caused a level-up.</summary>
+    public bool AwardTournament(TournamentRecord result)
+    {
+        Money += result.PrizeMoney;
+        bool leveled = GainXp(result.PrizeXp);
+        TournamentHistory.Add(result);
+        if (TournamentHistory.Count > 50)
+            TournamentHistory.RemoveAt(0);
+        Changed?.Invoke();
+        return leveled;
+    }
+
+    /// <summary>Sells the whole keepnet and returns the money earned.</summary>
+    public int SellAll()
+    {
+        int value = KeepnetValue;
+        Money += value;
+        Keepnet = new();
+        Changed?.Invoke();
+        return value;
+    }
+
+    /// <summary>Buys an item (or a bait pack). Returns null on success or a (Polish) error message.</summary>
+    public string? Buy(TackleSlot slot, string id, int price, int requiredLevel, int pack = 1)
+    {
+        if (Level < requiredLevel)
+            return $"Wymagany poziom {requiredLevel}";
+        if (slot != TackleSlot.Bait && Owns(slot, id))
+            return "Już to masz";
+        if (Money < price)
+            return "Za mało pieniędzy";
+        Money -= price;
+        if (slot == TackleSlot.Bait)
+            BaitCounts[id] = BaitCounts.GetValueOrDefault(id) + pack;
+        else
+            Owned[slot.Key()].Add(id);
+        Changed?.Invoke();
+        return null;
+    }
+
+    // ------------------------------------------------------------------ save / load
+    /// <summary>Saves unless running headless or FISHSIM_NO_SAVE is set (tests, screenshots).</summary>
+    public void Autosave()
+    {
+        if (DisplayServer.GetName() == "headless" || OS.HasEnvironment("FISHSIM_NO_SAVE"))
+            return;
+        Save();
+    }
+
+    public bool Save(string? path = null) => ProfileSerializer.Save(this, path ?? Path);
+
+    public static string PathFor(string user) => $"{SaveDir}/{SafeFileName(user.ToLowerInvariant())}.json";
+
+    /// <summary>Replaces characters that are not allowed in file names.</summary>
+    public static string SafeFileName(string name)
+    {
+        var bad = System.IO.Path.GetInvalidFileNameChars();
+        var chars = name.Select(c => Array.IndexOf(bad, c) >= 0 || c == ':' ? '_' : c).ToArray();
+        return new string(chars);
+    }
+
+    public static Profile LoadFrom(string file)
+    {
+        var p = new Profile { Path = file };
+        ProfileSerializer.LoadInto(p, file);
+        return p;
+    }
+
+    /// <summary>Loads (or creates) the profile of a user. The old single save is adopted by "admin".</summary>
+    public static Profile LoadFor(string user)
+    {
+        string target = PathFor(user);
+        Profile profile;
+        if (Godot.FileAccess.FileExists(target))
+            profile = LoadFrom(target);
+        else if (user.Equals("admin", StringComparison.OrdinalIgnoreCase) && Godot.FileAccess.FileExists(LegacySavePath))
+            profile = LoadFrom(LegacySavePath);
+        else
+            profile = new Profile();
+        profile.Username = user.ToLowerInvariant();
+        profile.Path = target;
+        return profile;
+    }
+}

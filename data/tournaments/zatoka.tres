@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="TournamentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Tournaments/TournamentData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Zatoka Szczupaka"
+Description = "Krótkie zawody w szuwarach: trzy największe ryby decydują o wszystkim. Szczupaki lubią świt."
+LocationName = "Zatoka Szuwarowa"
+RequiredLevel = 2
+EntryFee = 25
+DurationMinutes = 7.0
+CountedFish = 3
+BotCount = 6
+BotSkillMin = 0.35
+BotSkillMax = 0.75
+PrizeMoney = PackedInt32Array(250, 120, 60)
+PrizeXp = PackedInt32Array(110, 55, 25)

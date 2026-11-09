@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ReelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/ReelData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Młynek 3000"
+DragMax = 5.0
+ReelSpeed = 3.0
+LineCapacity = 100.0
+Price = 150
+RequiredLevel = 2

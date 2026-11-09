@@ -1,0 +1,188 @@
+using System;
+using Godot;
+
+namespace FishingSim.World;
+
+/// <summary>Drives sky colours, sun and moon, fog, stars, clouds (as a mood), rain and wind from <see cref="WorldState"/>.</summary>
+public partial class SkyController : Node
+{
+    // hour, sky top, sky horizon
+    private static readonly (float Hour, Color Top, Color Horizon)[] Keys =
+    {
+        (0f, new Color(0.02f, 0.03f, 0.08f), new Color(0.05f, 0.07f, 0.15f)),
+        (5f, new Color(0.04f, 0.06f, 0.16f), new Color(0.10f, 0.12f, 0.25f)),
+        (6f, new Color(0.20f, 0.30f, 0.55f), new Color(0.90f, 0.55f, 0.40f)),
+        (7.5f, new Color(0.30f, 0.52f, 0.85f), new Color(0.85f, 0.80f, 0.70f)),
+        (12f, new Color(0.25f, 0.50f, 0.90f), new Color(0.70f, 0.82f, 0.95f)),
+        (17f, new Color(0.30f, 0.50f, 0.85f), new Color(0.85f, 0.80f, 0.70f)),
+        (19f, new Color(0.25f, 0.30f, 0.55f), new Color(0.95f, 0.52f, 0.32f)),
+        (20.5f, new Color(0.06f, 0.08f, 0.20f), new Color(0.35f, 0.20f, 0.25f)),
+        (22f, new Color(0.02f, 0.03f, 0.08f), new Color(0.05f, 0.07f, 0.15f)),
+        (24f, new Color(0.02f, 0.03f, 0.08f), new Color(0.05f, 0.07f, 0.15f)),
+    };
+
+    private Godot.Environment _env = null!;
+    private ProceduralSkyMaterial _skyMaterial = null!;
+    private DirectionalLight3D _sun = null!;
+    private DirectionalLight3D _moon = null!;
+    private GpuParticles3D _rainFx = null!;
+    private MeshInstance3D _stars = null!;
+    private ShaderMaterial _starMaterial = null!;
+    private float _cloud;
+    private float _rain;
+    private float _wind = 0.3f;
+
+    /// <summary>Extra fog on top of the weather (mist over a marsh, haze in the hills); set per map.</summary>
+    public float FogBoost { get; set; }
+
+    public WorldState? World { get; set; }
+    public Water? Water { get; set; }
+
+    /// <summary>Rain and the star dome follow this node (the camera).</summary>
+    public Node3D? Follow { get; set; }
+
+    public override void _Ready()
+    {
+        _skyMaterial = new ProceduralSkyMaterial();
+        _env = new Godot.Environment
+        {
+            BackgroundMode = Godot.Environment.BGMode.Sky,
+            Sky = new Sky { SkyMaterial = _skyMaterial },
+            AmbientLightSource = Godot.Environment.AmbientSource.Sky,
+            ReflectedLightSource = Godot.Environment.ReflectionSource.Sky,
+            TonemapMode = Godot.Environment.ToneMapper.Filmic,
+            TonemapExposure = 0.8f,
+            FogEnabled = true,
+            FogDensity = 0.002f,
+        };
+        AddChild(new WorldEnvironment { Environment = _env });
+
+        _sun = new DirectionalLight3D { ShadowEnabled = true, DirectionalShadowMaxDistance = 80f };
+        AddChild(_sun);
+        _moon = new DirectionalLight3D { LightColor = new Color(0.6f, 0.7f, 1f) };
+        AddChild(_moon);
+
+        BuildRain();
+        BuildStars();
+        Apply();
+    }
+
+    private void BuildStars()
+    {
+        _starMaterial = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/stars.gdshader"), RenderPriority = -10 };
+        _stars = new MeshInstance3D
+        {
+            Mesh = new SphereMesh { Radius = 900f, Height = 1800f, RadialSegments = 32, Rings = 16 },
+            MaterialOverride = _starMaterial,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            CustomAabb = new Aabb(new Vector3(-1000, -1000, -1000), new Vector3(2000, 2000, 2000)),
+        };
+        AddChild(_stars);
+    }
+
+    private void BuildRain()
+    {
+        var drops = new QuadMesh
+        {
+            Size = new Vector2(0.008f, 0.4f),
+            Material = new StandardMaterial3D
+            {
+                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                AlbedoColor = new Color(0.75f, 0.82f, 0.9f, 0.45f),
+                BillboardMode = BaseMaterial3D.BillboardModeEnum.FixedY,
+            },
+        };
+        _rainFx = new GpuParticles3D
+        {
+            Amount = 7000,
+            Lifetime = 0.7,
+            Emitting = false,
+            VisibilityAabb = new Aabb(new Vector3(-40, -20, -40), new Vector3(80, 40, 80)),
+            ProcessMaterial = new ParticleProcessMaterial
+            {
+                EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box,
+                EmissionBoxExtents = new Vector3(22, 0.5f, 22),
+                Direction = new Vector3(0.12f, -1f, 0f),
+                Spread = 2f,
+                InitialVelocityMin = 17f,
+                InitialVelocityMax = 19f,
+                Gravity = Vector3.Zero,
+            },
+            DrawPass1 = drops,
+        };
+        AddChild(_rainFx);
+    }
+
+    public override void _Process(double delta)
+    {
+        if (World == null)
+            return;
+        float dt = (float)delta;
+        _cloud = Mathf.MoveToward(_cloud, World.CloudTarget, 0.25f * dt);
+        _rain = Mathf.MoveToward(_rain, World.RainTarget, 0.3f * dt);
+        _wind = Mathf.MoveToward(_wind, World.WindTarget, 0.2f * dt);
+        if (Water != null)
+        {
+            Water.Wind = _wind;
+            Water.Rain = _rain;
+        }
+        Apply();
+    }
+
+    private static (Color Top, Color Horizon) SampleSky(float hour)
+    {
+        for (int i = 0; i < Keys.Length - 1; i++)
+        {
+            var (ha, ta, ra) = Keys[i];
+            var (hb, tb, rb) = Keys[i + 1];
+            if (hour >= ha && hour <= hb)
+            {
+                float t = Mathf.InverseLerp(ha, hb, hour);
+                return (ta.Lerp(tb, t), ra.Lerp(rb, t));
+            }
+        }
+        return (Keys[0].Top, Keys[0].Horizon);
+    }
+
+    private void Apply()
+    {
+        float hour = World?.Hour ?? 12f;
+        float el = MathF.Sin((hour - 6f) / 24f * Mathf.Tau);
+        float elDeg = Mathf.RadToDeg(MathF.Asin(Math.Clamp(el, -1f, 1f)));
+        float day = Math.Clamp(el * 2.2f + 0.25f, 0f, 1f);
+
+        var (top, hor) = SampleSky(hour);
+        // Overcast: pull towards a grey that follows the daylight.
+        var grey = new Color(0.55f, 0.58f, 0.62f) * Mathf.Lerp(0.12f, 1f, day);
+        grey.A = 1f;
+        top = top.Lerp(grey, _cloud * 0.8f);
+        hor = hor.Lerp(grey * 1.05f, _cloud * 0.85f);
+        _skyMaterial.SkyTopColor = top;
+        _skyMaterial.SkyHorizonColor = hor;
+        _skyMaterial.GroundHorizonColor = hor;
+        _skyMaterial.GroundBottomColor = hor * 0.4f;
+        _skyMaterial.SunAngleMax = 25f * (1f - _cloud);
+
+        _sun.RotationDegrees = new Vector3(-elDeg, -30f, 0f);
+        _sun.LightEnergy = 0.95f * day * (1f - _cloud * 0.75f);
+        _sun.LightColor = new Color(1f, 0.55f, 0.3f).Lerp(new Color(1f, 0.96f, 0.9f), Math.Clamp(el * 2f, 0f, 1f));
+        _sun.ShadowEnabled = _cloud < 0.7f;
+
+        _moon.RotationDegrees = new Vector3(elDeg, 150f, 0f);
+        _moon.LightEnergy = 0.3f * Math.Clamp(-el * 2.5f, 0f, 1f) * (1f - _cloud * 0.6f);
+
+        _env.AmbientLightEnergy = Mathf.Lerp(0.2f, 0.65f, day);
+        _env.FogLightColor = hor * 0.9f;
+        _env.FogDensity = Mathf.Lerp(0.0015f, 0.005f, _cloud) + _rain * 0.006f + FogBoost;
+
+        _starMaterial.SetShaderParameter("night", Math.Clamp(-el * 3f, 0f, 1f) * (1f - _cloud));
+        if (Follow != null)
+        {
+            _stars.GlobalPosition = Follow.GlobalPosition;
+            _rainFx.GlobalPosition = new Vector3(Follow.GlobalPosition.X, 12f, Follow.GlobalPosition.Z);
+        }
+        _rainFx.Emitting = _rain > 0.02f;
+        _rainFx.AmountRatio = Math.Clamp(_rain, 0.05f, 1f);
+    }
+}

@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Patyk Junior 2.1m"
+CastMult = 0.75
+MaxLoad = 4.0
+ShockAbsorb = 0.3
+Price = 0
+RequiredLevel = 1

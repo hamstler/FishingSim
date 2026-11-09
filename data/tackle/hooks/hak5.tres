@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="HookData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/HookData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Hak #5 (średni)"
+Size = 5.0
+Price = 0
+RequiredLevel = 1
