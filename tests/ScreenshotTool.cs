@@ -41,6 +41,53 @@ public partial class ScreenshotTool : Node
         UserStore.Path = "/tmp/fishsim_shot_users.json";
         await NextFrame();
 
+        if (mode == 17)
+        {
+            // Postcards of every map, day and dusk.
+            var sheet = Image.CreateEmpty(FishingSim.Graphics.Postcard.Width * 2, FishingSim.Graphics.Postcard.Height * 4, false, Image.Format.Rgb8);
+            for (int i = 0; i < FishingSim.World.LakeBed.LocationPaths.Length; i++)
+            {
+                var loc = GD.Load<LocationData>(FishingSim.World.LakeBed.LocationPaths[i]);
+                sheet.BlitRect(FishingSim.Graphics.Postcard.Paint(loc, 10f), new Rect2I(0, 0, 320, 180), new Vector2I(0, i * 180));
+                sheet.BlitRect(FishingSim.Graphics.Postcard.Paint(loc, 18.5f), new Rect2I(0, 0, 320, 180), new Vector2I(320, i * 180));
+            }
+            sheet.Resize(sheet.GetWidth() * 2, sheet.GetHeight() * 2, Image.Interpolation.Nearest);
+            sheet.SavePng(output);
+            GD.Print($"saved {output}");
+            GetTree().Quit();
+            return;
+        }
+
+        if (mode == 16)
+        {
+            // Contact sheet of every item and fish icon (no 3D needed).
+            var icons = new List<ImageTexture>();
+            var loadout = new FishingSim.Progress.TackleLoadout();
+            foreach (FishingSim.Progress.TackleSlot slot in Enum.GetValues(typeof(FishingSim.Progress.TackleSlot)))
+                foreach (var item in loadout.Items(slot))
+                    icons.Add(FishingSim.Graphics.Icons.For(item));
+            var gear = new FishingSim.Progress.GearCatalog();
+            foreach (FishingSim.Progress.GearSlot slot in FishingSim.Progress.GearSlotExtensions.All)
+                foreach (var item in gear.Items(slot))
+                    icons.Add(FishingSim.Graphics.Icons.For(item));
+            foreach (var path in FishingSim.Data.SpeciesCatalog.Paths)
+                icons.Add(FishingSim.Graphics.Icons.Fish(GD.Load<FishSpecies>(path)));
+            const int cols = 10, cell = 68;
+            int rows = (icons.Count + cols - 1) / cols;
+            var sheet = Image.CreateEmpty(cols * cell, rows * cell, false, Image.Format.Rgba8);
+            sheet.Fill(new Color(0.93f, 0.86f, 0.7f));
+            for (int i = 0; i < icons.Count; i++)
+            {
+                var img = icons[i].GetImage();
+                sheet.BlendRect(img, new Rect2I(0, 0, 64, 64), new Vector2I((i % cols) * cell + 2, (i / cols) * cell + 2));
+            }
+            sheet.Resize(sheet.GetWidth() * 2, sheet.GetHeight() * 2, Image.Interpolation.Nearest);
+            sheet.SavePng(output);
+            GD.Print($"saved {output} ({icons.Count} icons)");
+            GetTree().Quit();
+            return;
+        }
+
         if (mode is 6 or 7)
         {
             await MenuShot(mode, output);
@@ -193,7 +240,15 @@ public partial class ScreenshotTool : Node
             for (int i = 0; i < 30; i++)
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
             if (mode == 11)
-                main.GetChildren().OfType<Shop>().First().OpenFor((ShopKind)arg);
+            {
+                var shopUi = main.GetChildren().OfType<Shop>().First();
+                rod.Profile.Money = 180;
+                rod.Profile.AddCatch(GD.Load<FishSpecies>("res://data/fish/okon.tres"), 0.6f);
+                rod.Profile.AddCatch(GD.Load<FishSpecies>("res://data/fish/karp.tres"), 4.2f);
+                shopUi.OpenFor((ShopKind)arg);
+                await NextFrame();
+                shopUi.SelectCard(1);
+            }
         }
         else if (mode is 8 or 9)
         {
