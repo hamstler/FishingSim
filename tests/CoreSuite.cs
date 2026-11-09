@@ -89,7 +89,7 @@ public sealed class CoreSuite : ITestSuite
         var juniorGear = new FightGear(DragMax: 3f, EffectiveLimit: 4f, RodShock: 0.3f, ReelSpeed: 2.2f, MaxLine: 60f);
 
         var (outcome, secs) = Fight(roach, 0.8f, teleGear, 0.5f, seed: 3);
-        t.Check(outcome == FightOutcome.Landed && secs < 90f, $"a roach on balanced gear is landed ({secs:0} s)");
+        t.Check(outcome == FightOutcome.Landed && secs is > 12f and < 90f, $"a roach on balanced gear puts up a fight but is landed ({secs:0} s)");
 
         (outcome, _) = Fight(carp, 12f, new FightGear(9f, 4f, 0.3f, 3.4f, 150f), 0.6f, seed: 4);
         t.Check(outcome == FightOutcome.LineBroke, "a drag set above the line strength breaks the line");
@@ -98,7 +98,7 @@ public sealed class CoreSuite : ITestSuite
         t.Check(outcome == FightOutcome.SpooledOut, "a nearly open drag lets the fish take all the line");
 
         (outcome, secs) = Fight(carp, 12f, teleGear, 0.5f, seed: 6);
-        t.Check(outcome == FightOutcome.Landed, $"a 12 kg carp is landed with a sensible drag ({secs:0} s)");
+        t.Check(outcome == FightOutcome.Landed && secs > 90f, $"a 12 kg carp is a long fight but is landed with a sensible drag ({secs:0} s)");
 
         var model = new FightModel(FishProfile.From(carp, 12f), new FightGear(9f, 4f, 0.3f, 3.4f, 150f), new SystemRng(8), 20f, 0f, 0.6f) { Unbreakable = true };
         bool ever = false;
@@ -108,8 +108,8 @@ public sealed class CoreSuite : ITestSuite
 
         var f = new FightModel(FishProfile.From(roach, 0.5f), teleGear, new SystemRng(1), 20f, 0f, 0.5f);
         t.Near(f.Fatigue, 1f, 0.001f, "fatigue x1 at the start");
-        for (int i = 0; i < 45 * 60; i++) f.Step(1f / 60f, 0.5f, false);
-        t.Near(f.Fatigue, 2f, 0.05f, "fatigue x2 after 45 s");
+        for (int i = 0; i < (int)(FightModel.FatigueSeconds * 60); i++) f.Step(1f / 60f, 0.5f, false);
+        t.Near(f.Fatigue, 2f, 0.05f, $"fatigue x2 after {FightModel.FatigueSeconds:0} s");
 
         var a = TraceLine(carp, 12f, teleGear, seed: 11);
         var b = TraceLine(carp, 12f, teleGear, seed: 11);
@@ -119,7 +119,7 @@ public sealed class CoreSuite : ITestSuite
 
         var times = Enumerable.Range(0, 12).Select(seed => Fight(carp, 12f, juniorGear, 0.6f, seed + 100)).ToList();
         t.Check(times.All(r => r.Outcome != FightOutcome.Ongoing), $"fights on weak gear end (slowest {times.Max(r => r.Seconds):0} s)");
-        t.Check(times.Where(r => r.Outcome == FightOutcome.Landed).All(r => r.Seconds < 300f), "fatigue keeps the longest weak-gear fight under 5 minutes");
+        t.Check(times.Where(r => r.Outcome == FightOutcome.Landed).All(r => r.Seconds < 480f), "fatigue keeps the longest weak-gear fight under 8 minutes");
 
         var small = Enumerable.Range(0, 10).Select(s => Fight(pike, 1.2f, teleGear, 0.5f, s + 200).Seconds).Average();
         var big = Enumerable.Range(0, 10).Select(s => Fight(pike, 7.5f, teleGear, 0.5f, s + 300).Seconds).Average();

@@ -27,6 +27,7 @@ public partial class Hud : CanvasLayer
     private Label _help = null!, _hint = null!, _dev = null!, _drag = null!;
     private ProgressBar _power = null!;
     private TensionGauge _gauge = null!;
+    private Label _advice = null!;
     private bool _devOpen, _helpOpen;
     private float _purseFlash, _tackleFlash, _hintTime = 10f;
     private string _lastPurse = "", _lastTackle = "";
@@ -84,9 +85,12 @@ public partial class Hud : CanvasLayer
         // Fishing readout: state, then a thin tension bar with drag and line below it.
         _status = Text(18, Ink, HorizontalAlignment.Center);
         Anchor(_status, 0.5f, 1f, -300, -112, 300, -86);
+        // The fight bar sits in the middle of the screen, under the crosshair.
         _gauge = new TensionGauge { Rod = _rod };
-        Anchor(_gauge, 0.5f, 1f, -160, -80, 160, -72);
+        Anchor(_gauge, 0.5f, 0.5f, -300, 130, 300, 176);
         AddChild(_gauge);
+        _advice = Text(18, Ink, HorizontalAlignment.Center);
+        Anchor(_advice, 0.5f, 0.5f, -300, 92, 300, 116);
         _power = new ProgressBar { ShowPercentage = false, Theme = UITheme.Make() };
         Anchor(_power, 0.5f, 1f, -160, -80, 160, -72);
         AddChild(_power);
@@ -165,7 +169,16 @@ public partial class Hud : CanvasLayer
         SetText(_status, state);
         Fade(_status, fishing || details, dt);
         _gauge.Visible = fighting;
-        _gauge.QueueRedraw();
+        float reserve = Core.FightGauge.Reserve(rod.Tension, rod.EffectiveLimit);
+        SetText(_advice, fighting ? Core.FightGauge.Advice(reserve) : _advice.Text);
+        _advice.AddThemeColorOverride("font_color", Core.FightGauge.Zone(reserve) switch
+        {
+            0 => new Color(1f, 0.45f, 0.35f),
+            1 => new Color(1f, 0.7f, 0.35f),
+            2 => new Color(1f, 0.86f, 0.5f),
+            _ => new Color(0.6f, 0.95f, 0.5f),
+        });
+        Fade(_advice, fighting, dt);
         _power.Visible = rod.State == RodState.Charging;
         _power.Value = rod.CastPower * 100f;
 
