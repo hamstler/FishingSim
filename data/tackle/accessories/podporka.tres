@@ -4,9 +4,9 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Rozwidlony kij-podpórka"
+DisplayName = "Podpórka z dzwoneczkiem"
 Kind = 2
 Power = 1.0
-Description = "Odłożenie wędki podczas czekania (w planach)."
+Description = "Dzwoneczek na podpórce dzwoni, gdy ryba dotknie przynęty."
 Price = 35
 RequiredLevel = 2

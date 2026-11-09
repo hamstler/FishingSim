@@ -565,6 +565,9 @@ public partial class FishingRod : Node3D
             Loadout.UseBait();
         _bobber.DriveVelocity = Vector3.Zero;
         _nibbleLength = _rng.Range(1f, 2.2f);
+        // The bell on the rod rest rings when a fish touches the bait.
+        if (Gear?.Has(AccessoryKind.RodPod) == true)
+            SoundCue?.Invoke(Core.Audio.OneShot.Bell, 1f);
         _pulseTimer = 0f;
         SetState(RodState.Nibble);
     }

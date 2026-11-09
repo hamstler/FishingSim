@@ -9,7 +9,7 @@ public enum AccessoryKind
     PolarizedGlasses,
     /// <summary>Latarka czołowa: light at night.</summary>
     Headlamp,
-    /// <summary>Podpórka / rod pod: put the rod down while waiting (planned: several rods).</summary>
+    /// <summary>Podpórka z dzwoneczkiem: a bell rings on every bite (planned: putting the rod down, several rods).</summary>
     RodPod,
     /// <summary>Krzesełko: resting speeds up the clock (planned).</summary>
     Chair,

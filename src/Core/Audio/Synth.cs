@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace FishingSim.Core.Audio;
 
 /// <summary>What a one-shot sound is made of.</summary>
-public enum OneShot { Splash, SmallSplash, StepWood, StepGrass, Strike, Catch, LineSnap }
+public enum OneShot { Splash, SmallSplash, StepWood, StepGrass, Strike, Catch, LineSnap, Bell }
 
 /// <summary>Levels of the continuous sounds (0..1), set every frame by the game.</summary>
 public struct AmbientLevels
@@ -66,6 +66,7 @@ public sealed class Synth
             OneShot.StepGrass => 0.16f,
             OneShot.Strike => 0.25f,
             OneShot.Catch => 0.6f,
+            OneShot.Bell => 0.9f,
             _ => 0.3f,
         };
         _voices.Add(new Voice { Kind = kind, Length = len, Gain = gain, Pitch = 0.85f + 0.3f * (float)_rnd.NextDouble() });
@@ -193,6 +194,13 @@ public sealed class Synth
                 float f = k < 0.4f ? 660f : 990f;
                 float local = k < 0.4f ? k / 0.4f : (k - 0.4f) / 0.6f;
                 return MathF.Sin(v.T * MathF.Tau * f) * MathF.Exp(-local * 6f) * 0.18f;
+            }
+            case OneShot.Bell:
+            {
+                // A small brass bell: inharmonic partials, quick strike, long ring.
+                float t = v.T;
+                float ring = MathF.Sin(t * MathF.Tau * 2100f) + 0.6f * MathF.Sin(t * MathF.Tau * 2100f * 2.76f) + 0.35f * MathF.Sin(t * MathF.Tau * 2100f * 5.4f);
+                return ring * MathF.Exp(-k * 4f) * 0.09f;
             }
             default:
                 return Noise() * MathF.Exp(-k * 12f) * 0.4f;

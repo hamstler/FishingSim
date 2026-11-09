@@ -295,8 +295,16 @@ public sealed class GearSuite : ITestSuite
         var rod = main.Rod;
         rod.DevSpeciesIndex = -1;
         rod.DevInstantBite = true;
-        int splashes = 0;
-        rod.SoundCue += (cue, _) => { if (cue == FishingSim.Core.Audio.OneShot.Splash) splashes++; };
+        int splashes = 0, bells = 0;
+        rod.SoundCue += (cue, _) =>
+        {
+            if (cue == FishingSim.Core.Audio.OneShot.Splash) splashes++;
+            if (cue == FishingSim.Core.Audio.OneShot.Bell) bells++;
+        };
+        var pod = main.Gear.Items(GearSlot.Accessory).First(i => i.ItemId == "podporka");
+        rod.Profile.Level = Math.Max(rod.Profile.Level, pod.RequiredLevel);
+        rod.Profile.Money += 100;
+        t.Check(main.Gear.Buy(GearSlot.Accessory, pod) == null, "the rod rest with a bell can be bought");
         rod.CastNow(0.35f);
         for (int i = 0; i < 360 && rod.State != RodState.Waiting; i++)
             await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
@@ -320,6 +328,7 @@ public sealed class GearSuite : ITestSuite
             await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
         }
         t.Check(splashes == 1, "the float lands with a splash sound");
+        t.Check(bells == 1, "the bell rings when the fish touches the bait");
         t.Check(main.GetChildren().OfType<FishingSim.Audio.SoundEngine>().Any(), "the sound engine runs in the game");
         t.Check(roachAgent != null && rod.Biter == roachAgent && rod.CurrentSpecies?.SpeciesName == "Płoć" && rod.CurrentWeight == roachAgent.Weight,
             "the roach next to the float is the fish that bites (same weight too)");
