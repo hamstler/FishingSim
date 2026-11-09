@@ -33,7 +33,6 @@ public partial class LakeBed : Node3D
 
     private readonly FastNoiseLite _noise = new() { Seed = 1234, Frequency = 0.01f };
     private readonly Dictionary<LocationData, MapLayout> _layouts = new();
-    private ImageTexture? _detailTexture;
     private StaticBody3D? _body;
 
     public List<LocationData> Locations { get; } = new();
@@ -182,26 +181,6 @@ public partial class LakeBed : Node3D
     }
 
     // ------------------------------------------------------------------ mesh
-    private ImageTexture DetailTexture()
-    {
-        if (_detailTexture != null)
-            return _detailTexture;
-        var n = new FastNoiseLite { Seed = 77, Frequency = 0.05f, FractalOctaves = 3 };
-        var src = n.GetSeamlessImage(128, 128);
-        var img = Image.CreateEmpty(128, 128, true, Image.Format.Rgb8);
-        for (int y = 0; y < 128; y++)
-        {
-            for (int x = 0; x < 128; x++)
-            {
-                float v = 0.78f + 0.34f * src.GetPixel(x, y).R;
-                img.SetPixel(x, y, new Color(v, v, v));
-            }
-        }
-        img.GenerateMipmaps();
-        _detailTexture = ImageTexture.CreateFromImage(img);
-        return _detailTexture;
-    }
-
     public Color ColorAt(LocationData loc, float x, float z, float h)
     {
         float n = _noise.GetNoise2D(x * 5f, z * 5f) * 0.08f;
@@ -225,6 +204,36 @@ public partial class LakeBed : Node3D
                 c = c.Lerp(loc.PathColor, path * 0.92f);
         }
         return new Color(c.R + n, c.G + n, c.B + n);
+    }
+
+    private ShaderMaterial? _terrainMaterial;
+
+    /// <summary>The ground material (shaders/terrain.gdshader); also animated (caustics) by <see cref="_Process"/>.</summary>
+    public ShaderMaterial TerrainMaterial()
+    {
+        if (_terrainMaterial != null)
+            return _terrainMaterial;
+        _terrainMaterial = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/terrain.gdshader") };
+        _terrainMaterial.SetShaderParameter("noise_tex", Graphics.ProceduralTextures.Noise(17, 0.02f, 512));
+        _terrainMaterial.SetShaderParameter("detail_normal", Graphics.ProceduralTextures.Noise(23, 0.03f, 512, true, 10f));
+        _terrainMaterial.SetShaderParameter("caustics_tex", Graphics.ProceduralTextures.Caustics());
+        return _terrainMaterial;
+    }
+
+    private float _time;
+
+    /// <summary>0..1 sun light reaching the ground (caustics fade at night); set by the sky.</summary>
+    public float Daylight { get; set; } = 1f;
+
+    public override void _Process(double delta)
+    {
+        using var perfScope = Graphics.Perf.Scope("lakebed");
+        _time += (float)delta;
+        if (_terrainMaterial != null)
+        {
+            _terrainMaterial.SetShaderParameter("time", _time);
+            _terrainMaterial.SetShaderParameter("daylight", Daylight);
+        }
     }
 
     public void Rebuild()
@@ -259,18 +268,7 @@ public partial class LakeBed : Node3D
         var mesh = st.Commit();
 
         _body = new StaticBody3D { CollisionLayer = 1 };
-        var material = new StandardMaterial3D
-        {
-            VertexColorUseAsAlbedo = true,
-            VertexColorIsSrgb = true,
-            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-            Roughness = 1f,
-            AlbedoTexture = DetailTexture(),
-            Uv1Triplanar = true,
-            Uv1WorldTriplanar = true,
-            Uv1Scale = new Vector3(0.18f, 0.18f, 0.18f),
-        };
-        _body.AddChild(new MeshInstance3D { Mesh = mesh, MaterialOverride = material });
+        _body.AddChild(new MeshInstance3D { Mesh = mesh, MaterialOverride = TerrainMaterial() });
         var shape = mesh.CreateTrimeshShape();
         shape.BackfaceCollision = true;
         _body.AddChild(new CollisionShape3D { Shape = shape });

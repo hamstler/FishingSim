@@ -3,7 +3,7 @@ using FishingSim.Fishing;
 
 namespace FishingSim.UI;
 
-/// <summary>Line tension bar with the drag setting marked by a white line.</summary>
+/// <summary>Thin line-tension bar; the gold tick marks the drag setting.</summary>
 public partial class TensionGauge : Control
 {
     public FishingRod? Rod { get; set; }
@@ -12,15 +12,13 @@ public partial class TensionGauge : Control
     {
         if (Rod == null)
             return;
-        DrawRect(new Rect2(Vector2.Zero, Size), new Color(0.03f, 0.06f, 0.09f, 0.75f));
+        // A thin bar: fill = tension, tick = where the drag starts to give line.
+        DrawRect(new Rect2(Vector2.Zero, Size), new Color(0.05f, 0.03f, 0.02f, 0.55f));
         float limit = Rod.EffectiveLimit;
         float ratio = Mathf.Clamp(Rod.Tension / limit, 0f, 1f);
-        var color = new Color(0.3f, 0.8f, 0.4f).Lerp(new Color(0.95f, 0.25f, 0.2f), Mathf.Clamp((ratio - 0.5f) * 2f, 0f, 1f));
-        DrawRect(new Rect2(2, 2, (Size.X - 4) * ratio, Size.Y - 4), color);
-        float dx = (Size.X - 4) * (Rod.DragSetting * Rod.DragMax / limit) + 2;
-        DrawLine(new Vector2(dx, 0), new Vector2(dx, Size.Y), Colors.White, 3f);
-        DrawRect(new Rect2(Vector2.Zero, Size), new Color(0.4f, 0.55f, 0.7f), false, 1f);
-        DrawString(ThemeDB.FallbackFont, new Vector2(0, Size.Y * 0.5f + 6f), $"{Rod.Tension:0.0} / {limit:0.0} kg",
-            HorizontalAlignment.Center, Size.X, 16, Colors.White);
+        var color = new Color(0.95f, 0.88f, 0.7f).Lerp(new Color(0.95f, 0.25f, 0.15f), Mathf.Clamp((ratio - 0.55f) * 2.2f, 0f, 1f));
+        DrawRect(new Rect2(0, 0, Size.X * ratio, Size.Y), color);
+        float dx = Mathf.Clamp(Size.X * (Rod.DragSetting * Rod.DragMax / limit), 0f, Size.X - 2f);
+        DrawRect(new Rect2(dx, -3, 2, Size.Y + 6), new Color(1f, 0.84f, 0.45f));
     }
 }

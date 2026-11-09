@@ -222,11 +222,11 @@ public partial class GameUI : CanvasLayer
         _depthSlider = new HSlider { MinValue = 0.5, MaxValue = 10, Step = 0.5, Value = 3 };
         _depthSlider.ValueChanged += _ => RefreshInventory();
         right.AddChild(_depthSlider);
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 8; i++)
         {
             var row = new HBoxContainer();
             row.AddThemeConstantOverride("separation", 8);
-            var name = new Label { CustomMinimumSize = new Vector2(100, 0) };
+            var name = new Label { CustomMinimumSize = new Vector2(150, 0) };
             var bar = new ProgressBar { CustomMinimumSize = new Vector2(200, 22), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, ShowPercentage = false, MaxValue = 100 };
             var pct = new Label { CustomMinimumSize = new Vector2(54, 0), HorizontalAlignment = HorizontalAlignment.Right };
             row.AddChild(name);
@@ -267,7 +267,7 @@ public partial class GameUI : CanvasLayer
             _slotPrev[s].Disabled = !idle;
             _slotNext[s].Disabled = !idle;
         }
-        string weak = _rod.LineStrength <= _rod.RodMaxLoad ? "żyłka" : "wędka";
+        string weak = _rod.LineStrength <= _rod.RodMaxLoad ? "linka" : "wędka";
         _summary.Text = $"Najsłabsze ogniwo: {weak}, limit {_rod.EffectiveLimit:0.0} kg. Maks. hamulec {_rod.DragMax:0.0} kg. "
             + $"Zasięg rzutu do ok. {_rod.EstimateCastRange():0} m."
             + (idle ? "" : "\nSprzęt można zmieniać tylko między rzutami.");
@@ -284,8 +284,8 @@ public partial class GameUI : CanvasLayer
         for (int i = 0; i < _chanceRows.Count; i++)
         {
             var row = _chanceRows[i];
-            row.Row.Visible = i < chances.Count;
-            if (i >= chances.Count)
+            row.Row.Visible = i < chances.Count && chances[i].Share > 0.005f;
+            if (!row.Row.Visible)
                 continue;
             row.Name.Text = chances[i].Species.SpeciesName;
             row.Bar.Value = chances[i].Share * 100f;
@@ -318,7 +318,7 @@ public partial class GameUI : CanvasLayer
         side.AddChild(title);
         side.AddChild(new Label
         {
-            Text = "Czerwona kreska: pomost\nŻółta strzałka: Ty\nBiały punkt: spławik\nKwadraty: sklepy i przystanek\nKręgi: odległość od Ciebie",
+            Text = "Czerwona kreska: pomost\nŻółta strzałka: Ty\nBiały punkt: spławik\nKwadraty: kramy i postój wozów\nKręgi: odległość od Ciebie",
             Modulate = new Color(1, 1, 1, 0.75f),
         });
         var gradient = new Gradient();
@@ -400,7 +400,7 @@ public partial class GameUI : CanvasLayer
         var perp = new Vector2(-dir.Y, dir.X);
         c.DrawColoredPolygon(new[] { pp + dir * 11f, pp - dir * 6f + perp * 6f, pp - dir * 6f - perp * 6f }, new Color(1f, 0.9f, 0.3f));
 
-        if (_rod.State is RodState.Waiting or RodState.Nibble or RodState.Bite or RodState.Fight)
+        if (_rod.State is RodState.Waiting or RodState.Nibble or RodState.Bite or RodState.Fight or RodState.Close)
         {
             var bp = WorldToPixel(_rod.Bobber.GlobalPosition.X, _rod.Bobber.GlobalPosition.Z, size);
             c.DrawLine(pp, bp, new Color(1, 1, 1, 0.5f), 1f);
@@ -489,7 +489,7 @@ public partial class GameUI : CanvasLayer
     private void RefreshJournal()
     {
         float totalKg = _profile.Journal.Sum(e => e.Weight);
-        _journalHead.Text = $"Poziom {_profile.Level} (XP {_profile.Xp} / {_profile.XpToNext}) | złowione ryby: {_profile.TotalCatches} | w dzienniku: {totalKg:0.0} kg | {_profile.Money} zł";
+        _journalHead.Text = $"Poziom {_profile.Level} (XP {_profile.Xp} / {_profile.XpToNext}) | złowione ryby: {_profile.TotalCatches} | w dzienniku: {totalKg:0.0} kg | {_profile.Money} gr";
 
         ClearChildren(_journalList);
         if (_profile.Journal.Count == 0)
@@ -504,6 +504,8 @@ public partial class GameUI : CanvasLayer
         }
 
         ClearChildren(_speciesList);
+        int known = _rod.Species.Count(sp => _profile.CatchCounts.GetValueOrDefault(sp.SpeciesName) > 0);
+        _speciesList.AddChild(new Label { Text = $"Atlas ryb: poznane {known} z {_rod.Species.Count} gatunków", Modulate = new Color(1f, 0.85f, 0.5f) });
         foreach (var sp in _rod.Species)
         {
             var entries = _profile.Journal.Where(e => e.Species == sp.SpeciesName).ToList();
@@ -513,7 +515,7 @@ public partial class GameUI : CanvasLayer
                 string favourite = entries.GroupBy(e => e.Bait ?? "?").OrderByDescending(g => g.Count()).First().Key;
                 float record = _profile.Records.GetValueOrDefault(sp.SpeciesName);
                 label.Text = $"{sp.SpeciesName}\n   w dzienniku: {entries.Count} szt., razem {entries.Sum(e => e.Weight):0.0} kg\n"
-                    + $"   rekord: {record:0.00} kg | najlepsza przynęta: {favourite}";
+                    + $"   rekord: {record:0.00} kg | najlepsza przynęta: {favourite}\n   {SpeciesTips(sp)}";
             }
             else
             {
@@ -522,5 +524,22 @@ public partial class GameUI : CanvasLayer
             }
             _speciesList.AddChild(label);
         }
+    }
+
+    private static readonly (string Id, string Name)[] BaitNames =
+    {
+        ("worm", "robak"), ("maggot", "czerwie"), ("insect", "koniki"), ("bread", "chleb"),
+        ("corn", "pszenica"), ("boilie", "kulka"), ("livebait", "żywiec"),
+    };
+
+    /// <summary>What the angler has learned about a species once caught: baits it takes, depth and best time.</summary>
+    public static string SpeciesTips(FishSpecies sp)
+    {
+        var baits = BaitNames.Where(b => sp.AffinityFor(b.Id) >= 0.8f).OrderByDescending(b => sp.AffinityFor(b.Id)).Select(b => b.Name).ToList();
+        string when = sp.NightActivity > sp.DayActivity * 1.2f ? "nocą"
+            : sp.TwilightBonus >= 1.5f ? "o świcie i zmierzchu"
+            : sp.DayActivity > sp.NightActivity * 2f ? "za dnia"
+            : "o każdej porze";
+        return $"bierze na: {(baits.Count > 0 ? string.Join(", ", baits) : "-")} | {sp.MinDepth:0.#}-{sp.MaxDepth:0.#} m | najlepiej {when}";
     }
 }

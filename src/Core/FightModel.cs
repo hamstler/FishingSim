@@ -60,6 +60,9 @@ public sealed class FightModel
     public float FishAngle { get; private set; }
     public bool Running { get; private set; } = true;
     public float LineStress { get; private set; }
+
+    /// <summary>The drag is giving line this step (the fish pulls harder than the drag setting).</summary>
+    public bool Slipping { get; private set; }
     public float Elapsed { get; private set; }
     public float PeakPull => _fish.PeakPull;
 
@@ -100,8 +103,11 @@ public sealed class FightModel
         }
     }
 
-    /// <summary>Advances the fight by <paramref name="dt"/> seconds.</summary>
-    public FightOutcome Step(float dt, float dragSetting, bool reeling)
+    /// <summary>
+    /// Advances the fight by <paramref name="dt"/> seconds. <paramref name="lifting"/> = the rod is raised (pumping):
+    /// the fish is drawn in faster and tires sooner, but the line carries more load.
+    /// </summary>
+    public FightOutcome Step(float dt, float dragSetting, bool reeling, bool lifting = false)
     {
         Elapsed += dt;
 
@@ -113,7 +119,7 @@ public sealed class FightModel
         float pull;
         if (Running)
         {
-            Stamina = MathF.Max(Stamina - _fish.StaminaDrain * Mathf.Lerp(1.3f, 0.85f, _fish.SizeRatio) * Fatigue * dt, 0f);
+            Stamina = MathF.Max(Stamina - _fish.StaminaDrain * Mathf.Lerp(1.3f, 0.85f, _fish.SizeRatio) * Fatigue * (lifting ? 1.35f : 1f) * dt, 0f);
             _burstTimer -= dt;
             if (_burstTimer <= 0f)
             {
@@ -134,7 +140,7 @@ public sealed class FightModel
         }
 
         // --- load, drag, tension ---
-        float raw = pull + (reeling ? 0.35f * _fish.PeakPull * staminaFactor : 0f);
+        float raw = pull + (reeling ? 0.35f * _fish.PeakPull * staminaFactor : 0f) + (lifting ? 0.3f * _fish.PeakPull * staminaFactor : 0f);
         float dragLimit = dragSetting * _gear.DragMax;
         float excess = MathF.Max(raw - dragLimit, 0f);
         float target = excess == 0f ? raw : dragLimit + 0.25f * (1f - _gear.RodShock) * excess;
@@ -143,7 +149,10 @@ public sealed class FightModel
 
         // --- line in / out ---
         float payout = excess * 0.5f;   // m/s pulled off the spool by a slipping drag
+        Slipping = excess > 0.05f;
         float reelIn = reeling ? _gear.ReelSpeed * Math.Clamp(1f - excess / 2f, 0f, 1f) : 0f;
+        if (lifting)
+            reelIn += 0.6f * Math.Clamp(1f - excess / 2f, 0f, 1f);   // pumping gains line
         LineOut += (payout - reelIn) * dt;
 
         // --- line stress ---

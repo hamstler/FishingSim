@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Młynek 3000"
+DisplayName = "Kołowrotek z kuźni"
 DragMax = 5.0
 ReelSpeed = 3.0
 LineCapacity = 100.0

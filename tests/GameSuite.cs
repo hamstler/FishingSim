@@ -141,7 +141,9 @@ public sealed class GameSuite : ITestSuite
         loadout.Index[(int)TackleSlot.Bait] = live;
         rod.World.Hour = 19f;
         var chances = rod.BiteChances(3f);
-        t.Check(chances[0].Species.SpeciesName == "Szczupak" && chances[0].Share > 0.99f, "live bait only attracts pike");
+        var takers = chances.Where(c => c.Share > 0f).ToList();
+        t.Check(takers.Count > 0 && takers.All(c => c.Species.AffinityFor("livebait") > 0f) && takers.Any(c => c.Species.SpeciesName == "Szczupak"),
+            $"live bait only attracts predators ({string.Join(", ", takers.Select(c => c.Species.SpeciesName))})");
         loadout.Index[(int)TackleSlot.Bait] = 0;
         loadout.Index[(int)TackleSlot.Rod] = 0;
         rod.ApplyTackle();
@@ -168,13 +170,21 @@ public sealed class GameSuite : ITestSuite
         int baitBefore = loadout.BaitCount;
         ui.Open(1);
         rod._UnhandledInput(Key(Godot.Key.Space));
-        t.Check(rod.State == RodState.Fight, "Space sets the hook even with the map open");
+        t.Check(rod.State == RodState.Bite, "Space no longer strikes (it is the landing net)");
+        rod._UnhandledInput(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Pressed = true });
+        t.Check(rod.State == RodState.Fight, "raising the rod (RMB) sets the hook, even with the map open");
         ui.Close();
         rod.DevUnbreakable = true;
         rod.ReelOverride = true;
         rod.DragSetting = 0.5f;
         int fishBefore = profile.TotalCatches;
-        await WaitForState(t, rod, RodState.Landed, 90);
+        await WaitForState(t, rod, RodState.Close, 90);
+        t.Check(rod.State == RodState.Close && profile.TotalCatches == fishBefore, "a beaten fish waits at the surface: it is not caught yet");
+        rod._UnhandledInput(Key(Godot.Key.Space));
+        t.Check(rod.State == RodState.Close && !rod.HasNet, "without a landing net Space does nothing");
+        rod.LiftOverride = true;
+        await WaitForState(t, rod, RodState.Landed, 15);
+        rod.LiftOverride = false;
         rod.ReelOverride = false;
         t.Check(rod.State == RodState.Landed && profile.TotalCatches == fishBefore + 1, "the fish is landed and added to the profile");
         t.Check(profile.Journal.Count > 0 && profile.Journal[^1].Location == "Zatoka Szuwarowa" && profile.Journal[^1].Bait != null, "the journal notes where and on what it was caught");
@@ -190,7 +200,7 @@ public sealed class GameSuite : ITestSuite
         rod.ResetToIdle();
         shop.Toggle();
         t.Check(shop.Visible && rod.InputBlocked, "B opens the shop and blocks fishing input");
-        int value = profile.KeepnetValue;
+        int value = profile.KeepnetValue - profile.UndersizedCount * Profile.UndersizedFine;
         shop.SellAll();
         t.Check(profile.Money == money0 + value && profile.Keepnet.Count == 0, "selling in the shop pays out");
         shop.Toggle();

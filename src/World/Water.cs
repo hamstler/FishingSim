@@ -33,6 +33,7 @@ public partial class Water : MeshInstance3D
         CustomAabb = new Aabb(new Vector3(-160, -1, -160), new Vector3(320, 2, 320));
         CastShadow = ShadowCastingSetting.Off;
         _material = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/water.gdshader") };
+        _material.SetShaderParameter("foam_noise", Graphics.ProceduralTextures.Noise(53, 0.02f, 256));
         MaterialOverride = _material;
         PushParameters();
     }
@@ -50,6 +51,7 @@ public partial class Water : MeshInstance3D
 
     public override void _Process(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("water");
         _waveTime += (float)delta;
         PushParameters();
     }
@@ -60,6 +62,12 @@ public partial class Water : MeshInstance3D
         _material.SetShaderParameter("amp", Amplitude);
         _material.SetShaderParameter("rain", Rain);
     }
+
+    /// <summary>0..1: how much surface glare is removed (polarized glasses make fish easier to see).</summary>
+    public void SetGlareCut(float amount) => _material.SetShaderParameter("glare_cut", Math.Clamp(amount, 0f, 1f));
+
+    /// <summary>How clear the lake is (metres; bigger = you see deeper). Set per map.</summary>
+    public void SetClarity(float metres) => _material.SetShaderParameter("clarity", Math.Max(metres, 0.3f));
 
     /// <summary>Colours of the water over the shallows and over the deep parts (set per map).</summary>
     public void SetTint(Color shallow, Color deep)

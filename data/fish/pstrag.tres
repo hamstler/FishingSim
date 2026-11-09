@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="FishSpecies" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/FishSpecies.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+SpeciesName = "Pstrąg potokowy"
+MinWeight = 0.1
+MaxWeight = 3.0
+Rarity = 0.9
+PullFactor = 1.2
+Aggression = 0.8
+StaminaDrain = 0.13
+MouthSize = 4.0
+BaitAffinity = {"worm": 1.4, "corn": 0.0, "bread": 0.0, "boilie": 0.0, "livebait": 0.6, "maggot": 0.9, "insect": 1.8}
+MinDepth = 0.3
+MaxDepth = 4.0
+DayActivity = 1.2
+NightActivity = 0.3
+TwilightBonus = 1.6
+WeatherPref = {"clear": 0.9, "cloudy": 1.2, "rain": 1.1}
+RunLengthMult = 1.0
+BurstMult = 1.8
+BurstRate = 1.0
+LengthRef = 0.35
+BodyDepth = 0.22
+DorsalPos = 0.5
+BackColor = Color(0.35, 0.32, 0.2, 1)
+BellyColor = Color(0.9, 0.85, 0.65, 1)
+FinColor = Color(0.55, 0.45, 0.3, 1)
+PricePerKg = 50.0
+TrophyWeight = 0.0

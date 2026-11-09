@@ -35,7 +35,7 @@ public sealed class CoreSuite : ITestSuite
         t.Check(roach.SpeciesName == "Płoć" && carp.PricePerKg == 25f, "species .tres values arrive in the C# properties");
         t.Check(carp.AffinityFor("boilie") == 2f && carp.AffinityFor("nonsense") == 0f, "bait affinity lookup");
         t.Check(pike.WeatherMultiplier("rain") == 1.3f && pike.WeatherMultiplier("hail") == 1f, "weather multiplier lookup with default");
-        t.Check(lake.AbundanceOf("Karp") == 0.6f && lake.AbundanceOf("Sum") == 0f, "location abundance lookup");
+        t.Check(lake.AbundanceOf("Karp") == 0.6f && lake.AbundanceOf("Pstrąg potokowy") == 0f, "location abundance lookup");
         t.Check(lake.OutlineRx == 120f && lake.HolePos == new Vector2(12, -40), "location numbers and vectors");
         var teleskop = GD.Load<RodData>("res://data/tackle/rods/teleskop.tres");
         t.Check(teleskop.ItemId == "teleskop" && teleskop.Price == 120 && teleskop.RequiredLevel == 2, "tackle id comes from the file name");

@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Kukurydza"
+DisplayName = "Gotowana pszenica"
 StartCount = 20
 Price = 12
 PackSize = 10

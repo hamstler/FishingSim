@@ -19,11 +19,11 @@ public partial class RodRig : Node3D
         Position = new Vector3(0.3f, -0.35f, -0.4f);
         RotationDegrees = new Vector3(-80f, 0f, 0f);
 
-        var cork = Mat(new Color(0.55f, 0.4f, 0.25f), 0.9f);
-        var black = Mat(new Color(0.05f, 0.05f, 0.06f), 0.5f);
-        var metal = Mat(new Color(0.65f, 0.66f, 0.7f), 0.25f, 0.8f);
-        var graphite = Mat(new Color(0.08f, 0.08f, 0.1f), 0.35f, 0.2f);
-        var red = Mat(new Color(0.7f, 0.08f, 0.06f), 0.6f);
+        var cork = Mat(new Color(0.36f, 0.22f, 0.13f), 0.9f);      // leather grip
+        var black = Mat(new Color(0.22f, 0.15f, 0.09f), 0.8f);       // dark wood fittings
+        var metal = Mat(new Color(0.55f, 0.42f, 0.22f), 0.4f, 0.6f);   // brass
+        var graphite = Mat(new Color(0.5f, 0.36f, 0.2f), 0.8f);       // hazel wood
+        var red = Mat(new Color(0.75f, 0.68f, 0.5f), 0.9f);          // twine whipping
 
         // Handle, butt cap and reel seat.
         Cyl(this, 0.021f, 0.021f, 0.36f, new Vector3(0, -0.13f, 0), cork);
@@ -83,12 +83,13 @@ public partial class RodRig : Node3D
     }
 
     private static StandardMaterial3D Mat(Color color, float roughness, float metallic = 0f) =>
-        new() { AlbedoColor = color, Roughness = roughness, Metallic = metallic };
+        World.Props.BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = color, Roughness = roughness, Metallic = metallic });
 
     private static MeshInstance3D Cyl(Node3D parent, float topRadius, float bottomRadius, float height, Vector3 pos, Material mat)
     {
         var mi = new MeshInstance3D
         {
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,   // first-person gear casts no shadow
             Mesh = new CylinderMesh { TopRadius = topRadius, BottomRadius = bottomRadius, Height = height, RadialSegments = 10, Rings = 1 },
             MaterialOverride = mat,
             Position = pos,
@@ -99,7 +100,7 @@ public partial class RodRig : Node3D
 
     private static MeshInstance3D Box(Node3D parent, Vector3 size, Vector3 pos, Material mat)
     {
-        var mi = new MeshInstance3D { Mesh = new BoxMesh { Size = size }, MaterialOverride = mat, Position = pos };
+        var mi = new MeshInstance3D { Mesh = new BoxMesh { Size = size }, MaterialOverride = mat, Position = pos, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
         parent.AddChild(mi);
         return mi;
     }

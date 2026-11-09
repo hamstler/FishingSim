@@ -10,21 +10,26 @@ using FishingSim.World;
 namespace FishingSim.UI;
 
 /// <summary>Which counter the player walked up to; decides which tabs the shop shows.</summary>
-public enum ShopKind { Tackle, Bait, FishBuyer, General, Travel }
+public enum ShopKind { Tackle, Bait, FishBuyer, Market, General, Travel }
 
-/// <summary>Tackle shop, bait shop, fish buyer and travel menu, opened by pressing E at a building door (only between casts).</summary>
+/// <summary>
+/// Tackle shop (rods, reels, lines, hooks, keepnets, landing nets, accessories), bait shop, fish buyer (fixed prices),
+/// fish market (live prices) and travel menu, opened by pressing E at a building door (only between casts).
+/// </summary>
 public partial class Shop : CanvasLayer
 {
     private static readonly (string Key, string Title)[] TabDefinitions =
     {
-        ("rod", "Wędki"), ("reel", "Kołowrotki"), ("line", "Żyłki"), ("hook", "Haki"),
-        ("bait", "Przynęty"), ("fish", "Ryby"), ("records", "Rekordy"), ("travel", "Łowiska"),
+        ("rod", "Wędki"), ("reel", "Kołowrotki"), ("line", "Linki"), ("hook", "Haczyki"),
+        ("keepnet", "Siatki"), ("landingnet", "Kasarki"), ("accessory", "Akcesoria"),
+        ("bait", "Przynęty"), ("fish", "Ryby"), ("market", "Targ"), ("records", "Rekordy"), ("travel", "Łowiska"),
     };
 
     private FishingRod _rod = null!;
     private Profile _profile = null!;
     private TackleLoadout _loadout = null!;
     private LakeBed _lake = null!;
+    private GearCatalog? _gear;
     private TabContainer _tabs = null!;
     private readonly Dictionary<string, VBoxContainer> _lists = new();
     private Label _money = null!, _message = null!, _title = null!;
@@ -35,6 +40,7 @@ public partial class Shop : CanvasLayer
         _profile = rod.Profile;
         _loadout = rod.Loadout;
         _lake = rod.Lake;
+        _gear = rod.Gear;
     }
 
     public TabContainer Tabs => _tabs;
@@ -57,7 +63,7 @@ public partial class Shop : CanvasLayer
 
         var head = new HBoxContainer();
         box.AddChild(head);
-        _title = new Label { Text = "Sklep wędkarski", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        _title = new Label { Text = "Kram wędkarski", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         _title.AddThemeFontSizeOverride("font_size", 26);
         head.AddChild(_title);
         _money = new Label();
@@ -79,7 +85,7 @@ public partial class Shop : CanvasLayer
         _message = new Label();
         _message.AddThemeColorOverride("font_color", new Color(1f, 0.9f, 0.4f));
         box.AddChild(_message);
-        box.AddChild(new Label { Text = "Esc - wyjdź ze sklepu | Odblokowywanie sprzętu zależy od poziomu", Modulate = new Color(1, 1, 1, 0.6f) });
+        box.AddChild(new Label { Text = "Esc - wyjdź | Lepszy sprzęt odblokowuje się z poziomem", Modulate = new Color(1, 1, 1, 0.6f) });
         _profile.Changed += Refresh;
     }
 
@@ -100,11 +106,13 @@ public partial class Shop : CanvasLayer
 
     private static readonly Dictionary<ShopKind, (string Title, string[] Tabs)> Kinds = new()
     {
-        [ShopKind.Tackle] = ("Sklep wędkarski", new[] { "rod", "reel", "line", "hook" }),
-        [ShopKind.Bait] = ("Sklep z przynętami", new[] { "bait" }),
+        [ShopKind.Tackle] = ("Kram wędkarski", new[] { "rod", "reel", "line", "hook", "keepnet", "landingnet", "accessory" }),
+        [ShopKind.Bait] = ("Kram z przynętami", new[] { "bait" }),
         [ShopKind.FishBuyer] = ("Skup ryb", new[] { "fish", "records" }),
-        [ShopKind.General] = ("Sklep wędkarski i przynęty", new[] { "rod", "reel", "line", "hook", "bait", "fish", "records" }),
-        [ShopKind.Travel] = ("Przystanek: wybierz łowisko", new[] { "travel" }),
+        [ShopKind.Market] = ("Targ rybny", new[] { "market", "records" }),
+        [ShopKind.General] = ("Kram wędkarski i przynęty",
+            new[] { "rod", "reel", "line", "hook", "keepnet", "landingnet", "accessory", "bait", "fish", "records" }),
+        [ShopKind.Travel] = ("Postój wozów: dokąd jedziesz?", new[] { "travel" }),
     };
 
     /// <summary>Opens the shop showing only the tabs that belong to this kind of counter.</summary>
@@ -150,10 +158,13 @@ public partial class Shop : CanvasLayer
     {
         if (!Visible)
             return;
-        _money.Text = $"{_profile.Money} zł | poziom {_profile.Level}";
+        _money.Text = $"{_profile.Money} gr | poziom {_profile.Level}";
         for (int s = 0; s < TackleSlotExtensions.Count; s++)
             FillGear((TackleSlot)s);
+        foreach (var slot in GearSlotExtensions.All)
+            FillGear(slot);
         FillFish();
+        FillMarket();
         FillRecords();
         FillTravel();
     }
@@ -201,7 +212,7 @@ public partial class Shop : CanvasLayer
             {
                 int have = _profile.BaitCounts.GetValueOrDefault(item.ItemId);
                 Row(list, item.DisplayName, Stats(item), locked ? $"Poziom {item.RequiredLevel}" : $"Masz: {have}",
-                    $"Kup ({item.Price} zł)", !locked && _profile.Money >= item.Price, () => Buy(slot, index));
+                    $"Kup ({item.Price} gr)", !locked && _profile.Money >= item.Price, () => Buy(slot, index));
             }
             else if (_profile.Owns(slot, item.ItemId))
             {
@@ -210,10 +221,92 @@ public partial class Shop : CanvasLayer
             }
             else
             {
-                Row(list, item.DisplayName, Stats(item), locked ? $"Poziom {item.RequiredLevel}" : $"{item.Price} zł",
-                    locked ? "Zablokowane" : $"Kup ({item.Price} zł)", !locked && _profile.Money >= item.Price, () => Buy(slot, index));
+                Row(list, item.DisplayName, Stats(item), locked ? $"Poziom {item.RequiredLevel}" : $"{item.Price} gr",
+                    locked ? "Zablokowane" : $"Kup ({item.Price} gr)", !locked && _profile.Money >= item.Price, () => Buy(slot, index));
             }
         }
+    }
+
+    private void FillGear(GearSlot slot)
+    {
+        var list = _lists[slot.Key()];
+        Clear(list);
+        if (_gear == null)
+            return;
+        foreach (var item in _gear.Items(slot))
+        {
+            var it = item;
+            bool locked = _profile.Level < item.RequiredLevel;
+            string stats = GearCatalog.Stats(item);
+            if (_profile.Gear.Owns(slot, item.ItemId))
+            {
+                if (!slot.IsEquippable())
+                {
+                    Row(list, item.DisplayName, stats, "Posiadane", "W plecaku", false, () => { });
+                    continue;
+                }
+                bool worn = _profile.Gear.EquippedId(slot) == item.ItemId;
+                Row(list, item.DisplayName, stats, "Posiadane", worn ? "Używane" : "Używaj", !worn, () =>
+                {
+                    _gear.Equip(slot, it);
+                    _message.Text = $"Używasz: {it.DisplayName}";
+                });
+            }
+            else
+            {
+                Row(list, item.DisplayName, stats, locked ? $"Poziom {item.RequiredLevel}" : $"{item.Price} gr",
+                    locked ? "Zablokowane" : $"Kup ({item.Price} gr)", !locked && _profile.Money >= item.Price, () =>
+                    {
+                        string? error = _gear.Buy(slot, it);
+                        _message.Text = error ?? $"Kupiono: {it.DisplayName}";
+                    });
+            }
+        }
+    }
+
+    private void FillMarket()
+    {
+        var list = _lists["market"];
+        Clear(list);
+        list.AddChild(new Label
+        {
+            Text = $"Dzień {_profile.Market.Day + 1} targu. Ceny zmieniają się codziennie, świeże i trofeowe ryby są droższe,\n"
+                   + "a każda sprzedana ryba obniża cenę gatunku (popyt wraca z czasem).",
+            Modulate = new Color(1, 1, 1, 0.75f),
+        });
+        foreach (var sp in _rod.Species)
+        {
+            float demand = _profile.Market.Demand(sp.SpeciesName) * _profile.Market.DailyFactor(sp.SpeciesName);
+            list.AddChild(new Label { Text = $"{sp.SpeciesName}: popyt {demand * 100f:0}% | trofeum od {sp.TrophyThreshold:0.0} kg" });
+        }
+        if (_profile.Keepnet.Count == 0)
+        {
+            list.AddChild(new Label { Text = "Siatka jest pusta." });
+            return;
+        }
+        for (int i = 0; i < _profile.Keepnet.Count; i++)
+        {
+            int index = i;
+            var f = _profile.Keepnet[i];
+            int quote = _profile.MarketQuote(f, _rod.Species);
+            Row(list, $"{f.Species} {f.Weight:0.00} kg", $"kondycja {f.Condition * 100f:0}% | skup płaci {f.Value} gr", $"{quote} gr",
+                "Sprzedaj", true, () => SellAtMarket(index));
+        }
+        var sell = new Button { Text = "Sprzedaj wszystko na targu", CustomMinimumSize = new Vector2(260, 36) };
+        sell.Pressed += SellAllAtMarket;
+        list.AddChild(sell);
+    }
+
+    private void SellAtMarket(int index)
+    {
+        int paid = _profile.SellAtMarket(index, _rod.Species);
+        _message.Text = $"Sprzedano na targu za {paid} gr";
+    }
+
+    public void SellAllAtMarket()
+    {
+        int paid = _profile.SellAllAtMarket(_rod.Species);
+        _message.Text = $"Sprzedano wszystko na targu za {paid} gr";
     }
 
     private void FillFish()
@@ -225,9 +318,13 @@ public partial class Shop : CanvasLayer
             list.AddChild(new Label { Text = "Siatka jest pusta. Złowione ryby trafiają tutaj, możesz je sprzedać." });
             return;
         }
+        if (_profile.KeepnetLimit is { } net)
+            list.AddChild(new Label { Text = $"Siatka: {_profile.Keepnet.Count}/{net.MaxFish} ryb, {_profile.KeepnetWeight:0.0}/{net.MaxKg:0} kg" });
         foreach (var g in _profile.Keepnet.GroupBy(f => f.Species))
-            list.AddChild(new Label { Text = $"{g.Key}: {g.Count()} szt., {g.Sum(f => f.Weight):0.00} kg, wartość {g.Sum(f => f.Value)} zł" });
-        var sell = new Button { Text = $"Sprzedaj wszystko ({_profile.KeepnetValue} zł)", CustomMinimumSize = new Vector2(260, 36) };
+            list.AddChild(new Label { Text = $"{g.Key}: {g.Count()} szt., {g.Sum(f => f.Weight):0.00} kg, wartość {g.Sum(f => f.Value)} gr" });
+        if (_profile.UndersizedCount > 0)
+            list.AddChild(new Label { Text = $"Niewymiarowe ryby: {_profile.UndersizedCount}. Strażnik pobierze {Profile.UndersizedFine} gr kary za każdą.", Modulate = new Color(1f, 0.55f, 0.45f) });
+        var sell = new Button { Text = $"Sprzedaj wszystko ({_profile.KeepnetValue - _profile.UndersizedCount * Profile.UndersizedFine} gr)", CustomMinimumSize = new Vector2(260, 36) };
         sell.Pressed += SellAll;
         list.AddChild(sell);
     }
@@ -256,7 +353,7 @@ public partial class Shop : CanvasLayer
             bool here = _lake.LocationIndex == i;
             bool locked = _profile.Level < loc.RequiredLevel;
             Row(list, loc.DisplayName, $"Maks. głębokość {loc.MaxDepth:0.0} m", locked ? $"Poziom {loc.RequiredLevel}" : "",
-                here ? "Tu jesteś" : locked ? "Zablokowane" : "Jedź", !here && !locked, () => Travel(index));
+                here ? "Tu jesteś" : locked ? "Zablokowane" : "Jedź wozem", !here && !locked, () => Travel(index));
         }
     }
 
@@ -280,7 +377,7 @@ public partial class Shop : CanvasLayer
     public void SellAll()
     {
         int value = _profile.SellAll();
-        _message.Text = $"Sprzedano ryby za {value} zł";
+        _message.Text = $"Sprzedano ryby za {value} gr";
     }
 
     private void Travel(int index)

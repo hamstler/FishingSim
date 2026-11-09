@@ -7,7 +7,7 @@ public abstract partial class TackleItem : Resource
 {
     [Export] public string DisplayName { get; set; } = "";
 
-    /// <summary>Price in zł (for bait: per pack).</summary>
+    /// <summary>Price in gr (for bait: per pack).</summary>
     [Export] public int Price { get; set; }
 
     [Export] public int RequiredLevel { get; set; } = 1;

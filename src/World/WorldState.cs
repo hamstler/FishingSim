@@ -23,9 +23,13 @@ public partial class WorldState : Node
             Advance((float)delta * MinutesPerSecond / 60f);
     }
 
+    /// <summary>Raised with the number of in-game hours that passed (keepnet freshness, market recovery).</summary>
+    public event Action<float>? HoursAdvanced;
+
     public void Advance(float hours)
     {
         Hour = Mathf.PosMod(Hour + hours, 24f);
+        HoursAdvanced?.Invoke(hours);
         _weatherTimer -= hours;
         if (_weatherTimer <= 0f)
             RollWeather();

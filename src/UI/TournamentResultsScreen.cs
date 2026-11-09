@@ -69,7 +69,7 @@ public partial class TournamentResultsScreen : CanvasLayer
         _box.AddChild(rank);
         _box.AddChild(new Label
         {
-            Text = result.PrizeMoney > 0 ? $"Nagroda: {result.PrizeMoney} zł i {result.PrizeXp} XP" : "Bez nagrody w tym razie. Spróbuj ponownie!",
+            Text = result.PrizeMoney > 0 ? $"Nagroda: {result.PrizeMoney} gr i {result.PrizeXp} XP" : "Bez nagrody w tym razie. Spróbuj ponownie!",
             HorizontalAlignment = HorizontalAlignment.Center,
             Modulate = new Color(0.7f, 0.95f, 0.7f),
         });

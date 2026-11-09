@@ -32,6 +32,7 @@ public sealed class TackleLoadout
     {
         "res://data/tackle/baits/worm.tres", "res://data/tackle/baits/corn.tres", "res://data/tackle/baits/bread.tres",
         "res://data/tackle/baits/boilie.tres", "res://data/tackle/baits/livebait.tres",
+        "res://data/tackle/baits/maggot.tres", "res://data/tackle/baits/insect.tres",
     };
 
     private readonly List<TackleItem>[] _items;

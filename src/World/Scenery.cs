@@ -43,10 +43,17 @@ public partial class Scenery : Node3D
             _lake.Rebuilt -= Rebuild;
     }
 
+    private float _time;
+    private float _wind = 0.3f;
+
     public override void _Process(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("scenery");
+        _time += (float)delta;
         if (_world == null)
             return;
+        _wind = Mathf.MoveToward(_wind, _world.WindTarget, 0.2f * (float)delta);
+        TreeFactory.SetWind(_wind, _time);
         float daylight = _world.Daylight;
         if (MathF.Abs(daylight - _lastDaylight) < 0.01f)
             return;
@@ -58,14 +65,14 @@ public partial class Scenery : Node3D
     // ------------------------------------------------------------------ pier
     private void BuildPier()
     {
-        var wood = new StandardMaterial3D
+        var wood = BuildingFactory.Pixel(new StandardMaterial3D
         {
             AlbedoTexture = Textures.Planks(),
             Uv1Triplanar = true,
-            Uv1Scale = Vector3.One,
+            Uv1Scale = Vector3.One * Textures.TriplanarScale,
             Roughness = 0.9f,
-        };
-        var dark = new StandardMaterial3D { AlbedoColor = new Color(0.22f, 0.15f, 0.09f), Roughness = 0.95f };
+        });
+        var dark = BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = new Color(0.22f, 0.15f, 0.09f), Roughness = 0.95f });
 
         var body = new StaticBody3D { CollisionLayer = 1, Position = new Vector3(0, 0.95f, 1) };
         var deckSize = new Vector3(3, 0.2f, 10);
@@ -188,6 +195,7 @@ public partial class Scenery : Node3D
         BuildingKind.Tackle or BuildingKind.General => new Color(0.95f, 0.75f, 0.2f),
         BuildingKind.Bait => new Color(0.5f, 0.9f, 0.35f),
         BuildingKind.FishBuyer => new Color(0.4f, 0.8f, 1f),
+        BuildingKind.Market => new Color(1f, 0.55f, 0.3f),
         BuildingKind.Office => new Color(1f, 0.45f, 0.45f),
         _ => new Color(0.85f, 0.85f, 0.95f),
     };
@@ -202,7 +210,7 @@ public partial class Scenery : Node3D
         return layout.PadDistance(x, z) > padMargin && layout.PathDistance(x, z) > pathMargin;
     }
 
-    private void AddMultiMesh(Mesh mesh, List<Transform3D> transforms, List<Color> colors)
+    private void AddMultiMesh(Mesh mesh, List<Transform3D> transforms, List<Color> colors, Material? material = null)
     {
         if (transforms.Count == 0)
             return;
@@ -218,18 +226,18 @@ public partial class Scenery : Node3D
             mm.SetInstanceTransform(i, transforms[i]);
             mm.SetInstanceColor(i, colors[i]);
         }
-        var inst = new MultiMeshInstance3D { Multimesh = mm, MaterialOverride = VertexColorMaterial() };
+        var inst = new MultiMeshInstance3D { Multimesh = mm, MaterialOverride = material ?? VertexColorMaterial() };
         AddChild(inst);
         Track(inst);
     }
 
-    private static StandardMaterial3D VertexColorMaterial() => new()
+    private static StandardMaterial3D VertexColorMaterial() => BuildingFactory.Pixel(new StandardMaterial3D
     {
         VertexColorUseAsAlbedo = true,
         VertexColorIsSrgb = true,
         Roughness = 1f,
         CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-    };
+    });
 
     private static Color Tint(Color c, float t) => new(c.R + t, c.G + t, c.B + t);
 
@@ -315,8 +323,8 @@ public partial class Scenery : Node3D
         {
             var meshes = TreeFactory.Get(kind);
             if (meshes.Trunk != null)
-                AddMultiMesh(meshes.Trunk, trunks[kind], trunkColors[kind]);
-            AddMultiMesh(meshes.Crown, crowns[kind], crownColors[kind]);
+                AddMultiMesh(meshes.Trunk, trunks[kind], trunkColors[kind], TreeFactory.BarkMaterial());
+            AddMultiMesh(meshes.Crown, crowns[kind], crownColors[kind], TreeFactory.FoliageMaterial(meshes.Needles));
         }
     }
 
@@ -358,9 +366,9 @@ public partial class Scenery : Node3D
                 tuftColors.Add(Tint(loc.GrassColor.Lerp(new Color(0.5f, 0.65f, 0.25f), 0.35f), rng.RandfRange(-0.06f, 0.06f)));
             }
         }
-        AddMultiMesh(TreeFactory.Get("bush").Crown, bushes, bushColors);
+        AddMultiMesh(TreeFactory.Get("bush").Crown, bushes, bushColors, TreeFactory.FoliageMaterial(false));
         AddMultiMesh(TreeFactory.Blossom(), flowers, flowerColors);
-        AddMultiMesh(TreeFactory.Tuft(), tufts, tuftColors);
+        AddMultiMesh(TreeFactory.Tuft(), tufts, tuftColors, TreeFactory.GrassMaterial());
         Count("bush", bushes.Count);
         Count("flower", flowers.Count);
         Count("tuft", tufts.Count);
@@ -435,7 +443,7 @@ public partial class Scenery : Node3D
             float gr = rng.RandfRange(0.38f, 0.55f);
             colors.Add(new Color(gr, gr * 0.98f, gr * 0.93f));
         }
-        AddMultiMesh(TreeFactory.Rock(), rocks, colors);
+        AddMultiMesh(TreeFactory.Rock(), rocks, colors, TreeFactory.RockMaterial());
         Count("rock", rocks.Count);
     }
 }

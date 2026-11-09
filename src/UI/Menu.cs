@@ -59,8 +59,8 @@ public partial class Menu : Control
     private void BuildBackground()
     {
         var gradient = new Gradient();
-        gradient.SetColor(0, new Color(0.12f, 0.24f, 0.40f));
-        gradient.SetColor(1, new Color(0.02f, 0.05f, 0.10f));
+        gradient.SetColor(0, new Color(0.10f, 0.13f, 0.20f));   // dusk over the lake
+        gradient.SetColor(1, new Color(0.06f, 0.04f, 0.03f));
         var background = new TextureRect
         {
             Texture = new GradientTexture2D { Gradient = gradient, FillFrom = Vector2.Zero, FillTo = new Vector2(0, 1), Width = 4, Height = 256 },
@@ -72,11 +72,19 @@ public partial class Menu : Control
 
         var title = new Label { Text = "Fishing Sim", HorizontalAlignment = HorizontalAlignment.Center };
         title.AddThemeFontSizeOverride("font_size", 64);
-        title.AddThemeColorOverride("font_color", new Color(0.9f, 0.96f, 1f));
+        title.AddThemeColorOverride("font_color", new Color(0.98f, 0.84f, 0.5f));
+        title.AddThemeColorOverride("font_outline_color", new Color(0.12f, 0.07f, 0.03f));
+        title.AddThemeConstantOverride("outline_size", 8);
         title.SetAnchorsPreset(LayoutPreset.TopWide);
         title.OffsetTop = 30f;
         title.OffsetBottom = 120f;
         AddChild(title);
+        _subtitle = new Label { Text = "średniowieczny symulator wędkarski", HorizontalAlignment = HorizontalAlignment.Center, Modulate = new Color(1, 1, 1, 0.6f) };
+        _subtitle.AddThemeFontSizeOverride("font_size", 18);
+        _subtitle.SetAnchorsPreset(LayoutPreset.TopWide);
+        _subtitle.OffsetTop = 112f;
+        _subtitle.OffsetBottom = 140f;
+        AddChild(_subtitle);
     }
 
     private static void Center(Control box, float width, float height)
@@ -158,26 +166,30 @@ public partial class Menu : Control
     }
 
     // ------------------------------------------------------------------ map selection
+    private Label? _subtitle;
+
     private void ShowMaps()
     {
         _loginBox.Visible = false;
+        if (_subtitle != null)
+            _subtitle.Visible = false;
         foreach (var c in _mapsBox.GetChildren())
             c.QueueFree();
         _mapsBox.Visible = true;
-        Center(_mapsBox, 1100, 560);
+        Center(_mapsBox, 1240, 560);
         _mapsBox.AddThemeConstantOverride("separation", 14);
 
         var profile = Profile.LoadFor(Session.Username);
         var head = new Label
         {
-            Text = $"Witaj, {Session.Username}  |  poziom {profile.Level}  |  {profile.Money} zł\nWybierz łowisko",
+            Text = $"Witaj, {Session.Username}  |  poziom {profile.Level}  |  {profile.Money} gr\nWybierz łowisko",
             HorizontalAlignment = HorizontalAlignment.Center,
         };
         head.AddThemeFontSizeOverride("font_size", 22);
         _mapsBox.AddChild(head);
 
         var row = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
-        row.AddThemeConstantOverride("separation", 20);
+        row.AddThemeConstantOverride("separation", 12);
         _mapsBox.AddChild(row);
         foreach (int i in Enumerable.Range(0, _locations.Count).OrderBy(i => _locations[i].RequiredLevel))
             row.AddChild(MapCard(i, profile));
@@ -191,10 +203,10 @@ public partial class Menu : Control
     {
         var loc = _locations[index];
         bool locked = profile.Level < loc.RequiredLevel;
-        var panel = new PanelContainer { CustomMinimumSize = new Vector2(320, 0) };
+        var panel = new PanelContainer { CustomMinimumSize = new Vector2(292, 0) };
         var margin = new MarginContainer();
         foreach (var side in new[] { "left", "right", "top", "bottom" })
-            margin.AddThemeConstantOverride("margin_" + side, 14);
+            margin.AddThemeConstantOverride("margin_" + side, 10);
         panel.AddChild(margin);
         var box = new VBoxContainer();
         box.AddThemeConstantOverride("separation", 8);
@@ -205,7 +217,7 @@ public partial class Menu : Control
         box.AddChild(new TextureRect
         {
             Texture = _previews[index],
-            CustomMinimumSize = new Vector2(290, 207),
+            CustomMinimumSize = new Vector2(270, 150),
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered,
             Modulate = locked ? new Color(0.45f, 0.45f, 0.45f) : Colors.White,
@@ -217,15 +229,18 @@ public partial class Menu : Control
         {
             Text = loc.Description,
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
-            CustomMinimumSize = new Vector2(290, 70),
+            CustomMinimumSize = new Vector2(270, 66),
             Modulate = new Color(1, 1, 1, 0.8f),
         });
-        var fish = loc.Abundance.Keys.Where(k => loc.AbundanceOf(k.AsString()) > 0f).Select(k => k.AsString());
+        // The most common fish first; the rest is just counted.
+        var fish = loc.Abundance.Keys.Select(k => k.AsString()).Where(k => loc.AbundanceOf(k) > 0f)
+            .OrderByDescending(k => loc.AbundanceOf(k)).ToList();
+        string list = string.Join(", ", fish.Take(5)) + (fish.Count > 5 ? $" i {fish.Count - 5} innych" : "");
         box.AddChild(new Label
         {
-            Text = $"Maks. głębokość: {loc.MaxDepth + loc.HoleDepth:0} m\nRyby: {string.Join(", ", fish)}",
+            Text = $"Maks. głębokość: {loc.MaxDepth + loc.HoleDepth:0} m\nGatunki ({fish.Count}): {list}",
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
-            CustomMinimumSize = new Vector2(290, 0),
+            CustomMinimumSize = new Vector2(270, 0),
         });
         var button = new Button { CustomMinimumSize = new Vector2(0, 44) };
         if (locked)

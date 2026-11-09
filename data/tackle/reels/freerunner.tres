@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Free-runner 5000"
+DisplayName = "Kołowrotek mistrza cechu"
 DragMax = 9.0
 ReelSpeed = 3.4
 LineCapacity = 150.0

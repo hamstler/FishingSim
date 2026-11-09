@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Godot;
 using FishingSim.Accounts;
+using FishingSim.Core.Animation;
 using FishingSim.Data;
 using FishingSim.Fishing;
 using FishingSim.Progress;
@@ -18,10 +19,6 @@ public partial class Main : Node3D
     /// <summary>Lets tools and tests open any map regardless of the player's level.</summary>
     public static bool UnlockAllMaps { get; set; }
 
-    private static readonly string[] SpeciesPaths =
-    {
-        "res://data/fish/ploc.tres", "res://data/fish/leszcz.tres", "res://data/fish/karp.tres", "res://data/fish/szczupak.tres",
-    };
 
     private Profile _profile = null!;
     private Water _water = null!;
@@ -29,12 +26,15 @@ public partial class Main : Node3D
     private WorldState _world = null!;
     private LakeBed _lake = null!;
     private TackleLoadout _loadout = null!;
+    private GearCatalog _gear = null!;
 
     public FishingRod Rod { get; private set; } = null!;
     public Player Player { get; private set; } = null!;
     public TournamentManager Tournaments { get; private set; } = null!;
     public Scenery Scenery { get; private set; } = null!;
     public InteractionManager Interactions { get; private set; } = null!;
+    public FishPopulation Fish { get; private set; } = null!;
+    public GearCatalog Gear => _gear;
 
     public override void _Ready()
     {
@@ -68,7 +68,7 @@ public partial class Main : Node3D
         Player = new Player { Position = Player.SpawnPoint, Bed = _lake };
         AddChild(Player);
 
-        _sky = new SkyController { World = _world, Water = _water, Follow = Player.Camera };
+        _sky = new SkyController { World = _world, Water = _water, Follow = Player.Camera, Bed = _lake };
         AddChild(_sky);
 
         var bobber = new Bobber { WaterY = WaterY, WaterHeight = _water.HeightAt };
@@ -77,10 +77,37 @@ public partial class Main : Node3D
         _loadout = new TackleLoadout();
         _loadout.Attach(_profile);
 
+        _gear = new GearCatalog();
+        _gear.Attach(_profile);
+
+        var species = LoadSpecies();
         Rod = new FishingRod();
         Player.AddChild(Rod);
         Rod.Setup(new RodDependencies(
-            Player.Camera, Player.RodTip, Player.Rig, bobber, LoadSpecies(), _loadout, _profile, _world, _lake, WaterY));
+            Player.Camera, Player.RodTip, Player.Rig, bobber, species, _loadout, _profile, _world, _lake, WaterY, _gear));
+        Player.ActionSource = () => ActionFor(Rod.State);
+        Player.Body.RaiseSource = () => Rod.Lifting && Rod.State is RodState.Nibble or RodState.Bite or RodState.Fight or RodState.Close or RodState.Waiting ? 1f : 0f;
+        Player.Body.HeldFishSource = () => Rod.HeldFish;
+        Player.Body.ReelingSource = () => Rod.Reeling && Rod.State is RodState.Waiting or RodState.Fight or RodState.Nibble or RodState.Bite;
+
+        // Medieval pixel-art look: the world is drawn at low resolution and scaled up (HUD stays sharp).
+        AddChild(new Graphics.PixelArtView(Player.Camera));
+
+        var grass = new Graphics.GrassField();
+        grass.Setup(_lake, Player);
+        AddChild(grass);
+
+        Fish = new FishPopulation();
+        Fish.Setup(_lake, Player, species, WaterY);
+        AddChild(Fish);
+        Rod.Population = Fish;
+
+        var sound = new Audio.SoundEngine();
+        sound.Setup(Rod, Player, _world, _lake);
+        AddChild(sound);
+        _gear.GearChanged += ApplyGearEffects;
+        ApplyGearEffects();
+        _world.HoursAdvanced += _profile.PassTime;
 
         Tournaments = new TournamentManager();
         AddChild(Tournaments);
@@ -120,11 +147,56 @@ public partial class Main : Node3D
         Input.MouseMode = Input.MouseModeEnum.Captured;
     }
 
+    private static BodyAction ActionFor(RodState state) => state switch
+    {
+        RodState.Charging or RodState.Flying => BodyAction.Cast,
+        RodState.Fight or RodState.Close => BodyAction.Fight,
+        RodState.Landed => BodyAction.Land,
+        _ => BodyAction.None,
+    };
+
+    private OmniLight3D? _lantern;
+    private float _restTimer;
+
+    /// <summary>The bought lantern hangs at the angler's belt and lights up after dusk.</summary>
+    public OmniLight3D? Lantern => _lantern;
+
+    /// <summary>Accessories that change the world: the brimmed hat shows fish further and deeper, the lantern gives light.</summary>
+    private void ApplyGearEffects()
+    {
+        bool hasLantern = _gear.Has(AccessoryKind.Headlamp);
+        if (hasLantern && _lantern == null)
+        {
+            _lantern = new OmniLight3D
+            {
+                LightColor = new Color(1f, 0.72f, 0.4f),
+                OmniRange = 9f,
+                OmniAttenuation = 1.4f,
+                ShadowEnabled = true,
+                Position = new Vector3(-0.35f, 1.05f, -0.25f),
+            };
+            Player.AddChild(_lantern);
+        }
+        else if (!hasLantern && _lantern != null)
+        {
+            _lantern.QueueFree();
+            _lantern = null;
+        }
+        var glasses = _gear.Accessory(AccessoryKind.PolarizedGlasses);
+        float clarity = _lake.Location.WaterClarity;
+        Fish.VisibleRange = FishPopulation.BaseVisibleRange + (glasses?.Power ?? 0f);
+        Fish.VisibleDepth = clarity * 0.6f + (glasses != null ? 1.2f : 0f);
+        _water.SetClarity(clarity);
+        _water.SetGlareCut(glasses != null ? 1f : 0f);
+    }
+
     private void ApplyMood()
     {
         var loc = _lake.Location;
         _water.SetTint(loc.WaterShallowColor, loc.WaterDeepColor);
         _sky.FogBoost = loc.FogBoost;
+        if (Fish != null)
+            ApplyGearEffects();
     }
 
     private static void OnInteract(Interactable spot, Shop shop, GameUI gameUi)
@@ -134,6 +206,7 @@ public partial class Main : Node3D
             case InteractKind.Tackle: shop.OpenFor(ShopKind.Tackle); break;
             case InteractKind.Bait: shop.OpenFor(ShopKind.Bait); break;
             case InteractKind.FishBuyer: shop.OpenFor(ShopKind.FishBuyer); break;
+            case InteractKind.Market: shop.OpenFor(ShopKind.Market); break;
             case InteractKind.General: shop.OpenFor(ShopKind.General); break;
             case InteractKind.BusStop: shop.OpenFor(ShopKind.Travel); break;
             case InteractKind.Office: gameUi.Open(3); break;
@@ -149,7 +222,7 @@ public partial class Main : Node3D
     private static List<FishSpecies> LoadSpecies()
     {
         var list = new List<FishSpecies>();
-        foreach (var path in SpeciesPaths)
+        foreach (var path in SpeciesCatalog.Paths)
         {
             var species = GD.Load<FishSpecies>(path);
             if (species != null)
@@ -166,6 +239,27 @@ public partial class Main : Node3D
         _profile.Autosave();
     }
 
+    /// <summary>True while the angler rests on the stool: waiting for a bite, standing still (time runs 4x).</summary>
+    public bool Resting { get; private set; }
+
+    public override void _Process(double delta)
+    {
+        using var perfScope = Graphics.Perf.Scope("main");
+        bool still = new Vector2(Player.Velocity.X, Player.Velocity.Z).Length() < 0.1f;
+        bool canRest = Rod.State == RodState.Waiting && still && _gear.Has(AccessoryKind.Chair) && Tournaments.Active == null;
+        _restTimer = canRest ? _restTimer + (float)delta : 0f;
+        Resting = _restTimer > 3f;
+        if (!_world.Paused)
+            _world.MinutesPerSecond = Resting ? 4f : 1f;
+        if (_lantern == null)
+            return;
+        // Lit only when it is dark; the tallow flame flickers.
+        float dark = Mathf.Clamp(1f - _world.Daylight * 2.5f, 0f, 1f);
+        float t = Time.GetTicksMsec() / 1000f;
+        _lantern.LightEnergy = dark * 1.6f * (0.88f + 0.08f * Mathf.Sin(t * 11f) + 0.04f * Mathf.Sin(t * 27f));
+        _lantern.Visible = dark > 0.01f;
+    }
+
     public override void _Notification(int what)
     {
         if (what == NotificationWMCloseRequest)
@@ -175,6 +269,8 @@ public partial class Main : Node3D
     public override void _ExitTree()
     {
         _profile.Changed -= Save;
+        _world.HoursAdvanced -= _profile.PassTime;
+        _gear.GearChanged -= ApplyGearEffects;
         _lake.Rebuilt -= RespawnPlayer;
         _lake.Rebuilt -= ApplyMood;
     }

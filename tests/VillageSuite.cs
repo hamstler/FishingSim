@@ -191,11 +191,25 @@ public sealed class VillageSuite : ITestSuite
         await Physics(t, 30);
         t.Check(Mathf.Abs(player.GlobalPosition.X - tackle.GlobalPosition.X) < 1f && player.IsOnFloor(), "the player can stand anywhere on the land, far from the pier");
         t.Check(interactions.Current == tackle, "standing at the tackle shop door offers the shop");
-        t.Check(tackle.Prompt.Contains("Sklep wędkarski"), $"the prompt names the shop ({tackle.Prompt})");
+        t.Check(tackle.Prompt.Contains("Kram wędkarski"), $"the prompt names the shop ({tackle.Prompt})");
 
         player.GlobalPosition = new Vector3(tackle.GlobalPosition.X + 25f, tackle.GlobalPosition.Y + 0.6f, tackle.GlobalPosition.Z + 20f);
         await Physics(t, 20);
         t.Check(interactions.Current == null, "far from every door there is no prompt");
+
+        // Stepping off the side of the pier onto the sand and walking back onto the deck.
+        player.Respawn();
+        player.GlobalPosition = new Vector3(2.5f, 1.3f, 3.6f);
+        player.Rotation = new Vector3(0f, Mathf.Pi / 2f, 0f);        // W walks towards -X, the pier
+        await Physics(t, 20);
+        float sandY = player.GlobalPosition.Y;
+        Input.ParseInputEvent(new InputEventKey { Keycode = Godot.Key.W, PhysicalKeycode = Godot.Key.W, Pressed = true });
+        await Physics(t, 36);
+        Input.ParseInputEvent(new InputEventKey { Keycode = Godot.Key.W, PhysicalKeycode = Godot.Key.W, Pressed = false });
+        await Physics(t, 10);
+        t.Check(sandY < 0.95f && player.GlobalPosition.Y > 1.0f && Mathf.Abs(player.GlobalPosition.X) < 1.5f,
+            $"walking from the sand back onto the pier works (sand y {sandY:0.00} -> {player.GlobalPosition.Y:0.00}, x {player.GlobalPosition.X:0.00})");
+        player.Rotation = Vector3.Zero;
 
         player.GlobalPosition = new Vector3(0f, 2f, -20f);   // deep water
         await Physics(t, 5);
@@ -207,12 +221,22 @@ public sealed class VillageSuite : ITestSuite
         t.Check(InteractionManager.Nearest(spots, spots[0].GlobalPosition + new Vector3(1f, 0f, 0f)) == spots[0], "the nearest door wins");
         t.Check(InteractionManager.Nearest(spots, new Vector3(0, 0, -100)) == null, "nothing is near in the middle of the lake");
 
+        t.Section("signs");
+        foreach (var text in new[] { "KRAM WĘDKARSKI", "GILDIA WĘDKARZY", "SKUP RYB", "Ł" })
+        {
+            var board = new Vector2(2.4f, 0.7f);
+            float px = FishingSim.World.Props.BuildingFactory.FitPixelSize(text, board);
+            var size = ThemeDB.FallbackFont.GetStringSize(text, HorizontalAlignment.Left, -1, 64) * px;
+            t.Check(size.X <= board.X * 0.8f && size.Y <= board.Y * 0.6f, $"'{text}' fits its sign ({size.X:0.00} x {size.Y:0.00} m on {board.X} x {board.Y} m)");
+        }
+
         t.Section("shops open by kind");
         int HiddenTabs() => Enumerable.Range(0, shop.Tabs.GetTabCount()).Count(i => shop.Tabs.IsTabHidden(i));
         int total = shop.Tabs.GetTabCount();
         foreach (var (kind, shown) in new[]
         {
-            (InteractKind.Tackle, 4), (InteractKind.Bait, 1), (InteractKind.FishBuyer, 2), (InteractKind.General, 7), (InteractKind.BusStop, 1),
+            (InteractKind.Tackle, 7), (InteractKind.Bait, 1), (InteractKind.FishBuyer, 2), (InteractKind.Market, 2), (InteractKind.General, 10),
+            (InteractKind.BusStop, 1),
         })
         {
             var spot = new Interactable { Kind = kind, Title = kind.ToString() };
@@ -221,7 +245,7 @@ public sealed class VillageSuite : ITestSuite
             shop.Close();
             spot.Free();
         }
-        var office = new Interactable { Kind = InteractKind.Office, Title = "Biuro zawodów" };
+        var office = new Interactable { Kind = InteractKind.Office, Title = "Gildia wędkarzy" };
         interactions.Activate(office);
         t.Check(ui.Visible && ui.CurrentTab == 3 && !shop.Visible, "the tournament office opens the tournaments tab");
         ui.Close();

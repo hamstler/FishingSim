@@ -44,9 +44,10 @@ public partial class Bobber : RigidBody3D
     {
         _visual = new Node3D { TopLevel = true };
         AddChild(_visual);
-        var red = new StandardMaterial3D { AlbedoColor = new Color(0.9f, 0.12f, 0.08f), Roughness = 0.3f };
-        var white = new StandardMaterial3D { AlbedoColor = new Color(0.95f, 0.95f, 0.92f), Roughness = 0.4f };
-        var orange = new StandardMaterial3D { AlbedoColor = new Color(1f, 0.55f, 0.05f) };
+        // Slightly self-lit colours so the float still reads at dusk and against glare.
+        var red = Glowing(new Color(0.95f, 0.1f, 0.06f), 0.35f);
+        var white = Glowing(new Color(0.96f, 0.96f, 0.92f), 0.2f);
+        var orange = Glowing(new Color(1f, 0.6f, 0.05f), 0.6f);
         _visual.AddChild(new MeshInstance3D
         {
             Mesh = new SphereMesh { Radius = 0.034f, Height = 0.07f, RadialSegments = 12, Rings = 6 },
@@ -65,6 +66,22 @@ public partial class Bobber : RigidBody3D
             Position = new Vector3(0, 0.145f, 0),
         });
     }
+
+    private static StandardMaterial3D Glowing(Color color, float glow) => new()
+    {
+        AlbedoColor = color,
+        Roughness = 0.4f,
+        EmissionEnabled = true,
+        Emission = color,
+        EmissionEnergyMultiplier = glow,
+        TextureFilter = BaseMaterial3D.TextureFilterEnum.Nearest,
+    };
+
+    /// <summary>
+    /// The float is drawn larger the further it is from the camera (1x up to 6 m, up to 7x far out), so it stays a
+    /// few pixels tall at any casting distance, like in most fishing games. Physics are not affected.
+    /// </summary>
+    public static float VisualScale(float distance) => Math.Clamp(distance / 6f, 1f, 7f);
 
     public void Launch(Vector3 position, Vector3 velocity)
     {
@@ -112,6 +129,9 @@ public partial class Bobber : RigidBody3D
     {
         _visual.GlobalPosition = GlobalPosition;
         _visual.GlobalRotation = Vector3.Zero;
+        var cam = GetViewport()?.GetCamera3D();
+        float k = cam == null ? 1f : VisualScale(cam.GlobalPosition.DistanceTo(GlobalPosition));
+        _visual.Scale = new Vector3(k, k, k);
     }
 
     public override void _PhysicsProcess(double delta)

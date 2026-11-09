@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Teleskop 2.4m"
+DisplayName = "Jesionowa wędka 2,4 m"
 CastMult = 1.0
 MaxLoad = 7.0
 ShockAbsorb = 0.2

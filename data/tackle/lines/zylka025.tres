@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Żyłka 0.25 mm"
+DisplayName = "Linka z końskiego włosia"
 Strength = 7.0
 Visibility = 1.0
 Price = 0

@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="FishSpecies" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/FishSpecies.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+SpeciesName = "Lin"
+MinWeight = 0.3
+MaxWeight = 4.0
+Rarity = 1.0
+PullFactor = 1.1
+Aggression = 0.3
+StaminaDrain = 0.08
+MouthSize = 5.0
+BaitAffinity = {"worm": 1.6, "corn": 0.8, "bread": 0.6, "boilie": 0.0, "livebait": 0.0, "maggot": 1.0, "insect": 0.0}
+MinDepth = 0.5
+MaxDepth = 4.0
+DayActivity = 0.6
+NightActivity = 1.0
+TwilightBonus = 1.5
+WeatherPref = {"clear": 0.9, "cloudy": 1.2, "rain": 1.1}
+RunLengthMult = 1.0
+BurstMult = 1.5
+BurstRate = 1.0
+LengthRef = 0.33
+BodyDepth = 0.3
+DorsalPos = 0.5
+BackColor = Color(0.2, 0.32, 0.12, 1)
+BellyColor = Color(0.6, 0.6, 0.3, 1)
+FinColor = Color(0.2, 0.28, 0.12, 1)
+PricePerKg = 30.0
+TrophyWeight = 0.0

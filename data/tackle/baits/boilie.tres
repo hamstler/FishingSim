@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Kulka proteinowa"
+DisplayName = "Kulka z ciasta i miodu"
 StartCount = 10
 Price = 60
 PackSize = 10

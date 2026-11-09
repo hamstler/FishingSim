@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="LandingNetData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/LandingNetData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Kasarek 40 cm"
+MaxWeight = 2.5
+Reach = 1.8
+Price = 25
+RequiredLevel = 1
