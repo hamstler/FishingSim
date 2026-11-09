@@ -142,6 +142,25 @@ def body_mask(mask, length_px):
     return np.asarray(opened) > 127
 
 
+def smooth_outline(samples):
+    """
+    The bases of thick fins survive the opening as steps in the edge; a step makes a lip in the lofted body that
+    catches the light as a bright line. A running median removes the short steps and a light blur rounds what is
+    left, so the back and belly run smoothly (the cut-out card still shows the real edge).
+    """
+    n = len(samples)
+    out = samples.copy()
+    for k in range(2):
+        col = samples[:, k]
+        med = np.array([np.median(col[max(0, i - 4):i + 5]) for i in range(n)])
+        pad = np.concatenate([np.full(6, med[0]), med, np.full(6, med[-1])])
+        g = np.exp(-0.5 * (np.arange(-6, 7) / 2.5) ** 2)
+        out[:, k] = np.convolve(pad, g / g.sum(), mode="valid")
+    # Keep the snout and the tail stalk where they were measured, easing into the smoothed edge.
+    w = np.clip(np.minimum(np.arange(n), np.arange(n)[::-1]) / 5.0, 0, 1)[:, None]
+    return samples * (1 - w) + out * w
+
+
 def head_on_left(mask):
     """The tail end has a thin stalk before the tail fin; the head end stays thick to the end."""
     top, bottom = column_profile(mask)
@@ -232,6 +251,17 @@ def main():
     top, bottom = column_profile(body)
     w = len(top)
     xs = np.nonzero(~np.isnan(top))[0]
+    # A broad, dark tail fin can survive the opening: the body then ends at the tail stalk, the narrowest point of
+    # its back third, not where the mask ends.
+    thick = np.convolve(np.nan_to_num(bottom - top), np.ones(5) / 5, mode="same")
+    lo, hi = int(xs.min() + (xs.max() - xs.min()) * 0.6), xs.max() - 2
+    if hi > lo:
+        seg = thick[lo:hi + 1]
+        after = np.maximum.accumulate(seg[::-1])[::-1]      # the thickest point from here to the end
+        ratio = seg / np.maximum(after, 1e-6)
+        stalk = lo + int(np.argmin(ratio))
+        if ratio[stalk - lo] < 0.8:
+            xs = xs[xs <= stalk]
     start, end = xs.min() / w, (xs.max() + 1) / w        # where the body begins and ends (the tail fin is beyond)
     samples = []
     for i in range(128):
@@ -240,7 +270,8 @@ def main():
         if np.isnan(top[col]):
             near = xs[np.argmin(np.abs(xs - col))]
             col = near
-        samples.append([round(float(top[col]) / a_small.shape[0], 4), round(float(bottom[col]) / a_small.shape[0], 4)])
+        samples.append([float(top[col]) / a_small.shape[0], float(bottom[col]) / a_small.shape[0]])
+    samples = [[round(float(t), 4), round(float(b), 4)] for t, b in smooth_outline(np.array(samples))]
     meta = {"aspect": round(rgba.height / rgba.width, 4), "body_start": round(float(start), 4),
             "body_end": round(float(end), 4), "outline": samples}
     json.dump(meta, open(f"{out_dir}/{sid}.json", "w"), indent=0)
