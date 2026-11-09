@@ -100,6 +100,10 @@ public partial class Main : Node3D
         Fish.Setup(_lake, Player, species, WaterY);
         AddChild(Fish);
         Rod.Population = Fish;
+
+        var sound = new Audio.SoundEngine();
+        sound.Setup(Rod, Player, _world, _lake);
+        AddChild(sound);
         _gear.GearChanged += ApplyGearEffects;
         ApplyGearEffects();
         _world.HoursAdvanced += _profile.PassTime;

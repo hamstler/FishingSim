@@ -60,6 +60,9 @@ public sealed class FightModel
     public float FishAngle { get; private set; }
     public bool Running { get; private set; } = true;
     public float LineStress { get; private set; }
+
+    /// <summary>The drag is giving line this step (the fish pulls harder than the drag setting).</summary>
+    public bool Slipping { get; private set; }
     public float Elapsed { get; private set; }
     public float PeakPull => _fish.PeakPull;
 
@@ -146,6 +149,7 @@ public sealed class FightModel
 
         // --- line in / out ---
         float payout = excess * 0.5f;   // m/s pulled off the spool by a slipping drag
+        Slipping = excess > 0.05f;
         float reelIn = reeling ? _gear.ReelSpeed * Math.Clamp(1f - excess / 2f, 0f, 1f) : 0f;
         if (lifting)
             reelIn += 0.6f * Math.Clamp(1f - excess / 2f, 0f, 1f);   // pumping gains line

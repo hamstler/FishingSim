@@ -152,6 +152,32 @@ public sealed class GearSuite : ITestSuite
             swim.Step(1f / 30f, threat, 5f);
         t.Check(swim.Agents.Average(a => Vector2.Distance(a.Position, threat)) > d0, "a running angler scares the fish away");
 
+        t.Section("procedural sound");
+        float Energy(FishingSim.Core.Audio.Synth syn, int n)
+        {
+            var buf = new float[n];
+            syn.Generate(buf);
+            return buf.Sum(x => x * x) / n;
+        }
+        var synth = new FishingSim.Core.Audio.Synth(22050f);
+        t.Check(Energy(synth, 4096) == 0f, "silence when nothing is playing");
+        synth.Play(FishingSim.Core.Audio.OneShot.Splash);
+        float splash = Energy(synth, 2205);
+        Energy(synth, 22050);
+        t.Check(splash > 1e-4f && synth.ActiveVoices == 0 && Energy(synth, 2048) == 0f, "a splash is heard, then fades to silence");
+        synth.Levels.Reel = 1f;
+        var reel = new float[22050];
+        synth.Generate(reel);
+        int clicks = 0;
+        for (int i = 1; i < reel.Length; i++)
+            if (MathF.Abs(reel[i]) > 0.05f && MathF.Abs(reel[i - 1]) <= 0.05f)
+                clicks++;
+        t.Check(clicks > 10 && reel.All(x => x is >= -1f and <= 1f), $"the reel ratchet clicks while reeling ({clicks} onsets per second), samples stay in range");
+        synth.Levels = default;
+        synth.Levels.Wind = 1f;
+        synth.Levels.Birds = 1f;
+        t.Check(Energy(synth, 22050) > 1e-5f, "wind and birds make an ambience");
+
         t.Section("bites from the fish you see");
         var lure = new FishSwimModel(water, new SystemRng(5));
         for (int i = 0; i < 8; i++)
@@ -210,6 +236,8 @@ public sealed class GearSuite : ITestSuite
         var rod = main.Rod;
         rod.DevSpeciesIndex = -1;
         rod.DevInstantBite = true;
+        int splashes = 0;
+        rod.SoundCue += (cue, _) => { if (cue == FishingSim.Core.Audio.OneShot.Splash) splashes++; };
         rod.CastNow(0.35f);
         for (int i = 0; i < 360 && rod.State != RodState.Waiting; i++)
             await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
@@ -232,6 +260,8 @@ public sealed class GearSuite : ITestSuite
             }
             await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
         }
+        t.Check(splashes == 1, "the float lands with a splash sound");
+        t.Check(main.GetChildren().OfType<FishingSim.Audio.SoundEngine>().Any(), "the sound engine runs in the game");
         t.Check(roachAgent != null && rod.Biter == roachAgent && rod.CurrentSpecies?.SpeciesName == "Płoć" && rod.CurrentWeight == roachAgent.Weight,
             "the roach next to the float is the fish that bites (same weight too)");
         rod.ResetToIdle();

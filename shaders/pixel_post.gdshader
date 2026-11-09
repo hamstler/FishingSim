@@ -20,17 +20,17 @@ float bayer4(vec2 p) {
 
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 
-vec3 fetch(vec2 px) { return texture(TEXTURE, (px + 0.5) / src_size).rgb; }
+vec3 fetch(sampler2D tex, vec2 px) { return texture(tex, (px + 0.5) / src_size).rgb; }
 
 void fragment() {
 	vec2 px = floor(UV * src_size);
-	vec3 c = fetch(px);
+	vec3 c = fetch(TEXTURE, px);
 	float l = luma(c);
 	// Outline the brighter side of a strong edge with the darker neighbour's colour (keeps silhouettes crisp).
-	float ln = luma(fetch(px + vec2(0.0, -1.0)));
-	float ls = luma(fetch(px + vec2(0.0, 1.0)));
-	float le = luma(fetch(px + vec2(1.0, 0.0)));
-	float lw = luma(fetch(px + vec2(-1.0, 0.0)));
+	float ln = luma(fetch(TEXTURE, px + vec2(0.0, -1.0)));
+	float ls = luma(fetch(TEXTURE, px + vec2(0.0, 1.0)));
+	float le = luma(fetch(TEXTURE, px + vec2(1.0, 0.0)));
+	float lw = luma(fetch(TEXTURE, px + vec2(-1.0, 0.0)));
 	float darkest = min(min(ln, ls), min(le, lw));
 	float edge = smoothstep(edge_threshold, edge_threshold * 2.0, l - darkest);
 	c *= 1.0 - edge * outline;

@@ -135,6 +135,12 @@ public partial class FishingRod : Node3D
     /// <summary>Raised when a fish is landed (species, weight).</summary>
     public event Action<FishSpecies, float>? FishLanded;
 
+    /// <summary>Sound cues for the audio engine (one-shot kind, gain).</summary>
+    public event Action<Core.Audio.OneShot, float>? SoundCue;
+
+    /// <summary>True while the drag gives line to a running fish.</summary>
+    public bool DragSlipping => State == RodState.Fight && (_fight?.Slipping ?? false);
+
     public float Tension => State == RodState.Close ? _closeTension : _fight?.Tension ?? 0f;
 
     // ------------------------------------------------------------------ lifting and landing
@@ -468,6 +474,7 @@ public partial class FishingRod : Node3D
         _lineOutOutsideFight = FlatDistance(_bobber.GlobalPosition);
         if (_bobber.Submerged > 0.5f)
         {
+            SoundCue?.Invoke(Core.Audio.OneShot.Splash, Math.Clamp(CastPower + 0.4f, 0.5f, 1f));
             NewBiteTimer();
             SetState(RodState.Waiting);
         }
@@ -625,6 +632,7 @@ public partial class FishingRod : Node3D
         {
             Unbreakable = DevUnbreakable,
         };
+        SoundCue?.Invoke(Core.Audio.OneShot.Strike, 1f);
         if (_biter != null)
             Population?.Hook(_biter);
         _fishModel?.QueueFree();
@@ -801,12 +809,14 @@ public partial class FishingRod : Node3D
         _fishNode.Visible = false;
         ShowHeldFish(species, CurrentWeight);
         SetState(RodState.Landed);
+        SoundCue?.Invoke(Core.Audio.OneShot.Catch, 1f);
         FishLanded?.Invoke(species, CurrentWeight);
     }
 
     private void BreakLine(string text)
     {
         ShowBanner(text, 3.5f);
+        SoundCue?.Invoke(Core.Audio.OneShot.LineSnap, 1f);
         LoseBiter(_fishNode.Visible ? _fishNode.GlobalPosition : null);
         _fight = null;
         _lineOutOutsideFight = 0f;
