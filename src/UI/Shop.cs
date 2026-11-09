@@ -322,7 +322,9 @@ public partial class Shop : CanvasLayer
             list.AddChild(new Label { Text = $"Siatka: {_profile.Keepnet.Count}/{net.MaxFish} ryb, {_profile.KeepnetWeight:0.0}/{net.MaxKg:0} kg" });
         foreach (var g in _profile.Keepnet.GroupBy(f => f.Species))
             list.AddChild(new Label { Text = $"{g.Key}: {g.Count()} szt., {g.Sum(f => f.Weight):0.00} kg, wartość {g.Sum(f => f.Value)} gr" });
-        var sell = new Button { Text = $"Sprzedaj wszystko ({_profile.KeepnetValue} gr)", CustomMinimumSize = new Vector2(260, 36) };
+        if (_profile.UndersizedCount > 0)
+            list.AddChild(new Label { Text = $"Niewymiarowe ryby: {_profile.UndersizedCount}. Strażnik pobierze {Profile.UndersizedFine} gr kary za każdą.", Modulate = new Color(1f, 0.55f, 0.45f) });
+        var sell = new Button { Text = $"Sprzedaj wszystko ({_profile.KeepnetValue - _profile.UndersizedCount * Profile.UndersizedFine} gr)", CustomMinimumSize = new Vector2(260, 36) };
         sell.Pressed += SellAll;
         list.AddChild(sell);
     }

@@ -30,7 +30,7 @@ public static class ProfileSerializer
     {
         var keepnet = new JsonArray();
         foreach (var c in p.Keepnet)
-            keepnet.Add(new JsonObject { ["species"] = c.Species, ["weight"] = c.Weight, ["value"] = c.Value, ["condition"] = c.Condition });
+            keepnet.Add(new JsonObject { ["species"] = c.Species, ["weight"] = c.Weight, ["value"] = c.Value, ["condition"] = c.Condition, ["undersized"] = c.Undersized });
 
         var journal = new JsonArray();
         foreach (var e in p.Journal)
@@ -144,7 +144,7 @@ public static class ProfileSerializer
             foreach (var n in net)
             {
                 if (n is JsonObject o && o["species"] is JsonNode sp)
-                    p.Keepnet.Add(new CatchRecord(sp.GetValue<string>(), Float(o["weight"], 0f), Int(o["value"], 0), Float(o["condition"], 1f)));
+                    p.Keepnet.Add(new CatchRecord(sp.GetValue<string>(), Float(o["weight"], 0f), Int(o["value"], 0), Float(o["condition"], 1f), o["undersized"] is JsonValue u && u.TryGetValue<bool>(out var und) && und));
             }
         }
         if (d["journal"] is JsonArray journal)

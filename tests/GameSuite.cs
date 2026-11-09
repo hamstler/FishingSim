@@ -200,7 +200,7 @@ public sealed class GameSuite : ITestSuite
         rod.ResetToIdle();
         shop.Toggle();
         t.Check(shop.Visible && rod.InputBlocked, "B opens the shop and blocks fishing input");
-        int value = profile.KeepnetValue;
+        int value = profile.KeepnetValue - profile.UndersizedCount * Profile.UndersizedFine;
         shop.SellAll();
         t.Check(profile.Money == money0 + value && profile.Keepnet.Count == 0, "selling in the shop pays out");
         shop.Toggle();

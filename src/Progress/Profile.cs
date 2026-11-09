@@ -11,7 +11,7 @@ namespace FishingSim.Progress;
 
 /// <summary>A fish in the keepnet, waiting to be sold. <paramref name="Value"/> is the fixed buyer's price;
 /// <paramref name="Condition"/> (1 = fresh, 0 = dead) drops while the fish sits in the net and lowers the market price.</summary>
-public sealed record CatchRecord(string Species, float Weight, int Value, float Condition = 1f);
+public sealed record CatchRecord(string Species, float Weight, int Value, float Condition = 1f, bool Undersized = false);
 
 /// <summary>One line of the fishing journal.</summary>
 public sealed record JournalEntry(
@@ -149,7 +149,7 @@ public sealed class Profile
     {
         if (index < 0 || index >= Keepnet.Count)
             return 0;
-        int paid = Market.Sell(LotFor(Keepnet[index], species));
+        int paid = Market.Sell(LotFor(Keepnet[index], species)) - (Keepnet[index].Undersized ? UndersizedFine : 0);
         Keepnet.RemoveAt(index);
         Money += paid;
         Changed?.Invoke();
@@ -160,7 +160,8 @@ public sealed class Profile
     public int SellAllAtMarket(IEnumerable<FishSpecies> species)
     {
         var list = species.ToList();
-        int paid = Market.SellAll(Keepnet.OrderByDescending(f => f.Weight).Select(f => LotFor(f, list)).ToList());
+        int paid = Market.SellAll(Keepnet.OrderByDescending(f => f.Weight).Select(f => LotFor(f, list)).ToList())
+                   - UndersizedCount * UndersizedFine;
         Money += paid;
         Keepnet = new();
         Changed?.Invoke();
@@ -174,7 +175,7 @@ public sealed class Profile
         int value = Progression.FishValue(species, weight);
         bool released = !KeepnetFits(weight);
         if (!released)
-            Keepnet.Add(new CatchRecord(name, weight, value));
+            Keepnet.Add(new CatchRecord(name, weight, value, 1f, weight < species.LegalWeight));
         CatchCounts[name] = CatchCounts.GetValueOrDefault(name) + 1;
         TotalCatches++;
 
@@ -221,9 +222,15 @@ public sealed class Profile
     }
 
     /// <summary>Sells the whole keepnet and returns the money earned.</summary>
+    /// <summary>Fine (gr) the bailiff takes for every undersized fish brought to a buyer.</summary>
+    public const int UndersizedFine = 10;
+
+    public int UndersizedCount => Keepnet.Count(f => f.Undersized);
+
+    /// <summary>Sells the whole keepnet at the fixed buyer. Returns the money earned after fines for undersized fish.</summary>
     public int SellAll()
     {
-        int value = KeepnetValue;
+        int value = KeepnetValue - UndersizedCount * UndersizedFine;
         Money += value;
         Keepnet = new();
         Changed?.Invoke();

@@ -56,6 +56,9 @@ public partial class FishSpecies : Resource
 
     public float TrophyThreshold => TrophyWeight > 0f ? TrophyWeight : MaxWeight * 0.8f;
 
+    /// <summary>The lord's minimum size (as a weight): smaller fish must go back into the water.</summary>
+    public float LegalWeight => MinWeight + (MaxWeight - MinWeight) * 0.12f;
+
     /// <summary>Affinity for a bait id (0 when the species ignores it).</summary>
     public float AffinityFor(string baitId) =>
         BaitAffinity.TryGetValue(baitId, out var v) ? v.AsSingle() : 0f;

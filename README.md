@@ -45,6 +45,7 @@ Symulator wędkarski w Godot 4.3 (.NET) napisany w całości w C#. Poza kodem s�
 - **Ryby widać w wodzie:** około 150 ryb pływa w ławicach i pojedynczo; ławice, które odpłyną daleko, wracają w okolice wędkarza, więc wokół zawsze coś pływa. Uciekają przed biegnącym wędkarzem. Kapelusz z szerokim rondem (mniej odblasków) pokazuje je dalej i głębiej.
 - **Tylko widok z oczu wędkarza:** kołysanie głowy w rytm kroków, oddech, widoczne ręce na wędce i kołowrotku.
 - **Dźwięk bez plików audio** (`src/Core/Audio/Synth.cs`, `src/Audio/SoundEngine.cs`): wiatr, chlupot wody przy brzegu, deszcz, ptaki w dzień, świerszcze nocą, kroki (inne na pomoście, inne na trawie), plusk spławika, terkot kołowrotka, jazgot hamulca, zacięcie, złowienie i zerwanie. Wszystko jest syntezowane w kodzie.
+- **Wymiar ochronny:** najmniejsze ryby każdego gatunku są niewymiarowe. Przy złowieniu gra ostrzega, a za każdą niewymiarową rybę sprzedaną w skupie lub na targu strażnik pobiera 10 gr kary. Wypuść ją klawiszem R.
 - **Brania od widocznych ryb:** ryby, które lubią przynętę, podpływają do spławika, a bierze konkretna ryba z okolicy. Spłoszone nie biorą, zerwana ryba ucieka.
 - Plan dalszej rozbudowy: [`docs/ROZWOJ.md`](docs/ROZWOJ.md).
 - **Dodawanie budynków:** wpis `"rodzaj,x,z[,obrót]"` w polu `Buildings` łowiska (np. `"tackle,-22,24"`). Budynki same obracają się twarzą do placu, teren pod nimi jest wyrównywany, a do drzwi prowadzi ścieżka.

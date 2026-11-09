@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -35,6 +36,14 @@ public sealed class ProgressSuite : ITestSuite
         }
         t.Check(p.Level == 3 && levels.SequenceEqual(new[] { 2, 3 }), $"levelled up 1 -> 2 -> 3 after {n} roach");
         t.Check(p.Keepnet.Count == n, "keepnet holds every catch");
+        var tiny = new Profile();
+        tiny.AddCatch(roach, 0.11f);
+        tiny.AddCatch(roach, 0.6f);
+        int expectFine = tiny.KeepnetValue - Profile.UndersizedFine;
+        t.Check(tiny.UndersizedCount == 1 && tiny.Keepnet[0].Undersized && !tiny.Keepnet[1].Undersized, "an 11 dag roach is undersized, a 60 dag one is not");
+        t.Check(tiny.SellAll() == expectFine, $"the bailiff fines {Profile.UndersizedFine} gr for each undersized fish sold");
+        var und = ProfileSerializer.FromJson(ProfileSerializer.ToJson(new Func<Profile>(() => { var q = new Profile(); q.AddCatch(roach, 0.11f); return q; })()).ToJsonString());
+        t.Check(und.Keepnet[0].Undersized, "the undersized mark survives save and load");
         int before = p.Money;
         int sold = p.SellAll();
         t.Check(p.Money == before + sold && p.Keepnet.Count == 0 && sold > 0, $"SellAll pays {sold} zł and empties the net");

@@ -815,6 +815,8 @@ public partial class FishingRod : Node3D
             text += $"\nAwans na poziom {Profile.Level}!";
         if (result.Released)
             text += "\nSiatka pełna: ryba wypuszczona. Sprzedaj ryby albo kup większą siatkę.";
+        else if (CurrentWeight < species.LegalWeight)
+            text += $"\nNiewymiarowa (poniżej {species.LegalWeight:0.00} kg)! Wypuść ją (R), bo strażnik ukarze.";
         ShowBanner(text, 4.5f);
         _lineOutOutsideFight = 0f;
         _fight = null;
