@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
 Turns a side-view fish photograph on a plain background into a game asset:
-  <id>.png   the fish cut out (RGBA), levelled, head on the left, cropped, 2048 px wide
+  <id>.webp  the fish cut out (RGBA), levelled, head on the left, cropped, 2048 px wide (WebP, a fifth of a PNG)
   <id>.json  the body outline without the fins (top and bottom edge at 128 points along the length),
              used to loft the 3D body so its silhouette matches the photo exactly.
 
 Usage: python3 tools/fish_photos/cutout.py <photo> <out_dir> <id> [--flip] [--threshold T] [--grabcut [--box x0,y0,x1,y1]]
-Pillow and numpy; --grabcut (busy backgrounds) also needs opencv-python-headless.
+                                          [--isnet model.onnx [--open N]]
+Pillow and numpy; --grabcut (busy backgrounds) also needs opencv-python-headless; --isnet (any background, keeps
+translucent fins soft) needs onnxruntime and the ISNet "general use" model (isnet-general-use.onnx, as published with
+the rembg project); the model is a tool only and is not shipped with the game.
 """
 import json
 import math
@@ -113,6 +116,43 @@ def segment_grabcut(img, box_frac=None):
     return mask, small.size
 
 
+def segment_isnet(img, model, box_frac=None, opening=5):
+    """
+    Mask of the fish from the ISNet salient-object model: a binary mask at a working resolution for levelling and
+    measuring, and a soft alpha at full resolution so thin, see-through fins keep their soft edge.
+    """
+    import onnxruntime as ort
+    sess = ort.InferenceSession(model, providers=["CPUExecutionProvider"])
+    src = img
+    if box_frac:
+        x0, y0, x1, y1 = box_frac
+        src = img.crop((int(x0 * img.width), int(y0 * img.height), int(x1 * img.width), int(y1 * img.height)))
+    arr = np.asarray(src.resize((1024, 1024), Image.LANCZOS)).astype(np.float32)
+    arr = arr / max(arr.max(), 1.0) - np.array([0.485, 0.456, 0.406], np.float32)
+    pred = sess.run(None, {sess.get_inputs()[0].name: arr.transpose(2, 0, 1)[None]})[0][0, 0]
+    pred = (pred - pred.min()) / max(pred.max() - pred.min(), 1e-6)
+    soft = Image.fromarray((pred * 255).astype(np.uint8)).resize(src.size, Image.LANCZOS)
+    if box_frac:
+        full = Image.new("L", img.size, 0)
+        full.paste(soft, (int(box_frac[0] * img.width), int(box_frac[1] * img.height)))
+        soft = full
+    small = soft.copy()
+    small.thumbnail((640, 640))
+    mask = np.asarray(small) > 127
+    # A small opening cuts thin things touching the fish (a stem, a line, a twig) loose, so they are dropped with
+    # the other stray pieces.
+    k = max(3, opening | 1)
+    mask = np.asarray(Image.fromarray(mask.astype(np.uint8) * 255).filter(ImageFilter.MinFilter(k)).filter(ImageFilter.MaxFilter(k))) > 127
+    mask = largest_component(mask)
+    keep = Image.fromarray(mask.astype(np.uint8) * 255).filter(ImageFilter.MaxFilter(7)).resize(img.size, Image.BILINEAR)
+    whole = ~flood_from_border(mask)
+    holes = Image.fromarray((whole & ~mask).astype(np.uint8) * 255).filter(ImageFilter.MaxFilter(3)).resize(img.size, Image.BILINEAR)
+    # Stray blobs away from the fish are dropped; holes inside it (silver highlights) are filled.
+    soft_arr = np.asarray(soft).astype(np.float32) * (np.asarray(keep) / 255.0)
+    filled = np.maximum(soft_arr, np.asarray(holes).astype(np.float32))
+    return whole, small.size, Image.fromarray(filled.clip(0, 255).astype(np.uint8))
+
+
 def level_angle(mask):
     ys, xs = np.nonzero(mask)
     xs = xs - xs.mean()
@@ -171,14 +211,14 @@ def head_on_left(mask):
     return left.min(initial=1e9) >= right.min(initial=1e9)
 
 
-def bleed(rgba, steps=32):
+def bleed(rgba, steps=32, solid=235):
     """
     Replaces the colour of the see-through and edge pixels with the fish's own colours spread outwards, so texture
     filtering never pulls in the old background (no white halo, no black rim at the snout).
     """
     arr = np.asarray(rgba).astype(np.float32)
     rgb, a = arr[..., :3].copy(), arr[..., 3]
-    known = a > 235
+    known = a > solid
     for _ in range(steps):
         acc = np.zeros_like(rgb)
         cnt = np.zeros(a.shape, dtype=np.float32)
@@ -204,14 +244,17 @@ def main():
     flip = "--flip" in sys.argv
     threshold = float(sys.argv[sys.argv.index("--threshold") + 1]) if "--threshold" in sys.argv else 38.0
     img = Image.open(src).convert("RGB")
-    if "--grabcut" in sys.argv:
-        box = None
-        if "--box" in sys.argv:
-            box = tuple(float(v) for v in sys.argv[sys.argv.index("--box") + 1].split(","))
+    box = None
+    if "--box" in sys.argv:
+        box = tuple(float(v) for v in sys.argv[sys.argv.index("--box") + 1].split(","))
+    soft = None
+    if "--isnet" in sys.argv:
+        opening = int(sys.argv[sys.argv.index("--open") + 1]) if "--open" in sys.argv else 5
+        mask, size, soft = segment_isnet(img, sys.argv[sys.argv.index("--isnet") + 1], box, opening)
+    elif "--grabcut" in sys.argv:
         mask, size = segment_grabcut(img, box)
     else:
         mask, size = segment(img, threshold)
-    scale = img.width / size[0]
 
     # Level the fish along its long axis.
     angle = level_angle(mask)
@@ -219,7 +262,7 @@ def main():
         angle -= 180
     if angle < -90:
         angle += 180
-    m_img = Image.fromarray(mask.astype(np.uint8) * 255).resize(img.size, Image.BILINEAR)
+    m_img = soft or Image.fromarray(mask.astype(np.uint8) * 255).resize(img.size, Image.BILINEAR)
     rgba = img.convert("RGBA")
     rgba.putalpha(m_img)
     rgba = rgba.rotate(angle, resample=Image.BICUBIC, expand=True)
@@ -235,13 +278,16 @@ def main():
         rgba = rgba.transpose(Image.FLIP_LEFT_RIGHT)
         alpha = alpha[:, ::-1]
 
-    # Soft, slightly eroded edge so no background halo is left around the fish.
-    a = Image.fromarray(alpha.astype(np.uint8) * 255).filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(1.2))
-    rgba.putalpha(a)
+    # Soft, slightly eroded edge so no background halo is left around the fish (the model's own soft edge when it
+    # has one).
+    if soft is None:
+        a = Image.fromarray(alpha.astype(np.uint8) * 255).filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(1.2))
+        rgba.putalpha(a)
     h = int(round(rgba.height * OUT_WIDTH / rgba.width))
     rgba = rgba.resize((OUT_WIDTH, h), Image.LANCZOS)
-    rgba = bleed(rgba)
-    rgba.save(f"{out_dir}/{sid}.png", optimize=True)
+    # A soft model edge keeps the real colour of see-through fins; only the faint fringe is replaced.
+    rgba = bleed(rgba, solid=235 if soft is None else 96)
+    rgba.save(f"{out_dir}/{sid}.webp", quality=92, alpha_quality=100, method=6)
 
     # Body outline (fins removed) at 128 points, in image fractions.
     small = rgba.copy()

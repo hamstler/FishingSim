@@ -3,8 +3,9 @@
 Turns the picked candidates into game assets: downloads each pick at 1920 px, cuts it out (cutout.py), adds the
 credit to its JSON and rewrites assets/fish/CREDITS.md.
 
-picks.json: {"species_id": {"index": 3, "grabcut": false, "flip": false, "box": "0.05,0.1,0.95,0.9", "threshold": 38}}
-Usage: python3 tools/fish_photos/finalize.py <photos_dir> <picks.json> <assets_dir>
+picks.json: {"species_id": {"index": 3, "isnet": true, "grabcut": false, "flip": false, "box": "0.05,0.1,0.95,0.9",
+                            "threshold": 38}}
+Usage: ISNET_MODEL=isnet-general-use.onnx python3 tools/fish_photos/finalize.py <photos_dir> <picks.json> <assets_dir>
 """
 import html
 import json
@@ -15,7 +16,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(__file__))
-from fetch import get  # noqa: E402
+from fetch import get, thumb_url  # noqa: E402
 
 photos, picks_file, assets = sys.argv[1], sys.argv[2], sys.argv[3]
 cands = json.load(open(os.path.join(photos, "candidates.json"), encoding="utf-8"))
@@ -23,16 +24,20 @@ picks = json.load(open(picks_file, encoding="utf-8"))
 here = os.path.dirname(os.path.abspath(__file__))
 for sid, pick in picks.items():
     c = cands[sid][pick["index"]]
-    src = os.path.join(photos, f"{sid}_full.jpg")
+    src = os.path.join(photos, f"{sid}_{pick['index']}_full.jpg")
     if not (os.path.exists(src) and os.path.getsize(src) > 0):
         print(f"{sid}: downloading", flush=True)
-        open(src, "wb").write(get(c["thumb"]))
+        open(src, "wb").write(get(thumb_url(c, 1920)))
         time.sleep(3)
     args = [sys.executable, os.path.join(here, "cutout.py"), src, assets, sid]
-    if pick.get("grabcut"):
+    if pick.get("isnet"):
+        args += ["--isnet", os.environ["ISNET_MODEL"]]
+    elif pick.get("grabcut"):
         args.append("--grabcut")
-        if pick.get("box"):
-            args += ["--box", pick["box"]]
+    if pick.get("box"):
+        args += ["--box", pick["box"]]
+    if pick.get("open"):
+        args += ["--open", str(pick["open"])]
     if pick.get("flip"):
         args.append("--flip")
     if pick.get("threshold"):

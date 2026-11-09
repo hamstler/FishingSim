@@ -46,11 +46,12 @@ public partial class FishModel : Node3D
 
     /// <summary>
     /// Builds a fish. <paramref name="detailed"/> = a close-up fish (hooked, held, in the atlas): a finer body mesh and
-    /// the high-resolution painted skin; fish swimming in the lake use the light version.
+    /// the high-resolution painted skin; fish swimming in the lake use the light version. A species with a photograph
+    /// (assets/fish) is built from it unless <paramref name="painted"/> asks for the painted model.
     /// </summary>
-    public static FishModel Create(FishSpecies species, float weight, bool detailed = false)
+    public static FishModel Create(FishSpecies species, float weight, bool detailed = false, bool painted = false)
     {
-        var model = new FishModel { _detailed = detailed };
+        var model = new FishModel { _detailed = detailed, _painted = painted };
         model.Build(species, weight);
         return model;
     }
@@ -442,11 +443,13 @@ public partial class FishModel : Node3D
     }
 
     // ================================================================== the node
+    private bool _painted;
+
     private void Build(FishSpecies sp, float weight)
     {
         _species = sp;
         Length = sp.LengthRef * MathF.Pow(MathF.Max(weight, 0.002f), 0.33f);
-        if (PhotoFish.For(sp) is { } photo)
+        if (!_painted && PhotoFish.For(sp) is { } photo)
         {
             BuildPhoto(sp, photo);
             return;
@@ -653,8 +656,12 @@ public partial class FishModel : Node3D
             float k = MathF.Max(MathF.Sin(phi), 0.02f);
             Ring(first.X - noseLen * MathF.Cos(phi) * 0.4f, first.Top, first.Bottom, k);
         }
+        // Over the last few percent the stalk also sinks into the card, so the body has no visible end.
         foreach (var r in rings)
-            Ring(r.X, r.Top, r.Bottom, 1f);
+        {
+            float t = Math.Clamp((r.X - (photo.BodyEnd - 0.05f)) / 0.05f, 0f, 1f);
+            Ring(r.X, r.Top, r.Bottom, 1f - 0.75f * t * t * (3f - 2f * t));
+        }
         int total = cap + rings.Count;
         for (int i = 0; i < total - 1; i++)
             for (int j = 0; j < segs; j++)
@@ -718,7 +725,9 @@ public partial class FishModel : Node3D
         _skinUpgraded = true;
         var card = new ShaderMaterial { Shader = _finShader };
         card.SetShaderParameter("fin_tex", photo.Texture);
-        card.SetShaderParameter("albedo_scale", 0.72f);
+        // The card is not metallic: dimmed by the body's metallic share so the stalk and fins match the flank.
+        card.SetShaderParameter("albedo_scale", 0.72f * (1f - 0.8f * (0.05f + 0.15f * style.Silver)));
+        card.SetShaderParameter("backlight", 0.12f);
         float phase = (float)(GD.Randf() * Mathf.Tau);
         foreach (var (mesh, material) in new (Mesh, Material)[] { (shape.Card, card), (shape.Body, _bodyShaderMaterial) })
         {

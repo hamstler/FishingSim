@@ -5,6 +5,7 @@ candidate thumbnails for picking. One API request per species (search + image in
 and retried politely (Wikimedia rate-limits shared addresses). Writes candidates.json next to the downloads.
 
 Usage: python3 tools/fish_photos/fetch.py search <species.json> <out_dir> [ids...]
+       python3 tools/fish_photos/fetch.py previews <out_dir> [per_species]   (330 px previews of the best-ranked)
        python3 tools/fish_photos/fetch.py download <out_dir> <picks.json>   (picks: {"species_id": [candidate indices]})
 """
 import json
@@ -57,6 +58,16 @@ def get(url, tries=12):
             print(f"  error {e}, retrying", flush=True)
             time.sleep(10)
     raise RuntimeError(f"gave up on {url}")
+
+
+def thumb_url(c, width):
+    """
+    The picture at a given width through commons.wikimedia.org/w/thumb.php. upload.wikimedia.org answers shared cloud
+    addresses with long rate-limit bans; thumb.php streams the same thumbnail from the wiki host.
+    """
+    name = c["title"].split(":", 1)[1].replace(" ", "_")
+    w = min(width, c.get("width") or width)
+    return "https://commons.wikimedia.org/w/thumb.php?" + urllib.parse.urlencode({"f": name, "w": str(w)})
 
 
 def search(term):
@@ -123,8 +134,7 @@ def download(out_dir, picks_file):
     for sid, indices in picks.items():
         for i in indices:
             c = found[sid][i]
-            # A standard thumbnail width (960 px) is usually cached, so it is served without rendering.
-            url = c["thumb"].replace("/1920px-", "/960px-")
+            url = thumb_url(c, 1920)
             path = os.path.join(out_dir, f"{sid}_{i}.jpg")
             if os.path.exists(path) and os.path.getsize(path) > 0:
                 continue
@@ -168,18 +178,18 @@ def previews(out_dir, per_species=5):
             if os.path.exists(path) and os.path.getsize(path) > 0:
                 continue
             os.makedirs(os.path.dirname(path), exist_ok=True)
-            url = found[sid][i]["thumb"].replace("/1920px-", "/330px-")
+            url = thumb_url(found[sid][i], 330)
             try:
                 open(path, "wb").write(get(url))
                 print(f"preview {sid}_{i}", flush=True)
             except Exception as e:
                 print(f"preview {sid}_{i} failed {e}", flush=True)
-            time.sleep(2)
+            time.sleep(3)
 
 
 def main():
     if sys.argv[1] == "previews":
-        previews(sys.argv[2])
+        previews(sys.argv[2], int(sys.argv[3]) if len(sys.argv) > 3 else 5)
         return
     if sys.argv[1] == "search":
         search_all(sys.argv[2], sys.argv[3], set(sys.argv[4:]))

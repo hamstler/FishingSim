@@ -7,7 +7,7 @@ using FishingSim.Data;
 namespace FishingSim.Fishing;
 
 /// <summary>
-/// A real photograph of a species (assets/fish/&lt;id&gt;.png, cut out with tools/fish_photos/cutout.py) with its body
+/// A real photograph of a species (assets/fish/&lt;id&gt;.webp or .png, cut out with tools/fish_photos/cutout.py) with its body
 /// outline and credit (&lt;id&gt;.json). When present, the fish is built from it: the body is lofted to the photo's own
 /// silhouette and wears the photo on both flanks, and the fins and tail come from the cut-out itself.
 /// </summary>
@@ -47,10 +47,12 @@ public sealed class PhotoFish
         if (Cache.TryGetValue(id, out var cached))
             return cached;
         PhotoFish? photo = null;
-        string png = $"res://assets/fish/{id}.png", json = $"res://assets/fish/{id}.json";
-        if (FileAccess.FileExists(png) && FileAccess.FileExists(json) && JsonNode.Parse(FileAccess.GetFileAsString(json)) is JsonObject meta)
+        string pic = $"res://assets/fish/{id}.webp", json = $"res://assets/fish/{id}.json";
+        if (!FileAccess.FileExists(pic))
+            pic = $"res://assets/fish/{id}.png";
+        if (FileAccess.FileExists(pic) && FileAccess.FileExists(json) && JsonNode.Parse(FileAccess.GetFileAsString(json)) is JsonObject meta)
         {
-            var img = Godot.Image.LoadFromFile(png);
+            var img = Godot.Image.LoadFromFile(pic);
             if (img != null && !img.IsEmpty())
             {
                 img.Convert(Godot.Image.Format.Rgba8);

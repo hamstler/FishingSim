@@ -7,6 +7,7 @@ render_mode cull_disabled, depth_prepass_alpha, diffuse_burley, specular_schlick
 uniform sampler2D fin_tex : source_color, filter_linear_mipmap_anisotropic;
 uniform float flutter = 0.0;     // paired fins: a gentle beat of their own
 uniform float albedo_scale = 1.0;
+uniform float backlight = 0.55;  // how much light shines through (a photo card is mostly solid body)
 
 void vertex() {
 	VERTEX = fish_bend(VERTEX, TIME);
@@ -19,5 +20,5 @@ void fragment() {
 	ALPHA = c.a;
 	ROUGHNESS = 0.4;
 	SPECULAR = 0.45;
-	BACKLIGHT = c.rgb * 0.55;
+	BACKLIGHT = c.rgb * backlight;
 }

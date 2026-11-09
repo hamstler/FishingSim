@@ -44,14 +44,15 @@ public sealed class GearSuite : ITestSuite
             $"{catalogue.Count} species load, all with unique names");
         var undescribed = catalogue.Where(s => s.LatinName == "" || s.Description.Length < 40).Select(s => s.SpeciesName).ToList();
         t.Check(undescribed.Count == 0, $"every species has a Latin name and an atlas description {string.Join(", ", undescribed)}");
-        // Fish models: every species has its own build and eyes in proportion to the head.
+        // Painted fish models (used where there is no photograph): every species has its own build and eyes in
+        // proportion to the head.
         var oversizedEyes = new List<string>();
         var builds = new Dictionary<string, (float H, float W)>();
         foreach (var sp in catalogue)
         {
             foreach (bool detailed in new[] { false, true })
             {
-                var m = FishingSim.Fishing.FishModel.Create(sp, sp.MinWeight, detailed);
+                var m = FishingSim.Fishing.FishModel.Create(sp, sp.MinWeight, detailed, painted: true);
                 if (m.EyeDiameter > 0.62f * m.HeadHeightAtEye || m.EyeDiameter > 0.12f * m.Length)
                     oversizedEyes.Add($"{sp.SpeciesName} {m.EyeDiameter * 1000f:0.0} mm / head {m.HeadHeightAtEye * 1000f:0.0} mm");
                 if (!detailed)
@@ -82,7 +83,7 @@ public sealed class GearSuite : ITestSuite
         var pupil = iris.GetPixel(128, 128);
         var irisRing = iris.GetPixel(128 + 85, 128);
         t.Check(pupil.R < 0.05f && irisRing.R > irisRing.B * 2f, "a roach's eye: black pupil in a red iris");
-        var close = FishingSim.Fishing.FishModel.Create(perch, 0.5f, detailed: true);
+        var close = FishingSim.Fishing.FishModel.Create(perch, 0.5f, detailed: true, painted: true);
         int shaded = close.FindChildren("*", nameof(MeshInstance3D), true, false).OfType<MeshInstance3D>().Count(m => m.MaterialOverride is ShaderMaterial);
         t.Check(shaded >= 6, $"a close-up perch swims with its body and {shaded - 1} fins bending together (shader materials)");
         close.Free();
