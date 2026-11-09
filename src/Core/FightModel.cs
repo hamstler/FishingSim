@@ -82,7 +82,13 @@ public sealed class FightModel
     }
 
     /// <summary>Long fights wear any fish out: drain speeds up the longer it goes on (x2 at 45 s, x5 at 90 s).</summary>
-    public float Fatigue => 1f + MathF.Pow(Elapsed / 45f, 2f);
+    /// <summary>Seconds after which the fish tires twice as fast; long fights still end, but not in seconds.</summary>
+    public const float FatigueSeconds = 90f;
+
+    /// <summary>Overall pace of tiring: lower = longer, harder fights.</summary>
+    public const float StaminaPace = 0.42f;
+
+    public float Fatigue => 1f + MathF.Pow(Elapsed / FatigueSeconds, 2f);
 
     /// <summary>Small fish dart often, big fish surge less often but harder; species set the overall rate.</summary>
     private float NextBurstInterval() =>
@@ -119,7 +125,7 @@ public sealed class FightModel
         float pull;
         if (Running)
         {
-            Stamina = MathF.Max(Stamina - _fish.StaminaDrain * Mathf.Lerp(1.3f, 0.85f, _fish.SizeRatio) * Fatigue * (lifting ? 1.35f : 1f) * dt, 0f);
+            Stamina = MathF.Max(Stamina - _fish.StaminaDrain * StaminaPace * Mathf.Lerp(1.3f, 0.85f, _fish.SizeRatio) * Fatigue * (lifting ? 1.35f : 1f) * dt, 0f);
             _burstTimer -= dt;
             if (_burstTimer <= 0f)
             {
@@ -135,8 +141,10 @@ public sealed class FightModel
         }
         else
         {
-            Stamina = MathF.Min(Stamina + 0.03f * dt / Fatigue, 1f);
-            pull = _fish.PeakPull * 0.25f * staminaFactor;
+            // Between runs the fish does not give up: it bores down and shakes its head.
+            Stamina = MathF.Max(Stamina - _fish.StaminaDrain * StaminaPace * 0.25f * Fatigue * dt, 0f);
+            float shake = MathF.Max(0f, MathF.Sin(Elapsed * (5f + 3f * _fish.Aggression))) * 0.35f * _fish.Aggression;
+            pull = _fish.PeakPull * (0.38f + shake) * staminaFactor;
         }
 
         // --- load, drag, tension ---
@@ -150,7 +158,9 @@ public sealed class FightModel
         // --- line in / out ---
         float payout = excess * 0.5f;   // m/s pulled off the spool by a slipping drag
         Slipping = excess > 0.05f;
-        float reelIn = reeling ? _gear.ReelSpeed * Math.Clamp(1f - excess / 2f, 0f, 1f) : 0f;
+        // A fresh fish resists being reeled in; a tired one comes easily.
+        float resistance = 1f - 0.6f * staminaFactor * Mathf.Lerp(0.6f, 1f, _fish.SizeRatio);
+        float reelIn = reeling ? _gear.ReelSpeed * resistance * Math.Clamp(1f - excess / 2f, 0f, 1f) : 0f;
         if (lifting)
             reelIn += 0.6f * Math.Clamp(1f - excess / 2f, 0f, 1f);   // pumping gains line
         LineOut += (payout - reelIn) * dt;

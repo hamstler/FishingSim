@@ -58,6 +58,22 @@ public partial class ScreenshotTool : Node
             return;
         }
 
+        if (mode == 18)
+        {
+            // Top-down previews of every map, side by side (shapes, bays, islands).
+            const int w = 300, h = 240;
+            var sheet = Image.CreateEmpty(w * FishingSim.World.LakeBed.LocationPaths.Length, h, false, Image.Format.Rgb8);
+            for (int i = 0; i < FishingSim.World.LakeBed.LocationPaths.Length; i++)
+            {
+                var loc = GD.Load<LocationData>(FishingSim.World.LakeBed.LocationPaths[i]);
+                var area = new Rect2(-160f, -195f, 320f, 260f);
+                sheet.BlitRect(FishingSim.UI.MapPreview.Render(loc, w, h, area).GetImage(), new Rect2I(0, 0, w, h), new Vector2I(i * w, 0));
+            }
+            sheet.SavePng(output);
+            GD.Print($"saved {output}");
+            GetTree().Quit();
+            return;
+        }
         if (mode == 16)
         {
             // Contact sheet of every item and fish icon (no 3D needed).

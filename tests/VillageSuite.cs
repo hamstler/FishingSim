@@ -152,7 +152,11 @@ public sealed class VillageSuite : ITestSuite
             var scenery = main.Scenery;
             stats[loc.DisplayName] = new Dictionary<string, int>(scenery.Stats);
             int functional = loc.BuildingSpecs().Count(s => s.IsFunctional);
-            t.Check(scenery.Interactables.Count == functional && scenery.Markers.Count == functional, $"{loc.DisplayName}: {functional} doors with a prompt and a map marker");
+            int sights = loc.Landmarks.Count(l => !l.StartsWith("platforms"));
+            t.Check(scenery.Interactables.Count == functional && scenery.Markers.Count == functional + sights,
+                $"{loc.DisplayName}: {functional} doors with a prompt, map markers for them and {sights} landmarks");
+            t.Check(loc.Landmarks.Length > 0 && scenery.Stats.Where(kv => kv.Key.StartsWith("landmark_")).Sum(kv => kv.Value) == loc.Landmarks.Length,
+                $"{loc.DisplayName}: its own landmarks are built ({string.Join(", ", loc.Landmarks.Select(l => l.Split(',')[0]))})");
             t.Check(scenery.Stats.Where(kv => kv.Key.StartsWith("building_")).Sum(kv => kv.Value) == loc.Buildings.Length, $"{loc.DisplayName}: every building was built");
             t.Check(scenery.Stats.GetValueOrDefault("tree_oak") + scenery.Stats.GetValueOrDefault("tree_spruce") + scenery.Stats.GetValueOrDefault("tree_pine")
                 + scenery.Stats.GetValueOrDefault("tree_birch") + scenery.Stats.GetValueOrDefault("tree_willow") > 20, $"{loc.DisplayName}: there are trees");

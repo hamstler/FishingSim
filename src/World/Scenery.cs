@@ -204,6 +204,7 @@ public partial class Scenery : Node3D
 
         var loc = _lake.Location;
         BuildVillage(loc);
+        BuildLandmarks(loc);
         var rng = new RandomNumberGenerator { Seed = 42 };
         ScatterTrees(loc, rng);
         ScatterGroundCover(loc, rng);
@@ -244,6 +245,48 @@ public partial class Scenery : Node3D
             Track(spot);
             Interactables.Add(spot);
             Markers.Add(new MapMarker(spec.Position, building.Title, MarkerColor(spec.Kind)));
+        }
+    }
+
+    // ------------------------------------------------------------------ landmarks
+    /// <summary>
+    /// The map's one-of-a-kind sights ("kind,x,z[,yaw[,size]]"). Huts, platforms and rock islets stand in the water;
+    /// the rest on the ground. Without a yaw they face the middle of the lake.
+    /// </summary>
+    private void BuildLandmarks(LocationData loc)
+    {
+        foreach (var entry in loc.Landmarks)
+        {
+            var parts = entry.Split(',', 2, StringSplitOptions.TrimEntries);
+            if (parts.Length < 2)
+                continue;
+            string kind = parts[0];
+            var n = LocationData.Numbers(parts[1]);
+            if (n.Length < 2)
+                continue;
+            float x = n[0], z = n[1];
+            float depth = _lake.DepthAt(loc, x, z);
+            float ground = _lake.HeightAt(loc, x, z);
+            float size = n.Length >= 4 ? n[3] : depth;
+            var building = BuildingFactory.Landmark(kind, size);
+            float y = kind switch
+            {
+                "stilthouse" or "platforms" => 0f,
+                "rocks" => ground > 0f ? ground - 0.4f : ground * 0.3f,
+                "waterfall" => MathF.Max(ground, 0f) - 0.4f,
+                _ => ground,
+            };
+            float yaw = n.Length >= 3
+                ? Mathf.DegToRad(n[2])
+                : MathF.Atan2(-x, loc.OutlineCz - z);
+            building.Position = new Vector3(x, y, z);
+            building.Rotation = new Vector3(0f, yaw, 0f);
+            AddChild(building);
+            Track(building);
+            _buildings.Add(building);
+            Count("landmark_" + kind);
+            if (building.Title != "" && kind != "platforms")
+                Markers.Add(new MapMarker(new Vector2(x, z), building.Title, new Color(0.8f, 0.78f, 0.7f)));
         }
     }
 
@@ -437,13 +480,22 @@ public partial class Scenery : Node3D
         List<Transform3D> reeds = new(), heads = new();
         List<Color> colors = new(), headColors = new();
         int maxReeds = (int)(1800 * loc.ReedDensity);
+        // Shorelines to sample: the main lake, its bays (x, z, rx, rz) and the islands (sampled just outside them).
+        var shores = new List<(float X, float Z, float Rx, float Rz, bool Island)> { (0f, loc.OutlineCz, loc.OutlineRx, loc.OutlineRz, false) };
+        foreach (var entry in loc.Lobes)
+            if (LocationData.Numbers(entry) is { Length: >= 4 } l)
+                shores.Add((l[0], l[1], l[2], l[3], false));
+        foreach (var entry in loc.Islands)
+            if (LocationData.Numbers(entry) is { Length: >= 3 } i)
+                shores.Add((i[0], i[1], i[2], i[2], true));
         for (int tries = 0; reeds.Count < maxReeds && tries < 90000; tries++)
         {
-            // Sample along the shoreline (a point on the outline ellipse, nudged inwards) instead of the whole map.
+            // Sample along a shoreline (a point on its outline, nudged into the water) instead of the whole map.
+            var shore = shores.Count == 1 || rng.Randf() < 0.5f ? shores[0] : shores[rng.RandiRange(1, shores.Count - 1)];
             float angle = rng.Randf() * Mathf.Tau;
-            float shrink = rng.RandfRange(0.9f, 1.02f);
-            float x = loc.OutlineRx * shrink * MathF.Cos(angle);
-            float z = loc.OutlineCz + loc.OutlineRz * shrink * MathF.Sin(angle);
+            float shrink = shore.Island ? rng.RandfRange(1f, 1.6f) : rng.RandfRange(0.85f, 1.04f);
+            float x = shore.X + shore.Rx * shrink * MathF.Cos(angle);
+            float z = shore.Z + shore.Rz * shrink * MathF.Sin(angle);
             if (MathF.Abs(x) < 9f && z > -14f)
                 continue;
             float d = _lake.DepthAt(loc, x, z);

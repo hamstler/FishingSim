@@ -1,3 +1,4 @@
+using System.Linq;
 using Godot;
 using Godot.Collections;
 
@@ -40,6 +41,24 @@ public partial class LocationData : Resource
 
     /// <summary>Extra fog density (mist over marshes, haze in the mountains).</summary>
     [Export] public float FogBoost { get; set; }
+
+    // --- shape of the water beyond the main ellipse (what makes each lake one of a kind) ---
+    /// <summary>1 = round ellipse; larger = more rectangular (fish ponds with dikes).</summary>
+    [Export] public float Squareness { get; set; } = 1f;
+
+    /// <summary>Extra bays and arms joined to the lake: "centreX,centreZ,radiusX,radiusZ".</summary>
+    [Export] public string[] Lobes { get; set; } = System.Array.Empty<string>();
+
+    /// <summary>Islands: "centreX,centreZ,radius".</summary>
+    [Export] public string[] Islands { get; set; } = System.Array.Empty<string>();
+
+    /// <summary>Landmarks far from the village: "kind,x,z[,yaw]" (tower, chapel, stilthouse, dike, waterfall, rocks).</summary>
+    [Export] public string[] Landmarks { get; set; } = System.Array.Empty<string>();
+
+    /// <summary>Parsed numbers of a comma-separated entry (invariant culture).</summary>
+    public static float[] Numbers(string entry) => entry.Split(',', System.StringSplitOptions.TrimEntries)
+        .Select(p => float.TryParse(p, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : float.NaN)
+        .Where(v => !float.IsNaN(v)).ToArray();
 
     /// <summary>How many metres into the water you can see (clear mountain lake ~6, murky marsh ~1.5).</summary>
     [Export] public float WaterClarity { get; set; } = 3f;

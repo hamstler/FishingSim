@@ -95,12 +95,16 @@ public partial class PixelArtView : Node
         var size = GetViewport().GetVisibleRect().Size;
         int px = GraphicsQuality.PixelSizeFor(size.Y);
         bool pixelArt = GraphicsQuality.Style == ArtStyle.PixelArt;
+        bool nordic = GraphicsQuality.Style == ArtStyle.Nordic;
         _post.SetShaderParameter("use_palette", pixelArt);
         _post.SetShaderParameter("outline", 0f);
-        _post.SetShaderParameter("saturation", pixelArt ? 1.18f : 1.08f);
+        _post.SetShaderParameter("saturation", pixelArt ? 1.18f : nordic ? 1f : 1.08f);
+        // The Nordic look keeps every colour: no quantisation, no dither (the grade lives in the Environment).
+        _post.SetShaderParameter("levels", nordic ? 255f : 32f);
+        _post.SetShaderParameter("dither", nordic ? 0f : 0.45f);
         if (_outline != null)
         {
-            _outline.Visible = !Renderer.IsCompatibility;
+            _outline.Visible = !Renderer.IsCompatibility && !nordic;
             ((ShaderMaterial)_outline.MaterialOverride).SetShaderParameter("strength", pixelArt ? 0.85f : 0.45f);
         }
         var low = new Vector2I(Math.Max((int)(size.X / px), 64), Math.Max((int)(size.Y / px), 36));
@@ -110,7 +114,8 @@ public partial class PixelArtView : Node
         // Crisp pixels: no smoothing of edges in the low-resolution image.
         _viewport.Msaa3D = Godot.Viewport.Msaa.Disabled;
         _viewport.UseTaa = false;
-        _viewport.ScreenSpaceAA = Godot.Viewport.ScreenSpaceAAEnum.Disabled;
+        // Nordic smooths geometry edges (the textures stay crisp); the pixel styles keep hard edges.
+        _viewport.ScreenSpaceAA = nordic ? Godot.Viewport.ScreenSpaceAAEnum.Fxaa : Godot.Viewport.ScreenSpaceAAEnum.Disabled;
     }
 
     public override void _Process(double delta)

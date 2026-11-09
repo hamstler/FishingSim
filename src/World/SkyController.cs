@@ -27,7 +27,7 @@ public partial class SkyController : Node
     private float _cloudTime;
     private DirectionalLight3D _sun = null!;
     private DirectionalLight3D _moon = null!;
-    private GpuParticles3D _rainFx = null!;
+    private MultiMeshInstance3D _rainFx = null!;
     private MeshInstance3D _stars = null!;
     private ShaderMaterial _starMaterial = null!;
     private float _cloud;
@@ -87,7 +87,7 @@ public partial class SkyController : Node
 
     private void ApplyQuality()
     {
-        _skyMaterial.SetShaderParameter("stylize", GraphicsQuality.Style == ArtStyle.PixelArt ? 0.75f : 0f);
+        _skyMaterial.SetShaderParameter("stylize", GraphicsQuality.Style switch { ArtStyle.PixelArt => 0.75f, ArtStyle.Nordic => 0.35f, _ => 0f });
         _applied = (float.NaN, 0f, 0f, 0f);     // re-apply fog for the style
         GraphicsQuality.ApplyEnvironment(_env);
         GraphicsQuality.ApplySun(_sun);
@@ -114,39 +114,43 @@ public partial class SkyController : Node
         AddChild(_stars);
     }
 
+    /// <summary>Most drops at full rain; light rain shows a share of them.</summary>
+    public const int RainDrops = 7000;
+
+    /// <summary>
+    /// Rain is a MultiMesh animated in shaders/rain.gdshader, not GPUParticles3D: particles drawn by two viewports
+    /// (the pixel-art view shares the world) with motion vectors crash Godot 4.3
+    /// ("particles_get_instance_buffer_motion_vectors_offsets: Parameter particles is null").
+    /// </summary>
     private void BuildRain()
     {
-        var drops = new QuadMesh
+        var rng = new RandomNumberGenerator { Seed = 77 };
+        var mm = new MultiMesh
         {
-            Size = new Vector2(0.008f, 0.4f),
-            Material = new StandardMaterial3D
-            {
-                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-                AlbedoColor = new Color(0.75f, 0.82f, 0.9f, 0.45f),
-                BillboardMode = BaseMaterial3D.BillboardModeEnum.FixedY,
-            },
+            TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
+            UseCustomData = true,
+            Mesh = new QuadMesh { Size = new Vector2(0.02f, 0.45f) },
+            InstanceCount = RainDrops,
         };
-        _rainFx = new GpuParticles3D
+        for (int i = 0; i < RainDrops; i++)
         {
-            Amount = 7000,
-            Lifetime = 0.7,
-            Emitting = false,
-            VisibilityAabb = new Aabb(new Vector3(-40, -20, -40), new Vector3(80, 40, 80)),
-            ProcessMaterial = new ParticleProcessMaterial
-            {
-                EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box,
-                EmissionBoxExtents = new Vector3(22, 0.5f, 22),
-                Direction = new Vector3(0.12f, -1f, 0f),
-                Spread = 2f,
-                InitialVelocityMin = 17f,
-                InitialVelocityMax = 19f,
-                Gravity = Vector3.Zero,
-            },
-            DrawPass1 = drops,
+            mm.SetInstanceTransform(i, Transform3D.Identity);
+            mm.SetInstanceCustomData(i, new Color(rng.Randf(), rng.Randf(), rng.Randf(), 0f));
+        }
+        mm.VisibleInstanceCount = 0;
+        _rainFx = new MultiMeshInstance3D
+        {
+            Multimesh = mm,
+            MaterialOverride = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/rain.gdshader") },
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            CustomAabb = new Aabb(new Vector3(-30, -5, -30), new Vector3(60, 25, 60)),
+            Visible = false,
         };
         AddChild(_rainFx);
     }
+
+    /// <summary>Drops currently drawn (0 when it is not raining).</summary>
+    public int VisibleRainDrops => _rainFx.Visible ? _rainFx.Multimesh.VisibleInstanceCount : 0;
 
     public override void _Process(double delta)
     {
@@ -191,7 +195,7 @@ public partial class SkyController : Node
         if (Follow != null)
         {
             _stars.GlobalPosition = Follow.GlobalPosition;
-            _rainFx.GlobalPosition = new Vector3(Follow.GlobalPosition.X, 12f, Follow.GlobalPosition.Z);
+            _rainFx.GlobalPosition = new Vector3(Follow.GlobalPosition.X, 0f, Follow.GlobalPosition.Z);
         }
 
         // Everything else (sun, sky colours, fog) only changes in steps: 2 game minutes (0.5 degree of sun) or a
@@ -235,7 +239,8 @@ public partial class SkyController : Node
         _env.TonemapExposure = Mathf.Lerp(1.45f, 1f, day);   // eyes adapt at night
         _env.FogLightColor = hor * 0.9f;
         // Pixel art wants clean colours: much less haze unless the weather or the map calls for it.
-        float haze = Graphics.GraphicsQuality.Style == Graphics.ArtStyle.PixelArt ? 0.35f : 1f;
+        bool nordic = Graphics.GraphicsQuality.Style == Graphics.ArtStyle.Nordic;
+        float haze = Graphics.GraphicsQuality.Style == Graphics.ArtStyle.PixelArt ? 0.35f : nordic ? 0.8f : 1f;
         _env.FogDensity = Mathf.Lerp(0.0012f * haze, 0.004f, _cloud) + _rain * 0.006f + FogBoost;
         bool illustrated = Graphics.GraphicsQuality.Style == Graphics.ArtStyle.PixelArt;
         // Distant hills fade into the sky colour (aerial perspective), like the far planes of an illustration.
@@ -243,9 +248,28 @@ public partial class SkyController : Node
         if (illustrated)
             _env.FogLightColor = new Color(0.62f, 0.8f, 0.93f).Lerp(hor * 0.9f, Math.Clamp(1f - day + _cloud, 0f, 1f));
         _env.VolumetricFogDensity = (0.003f + _cloud * 0.004f) * haze + _rain * 0.01f + FogBoost * 2f;
+        if (nordic)
+        {
+            // Valheim-like light: darker ambient for deep shadows, a strong sun that throws shafts through the fog,
+            // and haze tinted by the time of day.
+            _env.AmbientLightEnergy = Mathf.Lerp(0.75f, 0.72f, day);
+            // Moonlit nights: part of the ambient light is a cool blue instead of the near-black night sky.
+            _env.AmbientLightColor = new Color(0.36f, 0.45f, 0.66f);
+            _env.AmbientLightSkyContribution = Mathf.Lerp(0.35f, 1f, day);
+            _env.TonemapExposure = Mathf.Lerp(1.9f, 1.05f, day);   // nights stay readable, like moonlit Valheim
+            _sun.LightEnergy = 1.9f * day * (1f - _cloud * 0.65f);
+            _sun.LightVolumetricFogEnergy = Mathf.Lerp(0.3f, 1.6f, Math.Clamp(el * 3f, 0f, 1f));
+            _env.FogAerialPerspective = 0.55f;
+            _env.FogLightColor = hor.Lerp(new Color(0.55f, 0.66f, 0.74f), 0.4f);
+            _env.VolumetricFogAlbedo = new Color(0.9f, 0.88f, 0.84f).Lerp(hor, 0.35f);
+        }
 
         _starMaterial.SetShaderParameter("night", Math.Clamp(-el * 3f, 0f, 1f) * (1f - _cloud));
-        _rainFx.Emitting = _rain > 0.02f;
-        _rainFx.AmountRatio = Math.Clamp(_rain, 0.05f, 1f);
+        int drops = _rain > 0.02f ? (int)(RainDrops * Math.Clamp(_rain, 0.05f, 1f)) : 0;
+        if (drops != _rainFx.Multimesh.VisibleInstanceCount)
+        {
+            _rainFx.Multimesh.VisibleInstanceCount = drops;
+            _rainFx.Visible = drops > 0;
+        }
     }
 }
