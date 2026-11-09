@@ -35,6 +35,20 @@ public sealed class GearSuite : ITestSuite
         var roach = Species("ploc");
         var all = new[] { roach, Species("leszcz"), carp, Species("szczupak") };
 
+        t.Section("40 freshwater species");
+        var catalogue = SpeciesCatalog.Paths.Select(p => GD.Load<FishSpecies>(p)).ToList();
+        var maps = FishingSim.World.LakeBed.LocationPaths.Select(p => GD.Load<LocationData>(p)).ToList();
+        string[] baits = { "worm", "corn", "bread", "boilie", "livebait", "maggot", "insect" };
+        t.Check(catalogue.Count == 40 && catalogue.All(s => s != null) && catalogue.Select(s => s.SpeciesName).Distinct().Count() == 40,
+            $"{catalogue.Count} species load, all with unique names");
+        var homeless = catalogue.Where(s => maps.All(m => m.AbundanceOf(s.SpeciesName) <= 0f)).Select(s => s.SpeciesName).ToList();
+        t.Check(homeless.Count == 0, $"every species lives on at least one map {string.Join(", ", homeless)}");
+        var picky = catalogue.Where(s => baits.All(b => s.AffinityFor(b) <= 0f)).Select(s => s.SpeciesName).ToList();
+        t.Check(picky.Count == 0, $"every species takes at least one bait {string.Join(", ", picky)}");
+        t.Check(catalogue.All(s => s.MinWeight > 0f && s.MaxWeight > s.MinWeight && s.MaxDepth > s.MinDepth && s.PricePerKg > 0f),
+            "weights, depths and prices are sane");
+        t.Check(catalogue.Take(4).Select(s => s.SpeciesName).SequenceEqual(new[] { "Płoć", "Leszcz", "Karp", "Szczupak" }), "the first four keep their order");
+
         t.Section("fish market");
         var market = new FishMarket();
         var lot = new FishLot("Karp", 5f, 25f, 12f);

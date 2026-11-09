@@ -173,7 +173,7 @@ public partial class FishModel : Node3D
                 _underwater.Add(m);
             }
         }
-        float a = Math.Clamp(clarity, 0f, 1f) * 0.85f;
+        float a = 0.25f + Math.Clamp(clarity, 0f, 1f) * 0.7f;
         foreach (var m in _underwater)
             m.AlbedoColor = new Color(tint.R, tint.G, tint.B, a);
     }

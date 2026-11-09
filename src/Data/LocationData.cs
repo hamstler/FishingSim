@@ -41,6 +41,9 @@ public partial class LocationData : Resource
     /// <summary>Extra fog density (mist over marshes, haze in the mountains).</summary>
     [Export] public float FogBoost { get; set; }
 
+    /// <summary>How many metres into the water you can see (clear mountain lake ~6, murky marsh ~1.5).</summary>
+    [Export] public float WaterClarity { get; set; } = 3f;
+
     /// <summary>Multiplier for how tall the surrounding hills are.</summary>
     [Export] public float HillScale { get; set; } = 1f;
 

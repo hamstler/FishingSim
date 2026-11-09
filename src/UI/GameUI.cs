@@ -222,11 +222,11 @@ public partial class GameUI : CanvasLayer
         _depthSlider = new HSlider { MinValue = 0.5, MaxValue = 10, Step = 0.5, Value = 3 };
         _depthSlider.ValueChanged += _ => RefreshInventory();
         right.AddChild(_depthSlider);
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 8; i++)
         {
             var row = new HBoxContainer();
             row.AddThemeConstantOverride("separation", 8);
-            var name = new Label { CustomMinimumSize = new Vector2(100, 0) };
+            var name = new Label { CustomMinimumSize = new Vector2(150, 0) };
             var bar = new ProgressBar { CustomMinimumSize = new Vector2(200, 22), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, ShowPercentage = false, MaxValue = 100 };
             var pct = new Label { CustomMinimumSize = new Vector2(54, 0), HorizontalAlignment = HorizontalAlignment.Right };
             row.AddChild(name);
@@ -284,8 +284,8 @@ public partial class GameUI : CanvasLayer
         for (int i = 0; i < _chanceRows.Count; i++)
         {
             var row = _chanceRows[i];
-            row.Row.Visible = i < chances.Count;
-            if (i >= chances.Count)
+            row.Row.Visible = i < chances.Count && chances[i].Share > 0.005f;
+            if (!row.Row.Visible)
                 continue;
             row.Name.Text = chances[i].Species.SpeciesName;
             row.Bar.Value = chances[i].Share * 100f;

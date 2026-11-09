@@ -17,9 +17,12 @@ namespace FishingSim.World;
 /// </summary>
 public partial class FishPopulation : Node3D
 {
-    public const int MaxFish = 48;
-    public const float BaseVisibleRange = 20f;
+    public const int MaxFish = 150;
+    public const float BaseVisibleRange = 28f;
     public const float BaseVisibleDepth = 1.4f;
+
+    /// <summary>Fish seen through the water are drawn a little larger so they read at pixel-art resolution.</summary>
+    public const float ViewScale = 1.4f;
 
     private sealed class BedWater : IWaterVolume
     {
@@ -44,7 +47,7 @@ public partial class FishPopulation : Node3D
     public float VisibleDepth { get; set; } = BaseVisibleDepth;
 
     /// <summary>Colour the water casts on fish below the surface (set per map).</summary>
-    public Color Tint { get; set; } = new(0.62f, 0.78f, 0.74f);
+    public Color Tint { get; set; } = new(0.42f, 0.5f, 0.46f);
 
     public IReadOnlyList<FishAgent> Agents => _model.Agents;
 
@@ -100,6 +103,7 @@ public partial class FishPopulation : Node3D
                     float cruise = 0.35f + 0.25f * sp.Aggression;
                     var agent = _model.Spawn(sp.SpeciesName, weight, p, school, sp.MinDepth, sp.MaxDepth, cruise);
                     var view = FishModel.Create(sp, weight);
+                    view.Scale = Vector3.One * ViewScale;
                     view.Visible = false;
                     AddChild(view);
                     _views[agent.Id] = view;
@@ -130,6 +134,45 @@ public partial class FishPopulation : Node3D
         return false;
     }
 
+    private float _recycleTimer;
+
+    /// <summary>
+    /// Keeps the water around the angler alive: a school that drifted far away (and cannot be seen) is moved to fresh
+    /// water 6-28 m from the angler that suits its depth band. The population size stays the same.
+    /// </summary>
+    private void RecycleFarSchools(System.Numerics.Vector2 watcher)
+    {
+        foreach (var group in _model.Agents.GroupBy(a => a.School))
+        {
+            var members = group.ToList();
+            var centre = System.Numerics.Vector2.Zero;
+            foreach (var m in members)
+                centre += m.Position;
+            centre /= members.Count;
+            if (System.Numerics.Vector2.Distance(centre, watcher) < RecycleDistance)
+                continue;
+            var first = members[0];
+            for (int attempt = 0; attempt < 20; attempt++)
+            {
+                float ang = _rng.Range(0f, MathF.Tau), r = _rng.Range(6f, 28f);
+                var target = watcher + new System.Numerics.Vector2(MathF.Cos(ang), MathF.Sin(ang)) * r;
+                float d = _bed.DepthAt(target.X, target.Y);
+                if (d < MathF.Max(first.MinDepth, FishSwimModel.MinWaterDepth + 0.2f) || d > first.MaxDepth + 2f)
+                    continue;
+                foreach (var m in members)
+                {
+                    var p = target + (m.Position - centre) * 0.3f;
+                    m.Position = _bed.DepthAt(p.X, p.Y) >= FishSwimModel.MinWaterDepth ? p : target;
+                    m.Fear = 0f;
+                }
+                break;
+            }
+        }
+    }
+
+    /// <summary>Schools further than this from the angler are moved closer (out of sight).</summary>
+    public const float RecycleDistance = 60f;
+
     public override void _PhysicsProcess(double delta)
     {
         if (_watcher == null || !IsInstanceValid(_watcher))
@@ -139,6 +182,12 @@ public partial class FishPopulation : Node3D
         float speed = dt > 0f ? new Vector2(w.X - _lastWatcher.X, w.Z - _lastWatcher.Z).Length() / dt : 0f;
         _lastWatcher = w;
         _model.Step(dt, new System.Numerics.Vector2(w.X, w.Z), MathF.Min(speed, 10f));
+        _recycleTimer -= dt;
+        if (_recycleTimer <= 0f)
+        {
+            _recycleTimer = 0.5f;
+            RecycleFarSchools(new System.Numerics.Vector2(w.X, w.Z));
+        }
 
         foreach (var a in _model.Agents)
         {

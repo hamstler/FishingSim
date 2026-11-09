@@ -141,7 +141,9 @@ public sealed class GameSuite : ITestSuite
         loadout.Index[(int)TackleSlot.Bait] = live;
         rod.World.Hour = 19f;
         var chances = rod.BiteChances(3f);
-        t.Check(chances[0].Species.SpeciesName == "Szczupak" && chances[0].Share > 0.99f, "live bait only attracts pike");
+        var takers = chances.Where(c => c.Share > 0f).ToList();
+        t.Check(takers.Count > 0 && takers.All(c => c.Species.AffinityFor("livebait") > 0f) && takers.Any(c => c.Species.SpeciesName == "Szczupak"),
+            $"live bait only attracts predators ({string.Join(", ", takers.Select(c => c.Species.SpeciesName))})");
         loadout.Index[(int)TackleSlot.Bait] = 0;
         loadout.Index[(int)TackleSlot.Rod] = 0;
         rod.ApplyTackle();

@@ -19,10 +19,6 @@ public partial class Main : Node3D
     /// <summary>Lets tools and tests open any map regardless of the player's level.</summary>
     public static bool UnlockAllMaps { get; set; }
 
-    private static readonly string[] SpeciesPaths =
-    {
-        "res://data/fish/ploc.tres", "res://data/fish/leszcz.tres", "res://data/fish/karp.tres", "res://data/fish/szczupak.tres",
-    };
 
     private Profile _profile = null!;
     private Water _water = null!;
@@ -157,8 +153,10 @@ public partial class Main : Node3D
     private void ApplyGearEffects()
     {
         var glasses = _gear.Accessory(AccessoryKind.PolarizedGlasses);
+        float clarity = _lake.Location.WaterClarity;
         Fish.VisibleRange = FishPopulation.BaseVisibleRange + (glasses?.Power ?? 0f);
-        Fish.VisibleDepth = FishPopulation.BaseVisibleDepth + (glasses != null ? 1.2f : 0f);
+        Fish.VisibleDepth = clarity * 0.6f + (glasses != null ? 1.2f : 0f);
+        _water.SetClarity(clarity);
         _water.SetGlareCut(glasses != null ? 1f : 0f);
     }
 
@@ -167,6 +165,8 @@ public partial class Main : Node3D
         var loc = _lake.Location;
         _water.SetTint(loc.WaterShallowColor, loc.WaterDeepColor);
         _sky.FogBoost = loc.FogBoost;
+        if (Fish != null)
+            ApplyGearEffects();
     }
 
     private static void OnInteract(Interactable spot, Shop shop, GameUI gameUi)
@@ -192,7 +192,7 @@ public partial class Main : Node3D
     private static List<FishSpecies> LoadSpecies()
     {
         var list = new List<FishSpecies>();
-        foreach (var path in SpeciesPaths)
+        foreach (var path in SpeciesCatalog.Paths)
         {
             var species = GD.Load<FishSpecies>(path);
             if (species != null)

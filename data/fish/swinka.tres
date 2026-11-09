@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="FishSpecies" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/FishSpecies.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+SpeciesName = "Świnka"
+MinWeight = 0.2
+MaxWeight = 1.5
+Rarity = 0.7
+PullFactor = 1.0
+Aggression = 0.5
+StaminaDrain = 0.11
+MouthSize = 3.0
+BaitAffinity = {"worm": 1.0, "corn": 0.0, "bread": 0.8, "boilie": 0.0, "livebait": 0.0, "maggot": 1.2, "insect": 0.0}
+MinDepth = 0.5
+MaxDepth = 4.0
+DayActivity = 1.0
+NightActivity = 0.5
+TwilightBonus = 1.3
+WeatherPref = {"clear": 1.0, "cloudy": 1.0, "rain": 1.0}
+RunLengthMult = 1.0
+BurstMult = 1.5
+BurstRate = 1.0
+LengthRef = 0.33
+BodyDepth = 0.22
+DorsalPos = 0.5
+BackColor = Color(0.3, 0.33, 0.3, 1)
+BellyColor = Color(0.88, 0.88, 0.86, 1)
+FinColor = Color(0.7, 0.45, 0.4, 1)
+PricePerKg = 10.0
+TrophyWeight = 0.0

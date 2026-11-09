@@ -69,7 +69,7 @@ void fragment() {
 
 	// See-through shallows; how deep you can look depends on the lake's clarity (and polarized glasses).
 	float see = clarity * (1.0 + glare_cut * 0.8);
-	float a = mix(0.42, 0.93, smoothstep(0.0, see, d));
+	float a = mix(0.18, 0.9, smoothstep(0.0, see * 1.6, d));
 	a = floor(a * 4.0 + 0.5) / 4.0;
 	ALPHA = max(a * smoothstep(0.0, 0.08, d), highlight * 0.9 * step(0.02, d));
 }
