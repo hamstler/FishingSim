@@ -58,6 +58,45 @@ public partial class ScreenshotTool : Node
             return;
         }
 
+        if (mode == 21)
+        {
+            // Side views of 20 species (page = arg) in a small studio: body shapes, fins and eyes at a glance.
+            var root3d = new Node3D();
+            GetTree().Root.AddChild(root3d);
+            var env = new Godot.Environment
+            {
+                BackgroundMode = Godot.Environment.BGMode.Color, BackgroundColor = new Color(0.16f, 0.2f, 0.23f),
+                AmbientLightSource = Godot.Environment.AmbientSource.Color, AmbientLightColor = new Color(0.6f, 0.65f, 0.7f), AmbientLightEnergy = 0.7f,
+                TonemapMode = Godot.Environment.ToneMapper.Aces,
+            };
+            root3d.AddChild(new WorldEnvironment { Environment = env });
+            root3d.AddChild(new DirectionalLight3D { RotationDegrees = new Vector3(-35, 20, 0), LightEnergy = 1.5f });
+            var paths = FishingSim.Data.SpeciesCatalog.Paths.Skip(arg * 20).Take(20).ToList();
+            for (int i = 0; i < paths.Count; i++)
+            {
+                var sp = GD.Load<FishSpecies>(paths[i]);
+                var fish = FishModel.Create(sp, sp.MinWeight + (sp.MaxWeight - sp.MinWeight) * 0.5f);
+                fish.Wiggle = 0f;
+                float sc = 1f / fish.Length;
+                fish.Scale = new Vector3(sc, sc, sc);
+                fish.RotationDegrees = new Vector3(0, 90, 0);
+                fish.Position = new Vector3((i % 4) * 1.25f, -(i / 4) * 0.62f, 0);
+                root3d.AddChild(fish);
+                var label = new Label3D { Text = sp.SpeciesName, FontSize = 40, PixelSize = 0.0022f, Position = fish.Position + new Vector3(0, -0.24f, 0.3f) };
+                root3d.AddChild(label);
+            }
+            root3d.AddChild(new Camera3D
+            {
+                Projection = Camera3D.ProjectionType.Orthogonal, Size = 3.3f, Current = true,
+                Position = new Vector3(1.9f, -1.2f, 5f),
+            });
+            for (int i = 0; i < 12; i++)
+                await NextFrame();
+            GetViewport().GetTexture().GetImage().SavePng(output);
+            GD.Print($"saved {output}");
+            GetTree().Quit();
+            return;
+        }
         if (mode == 20)
         {
             // Detailed skins of a few species (1024×512 each), stacked: check scales, spots and bars up close.

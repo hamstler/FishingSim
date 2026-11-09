@@ -44,6 +44,26 @@ public sealed class GearSuite : ITestSuite
             $"{catalogue.Count} species load, all with unique names");
         var undescribed = catalogue.Where(s => s.LatinName == "" || s.Description.Length < 40).Select(s => s.SpeciesName).ToList();
         t.Check(undescribed.Count == 0, $"every species has a Latin name and an atlas description {string.Join(", ", undescribed)}");
+        // Fish models: every species has its own build and eyes in proportion to the head.
+        var oversizedEyes = new List<string>();
+        var builds = new Dictionary<string, (float H, float W)>();
+        foreach (var sp in catalogue)
+        {
+            foreach (bool detailed in new[] { false, true })
+            {
+                var m = FishingSim.Fishing.FishModel.Create(sp, sp.MinWeight, detailed);
+                if (m.EyeDiameter > 0.62f * m.HeadHeightAtEye || m.EyeDiameter > 0.12f * m.Length)
+                    oversizedEyes.Add($"{sp.SpeciesName} {m.EyeDiameter * 1000f:0.0} mm / head {m.HeadHeightAtEye * 1000f:0.0} mm");
+                if (!detailed)
+                    builds[sp.SpeciesName] = (m.MaxHeight / m.Length, m.MaxWidth / m.MaxHeight);
+                m.Free();
+            }
+        }
+        t.Check(oversizedEyes.Count == 0, $"no fish has eyes bigger than its head allows {string.Join(", ", oversizedEyes.Take(5))}");
+        t.Check(catalogue.Count(FishingSim.Fishing.FishBody.HasOwnShape) == catalogue.Count, "every species has a body shape of its own");
+        t.Check(builds["Leszcz"].H > builds["Szczupak"].H * 1.8f && builds["Węgorz"].W > builds["Leszcz"].W * 2.5f
+                && builds["Karaś złocisty"].H > builds["Płoć"].H * 1.4f && builds["Sum"].W > builds["Karp"].W,
+            $"bodies differ: a bream is deep and flat, a pike long, an eel round (H/L bream {builds["Leszcz"].H:0.00}, pike {builds["Szczupak"].H:0.00}; W/H eel {builds["Węgorz"].W:0.00}, bream {builds["Leszcz"].W:0.00})");
         var homeless = catalogue.Where(s => maps.All(m => m.AbundanceOf(s.SpeciesName) <= 0f)).Select(s => s.SpeciesName).ToList();
         t.Check(homeless.Count == 0, $"every species lives on at least one map {string.Join(", ", homeless)}");
         var picky = catalogue.Where(s => baits.All(b => s.AffinityFor(b) <= 0f)).Select(s => s.SpeciesName).ToList();
