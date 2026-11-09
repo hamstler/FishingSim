@@ -20,6 +20,7 @@ Symulator wędkarski w Godot 4.3 (.NET) napisany w całości w C#. Poza kodem s�
 | PPM (przytrzymaj) | podniesienie wędki: zacięcie przy braniu, pompowanie w holu, a gdy ryba jest przy brzegu, podciąganie jej do góry. Ryba jest złowiona, gdy dotknie wędkarza; ciężka zerwie przy tym linkę |
 | Spacja | kasarek (podbierak): wyjmuje rybę przy brzegu. Trzeba go kupić; bez kasarka Spacja nic nie robi |
 | Kółko myszy | hamulec (wartość w procentach w prawym dolnym rogu) |
+| R (zaraz po złowieniu) | wypuszczenie ryby (zwalnia miejsce w siatce, +3 XP) |
 | 1-5 (Shift = wstecz) | wędka, kołowrotek, żyłka, hak, przynęta (tylko przed rzutem) |
 | I / M / J / T | ekwipunek, mapa, dziennik, turnieje |
 | E | wejście do kramu, gildii, na targ lub na postój wozów (przy drzwiach budynku) |

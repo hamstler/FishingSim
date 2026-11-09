@@ -248,6 +248,26 @@ public sealed class Profile
         return null;
     }
 
+    /// <summary>XP for putting a fish back.</summary>
+    public const int ReleaseXp = 3;
+
+    /// <summary>
+    /// Puts the most recently kept fish back into the water (it must be the last one in the keepnet). Gives a little XP.
+    /// Returns false when that fish is not in the keepnet.
+    /// </summary>
+    public bool ReleaseLast(string species, float weight)
+    {
+        if (Keepnet.Count == 0)
+            return false;
+        var last = Keepnet[^1];
+        if (last.Species != species || MathF.Abs(last.Weight - weight) > 1e-4f)
+            return false;
+        Keepnet.RemoveAt(Keepnet.Count - 1);
+        GainXp(ReleaseXp);
+        Changed?.Invoke();
+        return true;
+    }
+
     /// <summary>Buys a keepnet, landing net or accessory. Returns null on success or a (Polish) error message.</summary>
     public string? BuyGear(GearSlot slot, string id, int price, int requiredLevel)
     {

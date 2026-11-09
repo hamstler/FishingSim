@@ -300,6 +300,9 @@ public partial class FishingRod : Node3D
             case Key.Space:
                 TryNet();
                 break;
+            case Key.R when State == RodState.Landed && _releasable && CurrentSpecies != null:
+                ReleaseCatch();
+                break;
             case Key.F2:
                 DevInstantBite = !DevInstantBite;
                 break;
@@ -801,6 +804,7 @@ public partial class FishingRod : Node3D
             Lake.Location.DisplayName, Loadout.Bait.DisplayName, Loadout.Hook.DisplayName,
             MathF.Round(CurrentDepth() * 10f) / 10f, World.TimeText);
         var result = Profile.AddCatch(species, CurrentWeight, context);
+        _releasable = !result.Released;
         if (_biter != null)
             Population?.Catch(_biter);
         _biter = null;
@@ -851,6 +855,22 @@ public partial class FishingRod : Node3D
         model.RotationDegrees = new Vector3(-6f, -75f, 10f);
         _camera.AddChild(model);
         _heldFish = model;
+    }
+
+    private bool _releasable;
+
+    /// <summary>True right after a kept catch: R puts it back into the water.</summary>
+    public bool CanRelease => State == RodState.Landed && _releasable;
+
+    /// <summary>Puts the fish just caught back into the water (R right after landing).</summary>
+    public void ReleaseCatch()
+    {
+        if (!CanRelease || CurrentSpecies == null || !Profile.ReleaseLast(CurrentSpecies.SpeciesName, CurrentWeight))
+            return;
+        _releasable = false;
+        ClearHeldFish();
+        SoundCue?.Invoke(Core.Audio.OneShot.SmallSplash, 0.8f);
+        ShowBanner($"Wypuszczono: {CurrentSpecies.SpeciesName} {CurrentWeight:0.00} kg (+{Profile.ReleaseXp} XP)", 2.5f);
     }
 
     /// <summary>The landed fish shown in front of the camera (held in the left hand), or null.</summary>

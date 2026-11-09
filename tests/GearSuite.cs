@@ -358,6 +358,17 @@ public sealed class GearSuite : ITestSuite
         t.Check(main.Rod.Gear != null && main.Rod.Profile.KeepnetLimit != null, "the rod knows the landing net and the keepnet limits the profile");
         t.Check(main.Player.Body != null && main.Player.Camera.Current, "first-person body and camera are in place");
 
+        // Releasing a catch with R.
+        var prof = main.Rod.Profile;
+        main.Rod.ForceLand(Species("ploc"), 0.2f);
+        int netBefore = prof.Keepnet.Count, xpBefore = prof.Xp;
+        main.Rod._UnhandledInput(new InputEventKey { Keycode = Godot.Key.R, Pressed = true });
+        t.Check(prof.Keepnet.Count == netBefore - 1 && prof.Xp == xpBefore + Profile.ReleaseXp && main.Rod.HeldFish == null,
+            "R right after landing puts the fish back (out of the keepnet, a little XP)");
+        main.Rod._UnhandledInput(new InputEventKey { Keycode = Godot.Key.R, Pressed = true });
+        t.Check(prof.Keepnet.Count == netBefore - 1, "a fish can only be released once");
+        main.Rod.ResetToIdle();
+
         var market = main.Scenery.Interactables.FirstOrDefault(s => s.Kind == InteractKind.Market);
         t.Check(market != null && market.Prompt.Contains("Targ rybny"), "the lake village has a fish market");
         var shop = main.GetChildren().OfType<Shop>().First();

@@ -159,6 +159,8 @@ public partial class Hud : CanvasLayer
             state += $"  ·  {rod.LineOut:0} m{(rod.Lifting ? "  ·  pompowanie" : "")}";
         if (rod.State == RodState.Close && rod.HasNet)
             state += ", Spacja - kasarek";
+        if (rod.CanRelease)
+            state += "  ·  R - wypuść";
         SetText(_status, state);
         Fade(_status, fishing || details, dt);
         _gauge.Visible = fighting;

@@ -75,7 +75,7 @@ Kolejność według wartości dla gracza; każdy punkt ma już miejsce w struktu
 5. **Akcesoria w działaniu.** Zrobione: kapelusz (widać ryby dalej i głębiej), latarnia (światło nocą), zydel
    (czas 4× szybciej podczas czekania), wiadro (żywiec przeżywa w 35%), podpórka z dzwoneczkiem (sygnał brania).
    Dalej: odłożenie wędki na podpórkę i kilka wędek naraz, zanęta.
-6. **Wypuszczanie ryb na żądanie** i limity ochronne (wymiar i okres ochronny), mandat od strażnika.
+6. **Wypuszczanie ryb na żądanie** (zrobione: R po złowieniu) i limity ochronne (wymiar i okres ochronny), mandat od strażnika.
 7. **Świat.** Łódź, więcej map, płynne przejścia między łowiskami pieszo zamiast przystanku, NPC wędkarze.
 8. **Grafika (medieval pixel art 3D).** Gotowe: potok niskiej rozdzielczości z paletą, ditheringiem i konturami,
    pixelowe tekstury, oświetlenie toon, szachulec i strzechy, latarnie, niebo z chmurami, pasmowa woda, drzewa
