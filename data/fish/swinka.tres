@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Świnka"
+LatinName = "Chondrostoma nasus"
+Description = "Zeskrobuje glony z kamieni chrząstkowatą wargą. Pływa stadami w nurcie, płetwy ma pomarańczowe."
 MinWeight = 0.2
 MaxWeight = 1.5
 Rarity = 0.7

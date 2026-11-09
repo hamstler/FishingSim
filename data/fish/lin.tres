@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Lin"
+LatinName = "Tinca tinca"
+Description = "Oliwkowozłoty mieszkaniec zarośniętych, mulistych stawów, z drobną łuską i czerwonym okiem. Bierze ostrożnie, o świcie."
 MinWeight = 0.3
 MaxWeight = 4.0
 Rarity = 1.0

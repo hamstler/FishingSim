@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Pstrąg potokowy"
+LatinName = "Salmo trutta fario"
+Description = "Klejnot górskich potoków: złotawy, z czerwonymi kropkami w jasnych obwódkach. Płochliwy i bojowy."
 MinWeight = 0.1
 MaxWeight = 3.0
 Rarity = 0.9

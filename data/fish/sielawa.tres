@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Sielawa"
+LatinName = "Coregonus albula"
+Description = "Mała, srebrna ryba zimnych, głębokich jezior. Pływa w wielkich ławicach w toni wodnej."
 MinWeight = 0.05
 MaxWeight = 0.4
 Rarity = 1.2

@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Różanka"
+LatinName = "Rhodeus amarus"
+Description = "Najmniejszy krajowy karpiowaty. Ikrę składa do muszli małży, a samiec mieni się różem i fioletem."
 MinWeight = 0.005
 MaxWeight = 0.04
 Rarity = 1.0

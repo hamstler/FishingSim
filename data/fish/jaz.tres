@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Jaź"
+LatinName = "Leuciscus idus"
+Description = "Krępy, srebrzysty karpiowaty dużych rzek i jezior. Ostrożny, ale w holu energiczny."
 MinWeight = 0.3
 MaxWeight = 3.5
 Rarity = 0.8

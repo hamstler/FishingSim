@@ -16,8 +16,12 @@ public readonly record struct FishProfile(
     float BurstMult,
     float BurstRate)
 {
+    /// <summary>
+    /// Even small fish pull noticeably (the +0.25 kg term): a half-kilo roach loads a light rod by about a third,
+    /// which is what makes the first, light tackle feel alive.
+    /// </summary>
     public static FishProfile From(FishSpecies sp, float weight) => new(
-        PeakPull: sp.PullFactor * MathF.Pow(weight, 0.7f),
+        PeakPull: sp.PullFactor * (MathF.Pow(weight, 0.7f) + 0.25f),
         SizeRatio: Math.Clamp(Mathf.InverseLerp(sp.MinWeight, sp.MaxWeight, weight), 0f, 1f),
         Aggression: sp.Aggression,
         StaminaDrain: sp.StaminaDrain,
@@ -75,18 +79,29 @@ public sealed class FightModel
         _gear = gear;
         _rng = rng;
         LineOut = MathF.Max(startDistance, 4f);
-        FishAngle = _targetAngle = _homeAngle = startAngle;
-        _phaseTimer = rng.Range(1f, 2f);
+        FishAngle = _homeAngle = startAngle;
+        // The strike: a hooked fish bolts at once, away and to one side, with a hard first surge.
+        Running = true;
+        _phaseTimer = rng.Range(2.5f, 4.5f) * fish.RunLengthMult;
+        _targetAngle = startAngle + (rng.NextFloat() < 0.5f ? -1f : 1f) * rng.Range(0.4f, 1.1f);
+        _burstLeft = Mathf.Lerp(0.5f, 0.8f, fish.SizeRatio);
+        BurstStarted = true;
         _burstTimer = NextBurstInterval();
-        Tension = dragSetting * gear.DragMax;
+        Tension = MathF.Min(dragSetting * gear.DragMax, fish.PeakPull);
     }
+
+    /// <summary>True on the step a surge begins (the game may show a jump or a swirl).</summary>
+    public bool BurstStarted { get; private set; }
+
+    /// <summary>A surge is under way (the fish shakes its head, thrashes or jumps).</summary>
+    public bool Bursting => _burstLeft > 0f;
 
     /// <summary>Long fights wear any fish out: drain speeds up the longer it goes on (x2 at 45 s, x5 at 90 s).</summary>
     /// <summary>Seconds after which the fish tires twice as fast; long fights still end, but not in seconds.</summary>
     public const float FatigueSeconds = 90f;
 
     /// <summary>Overall pace of tiring: lower = longer, harder fights.</summary>
-    public const float StaminaPace = 0.42f;
+    public const float StaminaPace = 0.34f;
 
     public float Fatigue => 1f + MathF.Pow(Elapsed / FatigueSeconds, 2f);
 
@@ -116,6 +131,8 @@ public sealed class FightModel
     public FightOutcome Step(float dt, float dragSetting, bool reeling, bool lifting = false)
     {
         Elapsed += dt;
+        if (Elapsed > dt * 1.5f)
+            BurstStarted = false;
 
         // --- fish AI ---
         _phaseTimer -= dt;
@@ -131,6 +148,7 @@ public sealed class FightModel
             {
                 _burstTimer = NextBurstInterval();
                 _burstLeft = Mathf.Lerp(0.2f, 0.45f, _fish.SizeRatio);
+                BurstStarted = true;
             }
             pull = _fish.PeakPull * staminaFactor * (1f + 0.15f * MathF.Sin(Elapsed * 7f));
             if (_burstLeft > 0f)
@@ -156,11 +174,12 @@ public sealed class FightModel
         Tension = Mathf.MoveToward(Tension, target, rate * dt);
 
         // --- line in / out ---
-        float payout = excess * 0.5f;   // m/s pulled off the spool by a slipping drag
+        float payout = excess * 0.65f;  // m/s pulled off the spool by a slipping drag
         Slipping = excess > 0.05f;
         // A fresh fish resists being reeled in; a tired one comes easily.
         float resistance = 1f - 0.6f * staminaFactor * Mathf.Lerp(0.6f, 1f, _fish.SizeRatio);
-        float reelIn = reeling ? _gear.ReelSpeed * resistance * Math.Clamp(1f - excess / 2f, 0f, 1f) : 0f;
+        // While the drag slips, cranking only twists the line: the spool turns back as fast as it is wound.
+        float reelIn = reeling ? _gear.ReelSpeed * resistance * Math.Clamp(1f - excess / 0.8f, 0f, 1f) : 0f;
         if (lifting)
             reelIn += 0.6f * Math.Clamp(1f - excess / 2f, 0f, 1f);   // pumping gains line
         LineOut += (payout - reelIn) * dt;

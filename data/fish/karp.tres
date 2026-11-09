@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Karp"
+LatinName = "Cyprinus carpio"
+Description = "Hodowany od średniowiecza w klasztornych stawach. Silny, wytrwały i podejrzliwy; potrafi walczyć wiele minut."
 MinWeight = 2.0
 MaxWeight = 15.0
 Rarity = 1.0

@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Głowacz białopłetwy"
+LatinName = "Cottus gobio"
+Description = "Mała, szerokogłowa ryba ukryta pod kamieniami górskich potoków. Nie ma pęcherza pławnego."
 MinWeight = 0.01
 MaxWeight = 0.08
 Rarity = 0.8

@@ -6,13 +6,6 @@ namespace FishingSim.Graphics;
 public enum QualityLevel { Low, Medium, High, Ultra }
 
 /// <summary>
-/// How the world is finished: chunky hand-pixelled look with a fixed palette, sharp native resolution, or Nordic
-/// (Valheim-like: native resolution with crisp low-res textures, heavy volumetric fog and sun shafts, strong bloom
-/// and ambient occlusion, teal shadows and warm light).
-/// </summary>
-public enum ArtStyle { PixelArt, Sharp, Nordic }
-
-/// <summary>
 /// Graphics presets: post-processing (SSAO, SSIL, SSR, SDFGI, volumetric fog, bloom), anti-aliasing, shadow range and
 /// grass density. Chosen in the pause menu and remembered in user://graphics.cfg. Effects the Compatibility renderer
 /// does not support are simply ignored by Godot.
@@ -24,46 +17,6 @@ public static class GraphicsQuality
     private static QualityLevel _level = QualityLevel.High;
 
     public static event Action? Changed;
-
-    private static ArtStyle _style = ArtStyle.Nordic;
-
-    /// <summary>The finish of the world image (pause menu): Nordic (default), pixel art or sharp.</summary>
-    public static ArtStyle Style
-    {
-        get
-        {
-            if (!_loaded)
-                Load();
-            return _style;
-        }
-    }
-
-    public static string StyleTitle(ArtStyle s) => s switch
-    {
-        ArtStyle.PixelArt => "Pixel art",
-        ArtStyle.Sharp => "Ostry",
-        _ => "Nordycki",
-    };
-
-    /// <summary>True for the Valheim-like look.</summary>
-    public static bool Nordic => Style == ArtStyle.Nordic;
-
-    public static void SetStyle(ArtStyle style)
-    {
-        _loaded = true;
-        _style = style;
-        SaveConfig();
-        Changed?.Invoke();
-    }
-
-    public static void CycleStyle() => SetStyle((ArtStyle)(((int)Style + 1) % 3));
-
-    /// <summary>Vertical resolution of the pixel-art image: each art pixel becomes several screen pixels.</summary>
-    public const int PixelArtLines = 360;
-
-    /// <summary>Screen pixels per world-image pixel for a window of the given height.</summary>
-    public static int PixelSizeFor(float screenHeight) =>
-        Style == ArtStyle.PixelArt ? Math.Max(2, (int)MathF.Round(screenHeight / PixelArtLines)) : PixelSize;
 
     public static QualityLevel Level
     {
@@ -99,7 +52,6 @@ public static class GraphicsQuality
             return;
         var cfg = new ConfigFile();
         cfg.SetValue("graphics", "quality", (int)_level);
-        cfg.SetValue("graphics", "art_style", (int)_style);
         cfg.Save(ConfigPath);
     }
 
@@ -110,8 +62,6 @@ public static class GraphicsQuality
         if (cfg.Load(ConfigPath) != Error.Ok)
             return;
         _level = (QualityLevel)Math.Clamp(cfg.GetValue("graphics", "quality", (int)QualityLevel.High).AsInt32(), 0, 3);
-        // "art_style" replaced "style" when the Nordic look became the default, so older configs start Nordic too.
-        _style = (ArtStyle)Math.Clamp(cfg.GetValue("graphics", "art_style", (int)ArtStyle.Nordic).AsInt32(), 0, 2);
     }
 
     /// <summary>Radius (m) of the dense grass around the player; 0 = no grass blades.</summary>
@@ -121,13 +71,6 @@ public static class GraphicsQuality
         QualityLevel.Medium => 18f,
         QualityLevel.High => 28f,
         _ => 40f,
-    };
-
-    /// <summary>Screen pixels per world-image pixel (the pixel-art scale): bigger = chunkier and faster.</summary>
-    public static int PixelSize => Level switch
-    {
-        QualityLevel.Low => 2,
-        _ => 1,      // native resolution: small, sharp pixels; the pixel-art look comes from textures, palette and outlines
     };
 
     /// <summary>Distance (m) between grass clumps.</summary>
@@ -159,7 +102,7 @@ public static class GraphicsQuality
         env.GlowBlendMode = Godot.Environment.GlowBlendModeEnum.Softlight;
 
         // Light shafts and depth haze; the plain distance fog (SkyController) stays on every level.
-        env.VolumetricFogEnabled = q >= QualityLevel.High && Style != ArtStyle.PixelArt;   // the illustrated look wants a clean sky
+        env.VolumetricFogEnabled = q >= QualityLevel.High;
         env.VolumetricFogDensity = 0.004f;
         env.VolumetricFogAnisotropy = 0.7f;
         env.VolumetricFogLength = 90f;
@@ -169,13 +112,11 @@ public static class GraphicsQuality
         env.AdjustmentEnabled = true;
         env.AdjustmentContrast = 1.04f;
         env.AdjustmentSaturation = 1.06f;
-        env.AdjustmentColorCorrection = null;
-        if (Style == ArtStyle.Nordic)
-            ApplyNordic(env, q);
+        ApplyNordic(env, q);
     }
 
     /// <summary>
-    /// The Valheim-like finish: thick light-catching fog with sun shafts, bloom on bright water and sky, deep ambient
+    /// The Nordic (Valheim-like) finish, the game's only look: thick light-catching fog with sun shafts, bloom on bright water and sky, deep ambient
     /// occlusion, and a grade that pushes shadows towards teal and highlights towards warm gold.
     /// </summary>
     private static void ApplyNordic(Godot.Environment env, QualityLevel q)

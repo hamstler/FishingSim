@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Palia"
+LatinName = "Salvelinus alpinus"
+Description = "Zimnolubny łososiowaty głębokich jezior górskich, z jasnymi plamkami i czerwonym brzuchem."
 MinWeight = 0.2
 MaxWeight = 4.0
 Rarity = 0.4

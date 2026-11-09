@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Jelec"
+LatinName = "Leuciscus leuciscus"
+Description = "Smukły, szybki mieszkaniec czystych rzek o żółtawych płetwach. Bierze na owady i czerwie."
 MinWeight = 0.05
 MaxWeight = 0.5
 Rarity = 1.5

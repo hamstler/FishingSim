@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Sum"
+LatinName = "Silurus glanis"
+Description = "Największa ryba słodkowodna Europy, z długimi wąsami i ogromnym pyskiem. Nocny łowca, w holu niezwykle silny."
 MinWeight = 3.0
 MaxWeight = 60.0
 Rarity = 0.15

@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Ukleja"
+LatinName = "Alburnus alburnus"
+Description = "Smukła srebrna rybka powierzchni. Stadami zbiera owady z lustra wody; świetny żywiec."
 MinWeight = 0.01
 MaxWeight = 0.15
 Rarity = 2.6

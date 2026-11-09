@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Karaś złocisty"
+LatinName = "Carassius carassius"
+Description = "Złocisty, wysoki karaś znoszący nawet przyduchę. Mieszka w małych, zarośniętych stawach i bierze delikatnie."
 MinWeight = 0.1
 MaxWeight = 2.0
 Rarity = 1.2

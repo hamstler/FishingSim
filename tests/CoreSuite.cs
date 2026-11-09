@@ -85,8 +85,8 @@ public sealed class CoreSuite : ITestSuite
         t.Check(largeHook > smallHook * 1.2f && smallHook >= carp.MinWeight && largeHook <= carp.MaxWeight, $"bigger hooks bring bigger fish ({smallHook:0.0} kg vs {largeHook:0.0} kg)");
 
         t.Section("fight model");
-        var teleGear = new FightGear(DragMax: 5f, EffectiveLimit: 7f, RodShock: 0.2f, ReelSpeed: 3f, MaxLine: 100f);
-        var juniorGear = new FightGear(DragMax: 3f, EffectiveLimit: 4f, RodShock: 0.3f, ReelSpeed: 2.2f, MaxLine: 60f);
+        var teleGear = new FightGear(DragMax: 4f, EffectiveLimit: 5f, RodShock: 0.2f, ReelSpeed: 3f, MaxLine: 100f);
+        var juniorGear = new FightGear(DragMax: 2f, EffectiveLimit: 2.4f, RodShock: 0.3f, ReelSpeed: 1.9f, MaxLine: 60f);
 
         var (outcome, secs) = Fight(roach, 0.8f, teleGear, 0.5f, seed: 3);
         t.Check(outcome == FightOutcome.Landed && secs is > 12f and < 90f, $"a roach on balanced gear puts up a fight but is landed ({secs:0} s)");
@@ -97,8 +97,11 @@ public sealed class CoreSuite : ITestSuite
         (outcome, secs) = Fight(carp, 12f, new FightGear(5f, 6f, 0.2f, 3f, 80f), 0.05f, seed: 5);
         t.Check(outcome == FightOutcome.SpooledOut, "a nearly open drag lets the fish take all the line");
 
-        (outcome, secs) = Fight(carp, 12f, teleGear, 0.5f, seed: 6);
-        t.Check(outcome == FightOutcome.Landed && secs > 90f, $"a 12 kg carp is a long fight but is landed with a sensible drag ({secs:0} s)");
+        var carpGear = new FightGear(DragMax: 9f, EffectiveLimit: 12f, RodShock: 0.12f, ReelSpeed: 3.4f, MaxLine: 150f);
+        (outcome, secs) = Fight(carp, 12f, carpGear, 0.5f, seed: 6);
+        t.Check(outcome == FightOutcome.Landed && secs > 55f, $"a 12 kg carp is a long fight but is landed on carp tackle with a sensible drag ({secs:0} s)");
+        (outcome, _) = Fight(carp, 12f, teleGear, 0.5f, seed: 6);
+        t.Check(outcome != FightOutcome.Landed, "the same carp is too much for a telescope rod");
 
         var model = new FightModel(FishProfile.From(carp, 12f), new FightGear(9f, 4f, 0.3f, 3.4f, 150f), new SystemRng(8), 20f, 0f, 0.6f) { Unbreakable = true };
         bool ever = false;
@@ -120,6 +123,25 @@ public sealed class CoreSuite : ITestSuite
         var times = Enumerable.Range(0, 12).Select(seed => Fight(carp, 12f, juniorGear, 0.6f, seed + 100)).ToList();
         t.Check(times.All(r => r.Outcome != FightOutcome.Ongoing), $"fights on weak gear end (slowest {times.Max(r => r.Seconds):0} s)");
         t.Check(times.Where(r => r.Outcome == FightOutcome.Landed).All(r => r.Seconds < 480f), "fatigue keeps the longest weak-gear fight under 8 minutes");
+
+        // The fight starts at the strike: the fish bolts at once and loads light starter tackle hard.
+        var strike = new FightModel(FishProfile.From(bream, 1.5f), juniorGear, new SystemRng(21), 15f, 0f, 0.5f);
+        float peakLoad = 0f, startLine = strike.LineOut;
+        for (int i = 0; i < 120; i++)
+        {
+            strike.Step(1f / 60f, 0.5f, reeling: true);
+            peakLoad = MathF.Max(peakLoad, strike.Tension / juniorGear.EffectiveLimit);
+        }
+        t.Check(strike.Running && strike.LineOut > startLine + 0.5f && peakLoad > 0.4f,
+            $"a 1.5 kg bream on starter tackle bolts at the strike and takes line ({strike.LineOut - startLine:0.0} m, load {peakLoad * 100f:0}%)");
+        var tiny = new FightModel(FishProfile.From(roach, 0.4f), juniorGear, new SystemRng(22), 15f, 0f, 0.5f);
+        float tinyLoad = 0f;
+        for (int i = 0; i < 180; i++)
+        {
+            tiny.Step(1f / 60f, 0.5f, reeling: true);
+            tinyLoad = MathF.Max(tinyLoad, tiny.Tension / juniorGear.EffectiveLimit);
+        }
+        t.Check(tinyLoad > 0.3f, $"even a 0.4 kg roach loads the starter rod noticeably ({tinyLoad * 100f:0}%)");
 
         var small = Enumerable.Range(0, 10).Select(s => Fight(pike, 1.2f, teleGear, 0.5f, s + 200).Seconds).Average();
         var big = Enumerable.Range(0, 10).Select(s => Fight(pike, 7.5f, teleGear, 0.5f, s + 300).Seconds).Average();

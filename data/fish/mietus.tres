@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Miętus"
+LatinName = "Lota lota"
+Description = "Jedyny słodkowodny dorszowaty, z jednym wąsem na brodzie. Aktywny w zimnej wodzie i nocą."
 MinWeight = 0.2
 MaxWeight = 3.0
 Rarity = 0.4

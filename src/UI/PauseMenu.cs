@@ -35,7 +35,7 @@ public partial class PauseMenu : CanvasLayer
 
         var panel = new PanelContainer { Theme = UITheme.Make() };
         panel.AnchorLeft = panel.AnchorRight = panel.AnchorTop = panel.AnchorBottom = 0.5f;
-        panel.OffsetLeft = -190; panel.OffsetRight = 190; panel.OffsetTop = -200; panel.OffsetBottom = 200;
+        panel.OffsetLeft = -190; panel.OffsetRight = 190; panel.OffsetTop = -230; panel.OffsetBottom = 230;
         AddChild(panel);
         var margin = new MarginContainer();
         foreach (var side in new[] { "left", "right", "top", "bottom" })
@@ -58,17 +58,13 @@ public partial class PauseMenu : CanvasLayer
         box.AddChild(_warning);
         AddButton(box, "Wznów", Resume);
         AddButton(box, "Zmień mapę", ChangeMap);
+        AddButton(box, "Atlas ryb", () => AddChild(new FishAtlas()));
         var quality = new Button { CustomMinimumSize = new Vector2(0, 46) };
         void ShowQuality() => quality.Text =
             $"Grafika: {Graphics.GraphicsQuality.Title(Graphics.GraphicsQuality.Level)}";
         ShowQuality();
         quality.Pressed += () => { Graphics.GraphicsQuality.Cycle(); ShowQuality(); };
         box.AddChild(quality);
-        var style = new Button { CustomMinimumSize = new Vector2(0, 46) };
-        void ShowStyle() => style.Text = $"Styl: {Graphics.GraphicsQuality.StyleTitle(Graphics.GraphicsQuality.Style)}";
-        ShowStyle();
-        style.Pressed += () => { Graphics.GraphicsQuality.CycleStyle(); ShowStyle(); ShowQuality(); };
-        box.AddChild(style);
         AddButton(box, "Wyloguj", Logout);
         AddButton(box, "Wyjdź z gry", Quit);
     }

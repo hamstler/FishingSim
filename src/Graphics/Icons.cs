@@ -293,7 +293,7 @@ public static class Icons
     });
 
     // ------------------------------------------------------------------ fish
-    /// <summary>The species drawn side-on with its pixel skin (FishSkin), fins and eye.</summary>
+    /// <summary>The species drawn side-on with its painted skin (FishSkin), fins and eye.</summary>
     public static ImageTexture Fish(FishSpecies sp) => Cached("fish:" + sp.SpeciesName, c =>
     {
         var skin = FishSkin.For(sp).GetImage();
@@ -318,8 +318,8 @@ public static class Icons
                 if (MathF.Abs(y - cy) > half)
                     continue;
                 float v = (y - (cy - half)) / MathF.Max(2f * half, 1f);       // 0 back, 1 belly
-                var col = skin.GetPixel(Math.Clamp((int)(u * (FishSkin.Width - 1)), 0, FishSkin.Width - 1),
-                                        Math.Clamp((int)(v * (FishSkin.Height - 1)), 0, FishSkin.Height - 1));
+                int sw = skin.GetWidth(), sh = skin.GetHeight();
+                var col = skin.GetPixel(Math.Clamp((int)(u * (sw - 1)), 0, sw - 1), Math.Clamp((int)(v * (sh - 1)), 0, sh - 1));
                 c.Px(x, y, col);
             }
         c.Disc(x0 + bodyLen * 0.1f, cy - h * 0.12f, 2.2f, 2.2f, C(0.95f, 0.78f, 0.25f));

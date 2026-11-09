@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Troć jeziorowa"
+LatinName = "Salmo trutta lacustris"
+Description = "Jeziorna forma pstrąga: duża, srebrzysta, z czarnymi plamkami. Żeruje głęboko na drobnych rybach."
 MinWeight = 1.0
 MaxWeight = 12.0
 Rarity = 0.2

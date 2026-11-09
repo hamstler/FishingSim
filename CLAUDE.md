@@ -5,22 +5,26 @@ Original RF4-style fishing simulator, Godot 4.3 .NET (C#). Polish README in READ
 ## Build / test
 - `dotnet build` (Godot.NET.Sdk 4.3.0; in offline sandboxes restore via the bundled GodotSharp/Tools/nupkgs source).
 - Tests: `FISHSIM_NO_SAVE=1 godot --headless --path . res://tests/run_tests.tscn -- <suite>` (core, accounts, progress, world, game, tournaments, village, gear).
-- Screenshots: `tests/screenshot.tscn` (use xvfb-run + `--rendering-driver vulkan` with lavapipe, ~30 s per shot; the pixel-art view needs Forward+).
+- Screenshots: `tests/screenshot.tscn` (use xvfb-run + `--rendering-driver vulkan` with lavapipe, ~30 s per shot; volumetric fog needs Forward+).
 
 ## Architecture
 Pure logic in src/Core (injected IRng); data as .tres resources; saves via System.Text.Json.Nodes; shaders in shaders/.
 
 ## Art direction
-- Medieval pixel art 3D: low-res SubViewport + nearest upscale + palette/dither/outline post (src/Graphics/PixelArtView, shaders/pixel_post).
-- Three styles (pause menu "Styl", GraphicsQuality.Style, saved as `art_style`): Nordic (default, Valheim-like: native res, crisp textures, no palette/outlines, volumetric fog with sun shafts, AO, bloom, teal-shadow/warm-light grade in GraphicsQuality.ApplyNordic, moonlit ambient in SkyController), PixelArt (~360 lines, warm 61-colour palette in pixel_post, illustrated sky `stylize`, no volumetric fog) and Sharp (native res).
-- Outlines: full-screen depth/normal pass shaders/outline.gdshader on the pixel camera (Forward+ only).
-- Textures: nearest-filtered 256px/2m procedural, toon diffuse (BuildingFactory.Pixel). Fish skins: src/Graphics/FishSkin. Decor: pier festoon lights (Scenery.BuildStringLights), golden fish signs, Graphics/Gulls.
+- One look only: Nordic (Valheim-like). Native resolution in the root viewport, crisp procedural textures, volumetric fog with sun shafts, AO, bloom, teal-shadow/warm-light grade (GraphicsQuality.ApplyNordic), moonlit ambient at night (SkyController). Pixel art was removed.
+- Textures: nearest-filtered 256px/2m procedural (BuildingFactory.Pixel). Fish skins: src/Graphics/FishSkin paints them per pixel on worker threads (512×256 for fish in the lake, 4096×2048 + normal map for hooked/held/atlas fish via FishModel.Create(..., detailed: true)); screenshot mode 20 = skin sheet, 19 = atlas. Decor: pier festoon lights (Scenery.BuildStringLights), golden fish signs, Graphics/Gulls.
 - Performance: never set sky material params or move the sun every frame (re-bakes radiance); cloud drift is the global shader param `cloud_drift`. Profile with FISHSIM_PERF=1 and screenshot mode 13.
 - UI pictures: src/Graphics/Icons (items, fish), src/Graphics/Postcard (one composition per map). Screenshot modes 16 (icon sheet), 17 (postcards) and 18 (top-down map shapes) run headless.
 - Maps are unique via LocationData Squareness/Lobes/Islands (LakeBed.InsideMetres) and Landmarks (World/Props/Landmarks.cs).
-- No GPUParticles: rain is a MultiMesh + shaders/rain.gdshader (particles in two viewports with motion vectors crash Godot 4.3).
+- No GPUParticles: rain is a MultiMesh + shaders/rain.gdshader (GPU particles with motion vectors crashed Godot 4.3 when two viewports drew them).
 - Rod: src/Core/Physics/RodBendModel drives RodRig.SetJointAngles (RodData.Action).
-- Quality presets in src/Graphics/GraphicsQuality (pause menu button); PixelArtView is skipped headless, so tests do not cover it.
+- Quality presets in src/Graphics/GraphicsQuality (pause menu button).
+
+## Game rules worth knowing
+- Day 06-18 lasts 40 real minutes, night 20 (src/Core/DayClock); WorldState.TimeScale is the stool speed-up.
+- 66 species in SpeciesCatalog (each needs LatinName, Description, a FishSkin style and an Abundance entry; GearSuite checks they are catchable).
+- Fights start with a strike run (FightModel ctor); starter tackle is weak on purpose (junior rod 2.4 kg, reel drag 2 kg).
+- HUD: minimap + clock top-right (UI/Minimap), fight bar under the status line (UI/TensionGauge). Fish atlas: UI/FishAtlas (menu and pause menu).
 
 ## Known issues
 - Intermittent exit 134 when running several suites in one process.

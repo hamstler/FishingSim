@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 DisplayName = "Kołowrotek z kuźni"
-DragMax = 5.0
+DragMax = 4.0
 ReelSpeed = 3.0
 LineCapacity = 100.0
 Price = 150

@@ -50,6 +50,15 @@ public sealed class WorldSuite : ITestSuite
         }
         t.Check(bed.AbundanceOf("Karp") == locations[bed.LocationIndex].AbundanceOf("Karp"), "abundance follows the selected location");
 
+        t.Section("day and night");
+        t.Near(DayClock.RealSecondsUntil(6f, 18f) / 60f, 40f, 0.2f, "the day lasts 40 real minutes");
+        t.Near(DayClock.RealSecondsUntil(18f, 6f) / 60f, 20f, 0.2f, "the night lasts 20 real minutes");
+        float clock = 17.5f;
+        for (int i = 0; i < 60 * 60; i++)
+            clock = DayClock.Advance(clock, 1f);
+        t.Near(clock, 17.5f, 0.01f, "a full cycle takes one real hour");
+        t.Near(DayClock.Advance(17.9f, 60f), 18.4f, 0.01f, "time runs twice as fast after dusk (17:54 + 1 min = 18:24)");
+
         t.Section("every map has its own shape");
         foreach (var loc in locations)
         {

@@ -58,6 +58,43 @@ public partial class ScreenshotTool : Node
             return;
         }
 
+        if (mode == 20)
+        {
+            // Detailed skins of a few species (1024×512 each), stacked: check scales, spots and bars up close.
+            string[] ids = { "pstrag", "okon", "karp", "szczupak", "karp_lustrzen", "pstrag_teczowy", "sum", "jesiotr" };
+            const int sw = 1024, sh = 512;
+            var sheet = Image.CreateEmpty(sw * 2, sh * (ids.Length / 2), false, Image.Format.Rgb8);
+            for (int i = 0; i < ids.Length; i++)
+            {
+                var sp = GD.Load<FishSpecies>($"res://data/fish/{ids[i]}.tres");
+                var (albedo, _) = FishingSim.Graphics.FishSkin.PaintNow(sp, sw, sh);
+                albedo.ClearMipmaps();
+                sheet.BlitRect(albedo, new Rect2I(0, 0, sw, sh), new Vector2I((i % 2) * sw, (i / 2) * sh));
+            }
+            sheet.SavePng(output);
+            GD.Print($"saved {output}");
+            GetTree().Quit();
+            return;
+        }
+        if (mode == 19)
+        {
+            // The fish atlas with one species on the turntable (arg = index in the catalogue).
+            var menu = GD.Load<PackedScene>("res://menu.tscn").Instantiate<Menu>();
+            GetTree().Root.AddChild(menu);
+            await NextFrame();
+            var atlas = menu.OpenAtlas();
+            await NextFrame();
+            var pick = GD.Load<FishSpecies>(FishingSim.Data.SpeciesCatalog.Paths[Math.Clamp(arg, 0, FishingSim.Data.SpeciesCatalog.Paths.Length - 1)]);
+            atlas.Select(pick);
+            for (int i = 0; i < 600 && !atlas.ModelReady; i++)
+                await NextFrame();
+            for (int i = 0; i < 20; i++)
+                await NextFrame();
+            GetViewport().GetTexture().GetImage().SavePng(output);
+            GD.Print($"saved {output} (detailed skin: {atlas.ModelReady}) atlas {atlas.Size} menu {menu.Size} shade {atlas.GetChild<Control>(0).Size} {atlas.GetChild(0).GetType().Name}");
+            GetTree().Quit();
+            return;
+        }
         if (mode == 18)
         {
             // Top-down previews of every map, side by side (shapes, bays, islands).
@@ -163,7 +200,10 @@ public partial class ScreenshotTool : Node
             if (mode == 2)
             {
                 var carp = GD.Load<FishSpecies>("res://data/fish/karp.tres");
-                rod.ForceLand(carp, 4.7f);
+                rod.ForceLand(GD.Load<FishSpecies>($"res://data/fish/{(arg > 0 ? FishingSim.Data.SpeciesCatalog.Paths[arg].GetFile().GetBaseName() : "karp")}.tres"), arg > 0 ? 1.2f : 4.7f);
+                // Wait for the detailed skin painted in the background.
+                for (int i = 0; i < 600 && !(rod.HeldFishModel?.HasDetailedSkin ?? true); i++)
+                    await NextFrame();
                 frames = 3;
             }
         }

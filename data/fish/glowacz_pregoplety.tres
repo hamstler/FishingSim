@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="FishSpecies" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/FishSpecies.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+SpeciesName = "Głowacz pręgopłetwy"
+LatinName = "Cottus poecilopus"
+Description = "Górski kuzyn głowacza z pręgowanymi płetwami brzusznymi. Kryje się pod kamieniami najzimniejszych potoków."
+MinWeight = 0.01
+MaxWeight = 0.07
+Rarity = 0.9
+PullFactor = 0.45
+Aggression = 0.5
+StaminaDrain = 0.11
+MouthSize = 2.0
+BaitAffinity = {"worm": 1.5, "corn": 0.0, "bread": 0.0, "boilie": 0.0, "livebait": 0.0, "maggot": 1.1, "insect": 0.0}
+MinDepth = 0.2
+MaxDepth = 2.0
+DayActivity = 1.0
+NightActivity = 0.6
+TwilightBonus = 1.2
+WeatherPref = {"clear": 1.0, "cloudy": 1.0, "rain": 1.1}
+RunLengthMult = 1.0
+BurstMult = 1.5
+BurstRate = 1.0
+LengthRef = 0.31
+BodyDepth = 0.24
+DorsalPos = 0.4
+BackColor = Color(0.38, 0.33, 0.24, 1)
+BellyColor = Color(0.82, 0.78, 0.66, 1)
+FinColor = Color(0.45, 0.38, 0.28, 1)
+PricePerKg = 4.0
+TrophyWeight = 0.0

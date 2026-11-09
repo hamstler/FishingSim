@@ -54,6 +54,23 @@ public sealed class GameSuite : ITestSuite
         var buttons = menu.MapButtons.ToList();
         t.Check(buttons.Count(b => b.Text.StartsWith("Łów")) == 2 && buttons.Count(b => b.Text.StartsWith("Zablok")) == 2,
             "a level-1 player sees 2 playable maps and 2 locked");
+
+        t.Section("fish atlas in the menu");
+        var atlas = menu.OpenAtlas();
+        await t.NextFrame();
+        t.Check(atlas.Visible && atlas.Size == menu.Size && atlas.Listed.Count == SpeciesCatalog.Paths.Length,
+            $"the atlas opens over the whole menu and lists all {atlas.Listed.Count} species");
+        atlas.SetSearch("pstrąg");
+        t.Check(atlas.Listed.Count == 3 && atlas.Listed.All(s => s.SpeciesName.StartsWith("Pstrąg")), "searching \"pstrąg\" finds the three trouts");
+        atlas.SetSearch("");
+        atlas.SetMapFilter(1 + Array.FindIndex(LakeBed.LocationPaths, p => p.EndsWith("staw.tres")));
+        t.Check(atlas.Listed.Any(s => s.SpeciesName == "Karp lustrzeń") && atlas.Listed.All(s => s.SpeciesName != "Głowacica"),
+            "the map filter shows only the fish of that ground");
+        atlas.Select(atlas.Listed.First(s => s.SpeciesName == "Karp lustrzeń"));
+        t.Check(atlas.FactsText.Contains("Cyprinus carpio") && atlas.FactsText.Contains("Staw Karpiowy") && atlas.FactsText.Contains("kg"),
+            "the selected fish shows its Latin name, sizes and where it lives");
+        atlas.Close();
+        await t.NextFrame();
         menu.QueueFree();
         await t.NextFrame();
     }
@@ -101,6 +118,15 @@ public sealed class GameSuite : ITestSuite
         var loadout = rod.Loadout;
         t.Check(lake.Location.DisplayName == "Zatoka Szuwarowa", "the picked map is the one that loads");
         t.Check(profile.Username == "admin", "the game runs as the logged-in user");
+
+        t.Section("minimap and clock");
+        var minimap = main.GetChildren().OfType<Hud>().First().GetChildren().OfType<Minimap>().FirstOrDefault();
+        t.Check(minimap != null && minimap.AnchorLeft == 1f && minimap.OffsetTop > 0f && minimap.OffsetTop < 40f,
+            "the minimap and clock sit in the top-right corner");
+        var mc = new Vector2(10f, -20f);
+        t.Check(Minimap.ToMap(mc, mc) == new Vector2(Minimap.Size / 2f, Minimap.Size / 2f)
+                && MathF.Abs(Minimap.ToMap(mc + new Vector2(Minimap.ViewMetres / 2f, 0f), mc).X - Minimap.Size) < 0.01f,
+            $"the minimap is centred on the angler and shows {Minimap.ViewMetres:0} m across");
 
         t.Section("pause menu");
         pause.Open();

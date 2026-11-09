@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Szczupak"
+LatinName = "Esox lucius"
+Description = "Drapieżnik zasadzek z pyskiem pełnym zębów. Czatuje w trzcinach i atakuje błyskawicznie, w holu wyskakuje z wody."
 MinWeight = 1.0
 MaxWeight = 8.0
 Rarity = 0.7

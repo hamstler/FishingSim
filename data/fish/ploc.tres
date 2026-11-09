@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Płoć"
+LatinName = "Rutilus rutilus"
+Description = "Najpospolitsza ryba naszych wód: srebrna, z czerwonym okiem i pomarańczowymi płetwami. Żeruje w ławicach przy dnie i w toni, bierze na białe robaki i chleb."
 MinWeight = 0.1
 MaxWeight = 0.9
 Rarity = 3.0

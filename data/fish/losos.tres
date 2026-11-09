@@ -5,9 +5,11 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Łosoś"
+LatinName = "Salmo salar"
+Description = "Wędrowiec z morza do rzek, w których się urodził. Skacze przez progi i w holu daje pokaz siły."
 MinWeight = 2.0
 MaxWeight = 20.0
-Rarity = 0.06
+Rarity = 0.09
 PullFactor = 1.7
 Aggression = 0.9
 StaminaDrain = 0.1

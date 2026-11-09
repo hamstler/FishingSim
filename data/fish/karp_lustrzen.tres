@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="FishSpecies" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/FishSpecies.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+SpeciesName = "Karp lustrzeń"
+LatinName = "Cyprinus carpio var. specularis"
+Description = "Hodowlana odmiana karpia z kilkoma wielkimi, lśniącymi łuskami na gładkiej skórze. Każda ryba ma inny układ "lusterek"."
+MinWeight = 2.0
+MaxWeight = 18.0
+Rarity = 0.8
+PullFactor = 1.45
+Aggression = 0.75
+StaminaDrain = 0.12
+MouthSize = 7.0
+BaitAffinity = {"worm": 0.5, "corn": 1.5, "bread": 0.5, "boilie": 2.0, "livebait": 0.0, "maggot": 0.0, "insect": 0.0}
+MinDepth = 1.0
+MaxDepth = 5.0
+DayActivity = 1.0
+NightActivity = 0.9
+TwilightBonus = 1.2
+WeatherPref = {"clear": 1.0, "cloudy": 1.1, "rain": 1.0}
+RunLengthMult = 1.4
+BurstMult = 1.3
+BurstRate = 0.8
+LengthRef = 0.35
+BodyDepth = 0.32
+DorsalPos = 0.45
+BackColor = Color(0.42, 0.36, 0.2, 1)
+BellyColor = Color(0.92, 0.82, 0.5, 1)
+FinColor = Color(0.55, 0.38, 0.25, 1)
+PricePerKg = 27.0
+TrophyWeight = 0.0
