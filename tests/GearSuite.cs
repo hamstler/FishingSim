@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Vector2 = System.Numerics.Vector2;
 using System.Threading.Tasks;
@@ -48,6 +49,53 @@ public sealed class GearSuite : ITestSuite
         t.Check(catalogue.All(s => s.MinWeight > 0f && s.MaxWeight > s.MinWeight && s.MaxDepth > s.MinDepth && s.PricePerKg > 0f),
             "weights, depths and prices are sane");
         t.Check(catalogue.Take(4).Select(s => s.SpeciesName).SequenceEqual(new[] { "Płoć", "Leszcz", "Karp", "Szczupak" }), "the first four keep their order");
+
+        // Balance: every species must be a realistic target for some setup the player can buy.
+        var hooks = new[] { 2f, 5f, 8f };
+        var depths = new[] { 0.5f, 1f, 2f, 3f, 5f, 8f, 12f };
+        var periods = new[] { FishingSim.Core.DayPeriod.Day, FishingSim.Core.DayPeriod.Twilight, FishingSim.Core.DayPeriod.Night };
+        var best = new Dictionary<string, float>();
+        foreach (var map in maps)
+            foreach (var baitId in baits)
+                foreach (float hook in hooks)
+                    foreach (float depth in depths)
+                        foreach (var period in periods)
+                        {
+                            if (depth > map.MaxDepth + 2f)
+                                continue;
+                            var ctx = new FishingSim.Core.BiteContext(baitId, hook, depth, map, period, FishingSim.Core.Weather.Cloudy);
+                            foreach (var c in FishingSim.Core.BiteModel.Chances(catalogue, ctx))
+                                best[c.Species.SpeciesName] = MathF.Max(best.GetValueOrDefault(c.Species.SpeciesName), c.Share);
+                        }
+        var hard = catalogue.Where(sp => best.GetValueOrDefault(sp.SpeciesName) < 0.03f)
+            .Select(sp => $"{sp.SpeciesName} {best.GetValueOrDefault(sp.SpeciesName) * 100f:0.0}%").ToList();
+        t.Check(hard.Count == 0, $"every species is at least a 3% chance with the right setup {string.Join(", ", hard)}");
+
+        // Fight balance: with the best gear on sale every species of a typical size can be landed.
+        var bestGear = new FightGear(9f, 12f, 0.12f, 3.4f, 150f);
+        var unlandable = new List<string>();
+        foreach (var sp in catalogue)
+        {
+            float typical = sp.MinWeight + (sp.MaxWeight - sp.MinWeight) * 0.22f;
+            int bestWins = 0;
+            foreach (float drag in new[] { 0.3f, 0.5f, 0.7f, 0.9f })
+            {
+                int wins = 0;
+                for (int seed = 0; seed < 10; seed++)
+                {
+                    var model = new FightModel(FishProfile.From(sp, typical), bestGear, new SystemRng(seed + 11), 25f, 0.3f, drag);
+                    var o = FightOutcome.Ongoing;
+                    for (int i = 0; i < 60 * 600 && o == FightOutcome.Ongoing; i++)
+                        o = model.Step(1f / 60f, drag, reeling: true);
+                    if (o == FightOutcome.Landed)
+                        wins++;
+                }
+                bestWins = Math.Max(bestWins, wins);
+            }
+            if (bestWins < 6)
+                unlandable.Add($"{sp.SpeciesName} {typical:0.0} kg ({bestWins}/10)");
+        }
+        t.Check(unlandable.Count == 0, $"every species of a typical size can be landed on the best gear {string.Join(", ", unlandable)}");
 
         t.Section("fish market");
         var market = new FishMarket();
