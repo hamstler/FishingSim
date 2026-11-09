@@ -65,23 +65,27 @@ Kolejność według wartości dla gracza; każdy punkt ma już miejsce w struktu
    do spławika (`FishSwimModel.Attractor`), a bierze konkretna ryba z okolicy (`PickNear`), z jej wagą. Spłoszone
    i zahaczone ryby nie biorą; zerwana ryba ucieka w popłochu, złowiona znika z łowiska, a w innym miejscu pojawia
    się nowa. Gdy przy spławiku nie ma chętnych, branie przychodzi „spoza wzroku” jak dawniej.
-2. **Model człowieka.** Zastąpić prymitywne przedramiona riggowanym modelem rąk (`.glb` + `AnimationTree`),
-   sterowanym tymi samymi parametrami `BodyPose` / `BodyAction` (bez zmian w logice).
-3. **Dźwięki.** Kroki (`BodyMotion.Footstep`, rodzaj podłoża z `LakeBed`), plusk przynęty, terkot hamulca, otoczenie.
+2. **Model człowieka.** Częściowo: dłonie z bloków trzymają wędkę (palce na rękojeści, lewa ręka na korbce
+   i na złowionej rybie). Dalej: riggowany model rąk (`.glb` + `AnimationTree`) sterowany tymi samymi
+   parametrami `BodyPose` / `BodyAction`, animacja zamachu kasarkiem.
+3. **Dźwięki.** Zrobione: synteza bez plików (`Core/Audio/Synth`): otoczenie wg pory i pogody, kroki wg podłoża,
+   plusk, kołowrotek, hamulec, zacięcie, złowienie, zerwanie, dzwoneczek brań. Dalej: dźwięk przestrzenny 3D,
+   odgłosy wioski.
 4. **Targ z NPC.** Hala targowa z handlarzami, zamówienia dnia ("kupię 3 leszcze powyżej 1 kg"), ceny na tablicy.
-5. **Akcesoria w działaniu.** Latarka czołowa (światło w nocy), podpórka (kilka wędek naraz), krzesełko
-   (szybszy czas), wiadro (żywotność żywca), zanęta.
+5. **Akcesoria w działaniu.** Zrobione: kapelusz (widać ryby dalej i głębiej), latarnia (światło nocą), zydel
+   (czas 4× szybciej podczas czekania), wiadro (żywiec przeżywa w 35%), podpórka z dzwoneczkiem (sygnał brania).
+   Dalej: odłożenie wędki na podpórkę i kilka wędek naraz, zanęta.
 6. **Wypuszczanie ryb na żądanie** i limity ochronne (wymiar i okres ochronny), mandat od strażnika.
 7. **Świat.** Łódź, więcej map, płynne przejścia między łowiskami pieszo zamiast przystanku, NPC wędkarze.
 8. **Grafika (medieval pixel art 3D).** Gotowe: potok niskiej rozdzielczości z paletą, ditheringiem i konturami,
    pixelowe tekstury, oświetlenie toon, szachulec i strzechy, latarnie, niebo z chmurami, pasmowa woda, drzewa
    z kart liści, trawa na wietrze. Zrobione też: minimalistyczny HUD, grosze, kramy, gildia, wóz na postoju,
-   migoczące światła, ostre (niewygładzane) fonty. Dalej: prawdziwa pikselowa czcionka (plik .ttf/.fnt),
-   ikony sprzętu jako sprite'y, minimalistyczne ekrany sklepu i ekwipunku.
+   migoczące światła, ostre (niewygładzane) fonty, lżejsze menu, naturalne zachody słońca. Dalej: prawdziwa
+   pikselowa czcionka (plik .ttf/.fnt), ikony sprzętu i ryb jako sprite'y.
 
 ## Testy
-Zestaw `gear` (`tests/GearSuite.cs`) sprawdza targ, siatki, podbieraki, akcesoria, zapis, animację ciała, pływanie
-ryb i ich obecność w grze. Uruchomienie:
+Wszystkie zestawy razem: `godot --headless --path . res://tests/run_tests.tscn` (379 sprawdzeń). Zestaw `gear` (`tests/GearSuite.cs`) sprawdza targ, siatki, podbieraki, akcesoria, zapis, animację ciała, pływanie
+ryb i ich obecność w grze, brania od widocznych ryb, dźwięk, akcesoria, atlas oraz balans 40 gatunków (każdy da się złowić i wyholować). Uruchomienie:
 ```
 FISHSIM_NO_SAVE=1 godot --headless --path . res://tests/run_tests.tscn -- gear
 ```
