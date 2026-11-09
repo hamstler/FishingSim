@@ -709,6 +709,7 @@ public partial class FishingRod : Node3D
         _fishNode.Visible = true;
         _fishDepth = 0.3f;
         _jump = 0f;
+        _fishYaw = _fight.Heading;
         SetState(RodState.Fight);
     }
 
@@ -733,11 +734,11 @@ public partial class FishingRod : Node3D
                 return;
         }
 
-        // Fish position and visuals.
-        float angle = _fight.FishAngle;
-        var dir = new Vector3(MathF.Sin(angle), 0f, MathF.Cos(angle));
-        var pos = Origin() + dir * _fight.LineOut;
+        // Fish position and visuals: where the fight model has it, facing the way it swims.
+        var pos = Origin() + new Vector3(_fight.Position.X, 0f, _fight.Position.Y);
         _bobber.Hold(new Vector3(pos.X, _waterY - 0.02f, pos.Z));
+        if (_fight.BurstStarted)
+            Twitch(0.6f + 1.2f * Math.Clamp(_fight.PeakPull / MathF.Max(EffectiveLimit, 0.1f), 0f, 1f));   // the rod kicks with every surge
         // A fresh fish bores deep and only comes up as it tires; runs take it down, rests let it rise.
         float floor = MathF.Min(CurrentDepth() * 0.75f, 2.4f);
         float wantDepth = Mathf.Lerp(0.2f, floor, MathF.Pow(_fight.Stamina, 0.7f)) * (_fight.Running ? 1f : 0.7f);
@@ -769,15 +770,18 @@ public partial class FishingRod : Node3D
         {
             SoundCue?.Invoke(Core.Audio.OneShot.SmallSplash, 0.6f);   // a tired fish thrashes at the surface
         }
-        float shake = _fight.Bursting ? MathF.Sin(_stateTime * 17f) * 0.45f : 0f;
-        float sway = MathF.Sin(_stateTime * (_fight.Running ? 3.1f : 1.7f)) * (_fight.Running ? 0.35f : 0.18f);
+        // The body follows its heading smoothly; head shakes during surges, a slight tail-beat sway otherwise.
+        _fishYaw = Mathf.LerpAngle(_fishYaw, _fight.Heading, Math.Clamp(6f * dt, 0f, 1f));
+        float shake = _fight.Bursting ? MathF.Sin(_stateTime * 17f) * 0.3f : 0f;
+        float sway = MathF.Sin(_stateTime * (4f + 6f * _fight.Speed)) * 0.06f;
         _fishNode.GlobalPosition = new Vector3(pos.X, fishY, pos.Z);
-        _fishNode.Rotation = new Vector3(pitch, angle + sway + shake, _fight.Bursting ? shake * 0.6f : 0f);
+        _fishNode.Rotation = new Vector3(pitch, _fishYaw + sway + shake, _fight.Bursting ? shake * 0.5f : 0f);
         if (_fishModel != null)
-            _fishModel.Wiggle = (_fight.Bursting ? 2.6f : _fight.Running ? 1.7f : 0.8f) * (0.4f + 0.6f * _fight.Stamina);
+            _fishModel.Wiggle = Math.Clamp(0.5f + _fight.Speed * 1.2f, 0.5f, 2.8f) * (0.4f + 0.6f * _fight.Stamina);
     }
 
     private float _fishDepth = 0.3f;
+    private float _fishYaw;
     private float _jump;
 
     // ------------------------------------------------------------------ fish at the surface: lift or net

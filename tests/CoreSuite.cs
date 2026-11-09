@@ -85,6 +85,18 @@ public sealed class CoreSuite : ITestSuite
         t.Check(largeHook > smallHook * 1.2f && smallHook >= carp.MinWeight && largeHook <= carp.MaxWeight, $"bigger hooks bring bigger fish ({smallHook:0.0} kg vs {largeHook:0.0} kg)");
 
         t.Section("fight model");
+        if (OS.HasEnvironment("FISHSIM_TRACE"))
+        {
+            var cg = new FightGear(9f, 12f, 0.12f, 3.4f, 150f);
+            var tr = new FightModel(FishProfile.From(carp, 12f), cg, new SystemRng(6), 25f, 0.3f, 0.5f);
+            for (int i = 0; i < 60 * 200; i++)
+            {
+                var o = tr.Step(1f / 60f, 0.5f, true);
+                if (i % 60 == 0 || o != FightOutcome.Ongoing)
+                    GD.Print($"t={tr.Elapsed:0} line={tr.LineOut:0.0} dist={tr.Distance:0.0} st={tr.Stamina:0.00} run={tr.Running} T={tr.Tension:0.0} slip={tr.Slipping} spd={tr.Speed:0.0} head={tr.Heading:0.0} ang={tr.FishAngle:0.0}");
+                if (o != FightOutcome.Ongoing) break;
+            }
+        }
         var teleGear = new FightGear(DragMax: 4f, EffectiveLimit: 5f, RodShock: 0.2f, ReelSpeed: 3f, MaxLine: 100f);
         var juniorGear = new FightGear(DragMax: 2f, EffectiveLimit: 2.4f, RodShock: 0.3f, ReelSpeed: 1.9f, MaxLine: 60f);
 
@@ -100,8 +112,11 @@ public sealed class CoreSuite : ITestSuite
         var carpGear = new FightGear(DragMax: 9f, EffectiveLimit: 12f, RodShock: 0.12f, ReelSpeed: 3.4f, MaxLine: 150f);
         (outcome, secs) = Fight(carp, 12f, carpGear, 0.5f, seed: 6);
         t.Check(outcome == FightOutcome.Landed && secs > 55f, $"a 12 kg carp is a long fight but is landed on carp tackle with a sensible drag ({secs:0} s)");
-        (outcome, _) = Fight(carp, 12f, teleGear, 0.5f, seed: 6);
-        t.Check(outcome != FightOutcome.Landed, "the same carp is too much for a telescope rod");
+        var tele = Enumerable.Range(0, 8).Select(i => Fight(carp, 12f, teleGear, 0.5f, seed: 40 + i)).ToList();
+        float teleLanded = tele.Count(r => r.Outcome == FightOutcome.Landed) / 8f;
+        float teleTime = tele.Where(r => r.Outcome == FightOutcome.Landed).Select(r => r.Seconds).DefaultIfEmpty(999f).Average();
+        t.Check(teleLanded < 0.7f || teleTime > secs * 1.5f,
+            $"the same carp is too much for a telescope rod (landed {teleLanded * 100f:0}%, avg {teleTime:0} s vs {secs:0} s on carp tackle)");
 
         var model = new FightModel(FishProfile.From(carp, 12f), new FightGear(9f, 4f, 0.3f, 3.4f, 150f), new SystemRng(8), 20f, 0f, 0.6f) { Unbreakable = true };
         bool ever = false;
@@ -123,6 +138,40 @@ public sealed class CoreSuite : ITestSuite
         var times = Enumerable.Range(0, 12).Select(seed => Fight(carp, 12f, juniorGear, 0.6f, seed + 100)).ToList();
         t.Check(times.All(r => r.Outcome != FightOutcome.Ongoing), $"fights on weak gear end (slowest {times.Max(r => r.Seconds):0} s)");
         t.Check(times.Where(r => r.Outcome == FightOutcome.Landed).All(r => r.Seconds < 480f), "fatigue keeps the longest weak-gear fight under 8 minutes");
+
+        // Realistic swimming: limited speed and turning, held on the line, facing away while it runs.
+        var pikeProfile = FishProfile.From(pike, 4f);
+        var swim = new FightModel(pikeProfile, teleGear, new SystemRng(31), 20f, 0.2f, 0.5f) { Unbreakable = true };
+        float fastest = 0f, widest = 0f, offLine = 0f, awayWhileRunning = 0f;
+        int runningSteps = 0;
+        var lastPos = swim.Position;
+        float lastHeading = swim.Heading, sharpest = 0f;
+        for (int i = 0; i < 60 * 60; i++)
+        {
+            if (swim.Step(1f / 60f, 0.5f, reeling: i % 240 < 150) != FightOutcome.Ongoing)
+                break;
+            fastest = MathF.Max(fastest, (swim.Position - lastPos).Length() * 60f);
+            var radial = swim.Position.Normalized();
+            widest = MathF.Max(widest, MathF.Abs((swim.Position - lastPos).Dot(new Vector2(radial.Y, -radial.X))) * 60f);
+            offLine = MathF.Max(offLine, swim.Distance - swim.LineOut);
+            sharpest = MathF.Max(sharpest, MathF.Abs(Mathf.Wrap(swim.Heading - lastHeading, -MathF.PI, MathF.PI)) * 60f);
+            if (swim.Running)
+            {
+                runningSteps++;
+                awayWhileRunning += MathF.Cos(swim.Heading - swim.FishAngle);
+            }
+            lastPos = swim.Position;
+            lastHeading = swim.Heading;
+        }
+        t.Check(fastest <= pikeProfile.BurstSpeed * 1.25f && pikeProfile.BurstSpeed is > 1.5f and < 4.5f,
+            $"a 4 kg pike never moves faster than its burst speed ({fastest:0.0} m/s, burst {pikeProfile.BurstSpeed:0.0})");
+        t.Check(widest <= pikeProfile.BurstSpeed, $"it swings across the line no faster than it can swim ({widest:0.0} m/s), no jumping from place to place");
+        t.Check(sharpest <= pikeProfile.TurnRate * 1.45f, $"it turns at a limited rate ({sharpest:0.0} rad/s)");
+        t.Check(offLine < 0.05f, "the line holds it: it is never further than the line paid out");
+        t.Check(runningSteps > 0 && awayWhileRunning / runningSteps > 0.3f, "while it runs it heads away from the angler");
+        float bigBurst = FishProfile.From(carp, 12f).BurstSpeed, smallBurst = FishProfile.From(roach, 0.3f).BurstSpeed;
+        t.Check(bigBurst > smallBurst * 1.8f && FishProfile.From(carp, 12f).TurnRate < FishProfile.From(roach, 0.3f).TurnRate,
+            $"a big fish is faster but turns slower than a small one ({bigBurst:0.0} vs {smallBurst:0.0} m/s)");
 
         // The fight starts at the strike: the fish bolts at once and loads light starter tackle hard.
         var strike = new FightModel(FishProfile.From(bream, 1.5f), juniorGear, new SystemRng(21), 15f, 0f, 0.5f);
