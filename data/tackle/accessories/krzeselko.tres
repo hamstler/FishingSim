@@ -7,6 +7,6 @@ script = ExtResource("1")
 DisplayName = "Zydel wędkarski"
 Kind = 3
 Power = 1.0
-Description = "Odpoczynek nad wodą (w planach: szybszy upływ czasu)."
+Description = "Usiądź i czekaj na branie: czas płynie cztery razy szybciej (nie podczas turnieju)."
 Price = 55
 RequiredLevel = 2

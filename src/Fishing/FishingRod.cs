@@ -54,6 +54,9 @@ public partial class FishingRod : Node3D
     private const float HookWindow = 1.2f;
     private const float ResultSeconds = 3.5f;
 
+    /// <summary>Chance that a live bait survives in the bucket and is not used up.</summary>
+    public const float BaitBucketSaveChance = 0.35f;
+
     private readonly IRng _rng = new SystemRng();
 
     // dependencies
@@ -556,7 +559,10 @@ public partial class FishingRod : Node3D
             NewBiteTimer();   // nothing here wants this bait/hook, keep waiting
             return;
         }
-        Loadout.UseBait();
+        // The live-bait bucket keeps spare baitfish alive: sometimes the used one goes back in.
+        bool spared = Loadout.Bait.ItemId == "livebait" && Gear?.Has(AccessoryKind.BaitBucket) == true && _rng.NextFloat() < BaitBucketSaveChance;
+        if (!spared)
+            Loadout.UseBait();
         _bobber.DriveVelocity = Vector3.Zero;
         _nibbleLength = _rng.Range(1f, 2.2f);
         _pulseTimer = 0f;

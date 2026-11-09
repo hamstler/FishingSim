@@ -326,6 +326,21 @@ public sealed class GearSuite : ITestSuite
         rod.ResetToIdle();
         t.Check(roachAgent != null && !roachAgent.Hooked && roachAgent.Fear > 0f && rod.Biter == null, "when the line comes in, the fish swims off in fright");
         rod.DevInstantBite = false;
+
+        // The stool: resting while waiting makes time run faster.
+        var stool = main.Gear.Items(GearSlot.Accessory).First(i => i.ItemId == "krzeselko");
+        main.Rod.Profile.Money += 200;
+        main.Rod.Profile.Level = Math.Max(main.Rod.Profile.Level, stool.RequiredLevel);
+        t.Check(main.Gear.Buy(GearSlot.Accessory, stool) == null, "the stool can be bought");
+        rod.CastNow(0.35f);
+        for (int i = 0; i < 360 && rod.State != RodState.Waiting; i++)
+            await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+        await t.Seconds(3.6);
+        t.Check(rod.State != RodState.Waiting || (main.Resting && worldState.MinutesPerSecond > 1f), "sitting still on the stool while waiting speeds up time");
+        rod.ResetToIdle();
+        await t.NextFrame();
+        await t.NextFrame();
+        t.Check(!main.Resting && worldState.MinutesPerSecond == 1f, "time runs normally again when the line comes in");
         t.Check(main.Rod.Gear != null && main.Rod.Profile.KeepnetLimit != null, "the rod knows the landing net and the keepnet limits the profile");
         t.Check(main.Player.Body != null && main.Player.Camera.Current, "first-person body and camera are in place");
 

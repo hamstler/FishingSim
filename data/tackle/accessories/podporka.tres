@@ -7,6 +7,6 @@ script = ExtResource("1")
 DisplayName = "Rozwidlony kij-podpórka"
 Kind = 2
 Power = 1.0
-Description = "Odłożenie wędki podczas czekania (w planach: kilka wędek naraz)."
+Description = "Odłożenie wędki podczas czekania (w planach)."
 Price = 35
 RequiredLevel = 2

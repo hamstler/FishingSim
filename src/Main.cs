@@ -156,6 +156,7 @@ public partial class Main : Node3D
     };
 
     private OmniLight3D? _lantern;
+    private float _restTimer;
 
     /// <summary>The bought lantern hangs at the angler's belt and lights up after dusk.</summary>
     public OmniLight3D? Lantern => _lantern;
@@ -238,8 +239,17 @@ public partial class Main : Node3D
         _profile.Autosave();
     }
 
+    /// <summary>True while the angler rests on the stool: waiting for a bite, standing still (time runs 4x).</summary>
+    public bool Resting { get; private set; }
+
     public override void _Process(double delta)
     {
+        bool still = new Vector2(Player.Velocity.X, Player.Velocity.Z).Length() < 0.1f;
+        bool canRest = Rod.State == RodState.Waiting && still && _gear.Has(AccessoryKind.Chair) && Tournaments.Active == null;
+        _restTimer = canRest ? _restTimer + (float)delta : 0f;
+        Resting = _restTimer > 3f;
+        if (!_world.Paused)
+            _world.MinutesPerSecond = Resting ? 4f : 1f;
         if (_lantern == null)
             return;
         // Lit only when it is dark; the tallow flame flickers.

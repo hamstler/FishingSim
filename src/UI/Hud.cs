@@ -153,6 +153,8 @@ public partial class Hud : CanvasLayer
         string state = rod.StateName;
         if (rod.State is RodState.Waiting or RodState.Nibble or RodState.Bite)
             state += $"  ·  {rod.CurrentDepth():0.0} m";
+        if (rod.State == RodState.Waiting && rod.World.MinutesPerSecond > 1f)
+            state += "  ·  odpoczynek na zydlu";
         if (rod.State == RodState.Fight)
             state += $"  ·  {rod.LineOut:0} m{(rod.Lifting ? "  ·  pompowanie" : "")}";
         if (rod.State == RodState.Close && rod.HasNet)
