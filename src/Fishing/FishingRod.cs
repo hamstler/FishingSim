@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using FishingSim.Core;
 using FishingSim.Core.Gear;
@@ -215,6 +216,9 @@ public partial class FishingRod : Node3D
         _lineVisibility = line.Visibility;
         // Rated power: the rod's own limit; it reads as fully bent near that load.
         _bendModel = new Core.Physics.RodBendModel(RodRig.Joints * RodRig.SegmentLength, rod.MaxLoad, rod.Action);
+        // A snapped rod is gone: nothing left in the hand until a new one is bought or handed out.
+        if (_rig != null)
+            _rig.Visible = Loadout.Profile == null || Loadout.Profile.Owns(TackleSlot.Rod, rod.ItemId);
     }
 
     private Core.Physics.RodBendModel? _bendModel;
@@ -297,13 +301,7 @@ public partial class FishingRod : Node3D
             switch (mb.ButtonIndex)
             {
                 case MouseButton.Left when mb.Pressed && State == RodState.Idle:
-                    if (Loadout.BaitCount <= 0)
-                    {
-                        ShowBanner("Brak przynęty! Zmień przynętę (klawisz 5)");
-                        return;
-                    }
-                    CastPower = 0f;
-                    SetState(RodState.Charging);
+                    TryStartCharge();
                     break;
                 case MouseButton.Left when !mb.Pressed && State == RodState.Charging:
                     Cast();
@@ -497,6 +495,27 @@ public partial class FishingRod : Node3D
         float speed = Mathf.Lerp(_castMin, _castMax, CastPower);
         _bobber.Launch(_rodTip.GlobalPosition, aim * speed);
         SetState(RodState.Flying);
+    }
+
+    /// <summary>LMB in the idle state: starts charging a cast, unless the kit or the bait is missing (then says why).</summary>
+    public bool TryStartCharge()
+    {
+        if (State != RodState.Idle)
+            return false;
+        if (!Loadout.Ready)
+        {
+            var missing = string.Join(", ", Profile.MissingKit().Select(m => m.MissingName()));
+            ShowBanner($"Brak sprzętu: {missing}. Kram wędkarski: kup nowy, a bez pieniędzy odbierz darmowy zestaw.", 4f);
+            return false;
+        }
+        if (Loadout.BaitCount <= 0)
+        {
+            ShowBanner("Brak przynęty! Zmień przynętę (klawisz 5)");
+            return false;
+        }
+        CastPower = 0f;
+        SetState(RodState.Charging);
+        return true;
     }
 
     /// <summary>Starts a cast with the given power without input (tests, tools).</summary>
@@ -701,10 +720,13 @@ public partial class FishingRod : Node3D
         switch (outcome)
         {
             case FightOutcome.LineBroke:
-                BreakLine(RodMaxLoad < LineStrength ? "Wędka się złamała!" : "Linka pękła!");
+                if (RodMaxLoad < LineStrength)
+                    BreakLine("Wędka się złamała!", TackleSlot.Rod);
+                else
+                    BreakLine("Linka pękła! Haczyk został w rybie.", TackleSlot.Hook);
                 return;
             case FightOutcome.SpooledOut:
-                BreakLine("Ryba wyciągnęła całą linkę!");
+                BreakLine("Ryba wyciągnęła całą linkę! Żyłka przepadła.", TackleSlot.Line);
                 return;
             case FightOutcome.Landed:
                 EnterClose();
@@ -786,7 +808,10 @@ public partial class FishingRod : Node3D
         _liftStress = ratio > 1f ? _liftStress + (ratio - 1f) * 3f * dt : MathF.Max(_liftStress - 0.5f * dt, 0f);
         if (!DevUnbreakable && (_liftStress >= 1f || ratio > 1.6f))
         {
-            BreakLine(RodMaxLoad < LineStrength ? "Wędka pękła pod ciężarem ryby!" : "Linka pękła przy podnoszeniu! Użyj kasarka.");
+            if (RodMaxLoad < LineStrength)
+                BreakLine("Wędka pękła pod ciężarem ryby!", TackleSlot.Rod);
+            else
+                BreakLine("Linka pękła przy podnoszeniu! Użyj kasarka.", TackleSlot.Hook);
             return;
         }
 
@@ -902,8 +927,26 @@ public partial class FishingRod : Node3D
         FishLanded?.Invoke(species, CurrentWeight);
     }
 
-    private void BreakLine(string text)
+    /// <summary>Breaks the tackle as if a fish had done it (tools and tests).</summary>
+    public void ForceBreak(TackleSlot slot) =>
+        BreakLine(slot == TackleSlot.Rod ? "Wędka się złamała!" : "Linka pękła!", slot);
+
+    /// <summary>
+    /// Ends the fight with a loss. <paramref name="destroyed"/> is the piece of tackle lost for good: a snapped rod, the
+    /// hook left in the fish, or the whole line pulled off the spool. It leaves the inventory.
+    /// </summary>
+    private void BreakLine(string text, TackleSlot? destroyed = null)
     {
+        if (destroyed is TackleSlot slot && !DevUnbreakable)
+        {
+            var lost = Loadout.Selected(slot);
+            if (Profile.Destroy(slot, lost.ItemId))
+            {
+                Loadout.Resync();
+                ApplyTackle();
+                text += Loadout.Ready ? $" Stracono: {lost.DisplayName}." : $" Stracono: {lost.DisplayName}. Kup nowy w kramie wędkarskim.";
+            }
+        }
         ShowBanner(text, 3.5f);
         SoundCue?.Invoke(Core.Audio.OneShot.LineSnap, 1f);
         LoseBiter(_fishNode.Visible ? _fishNode.GlobalPosition : null);

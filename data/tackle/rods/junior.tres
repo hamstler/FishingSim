@@ -8,6 +8,6 @@ DisplayName = "Leszczynowy kij 2 m"
 CastMult = 0.75
 MaxLoad = 2.4
 ShockAbsorb = 0.3
-Price = 0
+Price = 40
 RequiredLevel = 1
 Action = 0.15

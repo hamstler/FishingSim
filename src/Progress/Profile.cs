@@ -255,6 +255,66 @@ public sealed class Profile
         return null;
     }
 
+    // ------------------------------------------------------------------ broken gear and the free kit
+    /// <summary>The starter kit handed out free at the tackle shop to anglers who cannot afford anything else.</summary>
+    public static readonly IReadOnlyDictionary<TackleSlot, string> StarterKit = new Dictionary<TackleSlot, string>
+    {
+        [TackleSlot.Rod] = "junior", [TackleSlot.Reel] = "mlynek1000", [TackleSlot.Line] = "zylka025", [TackleSlot.Hook] = "hak5",
+    };
+
+    /// <summary>Worms that come with the free kit when the angler has no bait at all.</summary>
+    public const int StarterWorms = 10;
+
+    private static readonly TackleSlot[] KitSlots = { TackleSlot.Rod, TackleSlot.Reel, TackleSlot.Line, TackleSlot.Hook };
+
+    /// <summary>
+    /// Destroys an item (a snapped rod, a hook left in a fish, a line pulled off the spool): it leaves the inventory,
+    /// and if it was in use another owned item of that kind is equipped (or none). Returns false if it was not owned.
+    /// </summary>
+    public bool Destroy(TackleSlot slot, string id)
+    {
+        if (slot == TackleSlot.Bait || !Owned.TryGetValue(slot.Key(), out var ids) || !ids.Remove(id))
+            return false;
+        if (Equipped.GetValueOrDefault(slot.Key()) == id)
+            Equipped[slot.Key()] = ids.Count > 0 ? ids[0] : "";
+        Changed?.Invoke();
+        return true;
+    }
+
+    /// <summary>Kinds of gear the angler has none of (so they cannot fish).</summary>
+    public List<TackleSlot> MissingKit() =>
+        KitSlots.Where(s => !Owned.TryGetValue(s.Key(), out var ids) || ids.Count == 0).ToList();
+
+    public bool HasKit => MissingKit().Count == 0;
+
+    /// <summary>
+    /// The free kit is only for anglers who are stuck: something is missing and they cannot afford to buy it
+    /// (<paramref name="costOfMissing"/> = the cheapest replacement for every missing piece).
+    /// </summary>
+    public bool CanClaimFreeKit(int costOfMissing) => !HasKit && Money < costOfMissing;
+
+    /// <summary>Hands out the missing starter pieces (and worms when there is no bait). Null on success, else why not.</summary>
+    public string? ClaimFreeKit(int costOfMissing)
+    {
+        if (HasKit)
+            return "Masz już kompletny zestaw";
+        if (!CanClaimFreeKit(costOfMissing))
+            return $"Stać Cię na nowy sprzęt ({costOfMissing} gr): darmowy zestaw jest tylko dla tych bez pieniędzy";
+        foreach (var slot in MissingKit())
+        {
+            string id = StarterKit[slot];
+            Owned[slot.Key()].Add(id);
+            Equipped[slot.Key()] = id;
+        }
+        if (BaitCounts.Values.All(n => n <= 0))
+        {
+            BaitCounts["worm"] = StarterWorms;
+            Equipped["bait"] = "worm";
+        }
+        Changed?.Invoke();
+        return null;
+    }
+
     /// <summary>XP for putting a fish back.</summary>
     public const int ReleaseXp = 3;
 

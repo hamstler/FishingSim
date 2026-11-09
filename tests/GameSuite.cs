@@ -236,6 +236,27 @@ public sealed class GameSuite : ITestSuite
         shop.Toggle();
         t.Check(!shop.Visible && !rod.InputBlocked, "closing the shop re-enables input");
 
+        t.Section("broken gear and the free kit");
+        rod.DevUnbreakable = false;
+        string inHand = loadout.Rod.ItemId;
+        profile.Owned["rod"].RemoveAll(id => id != inHand);        // the only rod the angler has
+        rod.ForceBreak(TackleSlot.Rod);
+        t.Check(profile.Owned["rod"].Count == 0 && !loadout.Ready && !main.Player.Rig.Visible,
+            "a snapped rod disappears from the inventory and from the hand");
+        rod.ResetToIdle();
+        t.Check(!rod.TryStartCharge() && rod.State == RodState.Idle && rod.BannerText.Contains("wędki"), "without a rod there is no cast, and the banner says why");
+        profile.Money = 500;
+        shop.OpenFor(ShopKind.Tackle);
+        t.Check(shop.FreeKitButton.Visible && shop.FreeKitButton.Disabled, "with money the free kit is shown but cannot be taken");
+        shop.Close();
+        profile.Money = 5;
+        shop.OpenFor(ShopKind.Tackle);
+        t.Check(shop.FreeKitButton.Visible && !shop.FreeKitButton.Disabled, "a broke angler may take the free kit");
+        shop.FreeKitButton.EmitSignal(BaseButton.SignalName.Pressed);
+        t.Check(profile.Owns(TackleSlot.Rod, "junior") && loadout.Ready && main.Player.Rig.Visible && !shop.FreeKitButton.Visible,
+            "the free kit puts a rod back in the hand");
+        shop.Close();
+
         main.QueueFree();
         await t.NextFrame();
     }

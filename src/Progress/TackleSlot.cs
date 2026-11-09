@@ -16,6 +16,16 @@ public static class TackleSlotExtensions
         _ => "bait",
     };
 
+    /// <summary>"Brak sprzętu: wędki, haczyka" (genitive).</summary>
+    public static string MissingName(this TackleSlot slot) => slot switch
+    {
+        TackleSlot.Rod => "wędki",
+        TackleSlot.Reel => "kołowrotka",
+        TackleSlot.Line => "linki",
+        TackleSlot.Hook => "haczyka",
+        _ => "przynęty",
+    };
+
     public static string Title(this TackleSlot slot) => slot switch
     {
         TackleSlot.Rod => "Wędka",

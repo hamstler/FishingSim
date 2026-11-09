@@ -39,6 +39,37 @@ public partial class Shop : CanvasLayer
     private TabContainer _tabs = null!;
     private readonly Dictionary<string, Container> _lists = new();
     private Label _money = null!, _message = null!, _title = null!;
+    private Button _freeKit = null!;
+    private bool _tackleCounter;
+
+    /// <summary>The free-kit button (tests).</summary>
+    public Button FreeKitButton => _freeKit;
+
+    private void UpdateFreeKit()
+    {
+        bool needed = _tackleCounter && !_profile.HasKit;
+        _freeKit.Visible = needed;
+        if (!needed)
+            return;
+        int cost = _loadout.CostOfMissing();
+        string missing = string.Join(", ", _profile.MissingKit().Select(m => m.MissingName()));
+        bool can = _profile.CanClaimFreeKit(cost);
+        _freeKit.Disabled = !can;
+        _freeKit.Text = can
+            ? $"Odbierz darmowy zestaw (brakuje: {missing})"
+            : $"Brakuje: {missing}. Kup nowy sprzęt ({Lore.Money(cost)}): darmowy zestaw tylko dla tych, których na niego nie stać";
+    }
+
+    private void ClaimFreeKit()
+    {
+        string? error = _profile.ClaimFreeKit(_loadout.CostOfMissing());
+        if (error == null)
+        {
+            _loadout.Resync();
+            _rod.ApplyTackle();
+        }
+        _message.Text = error ?? "Kramarz wręcza Ci prosty zestaw. Powodzenia!";
+    }
 
     // detail panel
     private TextureRect _detailIcon = null!;
@@ -129,6 +160,10 @@ public partial class Shop : CanvasLayer
         _message = new Label();
         _message.AddThemeColorOverride("font_color", Gold);
         box.AddChild(_message);
+        // The free starter kit: only at the tackle counter, only for anglers with nothing to fish with and no money.
+        _freeKit = new Button { CustomMinimumSize = new Vector2(0, 40), Visible = false };
+        _freeKit.Pressed += ClaimFreeKit;
+        box.AddChild(_freeKit);
         box.AddChild(new Label { Text = "Esc - wyjdź  |  kliknij kartę, aby zobaczyć szczegóły  |  lepszy sprzęt odblokowuje się z poziomem", Modulate = Muted });
         _profile.Changed += Refresh;
     }
@@ -221,6 +256,7 @@ public partial class Shop : CanvasLayer
             return;
         var (title, tabs) = Kinds[kind];
         _title.Text = title;
+        _tackleCounter = tabs.Contains("rod");
         int first = -1;
         for (int i = 0; i < TabDefinitions.Length; i++)
         {
@@ -259,6 +295,7 @@ public partial class Shop : CanvasLayer
         if (!Visible)
             return;
         _money.Text = $"Sakiewka: {Lore.Money(_profile.Money)}   ·   poziom {_profile.Level}";
+        UpdateFreeKit();
         for (int s = 0; s < TackleSlotExtensions.Count; s++)
             FillTackle((TackleSlot)s);
         foreach (var slot in GearSlotExtensions.All)
@@ -582,8 +619,12 @@ public partial class Shop : CanvasLayer
     {
         var item = _loadout.Items(slot)[index];
         int pack = item is BaitData bait ? bait.PackSize : 1;
+        bool hadOne = slot == TackleSlot.Bait || _profile.Owns(slot, _loadout.Selected(slot).ItemId);
         string? error = _profile.Buy(slot, item.ItemId, item.Price, item.RequiredLevel, pack);
         _message.Text = error ?? $"Kupiono: {item.DisplayName}";
+        // Replacing a destroyed piece: put the new one on straight away.
+        if (error == null && !hadOne)
+            Equip(slot, index);
     }
 
     private void Equip(TackleSlot slot, int index)
