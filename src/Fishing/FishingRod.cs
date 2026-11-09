@@ -9,7 +9,8 @@ using FishingSim.World;
 
 namespace FishingSim.Fishing;
 
-public enum RodState { Idle, Charging, Flying, Waiting, Nibble, Bite, Fight, Landed, Broken }
+/// <summary>Close = the fish is beaten and at the surface in front of you: lift it (RMB) or net it (Space).</summary>
+public enum RodState { Idle, Charging, Flying, Waiting, Nibble, Bite, Fight, Close, Landed, Broken }
 
 /// <summary>Everything the rod needs from the rest of the game.</summary>
 public sealed record RodDependencies(
@@ -38,8 +39,9 @@ public partial class FishingRod : Node3D
         [RodState.Flying] = "Zarzucanie...",
         [RodState.Waiting] = "Czekanie na branie",
         [RodState.Nibble] = "Podgryzanie!",
-        [RodState.Bite] = "BRANIE! Zacinaj!",
+        [RodState.Bite] = "BRANIE! Zacinaj (PPM)!",
         [RodState.Fight] = "Hol",
+        [RodState.Close] = "Ryba przy brzegu: PPM podnieś",
         [RodState.Landed] = "Złowiona!",
         [RodState.Broken] = "Zerwanie",
     };
@@ -123,7 +125,23 @@ public partial class FishingRod : Node3D
     /// <summary>Raised when a fish is landed (species, weight).</summary>
     public event Action<FishSpecies, float>? FishLanded;
 
-    public float Tension => _fight?.Tension ?? 0f;
+    public float Tension => State == RodState.Close ? _closeTension : _fight?.Tension ?? 0f;
+
+    // ------------------------------------------------------------------ lifting and landing
+    private float _lift, _closeTension, _closeStamina, _closeLine, _liftStress, _netTime;
+    private MeshInstance3D? _net;
+
+    /// <summary>The rod is held up (right mouse button): strike, pump during the fight, lift the fish out.</summary>
+    public bool Lifting { get; private set; }
+
+    /// <summary>Tests and tools: keep the rod raised without input.</summary>
+    public bool LiftOverride { get; set; }
+
+    /// <summary>0 = beaten fish at the surface, 1 = lifted up to the angler (caught).</summary>
+    public float Lift => _lift;
+
+    /// <summary>True when a landing net is owned and equipped (Space uses it when the fish is close).</summary>
+    public bool HasNet => Gear?.LandingNet != null;
     public float LineOut => _fight?.LineOut ?? _lineOutOutsideFight;
     public float FishStamina => _fight?.Stamina ?? 1f;
 
@@ -212,7 +230,7 @@ public partial class FishingRod : Node3D
     {
         if (InputBlocked)
         {
-            if (AllowHookKey && @event is InputEventKey { Pressed: true, Echo: false, Keycode: Key.Space })
+            if (AllowHookKey && @event is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Right })
                 TryHook();
             return;
         }
@@ -261,7 +279,7 @@ public partial class FishingRod : Node3D
         switch (key.Keycode)
         {
             case Key.Space:
-                TryHook();
+                TryNet();
                 break;
             case Key.F2:
                 DevInstantBite = !DevInstantBite;
@@ -324,8 +342,9 @@ public partial class FishingRod : Node3D
         if (_bobber == null)
             return;
         float dt = (float)delta;
-        Reeling = ReelOverride
-            || (!InputBlocked && Input.IsMouseButtonPressed(MouseButton.Left) && Input.MouseMode == Input.MouseModeEnum.Captured);
+        bool captured = !InputBlocked && Input.MouseMode == Input.MouseModeEnum.Captured;
+        Reeling = ReelOverride || (captured && Input.IsMouseButtonPressed(MouseButton.Left));
+        Lifting = LiftOverride || (captured && Input.IsMouseButtonPressed(MouseButton.Right));
         BannerTime = MathF.Max(BannerTime - dt, 0f);
         _stateTime += dt;
         switch (State)
@@ -336,10 +355,12 @@ public partial class FishingRod : Node3D
             case RodState.Nibble: TickNibble(dt); break;
             case RodState.Bite: TickBite(); break;
             case RodState.Fight: TickFight(dt); break;
+            case RodState.Close: TickClose(dt); break;
             case RodState.Landed:
             case RodState.Broken: TickResult(); break;
         }
-        float bendTarget = State == RodState.Fight ? Math.Clamp(Tension / EffectiveLimit, 0f, 1f) : 0f;
+        float bendTarget = State is RodState.Fight or RodState.Close ? Math.Clamp(Tension / EffectiveLimit, 0f, 1f) : 0f;
+        TickNet(dt);
         _bend = Mathf.Lerp(_bend, bendTarget, MathF.Min(dt * 8f, 1f));
         _rig.SetBend(_bend);
         UpdateLine();
@@ -553,7 +574,7 @@ public partial class FishingRod : Node3D
     {
         if (_fight == null)
             return;
-        var outcome = _fight.Step(dt, DragSetting, Reeling);
+        var outcome = _fight.Step(dt, DragSetting, Reeling, Lifting);
         switch (outcome)
         {
             case FightOutcome.LineBroke:
@@ -563,14 +584,7 @@ public partial class FishingRod : Node3D
                 BreakLine("Ryba wyciągnęła całą żyłkę!");
                 return;
             case FightOutcome.Landed:
-                if (!DevUnbreakable && LandingModel.Resolve(_rng, CurrentWeight, Gear?.LandingNetSpec, _fight.Stamina) == LandingOutcome.Escaped)
-                {
-                    BreakLine(Gear?.LandingNet == null
-                        ? "Ryba spadła przy wyjmowaniu ręką! Kup podbierak."
-                        : "Ryba nie zmieściła się w podbieraku i spadła!");
-                    return;
-                }
-                LandFish();
+                EnterClose();
                 return;
         }
 
@@ -584,6 +598,109 @@ public partial class FishingRod : Node3D
         _fishNode.Rotation = new Vector3(0f, angle + MathF.Sin(_stateTime * 2f) * 0.15f, 0f);
         if (_fishModel != null)
             _fishModel.Wiggle = (_fight.Running ? 1.6f : 0.7f) * (0.4f + 0.6f * _fight.Stamina);
+    }
+
+    // ------------------------------------------------------------------ fish at the surface: lift or net
+    private void EnterClose()
+    {
+        _closeStamina = _fight!.Stamina;
+        _closeLine = MathF.Min(_fight.LineOut, FightModel.LandDistance);
+        _lift = 0f;
+        _liftStress = 0f;
+        SetState(RodState.Close);
+        ShowBanner(HasNet ? "Ryba przy brzegu! PPM - podnieś, Spacja - kasarek" : "Ryba przy brzegu! Przytrzymaj PPM, aby ją podnieść", 2.5f);
+    }
+
+    private Vector3 TouchPoint() => _camera.ToGlobal(new Vector3(0.05f, -0.2f, -0.55f));
+
+    private void TickClose(float dt)
+    {
+        var species = CurrentSpecies!;
+        _closeStamina = MathF.Min(_closeStamina + 0.015f * dt, 1f);
+        _lift = LiftModel.Step(_lift, Lifting, CurrentWeight, _closeStamina, dt);
+        float target = Lifting || _lift > 0f
+            ? LiftModel.Tension(CurrentWeight, _closeStamina, _lift)
+            : CurrentWeight * 0.25f * (0.4f + _closeStamina);
+        _closeTension = Mathf.MoveToward(_closeTension, target, 25f * dt);
+
+        // Too heavy to lift on this tackle: the line (or the rod) gives.
+        float ratio = _closeTension / EffectiveLimit;
+        _liftStress = ratio > 1f ? _liftStress + (ratio - 1f) * 3f * dt : MathF.Max(_liftStress - 0.5f * dt, 0f);
+        if (!DevUnbreakable && (_liftStress >= 1f || ratio > 1.6f))
+        {
+            BreakLine(RodMaxLoad < LineStrength ? "Wędka pękła pod ciężarem ryby!" : "Linka pękła przy podnoszeniu! Użyj kasarka.");
+            return;
+        }
+
+        // The fish swings from the surface up to the angler's hand.
+        float angle = _fight?.FishAngle ?? 0f;
+        var water = Origin() + new Vector3(MathF.Sin(angle), 0f, MathF.Cos(angle)) * _closeLine + Vector3.Down * 0.05f;
+        float t = _lift * _lift * (3f - 2f * _lift);
+        var pos = water.Lerp(TouchPoint(), t) + Vector3.Up * MathF.Sin(t * MathF.PI) * 0.5f;
+        _fishNode.GlobalPosition = pos;
+        _fishNode.Rotation = new Vector3(-t * 1.3f, angle + MathF.Sin(_stateTime * 9f) * 0.25f * (1f - t * 0.5f), 0f);
+        // The float hangs on the line between the rod tip and the fish.
+        _bobber.Hold(pos.Lerp(_rodTip.GlobalPosition, 0.3f + 0.2f * t));
+        if (_fishModel != null)
+            _fishModel.Wiggle = 0.6f + 1.4f * _closeStamina;
+
+        if (_lift >= 1f)
+            LandFish();
+    }
+
+    /// <summary>Space: scoop the fish with the landing net. Does nothing without a net or when the fish is not close.</summary>
+    public void TryNet()
+    {
+        var net = Gear?.LandingNet;
+        if (net == null || State != RodState.Close || _netTime > 0f)
+            return;
+        ShowNet(_fishNode.GlobalPosition);
+        if (!DevUnbreakable && LandingModel.Resolve(_rng, CurrentWeight, net.Spec, _closeStamina) == LandingOutcome.Escaped)
+        {
+            BreakLine(CurrentWeight > net.MaxWeight ? "Ryba nie zmieściła się w kasarku i uciekła!" : "Ryba wyślizgnęła się z kasarka!");
+            return;
+        }
+        LandFish();
+    }
+
+    /// <summary>A simple landing net (handle, hoop, mesh) that swings in under the fish and fades away.</summary>
+    private void ShowNet(Vector3 at)
+    {
+        _net?.QueueFree();
+        var st = new SurfaceTool();
+        st.Begin(Mesh.PrimitiveType.Triangles);
+        st.AppendFrom(new CylinderMesh { TopRadius = 0.015f, BottomRadius = 0.02f, Height = 1.6f, RadialSegments = 6 }, 0,
+            new Transform3D(Basis.FromEuler(new Vector3(0, 0, 1.2f)), new Vector3(0.75f, 0.35f, 0)));
+        st.AppendFrom(new TorusMesh { InnerRadius = 0.26f, OuterRadius = 0.3f, Rings = 12, RingSegments = 4 }, 0, Transform3D.Identity);
+        st.AppendFrom(new SphereMesh { Radius = 0.27f, Height = 0.4f, RadialSegments = 10, Rings = 5, IsHemisphere = true }, 0,
+            new Transform3D(Basis.FromEuler(new Vector3(MathF.PI, 0, 0)), Vector3.Zero));
+        _net = new MeshInstance3D
+        {
+            Mesh = st.Commit(),
+            TopLevel = true,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            MaterialOverride = FishingSim.World.Props.BuildingFactory.Pixel(new StandardMaterial3D
+            {
+                AlbedoColor = new Color(0.45f, 0.33f, 0.2f),
+                CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+            }),
+        };
+        AddChild(_net);
+        _net.GlobalPosition = at + Vector3.Down * 0.1f;
+        _netTime = 1.2f;
+    }
+
+    private void TickNet(float dt)
+    {
+        if (_net == null)
+            return;
+        _netTime -= dt;
+        _net.GlobalPosition += Vector3.Up * dt * 0.6f;
+        if (_netTime <= 0f)
+        {
+            _net.QueueFree();
+            _net = null;
+        }
     }
 
     /// <summary>Lands the given fish immediately (dev tools and tests).</summary>
@@ -664,7 +781,7 @@ public partial class FishingRod : Node3D
         var a = _rodTip.GlobalPosition;
         var b = _bobber.GlobalPosition;
         float ratio = Math.Clamp(Tension / EffectiveLimit, 0f, 1f);
-        float slack = State == RodState.Fight ? 1f - Math.Clamp(ratio * 2f, 0f, 1f) : 1f;
+        float slack = State is RodState.Fight or RodState.Close ? 1f - Math.Clamp(ratio * 2f, 0f, 1f) : 1f;
         float sag = slack * Math.Clamp(a.DistanceTo(b) * 0.04f, 0f, 1.5f);
         _lineMaterial.AlbedoColor = Colors.White.Lerp(new Color(1f, 0.2f, 0.15f), Math.Clamp((ratio - 0.5f) * 2f, 0f, 1f));
         _lineMesh.SurfaceBegin(Mesh.PrimitiveType.LineStrip, _lineMaterial);

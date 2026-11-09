@@ -60,13 +60,13 @@ public sealed class GearSuite : ITestSuite
 
         t.Section("profile gear, keepnet and market");
         var p = new Profile();
-        t.Check(p.Gear.Owns(GearSlot.Keepnet, GearInventory.StarterKeepnet) && p.Gear.EquippedId(GearSlot.LandingNet) == GearInventory.StarterLandingNet,
-            "a new angler gets a small keepnet and landing net");
+        t.Check(p.Gear.Owns(GearSlot.Keepnet, GearInventory.StarterKeepnet) && p.Gear.EquippedId(GearSlot.LandingNet) == null,
+            "a new angler gets a small keepnet but no landing net");
         var catalog = new GearCatalog();
         catalog.Attach(p);
         t.Check(catalog.Items(GearSlot.Keepnet).Count >= 3 && catalog.Items(GearSlot.LandingNet).Count >= 3 && catalog.Items(GearSlot.Accessory).Count >= 3,
             "keepnets, landing nets and accessories load from data/tackle");
-        t.Check(p.KeepnetLimit is { MaxFish: 15 } && catalog.LandingNetSpec is { MaxWeight: > 2f }, "the equipped keepnet limits the profile");
+        t.Check(p.KeepnetLimit is { MaxFish: 15 } && catalog.LandingNetSpec == null, "the equipped keepnet limits the profile; no net yet");
         var r1 = p.AddCatch(carp, 6f);
         var r2 = p.AddCatch(carp, 5f);
         t.Check(!r1.Released && r2.Released && p.Keepnet.Count == 1 && p.TotalCatches == 2, "a full keepnet releases the fish (XP and journal still count)");
@@ -94,7 +94,20 @@ public sealed class GearSuite : ITestSuite
                 && loaded.Gear.Owns(GearSlot.Accessory, "okulary_polaryzacyjne"), "gear survives save and load");
         t.Check(loaded.Market.Saturation.ContainsKey("Płoć") && loaded.Keepnet.Count == 1, "market state and keepnet survive save and load");
         var old = ProfileSerializer.FromJson("{\"money\": 50, \"keepnet\": [{\"species\": \"Płoć\", \"weight\": 0.4, \"value\": 5}]}");
-        t.Check(old.Gear.Owns(GearSlot.LandingNet, GearInventory.StarterLandingNet) && old.Keepnet[0].Condition == 1f, "old saves get starter gear and fresh fish");
+        t.Check(old.Gear.Owns(GearSlot.Keepnet, GearInventory.StarterKeepnet) && old.Gear.EquippedId(GearSlot.LandingNet) == null
+                && old.Keepnet[0].Condition == 1f, "old saves get the starter keepnet and fresh fish");
+
+        t.Section("lifting the fish out");
+        t.Check(LiftModel.Tension(0.5f, 0.2f, 1f) < 1.5f && LiftModel.Tension(6f, 0.3f, 1f) > 8f, "a roach lifts easily, a 6 kg carp loads the line past 8 kg");
+        float lift = 0f, secs = 0f;
+        while (lift < 1f && secs < 10f) { lift = LiftModel.Step(lift, true, 0.5f, 0.2f, 0.05f); secs += 0.05f; }
+        t.Check(lift >= 1f && secs < 2.5f, $"a small fish reaches the hand in {secs:0.0} s");
+        t.Check(LiftModel.Step(0.5f, false, 0.5f, 0.2f, 0.2f) < 0.5f, "lowering the rod lets the fish sink back");
+        var net = p.Gear.EquippedId(GearSlot.LandingNet);
+        p.Money += 100;
+        var small = catalog.Items(GearSlot.LandingNet).First(i => i.ItemId == "podbierak_maly");
+        t.Check(net == null && small.Price > 0 && catalog.Buy(GearSlot.LandingNet, small) == null && catalog.LandingNet?.ItemId == "podbierak_maly",
+            "the landing net has to be bought and is used straight away");
 
         t.Section("body animation");
         var walk = new BodyMotion();

@@ -32,7 +32,6 @@ public static class GearSlotExtensions
 public sealed class GearInventory
 {
     public const string StarterKeepnet = "siatka_mala";
-    public const string StarterLandingNet = "podbierak_maly";
 
     public Dictionary<string, List<string>> Owned { get; set; } = new();
     public Dictionary<string, string> Equipped { get; set; } = new();
@@ -44,13 +43,12 @@ public sealed class GearInventory
         Owned = new()
         {
             [GearSlot.Keepnet.Key()] = new() { StarterKeepnet },
-            [GearSlot.LandingNet.Key()] = new() { StarterLandingNet },
+            [GearSlot.LandingNet.Key()] = new(),          // no landing net until you buy one
             [GearSlot.Accessory.Key()] = new(),
         };
         Equipped = new()
         {
             [GearSlot.Keepnet.Key()] = StarterKeepnet,
-            [GearSlot.LandingNet.Key()] = StarterLandingNet,
         };
     }
 

@@ -24,7 +24,7 @@ public partial class Hud : CanvasLayer
     private TournamentManager _tournaments = null!;
     private InteractionManager _interactions = null!;
     private Label _status = null!, _purse = null!, _tackle = null!, _time = null!, _banner = null!, _prompt = null!, _tournament = null!;
-    private Label _help = null!, _hint = null!, _dev = null!;
+    private Label _help = null!, _hint = null!, _dev = null!, _drag = null!;
     private ProgressBar _power = null!;
     private TensionGauge _gauge = null!;
     private bool _devOpen, _helpOpen;
@@ -91,8 +91,11 @@ public partial class Hud : CanvasLayer
         Anchor(_power, 0.5f, 1f, -160, -80, 160, -72);
         AddChild(_power);
 
-        _purse = Text(15, Ink, HorizontalAlignment.Right);
-        Anchor(_purse, 1f, 1f, -420, -64, -16, -14);
+        // Drag (mouse wheel) is always shown in the bottom-right corner.
+        _drag = Text(17, Ink, HorizontalAlignment.Right);
+        Anchor(_drag, 1f, 1f, -300, -38, -16, -12);
+        _purse = Text(15, new Color(Ink, 0.9f), HorizontalAlignment.Right);
+        Anchor(_purse, 1f, 1f, -460, -66, -16, -40);
         _tackle = Text(14, new Color(Ink, 0.85f));
         Anchor(_tackle, 0f, 1f, 16, -100, 520, -14);
 
@@ -102,8 +105,9 @@ public partial class Hud : CanvasLayer
         _help = Text(14, Ink);
         Anchor(_help, 0f, 0.5f, 16, -90, 600, 90);
         _help.Text = "WASD - ruch, Shift - bieg, mysz - rozglądanie\n"
-            + "LPM przytrzymaj i puść - rzut, potem LPM - zwijanie\n"
-            + "PPM / Spacja - zacięcie, kółko - hamulec\n"
+            + "LPM przytrzymaj i puść - rzut, potem LPM - zwijanie linki\n"
+            + "PPM - podniesienie wędki: zacięcie, pompowanie, wyciągnięcie ryby\n"
+            + "Spacja - kasarek (trzeba go kupić), kółko - hamulec\n"
             + "1-5 - zmiana sprzętu (Shift = wstecz), Tab - stan\n"
             + "E - wejście | I ekwipunek | M mapa | J dziennik | T turnieje\n"
             + "Esc - menu | F1 - dev";
@@ -145,12 +149,14 @@ public partial class Hud : CanvasLayer
 
         // Fishing readout only while a line is out (or while casting).
         bool fishing = rod.State != RodState.Idle;
-        bool fighting = rod.State == RodState.Fight;
+        bool fighting = rod.State is RodState.Fight or RodState.Close;
         string state = rod.StateName;
         if (rod.State is RodState.Waiting or RodState.Nibble or RodState.Bite)
             state += $"  ·  {rod.CurrentDepth():0.0} m";
-        if (fighting)
-            state += $"  ·  hamulec {Mathf.RoundToInt(rod.DragSetting * 100f)}%  ·  {rod.LineOut:0} m";
+        if (rod.State == RodState.Fight)
+            state += $"  ·  {rod.LineOut:0} m{(rod.Lifting ? "  ·  pompowanie" : "")}";
+        if (rod.State == RodState.Close && rod.HasNet)
+            state += ", Spacja - kasarek";
         SetText(_status, state);
         Fade(_status, fishing || details, dt);
         _gauge.Visible = fighting;
@@ -158,6 +164,7 @@ public partial class Hud : CanvasLayer
         _power.Visible = rod.State == RodState.Charging;
         _power.Value = rod.CastPower * 100f;
 
+        SetText(_drag, $"Hamulec {Mathf.RoundToInt(rod.DragSetting * 100f)}%");
         SetText(_banner, rod.BannerTime > 0f ? rod.BannerText : _banner.Text);
         Fade(_banner, rod.BannerTime > 0f, dt);
 
@@ -218,7 +225,7 @@ public partial class Hud : CanvasLayer
         var rod = _rod;
         string forced = rod.DevSpeciesIndex >= 0 && rod.DevSpeciesIndex < rod.Species.Count ? rod.Species[rod.DevSpeciesIndex].SpeciesName : "losowy";
         string fish = "-";
-        if (rod.CurrentSpecies != null && rod.State is RodState.Nibble or RodState.Bite or RodState.Fight)
+        if (rod.CurrentSpecies != null && rod.State is RodState.Nibble or RodState.Bite or RodState.Fight or RodState.Close)
             fish = $"{rod.CurrentSpecies.SpeciesName} {rod.CurrentWeight:0.00} kg, kondycja {Mathf.RoundToInt(rod.FishStamina * 100f)}%";
         var weights = new List<string>();
         foreach (var sp in rod.Species)

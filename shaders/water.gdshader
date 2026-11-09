@@ -55,12 +55,12 @@ void fragment() {
 	// Ripple highlights: short horizontal dashes drifting with the wind.
 	float rip = texture(foam_noise, p * 0.09 + vec2(wave_time * 0.015, wave_time * 0.006)).r;
 	float stripe = step(0.88, fract(p.y * 0.9 + rip * 2.2 + wave_time * 0.08));
-	float sparkle = stripe * step(0.6, rip) * (0.4 + amp * 10.0);
+	float sparkle = stripe * step(0.6, rip) * (0.4 + amp * 10.0) * smoothstep(4.0, 12.0, length(VERTEX));   // none right under your feet
 	// Rain rings: pixel dots popping on the surface.
 	float rnd = fract(sin(dot(floor(p * 2.0), vec2(12.9898, 78.233))) * 43758.5453);
 	float drop = rain * step(0.985, fract(rnd + wave_time * 0.9));
 	// Foam where the water meets the shore.
-	float foam = step(d, 0.07 + 0.04 * sin(wave_time * 1.5 + p.x * 0.7)) * step(0.68, texture(foam_noise, p * 1.3 + vec2(wave_time * 0.03)).r);
+	float foam = step(d, 0.04 + 0.025 * sin(wave_time * 1.5 + p.x * 0.7)) * step(0.68, texture(foam_noise, p * 1.3 + vec2(wave_time * 0.03)).r);
 
 	float highlight = clamp(max(max(sparkle, drop), foam), 0.0, 1.0);
 	ALBEDO = mix(col, vec3(0.92, 0.95, 0.95), highlight);

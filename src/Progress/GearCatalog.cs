@@ -93,7 +93,12 @@ public sealed class GearCatalog
             return "Brak profilu";
         string? error = Profile.BuyGear(slot, item.ItemId, item.Price, item.RequiredLevel);
         if (error == null)
+        {
+            // The first keepnet or landing net you buy is put to use straight away.
+            if (slot.IsEquippable() && Profile.Gear.EquippedId(slot) == null)
+                Profile.Gear.Equip(slot, item.ItemId);
             Apply();
+        }
         return error;
     }
 

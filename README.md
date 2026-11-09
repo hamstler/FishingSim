@@ -16,9 +16,10 @@ Symulator wędkarski w Godot 4.3 (.NET) napisany w całości w C#. Poza kodem s�
 | Klawisz | Działanie |
 |---|---|
 | WASD, mysz | ruch po całej mapie, rozglądanie |
-| LPM (przytrzymaj / puść) | ładowanie i rzut; potem zwijanie |
-| PPM lub Spacja | zacięcie, gdy spławik się zanurzy |
-| Kółko myszy | hamulec |
+| LPM (przytrzymaj / puść) | ładowanie i rzut; potem zwijanie linki |
+| PPM (przytrzymaj) | podniesienie wędki: zacięcie przy braniu, pompowanie w holu, a gdy ryba jest przy brzegu, podciąganie jej do góry. Ryba jest złowiona, gdy dotknie wędkarza; ciężka zerwie przy tym linkę |
+| Spacja | kasarek (podbierak): wyjmuje rybę przy brzegu. Trzeba go kupić; bez kasarka Spacja nic nie robi |
+| Kółko myszy | hamulec (wartość w procentach w prawym dolnym rogu) |
 | 1-5 (Shift = wstecz) | wędka, kołowrotek, żyłka, hak, przynęta (tylko przed rzutem) |
 | I / M / J / T | ekwipunek, mapa, dziennik, turnieje |
 | E | wejście do kramu, gildii, na targ lub na postój wozów (przy drzwiach budynku) |
@@ -37,7 +38,7 @@ Symulator wędkarski w Godot 4.3 (.NET) napisany w całości w C#. Poza kodem s�
   - *Górskie Jezioro* (poziom 4): sosny, skały, wysokie wzgórza ze śniegiem, górska chata.
 - **Budynki** (`src/World/Props/BuildingFactory.cs`, wszystko z prymitywów): kramy i domy z szachulcem i strzechą, stodoła, wiatrak z obracającymi się skrzydłami, skup ryb ze stoiskiem i suszarnią, gildia z chorągwią, wóz z plandeką przy drogowskazie, latarnie na słupach (migoczą po zmroku), ławki, łodzie, płoty, skrzynie i beczki. Okna i latarnie świecą po zmroku.
 - **Kramy to budynki:** podejdź do drzwi i naciśnij E. Kram wędkarski sprzedaje sprzęt (wędki, kołowrotki, linki, haczyki, siatki, kasarki, akcesoria), kram z przynętami przynęty, skup ryb kupuje po stałej cenie, targ rybny (Jezioro Zielone) płaci według cen dnia z premią za świeże i trofeowe ryby, na postoju wozów zmienia się łowisko, a gildia wędkarzy prowadzi turnieje (zakładka T działa też z daleka).
-- **Siatka i podbierak:** siatka ma limit ryb i kilogramów (pełna = ryba wypuszczona), a ryby tracą w niej kondycję. Duże ryby bez odpowiedniego podbieraka często spadają przy wyjmowaniu.
+- **Siatka i podbierak:** siatka ma limit ryb i kilogramów (pełna = ryba wypuszczona), a ryby tracą w niej kondycję. Na start nie masz kasarka: małą rybę podciągasz wędką (PPM) aż do siebie, dużą trzeba wyjąć kasarkiem (Spacja), bo przy podnoszeniu zerwie linkę. Za mały kasarek też jej nie utrzyma.
 - **Ryby widać w wodzie:** ławice pływają przy brzegu i uciekają przed biegnącym wędkarzem. Kapelusz z szerokim rondem (mniej odblasków) pokazuje je dalej i głębiej.
 - **Tylko widok z oczu wędkarza:** kołysanie głowy w rytm kroków, oddech, widoczne ręce na wędce i kołowrotku.
 - Plan dalszej rozbudowy: [`docs/ROZWOJ.md`](docs/ROZWOJ.md).

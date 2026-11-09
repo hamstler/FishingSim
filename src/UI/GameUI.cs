@@ -400,7 +400,7 @@ public partial class GameUI : CanvasLayer
         var perp = new Vector2(-dir.Y, dir.X);
         c.DrawColoredPolygon(new[] { pp + dir * 11f, pp - dir * 6f + perp * 6f, pp - dir * 6f - perp * 6f }, new Color(1f, 0.9f, 0.3f));
 
-        if (_rod.State is RodState.Waiting or RodState.Nibble or RodState.Bite or RodState.Fight)
+        if (_rod.State is RodState.Waiting or RodState.Nibble or RodState.Bite or RodState.Fight or RodState.Close)
         {
             var bp = WorldToPixel(_rod.Bobber.GlobalPosition.X, _rod.Bobber.GlobalPosition.Z, size);
             c.DrawLine(pp, bp, new Color(1, 1, 1, 0.5f), 1f);

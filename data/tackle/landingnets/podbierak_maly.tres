@@ -7,5 +7,5 @@ script = ExtResource("1")
 DisplayName = "Kasarek 40 cm"
 MaxWeight = 2.5
 Reach = 1.8
-Price = 0
+Price = 25
 RequiredLevel = 1

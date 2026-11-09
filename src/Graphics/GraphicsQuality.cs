@@ -71,9 +71,8 @@ public static class GraphicsQuality
     /// <summary>Screen pixels per world-image pixel (the pixel-art scale): bigger = chunkier and faster.</summary>
     public static int PixelSize => Level switch
     {
-        QualityLevel.Low => 4,
-        QualityLevel.Ultra => 2,
-        _ => 3,
+        QualityLevel.Low => 3,
+        _ => 2,
     };
 
     /// <summary>Distance (m) between grass clumps.</summary>

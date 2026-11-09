@@ -103,6 +103,29 @@ public partial class ScreenshotTool : Node
                 frames = 3;
             }
         }
+        else if (mode == 12)
+        {
+            // Lifting a beaten roach out of the water (arg = tenths of the lift to stop at, e.g. 5 = halfway).
+            rod.DevInstantBite = true;
+            rod.DevUnbreakable = true;
+            rod.DevSpeciesIndex = 0;
+            rod.CastNow(0.3f);
+            double t = 0;
+            while (t < 60 && rod.State != RodState.Close)
+            {
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                t += 1.0 / 60.0;
+                if (rod.State == RodState.Bite)
+                    rod.TryHook();
+                rod.ReelOverride = rod.State == RodState.Fight;
+            }
+            rod.ReelOverride = false;
+            rod.LiftOverride = true;
+            float stopAt = Math.Clamp(arg, 1, 9) / 10f;
+            while (rod.State == RodState.Close && rod.Lift < stopAt)
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            frames = 2;
+        }
         else if (mode == 3)
         {
             var carp = GD.Load<FishSpecies>("res://data/fish/karp.tres");

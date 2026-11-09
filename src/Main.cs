@@ -90,6 +90,8 @@ public partial class Main : Node3D
         Rod.Setup(new RodDependencies(
             Player.Camera, Player.RodTip, Player.Rig, bobber, species, _loadout, _profile, _world, _lake, WaterY, _gear));
         Player.ActionSource = () => ActionFor(Rod.State);
+        Player.Body.RaiseSource = () => Rod.Lifting && Rod.State is RodState.Nibble or RodState.Bite or RodState.Fight or RodState.Close or RodState.Waiting ? 1f : 0f;
+        Player.Body.ReelingSource = () => Rod.Reeling && Rod.State is RodState.Waiting or RodState.Fight or RodState.Nibble or RodState.Bite;
 
         // Medieval pixel-art look: the world is drawn at low resolution and scaled up (HUD stays sharp).
         AddChild(new Graphics.PixelArtView(Player.Camera));
@@ -146,7 +148,7 @@ public partial class Main : Node3D
     private static BodyAction ActionFor(RodState state) => state switch
     {
         RodState.Charging or RodState.Flying => BodyAction.Cast,
-        RodState.Fight => BodyAction.Fight,
+        RodState.Fight or RodState.Close => BodyAction.Fight,
         RodState.Landed => BodyAction.Land,
         _ => BodyAction.None,
     };
