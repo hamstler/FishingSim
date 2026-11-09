@@ -198,6 +198,17 @@ public partial class Menu : Control
         _error.AddThemeColorOverride("font_color", new Color(1f, 0.45f, 0.4f));
         box.AddChild(_error);
         box.AddChild(new Label { Text = "Domyślne konto: admin / admin", Modulate = new Color(1, 1, 1, 0.55f) });
+        var atlas = new Button { Text = "Atlas ryb", CustomMinimumSize = new Vector2(0, 40) };
+        atlas.Pressed += () => OpenAtlas();
+        box.AddChild(atlas);
+    }
+
+    /// <summary>The fish atlas over the menu (from the login form or the map selection).</summary>
+    public FishAtlas OpenAtlas()
+    {
+        var atlas = new FishAtlas();
+        AddChild(atlas);
+        return atlas;
     }
 
     private void ShowLogin()
@@ -266,9 +277,15 @@ public partial class Menu : Control
         foreach (int i in Enumerable.Range(0, _locations.Count).OrderBy(i => _locations[i].RequiredLevel))
             row.AddChild(MapCard(i, profile));
 
-        var logout = new Button { Text = "Wyloguj", CustomMinimumSize = new Vector2(160, 40), SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
+        var buttons = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        buttons.AddThemeConstantOverride("separation", 12);
+        _mapsBox.AddChild(buttons);
+        var atlas = new Button { Text = "Atlas ryb", CustomMinimumSize = new Vector2(160, 40) };
+        atlas.Pressed += () => OpenAtlas();
+        buttons.AddChild(atlas);
+        var logout = new Button { Text = "Wyloguj", CustomMinimumSize = new Vector2(160, 40) };
         logout.Pressed += Logout;
-        _mapsBox.AddChild(logout);
+        buttons.AddChild(logout);
     }
 
     private Control MapCard(int index, Profile profile)

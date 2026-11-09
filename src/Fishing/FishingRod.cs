@@ -604,6 +604,8 @@ public partial class FishingRod : Node3D
         if (Gear?.Has(AccessoryKind.RodPod) == true)
             SoundCue?.Invoke(Core.Audio.OneShot.Bell, 1f);
         _pulseTimer = 0f;
+        if (CurrentSpecies != null)
+            Graphics.FishSkin.Prewarm(CurrentSpecies);     // paint the close-up skin while the float twitches
         SetState(RodState.Nibble);
     }
 
@@ -683,9 +685,11 @@ public partial class FishingRod : Node3D
         if (_biter != null)
             Population?.Hook(_biter);
         _fishModel?.QueueFree();
-        _fishModel = FishModel.Create(species, CurrentWeight);
+        _fishModel = FishModel.Create(species, CurrentWeight, detailed: true);
         _fishNode.AddChild(_fishModel);
         _fishNode.Visible = true;
+        _fishDepth = 0.3f;
+        _jump = 0f;
         SetState(RodState.Fight);
     }
 
@@ -712,12 +716,47 @@ public partial class FishingRod : Node3D
         var dir = new Vector3(MathF.Sin(angle), 0f, MathF.Cos(angle));
         var pos = Origin() + dir * _fight.LineOut;
         _bobber.Hold(new Vector3(pos.X, _waterY - 0.02f, pos.Z));
-        float fishY = _waterY - MathF.Min(0.35f, CurrentDepth() * 0.5f);
+        // A fresh fish bores deep and only comes up as it tires; runs take it down, rests let it rise.
+        float floor = MathF.Min(CurrentDepth() * 0.75f, 2.4f);
+        float wantDepth = Mathf.Lerp(0.2f, floor, MathF.Pow(_fight.Stamina, 0.7f)) * (_fight.Running ? 1f : 0.7f);
+        _fishDepth = Mathf.MoveToward(_fishDepth, MathF.Max(wantDepth, 0.15f), 0.8f * dt);
+        float fishY = _waterY - _fishDepth;
+
+        // Surges: head shakes, and the jumpers (pike, asp, trout, salmon) leap clear of the water.
+        var sp = CurrentSpecies!;
+        bool jumper = sp.Aggression >= 0.8f && sp.BurstMult >= 1.8f;
+        if (_fight.BurstStarted && _jump <= 0f && jumper && _fight.Stamina > 0.25f && _rng.NextFloat() < 0.4f)
+        {
+            _jump = 0.0001f;
+            SoundCue?.Invoke(Core.Audio.OneShot.Splash, 0.7f);
+        }
+        float pitch = 0f;
+        if (_jump > 0f)
+        {
+            _jump += dt / 0.9f;
+            float leap = MathF.Sin(MathF.Min(_jump, 1f) * MathF.PI);
+            fishY = Mathf.Lerp(fishY, _waterY + 0.5f + 0.5f * Math.Clamp(CurrentWeight / 6f, 0f, 1f), leap);
+            pitch = Mathf.Lerp(-0.9f, 0.9f, MathF.Min(_jump, 1f));
+            if (_jump >= 1f)
+            {
+                _jump = 0f;
+                SoundCue?.Invoke(Core.Audio.OneShot.Splash, 0.9f);
+            }
+        }
+        else if (_fight.BurstStarted && _fishDepth < 0.5f)
+        {
+            SoundCue?.Invoke(Core.Audio.OneShot.SmallSplash, 0.6f);   // a tired fish thrashes at the surface
+        }
+        float shake = _fight.Bursting ? MathF.Sin(_stateTime * 17f) * 0.45f : 0f;
+        float sway = MathF.Sin(_stateTime * (_fight.Running ? 3.1f : 1.7f)) * (_fight.Running ? 0.35f : 0.18f);
         _fishNode.GlobalPosition = new Vector3(pos.X, fishY, pos.Z);
-        _fishNode.Rotation = new Vector3(0f, angle + MathF.Sin(_stateTime * 2f) * 0.15f, 0f);
+        _fishNode.Rotation = new Vector3(pitch, angle + sway + shake, _fight.Bursting ? shake * 0.6f : 0f);
         if (_fishModel != null)
-            _fishModel.Wiggle = (_fight.Running ? 1.6f : 0.7f) * (0.4f + 0.6f * _fight.Stamina);
+            _fishModel.Wiggle = (_fight.Bursting ? 2.6f : _fight.Running ? 1.7f : 0.8f) * (0.4f + 0.6f * _fight.Stamina);
     }
+
+    private float _fishDepth = 0.3f;
+    private float _jump;
 
     // ------------------------------------------------------------------ fish at the surface: lift or net
     private void EnterClose()
@@ -884,7 +923,7 @@ public partial class FishingRod : Node3D
     private void ShowHeldFish(FishSpecies species, float weight)
     {
         ClearHeldFish();
-        var model = FishModel.Create(species, weight);
+        var model = FishModel.Create(species, weight, detailed: true);
         float fit = MathF.Min(1f, 0.55f / model.Length);
         model.Scale = new Vector3(fit, fit, fit);
         model.Wiggle = 0.25f;
@@ -912,6 +951,9 @@ public partial class FishingRod : Node3D
 
     /// <summary>The landed fish shown in front of the camera (held in the left hand), or null.</summary>
     public Node3D? HeldFish => _heldFish;
+
+    /// <summary>The held fish's model (to check its detailed skin).</summary>
+    public FishModel? HeldFishModel => _heldFish;
 
     private void ClearHeldFish()
     {

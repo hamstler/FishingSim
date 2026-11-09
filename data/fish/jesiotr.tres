@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Jesiotr ostronosy"
+LatinName = "Acipenser oxyrinchus"
+Description = "Prastara ryba z rzędami kostnych tarczek zamiast łusek. Przywracany do polskich rzek; zdobycz rzadka i wielka."
 MinWeight = 3.0
 MaxWeight = 40.0
 Rarity = 0.2

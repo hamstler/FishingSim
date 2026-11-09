@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Kiełb"
+LatinName = "Gobio gobio"
+Description = "Drobna ryba z wąsikami, ryjąca w piasku. Trzyma się płytkiego, czystego dna."
 MinWeight = 0.01
 MaxWeight = 0.15
 Rarity = 2.0

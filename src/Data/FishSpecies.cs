@@ -9,6 +9,12 @@ public partial class FishSpecies : Resource
 {
     // --- identity & size ---
     [Export] public string SpeciesName { get; set; } = "";
+
+    /// <summary>Scientific name, shown in the atlas.</summary>
+    [Export] public string LatinName { get; set; } = "";
+
+    /// <summary>A few sentences about the fish for the atlas (Polish).</summary>
+    [Export(PropertyHint.MultilineText)] public string Description { get; set; } = "";
     [Export] public float MinWeight { get; set; } = 0.1f;
     [Export] public float MaxWeight { get; set; } = 0.9f;
 
@@ -16,7 +22,7 @@ public partial class FishSpecies : Resource
     [Export] public float Rarity { get; set; } = 1f;
 
     // --- fight ---
-    /// <summary>Peak pull (kg-force) = PullFactor * weight^0.7.</summary>
+    /// <summary>Peak pull (kg-force) = PullFactor * (weight^0.7 + 0.25).</summary>
     [Export] public float PullFactor { get; set; } = 1f;
     [Export(PropertyHint.Range, "0,1")] public float Aggression { get; set; } = 0.5f;
     [Export] public float StaminaDrain { get; set; } = 0.12f;

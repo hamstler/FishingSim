@@ -1,7 +1,7 @@
 namespace FishingSim.Data;
 
 /// <summary>
-/// Every fish species in the game (40 European freshwater species). Adding a species = a .tres in data/fish/,
+/// Every fish species in the game (66 freshwater species of Europe, native and naturalised). Adding a species = a .tres in data/fish/,
 /// a line here and an abundance entry in the locations where it lives. The first four keep their indices (dev tools).
 /// </summary>
 public static class SpeciesCatalog
@@ -48,5 +48,31 @@ public static class SpeciesCatalog
         "res://data/fish/piskorz.tres",
         "res://data/fish/glowacz.tres",
         "res://data/fish/jesiotr.tres",
+        "res://data/fish/pstrag_teczowy.tres",
+        "res://data/fish/pstrag_zrodlany.tres",
+        "res://data/fish/troc_wedrowna.tres",
+        "res://data/fish/amur.tres",
+        "res://data/fish/tolpyga_biala.tres",
+        "res://data/fish/tolpyga_pstra.tres",
+        "res://data/fish/sazan.tres",
+        "res://data/fish/karp_lustrzen.tres",
+        "res://data/fish/sumik_karlowaty.tres",
+        "res://data/fish/sumik_kanalowy.tres",
+        "res://data/fish/bass.tres",
+        "res://data/fish/sandacz_wolzanski.tres",
+        "res://data/fish/czop.tres",
+        "res://data/fish/brzanka.tres",
+        "res://data/fish/kielb_bialoplety.tres",
+        "res://data/fish/sliz.tres",
+        "res://data/fish/koza.tres",
+        "res://data/fish/babka_bycza.tres",
+        "res://data/fish/ciernik.tres",
+        "res://data/fish/cierniczek.tres",
+        "res://data/fish/slonecznica.tres",
+        "res://data/fish/strzebla_blotna.tres",
+        "res://data/fish/glowacz_pregoplety.tres",
+        "res://data/fish/stynka.tres",
+        "res://data/fish/sterlet.tres",
+        "res://data/fish/orfa.tres",
     };
 }

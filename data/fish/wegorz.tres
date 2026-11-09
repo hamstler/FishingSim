@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Węgorz"
+LatinName = "Anguilla anguilla"
+Description = "Wężowata ryba, która wędruje na tarło aż do Morza Sargassowego. Nocny łowca, twardy w holu."
 MinWeight = 0.3
 MaxWeight = 4.0
 Rarity = 0.4

@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="FishSpecies" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/FishSpecies.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+SpeciesName = "Strzebla błotna"
+LatinName = "Rhynchocypris percnurus"
+Description = "Rzadka, ginąca rybka drobnych, zarastających zbiorników, złotawa i gęsto nakrapiana. Dziś pod ścisłą ochroną."
+MinWeight = 0.005
+MaxWeight = 0.04
+Rarity = 0.9
+PullFactor = 0.45
+Aggression = 0.5
+StaminaDrain = 0.11
+MouthSize = 1.0
+BaitAffinity = {"worm": 1.5, "corn": 0.0, "bread": 0.0, "boilie": 0.0, "livebait": 0.0, "maggot": 1.3, "insect": 0.0}
+MinDepth = 0.2
+MaxDepth = 1.5
+DayActivity = 1.0
+NightActivity = 0.5
+TwilightBonus = 1.2
+WeatherPref = {"clear": 1.0, "cloudy": 1.0, "rain": 1.1}
+RunLengthMult = 1.0
+BurstMult = 1.5
+BurstRate = 1.0
+LengthRef = 0.35
+BodyDepth = 0.2
+DorsalPos = 0.55
+BackColor = Color(0.52, 0.45, 0.25, 1)
+BellyColor = Color(0.9, 0.82, 0.55, 1)
+FinColor = Color(0.65, 0.55, 0.35, 1)
+PricePerKg = 5.0
+TrophyWeight = 0.0

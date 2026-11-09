@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Krąp"
+LatinName = "Blicca bjoerkna"
+Description = "Mniejszy kuzyn leszcza z czerwonawymi płetwami piersiowymi. Trzyma się w dużych stadach przy dnie."
 MinWeight = 0.05
 MaxWeight = 0.8
 Rarity = 2.0

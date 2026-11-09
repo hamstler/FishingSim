@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Brzana"
+LatinName = "Barbus barbus"
+Description = "Wąsata ryba bystrych, żwirowych rzek. W nurcie walczy jak mało która ryba tej wielkości."
 MinWeight = 0.3
 MaxWeight = 5.0
 Rarity = 0.6

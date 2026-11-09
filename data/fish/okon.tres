@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Okoń"
+LatinName = "Perca fluviatilis"
+Description = "Pasiasty drapieżnik z kolczastą płetwą grzbietową. Poluje stadami na drobnicę, chętnie bierze robaka."
 MinWeight = 0.05
 MaxWeight = 1.8
 Rarity = 2.2

@@ -36,12 +36,14 @@ public sealed class GearSuite : ITestSuite
         var roach = Species("ploc");
         var all = new[] { roach, Species("leszcz"), carp, Species("szczupak") };
 
-        t.Section("40 freshwater species");
+        t.Section("66 freshwater species");
         var catalogue = SpeciesCatalog.Paths.Select(p => GD.Load<FishSpecies>(p)).ToList();
         var maps = FishingSim.World.LakeBed.LocationPaths.Select(p => GD.Load<LocationData>(p)).ToList();
         string[] baits = { "worm", "corn", "bread", "boilie", "livebait", "maggot", "insect" };
-        t.Check(catalogue.Count == 40 && catalogue.All(s => s != null) && catalogue.Select(s => s.SpeciesName).Distinct().Count() == 40,
+        t.Check(catalogue.Count >= 66 && catalogue.All(s => s != null) && catalogue.Select(s => s.SpeciesName).Distinct().Count() == catalogue.Count,
             $"{catalogue.Count} species load, all with unique names");
+        var undescribed = catalogue.Where(s => s.LatinName == "" || s.Description.Length < 40).Select(s => s.SpeciesName).ToList();
+        t.Check(undescribed.Count == 0, $"every species has a Latin name and an atlas description {string.Join(", ", undescribed)}");
         var homeless = catalogue.Where(s => maps.All(m => m.AbundanceOf(s.SpeciesName) <= 0f)).Select(s => s.SpeciesName).ToList();
         t.Check(homeless.Count == 0, $"every species lives on at least one map {string.Join(", ", homeless)}");
         var picky = catalogue.Where(s => baits.All(b => s.AffinityFor(b) <= 0f)).Select(s => s.SpeciesName).ToList();
@@ -402,11 +404,11 @@ public sealed class GearSuite : ITestSuite
         for (int i = 0; i < 360 && rod.State != RodState.Waiting; i++)
             await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
         await t.Seconds(3.6);
-        t.Check(rod.State != RodState.Waiting || (main.Resting && worldState.MinutesPerSecond > 1f), "sitting still on the stool while waiting speeds up time");
+        t.Check(rod.State != RodState.Waiting || (main.Resting && worldState.TimeScale > 1f), "sitting still on the stool while waiting speeds up time");
         rod.ResetToIdle();
         await t.NextFrame();
         await t.NextFrame();
-        t.Check(!main.Resting && worldState.MinutesPerSecond == 1f, "time runs normally again when the line comes in");
+        t.Check(!main.Resting && worldState.TimeScale == 1f, "time runs normally again when the line comes in");
         t.Check(main.Rod.Gear != null && main.Rod.Profile.KeepnetLimit != null, "the rod knows the landing net and the keepnet limits the profile");
         t.Check(main.Player.Body != null && main.Player.Camera.Current, "first-person body and camera are in place");
 

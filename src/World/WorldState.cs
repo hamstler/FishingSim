@@ -14,13 +14,19 @@ public partial class WorldState : Node
     public Weather Weather { get; set; } = Weather.Clear;
     public bool Paused { get; set; }
 
-    /// <summary>Game minutes per real second (1 = a full day lasts 24 real minutes).</summary>
-    public float MinutesPerSecond { get; set; } = 1f;
+    /// <summary>Speed-up of the clock (1 = normal: 40 real minutes of day, 20 of night; resting on the stool = 4).</summary>
+    public float TimeScale { get; set; } = 1f;
+
+    /// <summary>Game minutes passing per real second right now.</summary>
+    public float MinutesPerSecond => DayClock.GameMinutesPerSecond(Hour) * TimeScale;
 
     public override void _Process(double delta)
     {
-        if (!Paused)
-            Advance((float)delta * MinutesPerSecond / 60f);
+        if (Paused)
+            return;
+        float before = Hour;
+        float after = DayClock.Advance(Hour, (float)delta, TimeScale);
+        Advance(Mathf.PosMod(after - before, 24f));
     }
 
     /// <summary>Raised with the number of in-game hours that passed (keepnet freshness, market recovery).</summary>

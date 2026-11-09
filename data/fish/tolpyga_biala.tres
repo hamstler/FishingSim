@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="FishSpecies" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/FishSpecies.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+SpeciesName = "Tołpyga biała"
+LatinName = "Hypophthalmichthys molitrix"
+Description = "Srebrzysta ryba o nisko osadzonych oczach, filtruje fitoplankton. Spłoszona potrafi wyskakiwać wysoko nad wodę."
+MinWeight = 2.0
+MaxWeight = 25.0
+Rarity = 0.4
+PullFactor = 1.5
+Aggression = 0.75
+StaminaDrain = 0.1
+MouthSize = 6.0
+BaitAffinity = {"worm": 0.0, "corn": 0.8, "bread": 1.6, "boilie": 0.6, "livebait": 0.0, "maggot": 0.0, "insect": 0.0}
+MinDepth = 0.5
+MaxDepth = 3.5
+DayActivity = 1.2
+NightActivity = 0.4
+TwilightBonus = 1.0
+WeatherPref = {"clear": 1.3, "cloudy": 1.0, "rain": 0.9}
+RunLengthMult = 1.4
+BurstMult = 1.6
+BurstRate = 1.0
+LengthRef = 0.35
+BodyDepth = 0.27
+DorsalPos = 0.45
+BackColor = Color(0.55, 0.6, 0.62, 1)
+BellyColor = Color(0.94, 0.94, 0.94, 1)
+FinColor = Color(0.6, 0.6, 0.62, 1)
+PricePerKg = 12.0
+TrophyWeight = 0.0

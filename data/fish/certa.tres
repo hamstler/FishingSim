@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Certa"
+LatinName = "Vimba vimba"
+Description = "Wędrowna ryba o wydłużonym pysku; w czasie tarła samce ciemnieją, a brzuch staje się pomarańczowy."
 MinWeight = 0.3
 MaxWeight = 2.5
 Rarity = 0.75

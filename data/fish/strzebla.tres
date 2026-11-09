@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Strzebla potokowa"
+LatinName = "Phoxinus phoxinus"
+Description = "Maleńka, kolorowa rybka górskich potoków. Samce w szacie godowej mają czerwone brzuchy."
 MinWeight = 0.005
 MaxWeight = 0.05
 Rarity = 1.5

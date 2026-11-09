@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Sapa"
+LatinName = "Ballerus sapa"
+Description = "Rzadka, leszczowata ryba dużych rzek z wydłużoną płetwą odbytową."
 MinWeight = 0.2
 MaxWeight = 1.5
 Rarity = 0.7

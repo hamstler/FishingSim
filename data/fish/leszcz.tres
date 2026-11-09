@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Leszcz"
+LatinName = "Abramis brama"
+Description = "Wysoki, bocznie spłaszczony karpiowaty pokryty śluzem. Duże stada przeczesują muliste dno, najlepiej biorą nocą i o świcie."
 MinWeight = 0.5
 MaxWeight = 3.5
 Rarity = 2.0

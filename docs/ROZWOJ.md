@@ -69,7 +69,7 @@ kształty map z góry: tryb 18.
 
 ### Deszcz
 Deszcz to `MultiMesh` animowany w `shaders/rain.gdshader`, a nie `GPUParticles3D`: cząsteczki rysowane przez dwa
-widoki naraz (widok pikselowy dzieli świat) z wektorami ruchu wywracały Godota 4.3 (`particles_get_instance_buffer_motion_vectors_offsets`).
+widoki naraz z wektorami ruchu wywracały Godota 4.3 (`particles_get_instance_buffer_motion_vectors_offsets`).
 
 ## Dodawanie treści
 - **Kształt łowiska**: `Lobes` ("x,z,rx,rz") dokładają zatoki, `Islands` ("x,z,r") wycinają wyspy, `Squareness` > 1 robi staw prostokątny.
@@ -98,18 +98,17 @@ Kolejność według wartości dla gracza; każdy punkt ma już miejsce w struktu
    Dalej: odłożenie wędki na podpórkę i kilka wędek naraz, zanęta.
 6. **Wypuszczanie ryb na żądanie** (zrobione: R po złowieniu) i limity ochronne (zrobione: wymiar ochronny i kara strażnika; dalej: okresy ochronne) (wymiar i okres ochronny), mandat od strażnika.
 7. **Świat.** Łódź, więcej map, płynne przejścia między łowiskami pieszo zamiast przystanku, NPC wędkarze.
-8. **Grafika.** Domyślny styl „Nordycki” (zbliżony do Valheima): pełna rozdzielczość z ostrymi, pikselowymi
-   teksturami, gęsta mgła z promieniami słońca, cienie i okluzja, bloom, chłodne cienie i ciepłe światło, jasne
-   księżycowe noce. Do wyboru w menu pauzy także pixel art i styl ostry. Dalej: gęstsze lasy, mgła w dolinach, ognisko.
-   **Medieval pixel art 3D.** Gotowe: potok niskiej rozdzielczości z paletą, ditheringiem i konturami,
-   pixelowe tekstury, oświetlenie toon, szachulec i strzechy, latarnie, niebo z chmurami, pasmowa woda, drzewa
-   z kart liści, trawa na wietrze. Zrobione też: minimalistyczny HUD, grosze, kramy, gildia, wóz na postoju,
-   migoczące światła, ostre (niewygładzane) fonty, lżejsze menu, naturalne zachody słońca. Dalej: prawdziwa
-   pikselowa czcionka (plik .ttf/.fnt), ikony sprzętu i ryb jako sprite'y.
+8. **Grafika.** Jedyny styl: nordycki (zbliżony do Valheima). Pełna rozdzielczość z ostrymi teksturami, gęsta
+   mgła z promieniami słońca, cienie i okluzja, bloom, chłodne cienie i ciepłe światło, księżycowe noce. Pixel art
+   został usunięty. Dalej: gęstsze lasy, mgła w dolinach, ognisko, modele budynków z prawdziwych siatek.
+9. **Doba i HUD.** Zrobione: dzień 40 min, noc 20 min (`Core/DayClock`), minimapa i zegar w prawym górnym rogu
+   (`UI/Minimap`).
+10. **Ryby.** Zrobione: 66 gatunków z opisami, szczegółowe skóry (`Graphics/FishSkin`, malowane w tle wątkami),
+    atlas w menu (`UI/FishAtlas`). Dalej: osobne tekstury płetw z promieniami, pyski i wąsy jako siatki.
 
 ## Testy
-Wszystkie zestawy razem: `godot --headless --path . res://tests/run_tests.tscn` (409 sprawdzeń). Zestaw `gear` (`tests/GearSuite.cs`) sprawdza targ, siatki, podbieraki, akcesoria, zapis, animację ciała, pływanie
-ryb i ich obecność w grze, brania od widocznych ryb, dźwięk, akcesoria, atlas oraz balans 40 gatunków (każdy da się złowić i wyholować). Uruchomienie:
+Wszystkie zestawy razem: `godot --headless --path . res://tests/run_tests.tscn` (423 sprawdzenia). Zestaw `gear` (`tests/GearSuite.cs`) sprawdza targ, siatki, podbieraki, akcesoria, zapis, animację ciała, pływanie
+ryb i ich obecność w grze, brania od widocznych ryb, dźwięk, akcesoria, atlas oraz balans 66 gatunków (każdy da się złowić i wyholować). Uruchomienie:
 ```
 FISHSIM_NO_SAVE=1 godot --headless --path . res://tests/run_tests.tscn -- gear
 ```

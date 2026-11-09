@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Jazgarz"
+LatinName = "Gymnocephalus cernua"
+Description = "Mały, kolczasty okoniowaty pokryty śluzem. Łapczywie bierze robaka przy dnie."
 MinWeight = 0.01
 MaxWeight = 0.15
 Rarity = 2.2

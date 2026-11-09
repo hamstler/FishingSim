@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Głowacica"
+LatinName = "Hucho hucho"
+Description = "Królowa górskich rzek, potężny i rzadki łososiowaty drapieżnik. Złowienie jej to wyprawa życia."
 MinWeight = 2.0
 MaxWeight = 25.0
 Rarity = 0.22

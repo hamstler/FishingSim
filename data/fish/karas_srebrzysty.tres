@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Karaś srebrzysty"
+LatinName = "Carassius gibelio"
+Description = "Srebrny krewniak karasia złocistego, przybysz ze wschodu. Bardzo żywotny i liczny w ciepłych wodach."
 MinWeight = 0.1
 MaxWeight = 1.5
 Rarity = 1.8

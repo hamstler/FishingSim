@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Rozpiór"
+LatinName = "Ballerus ballerus"
+Description = "Płaska, srebrna ryba z bardzo długą płetwą odbytową. Żeruje w toni na planktonie."
 MinWeight = 0.2
 MaxWeight = 1.2
 Rarity = 0.5

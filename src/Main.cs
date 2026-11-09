@@ -90,9 +90,6 @@ public partial class Main : Node3D
         Player.Body.HeldFishSource = () => Rod.HeldFish;
         Player.Body.ReelingSource = () => Rod.Reeling && Rod.State is RodState.Waiting or RodState.Fight or RodState.Nibble or RodState.Bite;
 
-        // Medieval pixel-art look: the world is drawn at low resolution and scaled up (HUD stays sharp).
-        AddChild(new Graphics.PixelArtView(Player.Camera));
-
         var grass = new Graphics.GrassField();
         grass.Setup(_lake, Player);
         AddChild(grass);
@@ -119,7 +116,7 @@ public partial class Main : Node3D
         Interactions.Setup(Player, Scenery, Rod);
 
         var hud = new Hud();
-        hud.Setup(Rod, Tournaments, Interactions);
+        hud.Setup(Rod, Tournaments, Interactions, Player, Scenery);
         AddChild(hud);
 
         var shop = new Shop();
@@ -251,7 +248,7 @@ public partial class Main : Node3D
         _restTimer = canRest ? _restTimer + (float)delta : 0f;
         Resting = _restTimer > 3f;
         if (!_world.Paused)
-            _world.MinutesPerSecond = Resting ? 4f : 1f;
+            _world.TimeScale = Resting ? 4f : 1f;
         if (_lantern == null)
             return;
         // Lit only when it is dark; the tallow flame flickers.

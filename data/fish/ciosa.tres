@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Ciosa"
+LatinName = "Pelecus cultratus"
+Description = "Ryba o kształcie noża, z prostym grzbietem i wygiętym brzuchem. Żeruje przy powierzchni."
 MinWeight = 0.2
 MaxWeight = 1.5
 Rarity = 0.5

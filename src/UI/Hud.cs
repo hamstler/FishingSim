@@ -53,8 +53,15 @@ public partial class Hud : CanvasLayer
     private float _purseFlash, _tackleFlash, _hintTime = 10f;
     private string _lastPurse = "", _lastTackle = "";
 
-    public void Setup(FishingRod rod, TournamentManager tournaments, InteractionManager interactions)
+    private Minimap? _minimap;
+
+    public void Setup(FishingRod rod, TournamentManager tournaments, InteractionManager interactions, Node3D? player = null, Scenery? scenery = null)
     {
+        if (player != null && scenery != null)
+        {
+            _minimap = new Minimap();
+            _minimap.Setup(rod, player, scenery);
+        }
         _rod = rod;
         _tournaments = tournaments;
         _interactions = interactions;
@@ -93,6 +100,13 @@ public partial class Hud : CanvasLayer
 
         _time = Text(15, new Color(Ink, 0.75f), HorizontalAlignment.Right);
         Anchor(_time, 1f, 0f, -420, 12, -16, 60);
+        // Minimap and clock in the top-right corner (they replace the time line).
+        if (_minimap != null)
+        {
+            Anchor(_minimap, 1f, 0f, -Minimap.Size - 20f, 20f, -20f, 20f + Minimap.Size + 80f);
+            AddChild(_minimap);
+            _time.Visible = false;
+        }
 
         _tournament = Text(15, Gold);
         Anchor(_tournament, 0f, 0f, 16, 12, 520, 100);
@@ -137,7 +151,7 @@ public partial class Hud : CanvasLayer
             + "Esc - menu | F1 - dev";
 
         _dev = Text(13, Gold);
-        Anchor(_dev, 1f, 0f, -460, 40, -16, 400);
+        Anchor(_dev, 1f, 0f, -460, Minimap.Size + 120f, -16, Minimap.Size + 480f);
         _dev.HorizontalAlignment = HorizontalAlignment.Right;
     }
 
@@ -178,7 +192,7 @@ public partial class Hud : CanvasLayer
         string state = rod.StateName;
         if (rod.State is RodState.Waiting or RodState.Nibble or RodState.Bite)
             state += $"  ·  {rod.CurrentDepth():0.0} m";
-        if (rod.State == RodState.Waiting && rod.World.MinutesPerSecond > 1f)
+        if (rod.State == RodState.Waiting && rod.World.TimeScale > 1f)
             state += "  ·  odpoczynek na zydlu";
         if (rod.State == RodState.Fight)
             state += $"  ·  {rod.LineOut:0} m{(rod.Lifting ? "  ·  pompowanie" : "")}";
@@ -225,7 +239,8 @@ public partial class Hud : CanvasLayer
         Fade(_tackle, (_tackleFlash > 0f || details) && !_helpOpen, dt);
 
         SetText(_time, $"{rod.World.TimeText}  ·  {rod.World.Weather.DisplayName()}\n{rod.Lake.Location.DisplayName}");
-        Fade(_time, details, dt);
+        if (_minimap == null)
+            Fade(_time, details, dt);
 
         var spot = _interactions.Current;
         if (spot != null)

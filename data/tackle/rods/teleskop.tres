@@ -6,7 +6,7 @@
 script = ExtResource("1")
 DisplayName = "Jesionowa wędka 2,4 m"
 CastMult = 1.0
-MaxLoad = 7.0
+MaxLoad = 5.0
 ShockAbsorb = 0.2
 Price = 120
 RequiredLevel = 2

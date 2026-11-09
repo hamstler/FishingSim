@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="FishSpecies" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/FishSpecies.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+SpeciesName = "Sandacz wołżański"
+LatinName = "Sander volgensis"
+Description = "Mniejszy krewny sandacza, bez wielkich kłów, z wyraźnymi poprzecznymi pręgami. Spotykany w dolnym biegu dużych rzek."
+MinWeight = 0.2
+MaxWeight = 1.5
+Rarity = 0.4
+PullFactor = 1.15
+Aggression = 0.7
+StaminaDrain = 0.13
+MouthSize = 5.0
+BaitAffinity = {"worm": 0.8, "corn": 0.0, "bread": 0.0, "boilie": 0.0, "livebait": 1.8, "maggot": 0.0, "insect": 0.0}
+MinDepth = 1.5
+MaxDepth = 8.0
+DayActivity = 0.6
+NightActivity = 1.2
+TwilightBonus = 1.5
+WeatherPref = {"clear": 0.9, "cloudy": 1.1, "rain": 1.2}
+RunLengthMult = 1.0
+BurstMult = 1.5
+BurstRate = 1.1
+LengthRef = 0.37
+BodyDepth = 0.18
+DorsalPos = 0.45
+BackColor = Color(0.42, 0.42, 0.34, 1)
+BellyColor = Color(0.9, 0.88, 0.8, 1)
+FinColor = Color(0.5, 0.48, 0.4, 1)
+PricePerKg = 40.0
+TrophyWeight = 0.0

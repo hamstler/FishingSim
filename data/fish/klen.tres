@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Kleń"
+LatinName = "Squalius cephalus"
+Description = "Szerokogłowy wszystkożerca rzek z ciemno obrysowaną łuską. Zjada owady, owoce, a nawet małe ryby."
 MinWeight = 0.2
 MaxWeight = 4.0
 Rarity = 0.8

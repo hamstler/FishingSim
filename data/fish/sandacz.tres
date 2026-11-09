@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Sandacz"
+LatinName = "Sander lucioperca"
+Description = "Szklistooki drapieżnik głębokich, mętnych wód. Żeruje o zmroku i nocą, ceniony za białe mięso."
 MinWeight = 0.8
 MaxWeight = 10.0
 Rarity = 0.6

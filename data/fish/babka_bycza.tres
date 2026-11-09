@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="FishSpecies" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/FishSpecies.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+SpeciesName = "Babka bycza"
+LatinName = "Neogobius melanostomus"
+Description = "Przybysz z Morza Czarnego z wielką głową i czarną plamą na płetwie grzbietowej. Łapczywa, łapie się na wszystko przy dnie."
+MinWeight = 0.02
+MaxWeight = 0.3
+Rarity = 1.5
+PullFactor = 0.75
+Aggression = 0.75
+StaminaDrain = 0.12
+MouthSize = 3.0
+BaitAffinity = {"worm": 1.8, "corn": 0.0, "bread": 0.0, "boilie": 0.0, "livebait": 0.4, "maggot": 1.2, "insect": 0.0}
+MinDepth = 0.3
+MaxDepth = 5.0
+DayActivity = 1.2
+NightActivity = 0.6
+TwilightBonus = 1.2
+WeatherPref = {"clear": 1.0, "cloudy": 1.0, "rain": 1.0}
+RunLengthMult = 0.9
+BurstMult = 1.5
+BurstRate = 1.2
+LengthRef = 0.33
+BodyDepth = 0.24
+DorsalPos = 0.4
+BackColor = Color(0.35, 0.32, 0.24, 1)
+BellyColor = Color(0.8, 0.76, 0.62, 1)
+FinColor = Color(0.3, 0.28, 0.22, 1)
+PricePerKg = 4.0
+TrophyWeight = 0.0

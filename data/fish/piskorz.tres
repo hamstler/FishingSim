@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Piskorz"
+LatinName = "Misgurnus fossilis"
+Description = "Wąsaty, wężowaty mieszkaniec mułu. Przed burzą robi się niespokojny, stąd ludowa nazwa "pogodnik"."
 MinWeight = 0.02
 MaxWeight = 0.15
 Rarity = 0.6

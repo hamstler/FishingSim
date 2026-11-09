@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Boleń"
+LatinName = "Leuciscus aspius"
+Description = "Jedyny drapieżny karpiowaty: goni ukleje przy powierzchni z charakterystycznym pluskiem. Szybki i waleczny."
 MinWeight = 0.5
 MaxWeight = 7.0
 Rarity = 0.5

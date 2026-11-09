@@ -87,7 +87,7 @@ public partial class SkyController : Node
 
     private void ApplyQuality()
     {
-        _skyMaterial.SetShaderParameter("stylize", GraphicsQuality.Style switch { ArtStyle.PixelArt => 0.75f, ArtStyle.Nordic => 0.35f, _ => 0f });
+        _skyMaterial.SetShaderParameter("stylize", 0.35f);   // a touch of painted sky over the physical one
         _applied = (float.NaN, 0f, 0f, 0f);     // re-apply fog for the style
         GraphicsQuality.ApplyEnvironment(_env);
         GraphicsQuality.ApplySun(_sun);
@@ -119,7 +119,7 @@ public partial class SkyController : Node
 
     /// <summary>
     /// Rain is a MultiMesh animated in shaders/rain.gdshader, not GPUParticles3D: particles drawn by two viewports
-    /// (the pixel-art view shares the world) with motion vectors crash Godot 4.3
+    /// (a second viewport sharing the world) with motion vectors crash Godot 4.3
     /// ("particles_get_instance_buffer_motion_vectors_offsets: Parameter particles is null").
     /// </summary>
     private void BuildRain()
@@ -222,11 +222,8 @@ public partial class SkyController : Node
 
         // Keep the sun just above the horizon at dusk so the sky shader still gets a sunset; it fades out at night.
         _sun.RotationDegrees = new Vector3(-MathF.Max(elDeg, -4f), -30f, 0f);
-        _sun.LightEnergy = 1.7f * day * (1f - _cloud * 0.7f);
         _sun.LightColor = new Color(1f, 0.5f, 0.26f).Lerp(new Color(1f, 0.95f, 0.88f), Math.Clamp(el * 2.2f, 0f, 1f));
         _sun.ShadowEnabled = _cloud < 0.75f && day > 0.02f;
-        // A low sun shining straight through the haze would paint the whole sky red: let it light the fog less.
-        _sun.LightVolumetricFogEnergy = Mathf.Lerp(0.08f, 1f, Math.Clamp(el * 3f, 0f, 1f));
         _sun.Visible = el > -0.12f;
 
         _moon.RotationDegrees = new Vector3(elDeg, 150f, 0f);
@@ -234,35 +231,20 @@ public partial class SkyController : Node
 
         if (Bed != null)
             Bed.Daylight = day * (1f - _cloud * 0.85f);
-        _env.AmbientLightEnergy = Mathf.Lerp(0.35f, 1f, day);
-        _env.AmbientLightSkyContribution = 1f;
-        _env.TonemapExposure = Mathf.Lerp(1.45f, 1f, day);   // eyes adapt at night
-        _env.FogLightColor = hor * 0.9f;
-        // Pixel art wants clean colours: much less haze unless the weather or the map calls for it.
-        bool nordic = Graphics.GraphicsQuality.Style == Graphics.ArtStyle.Nordic;
-        float haze = Graphics.GraphicsQuality.Style == Graphics.ArtStyle.PixelArt ? 0.35f : nordic ? 0.8f : 1f;
-        _env.FogDensity = Mathf.Lerp(0.0012f * haze, 0.004f, _cloud) + _rain * 0.006f + FogBoost;
-        bool illustrated = Graphics.GraphicsQuality.Style == Graphics.ArtStyle.PixelArt;
-        // Distant hills fade into the sky colour (aerial perspective), like the far planes of an illustration.
-        _env.FogAerialPerspective = illustrated ? 0.95f : 0.65f;
-        if (illustrated)
-            _env.FogLightColor = new Color(0.62f, 0.8f, 0.93f).Lerp(hor * 0.9f, Math.Clamp(1f - day + _cloud, 0f, 1f));
-        _env.VolumetricFogDensity = (0.003f + _cloud * 0.004f) * haze + _rain * 0.01f + FogBoost * 2f;
-        if (nordic)
-        {
-            // Valheim-like light: darker ambient for deep shadows, a strong sun that throws shafts through the fog,
-            // and haze tinted by the time of day.
-            _env.AmbientLightEnergy = Mathf.Lerp(0.75f, 0.72f, day);
-            // Moonlit nights: part of the ambient light is a cool blue instead of the near-black night sky.
-            _env.AmbientLightColor = new Color(0.36f, 0.45f, 0.66f);
-            _env.AmbientLightSkyContribution = Mathf.Lerp(0.35f, 1f, day);
-            _env.TonemapExposure = Mathf.Lerp(1.9f, 1.05f, day);   // nights stay readable, like moonlit Valheim
-            _sun.LightEnergy = 1.9f * day * (1f - _cloud * 0.65f);
-            _sun.LightVolumetricFogEnergy = Mathf.Lerp(0.3f, 1.6f, Math.Clamp(el * 3f, 0f, 1f));
-            _env.FogAerialPerspective = 0.55f;
-            _env.FogLightColor = hor.Lerp(new Color(0.55f, 0.66f, 0.74f), 0.4f);
-            _env.VolumetricFogAlbedo = new Color(0.9f, 0.88f, 0.84f).Lerp(hor, 0.35f);
-        }
+        // Valheim-like light: deep shadows, a strong sun that throws shafts through the fog, haze tinted by the time
+        // of day, and moonlit nights (part of the ambient light is a cool blue instead of the near-black night sky).
+        _env.AmbientLightEnergy = Mathf.Lerp(0.75f, 0.72f, day);
+        _env.AmbientLightColor = new Color(0.36f, 0.45f, 0.66f);
+        _env.AmbientLightSkyContribution = Mathf.Lerp(0.35f, 1f, day);
+        _env.TonemapExposure = Mathf.Lerp(1.9f, 1.05f, day);
+        _env.FogDensity = Mathf.Lerp(0.001f, 0.004f, _cloud) + _rain * 0.006f + FogBoost;
+        _env.VolumetricFogDensity = (0.003f + _cloud * 0.004f) * 0.8f + _rain * 0.01f + FogBoost * 2f;
+        _sun.LightEnergy = 1.9f * day * (1f - _cloud * 0.65f);
+        // A low sun lights the haze less, or it would paint the whole sky red.
+        _sun.LightVolumetricFogEnergy = Mathf.Lerp(0.3f, 1.6f, Math.Clamp(el * 3f, 0f, 1f));
+        _env.FogAerialPerspective = 0.55f;
+        _env.FogLightColor = hor.Lerp(new Color(0.55f, 0.66f, 0.74f), 0.4f);
+        _env.VolumetricFogAlbedo = new Color(0.9f, 0.88f, 0.84f).Lerp(hor, 0.35f);
 
         _starMaterial.SetShaderParameter("night", Math.Clamp(-el * 3f, 0f, 1f) * (1f - _cloud));
         int drops = _rain > 0.02f ? (int)(RainDrops * Math.Clamp(_rain, 0.05f, 1f)) : 0;

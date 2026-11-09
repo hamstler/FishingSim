@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Wzdręga"
+LatinName = "Scardinius erythrophthalmus"
+Description = "Złocista ryba o jaskrawoczerwonych płetwach. Żeruje przy powierzchni, wśród roślin, w ciepłe dni."
 MinWeight = 0.05
 MaxWeight = 1.0
 Rarity = 1.6

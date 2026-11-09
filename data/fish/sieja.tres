@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Sieja"
+LatinName = "Coregonus lavaretus"
+Description = "Większa krewna sielawy o małej głowie. Żyje w chłodnych, czystych jeziorach."
 MinWeight = 0.3
 MaxWeight = 3.0
 Rarity = 0.4

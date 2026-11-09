@@ -5,8 +5,8 @@
 [resource]
 script = ExtResource("1")
 DisplayName = "Drewniany kołowrotek"
-DragMax = 3.0
-ReelSpeed = 2.2
+DragMax = 2.0
+ReelSpeed = 1.9
 LineCapacity = 60.0
 Price = 0
 RequiredLevel = 1

@@ -5,6 +5,8 @@
 [resource]
 script = ExtResource("1")
 SpeciesName = "Lipień"
+LatinName = "Thymallus thymallus"
+Description = "Ma wielką, mieniącą się fioletem płetwę grzbietową. Żyje w czystych, chłodnych rzekach, poluje na owady."
 MinWeight = 0.1
 MaxWeight = 1.8
 Rarity = 0.6

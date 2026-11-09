@@ -6,7 +6,7 @@
 script = ExtResource("1")
 DisplayName = "Leszczynowy kij 2 m"
 CastMult = 0.75
-MaxLoad = 4.0
+MaxLoad = 2.4
 ShockAbsorb = 0.3
 Price = 0
 RequiredLevel = 1
