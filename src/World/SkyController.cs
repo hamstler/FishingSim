@@ -201,6 +201,8 @@ public partial class SkyController : Node
         _sun.LightEnergy = 1.7f * day * (1f - _cloud * 0.7f);
         _sun.LightColor = new Color(1f, 0.5f, 0.26f).Lerp(new Color(1f, 0.95f, 0.88f), Math.Clamp(el * 2.2f, 0f, 1f));
         _sun.ShadowEnabled = _cloud < 0.75f && day > 0.02f;
+        // A low sun shining straight through the haze would paint the whole sky red: let it light the fog less.
+        _sun.LightVolumetricFogEnergy = Mathf.Lerp(0.08f, 1f, Math.Clamp(el * 3f, 0f, 1f));
         _sun.Visible = el > -0.12f;
 
         _moon.RotationDegrees = new Vector3(elDeg, 150f, 0f);
@@ -210,7 +212,7 @@ public partial class SkyController : Node
             Bed.Daylight = day * (1f - _cloud * 0.85f);
         _env.AmbientLightEnergy = Mathf.Lerp(0.35f, 1f, day);
         _env.AmbientLightSkyContribution = 1f;
-        _env.TonemapExposure = Mathf.Lerp(1.9f, 1f, day);   // eyes adapt at night
+        _env.TonemapExposure = Mathf.Lerp(1.45f, 1f, day);   // eyes adapt at night
         _env.FogLightColor = hor * 0.9f;
         _env.FogDensity = Mathf.Lerp(0.0012f, 0.004f, _cloud) + _rain * 0.006f + FogBoost;
         _env.VolumetricFogDensity = 0.003f + _cloud * 0.004f + _rain * 0.01f + FogBoost * 2f;

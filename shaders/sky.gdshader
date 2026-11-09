@@ -78,7 +78,15 @@ void sky() {
 		color = pow(color, vec3(1.0 / (1.2 + (1.2 * sun_fade))));
 		color *= exposure;
 		float l = dot(color, vec3(0.3, 0.59, 0.11));
-		color = max(mix(vec3(l), color, saturation), vec3(0.0));
+		// Full boost for a blue day sky, much less at sunrise and sunset (or the whole sky turns blood red).
+		float sat = mix(1.0, saturation, smoothstep(0.02, 0.4, sun_dir.y));
+		color = max(mix(vec3(l), color, sat), vec3(0.0));
+		// At dusk the upper sky turns deep blue; the red glow stays low around the sun and the horizon.
+		float dusk = 1.0 - smoothstep(0.05, 0.35, sun_dir.y);
+		float high = smoothstep(0.05, 0.6, EYEDIR.y);
+		float glow = pow(max(cos_theta, 0.0), 6.0);
+		vec3 twilight_blue = vec3(0.035, 0.06, 0.15) + vec3(l) * vec3(0.4, 0.5, 0.9);
+		color = mix(color, twilight_blue, dusk * high * (1.0 - glow) * 0.8);
 	}
 	color += night_color * night;
 
