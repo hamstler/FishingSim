@@ -5,6 +5,9 @@ namespace FishingSim.Graphics;
 
 public enum QualityLevel { Low, Medium, High, Ultra }
 
+/// <summary>How the world is finished: chunky hand-pixelled look with a fixed palette, or sharp native resolution.</summary>
+public enum ArtStyle { PixelArt, Sharp }
+
 /// <summary>
 /// Graphics presets: post-processing (SSAO, SSIL, SSR, SDFGI, volumetric fog, bloom), anti-aliasing, shadow range and
 /// grass density. Chosen in the pause menu and remembered in user://graphics.cfg. Effects the Compatibility renderer
@@ -17,6 +20,38 @@ public static class GraphicsQuality
     private static QualityLevel _level = QualityLevel.High;
 
     public static event Action? Changed;
+
+    private static ArtStyle _style = ArtStyle.PixelArt;
+
+    /// <summary>The finish of the world image (pause menu): pixel art (default) or sharp.</summary>
+    public static ArtStyle Style
+    {
+        get
+        {
+            if (!_loaded)
+                Load();
+            return _style;
+        }
+    }
+
+    public static string StyleTitle(ArtStyle s) => s == ArtStyle.PixelArt ? "Pixel art" : "Ostry";
+
+    public static void SetStyle(ArtStyle style)
+    {
+        _loaded = true;
+        _style = style;
+        SaveConfig();
+        Changed?.Invoke();
+    }
+
+    public static void CycleStyle() => SetStyle(Style == ArtStyle.PixelArt ? ArtStyle.Sharp : ArtStyle.PixelArt);
+
+    /// <summary>Vertical resolution of the pixel-art image: each art pixel becomes several screen pixels.</summary>
+    public const int PixelArtLines = 360;
+
+    /// <summary>Screen pixels per world-image pixel for a window of the given height.</summary>
+    public static int PixelSizeFor(float screenHeight) =>
+        Style == ArtStyle.PixelArt ? Math.Max(2, (int)MathF.Round(screenHeight / PixelArtLines)) : PixelSize;
 
     public static QualityLevel Level
     {
@@ -40,23 +75,30 @@ public static class GraphicsQuality
     {
         _loaded = true;
         _level = level;
-        if (!Renderer.IsHeadless)
-        {
-            var cfg = new ConfigFile();
-            cfg.SetValue("graphics", "quality", (int)level);
-            cfg.Save(ConfigPath);
-        }
+        SaveConfig();
         Changed?.Invoke();
     }
 
     public static void Cycle() => Set((QualityLevel)(((int)Level + 1) % 4));
 
+    private static void SaveConfig()
+    {
+        if (Renderer.IsHeadless)
+            return;
+        var cfg = new ConfigFile();
+        cfg.SetValue("graphics", "quality", (int)_level);
+        cfg.SetValue("graphics", "style", (int)_style);
+        cfg.Save(ConfigPath);
+    }
+
     private static void Load()
     {
         _loaded = true;
         var cfg = new ConfigFile();
-        if (cfg.Load(ConfigPath) == Error.Ok)
-            _level = (QualityLevel)Math.Clamp(cfg.GetValue("graphics", "quality", (int)QualityLevel.High).AsInt32(), 0, 3);
+        if (cfg.Load(ConfigPath) != Error.Ok)
+            return;
+        _level = (QualityLevel)Math.Clamp(cfg.GetValue("graphics", "quality", (int)QualityLevel.High).AsInt32(), 0, 3);
+        _style = (ArtStyle)Math.Clamp(cfg.GetValue("graphics", "style", (int)ArtStyle.PixelArt).AsInt32(), 0, 1);
     }
 
     /// <summary>Radius (m) of the dense grass around the player; 0 = no grass blades.</summary>
@@ -104,7 +146,7 @@ public static class GraphicsQuality
         env.GlowBlendMode = Godot.Environment.GlowBlendModeEnum.Softlight;
 
         // Light shafts and depth haze; the plain distance fog (SkyController) stays on every level.
-        env.VolumetricFogEnabled = q >= QualityLevel.High;
+        env.VolumetricFogEnabled = q >= QualityLevel.High && Style != ArtStyle.PixelArt;   // the illustrated look wants a clean sky
         env.VolumetricFogDensity = 0.004f;
         env.VolumetricFogAnisotropy = 0.7f;
         env.VolumetricFogLength = 90f;

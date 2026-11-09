@@ -60,10 +60,15 @@ public partial class PauseMenu : CanvasLayer
         AddButton(box, "Zmień mapę", ChangeMap);
         var quality = new Button { CustomMinimumSize = new Vector2(0, 46) };
         void ShowQuality() => quality.Text =
-            $"Grafika: {Graphics.GraphicsQuality.Title(Graphics.GraphicsQuality.Level)} (piksel x{Graphics.GraphicsQuality.PixelSize})";
+            $"Grafika: {Graphics.GraphicsQuality.Title(Graphics.GraphicsQuality.Level)}";
         ShowQuality();
         quality.Pressed += () => { Graphics.GraphicsQuality.Cycle(); ShowQuality(); };
         box.AddChild(quality);
+        var style = new Button { CustomMinimumSize = new Vector2(0, 46) };
+        void ShowStyle() => style.Text = $"Styl: {Graphics.GraphicsQuality.StyleTitle(Graphics.GraphicsQuality.Style)}";
+        ShowStyle();
+        style.Pressed += () => { Graphics.GraphicsQuality.CycleStyle(); ShowStyle(); ShowQuality(); };
+        box.AddChild(style);
         AddButton(box, "Wyloguj", Logout);
         AddButton(box, "Wyjdź z gry", Quit);
     }

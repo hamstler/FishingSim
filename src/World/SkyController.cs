@@ -87,6 +87,8 @@ public partial class SkyController : Node
 
     private void ApplyQuality()
     {
+        _skyMaterial.SetShaderParameter("stylize", GraphicsQuality.Style == ArtStyle.PixelArt ? 0.75f : 0f);
+        _applied = (float.NaN, 0f, 0f, 0f);     // re-apply fog for the style
         GraphicsQuality.ApplyEnvironment(_env);
         GraphicsQuality.ApplySun(_sun);
         if (IsInsideTree())
@@ -232,8 +234,15 @@ public partial class SkyController : Node
         _env.AmbientLightSkyContribution = 1f;
         _env.TonemapExposure = Mathf.Lerp(1.45f, 1f, day);   // eyes adapt at night
         _env.FogLightColor = hor * 0.9f;
-        _env.FogDensity = Mathf.Lerp(0.0012f, 0.004f, _cloud) + _rain * 0.006f + FogBoost;
-        _env.VolumetricFogDensity = 0.003f + _cloud * 0.004f + _rain * 0.01f + FogBoost * 2f;
+        // Pixel art wants clean colours: much less haze unless the weather or the map calls for it.
+        float haze = Graphics.GraphicsQuality.Style == Graphics.ArtStyle.PixelArt ? 0.35f : 1f;
+        _env.FogDensity = Mathf.Lerp(0.0012f * haze, 0.004f, _cloud) + _rain * 0.006f + FogBoost;
+        bool illustrated = Graphics.GraphicsQuality.Style == Graphics.ArtStyle.PixelArt;
+        // Distant hills fade into the sky colour (aerial perspective), like the far planes of an illustration.
+        _env.FogAerialPerspective = illustrated ? 0.95f : 0.65f;
+        if (illustrated)
+            _env.FogLightColor = new Color(0.62f, 0.8f, 0.93f).Lerp(hor * 0.9f, Math.Clamp(1f - day + _cloud, 0f, 1f));
+        _env.VolumetricFogDensity = (0.003f + _cloud * 0.004f) * haze + _rain * 0.01f + FogBoost * 2f;
 
         _starMaterial.SetShaderParameter("night", Math.Clamp(-el * 3f, 0f, 1f) * (1f - _cloud));
         _rainFx.Emitting = _rain > 0.02f;

@@ -101,6 +101,7 @@ public partial class Main : Node3D
         Fish.Setup(_lake, Player, species, WaterY);
         AddChild(Fish);
         Rod.Population = Fish;
+        AddChild(new Graphics.Gulls { Daylight = () => _world.Daylight });
 
         var sound = new Audio.SoundEngine();
         sound.Setup(Rod, Player, _world, _lake);

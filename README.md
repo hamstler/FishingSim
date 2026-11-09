@@ -1,6 +1,8 @@
 # Fishing Sim (RF4-like), wersja C#
 
-**Styl graficzny: medieval pixel art 3D.** Świat 3D jest renderowany w niskiej rozdzielczości i powiększany bez wygładzania, z ograniczoną paletą, ditheringiem i konturami (`src/Graphics/PixelArtView.cs`, `shaders/pixel_post.gdshader`), a HUD zostaje ostry. Wioska jest średniowieczna: domy z szachulcem i strzechą, latarnie na drewnianych słupach, drewniana wędka. Tekstury to proceduralny pixel art 32×32 z filtrowaniem nearest, a oświetlenie jest pasmowe (toon). Jakość grafiki (wielkość piksela, cienie, trawa, efekty) zmienia się w menu pauzy. Waluta to grosze (gr), sklepy to kramy, turnieje prowadzi gildia wędkarzy, a na inne łowisko jedzie się wozem.
+**Styl graficzny: ilustracyjny pixel art 3D** (domyślny; w menu pauzy można przełączyć na „Ostry”): ciepła, ograniczona paleta, brązowe kontury brył, płaskie chmury, lampki nad pomostem, złote ryby na dachach skupu i targu, mewy.
+
+**Wcześniej: medieval pixel art 3D.** Świat 3D jest renderowany w niskiej rozdzielczości i powiększany bez wygładzania, z ograniczoną paletą, ditheringiem i konturami (`src/Graphics/PixelArtView.cs`, `shaders/pixel_post.gdshader`), a HUD zostaje ostry. Wioska jest średniowieczna: domy z szachulcem i strzechą, latarnie na drewnianych słupach, drewniana wędka. Tekstury to proceduralny pixel art 32×32 z filtrowaniem nearest, a oświetlenie jest pasmowe (toon). Jakość grafiki (wielkość piksela, cienie, trawa, efekty) zmienia się w menu pauzy. Waluta to grosze (gr), sklepy to kramy, turnieje prowadzi gildia wędkarzy, a na inne łowisko jedzie się wozem.
 
 **Minimalistyczny interfejs:** podczas zwykłego rozglądania na ekranie jest tylko mała kropka celownika. Stan wędki i cienki pasek napięcia pojawiają się w trakcie łowienia, sakiewka i siatka na chwilę po zmianie, a sprzęt na chwilę po przełączeniu. Tab pokazuje wszystko naraz, H sterowanie.
 

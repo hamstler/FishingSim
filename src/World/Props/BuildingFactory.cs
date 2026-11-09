@@ -60,10 +60,12 @@ public static class BuildingFactory
                 break;
             case BuildingKind.FishBuyer:
                 FishStall(b, new Color(0.18f, 0.4f, 0.55f));
+                GoldenFish(b, new Vector3(0f, 5.1f, 0.2f));
                 break;
             case BuildingKind.Market:
                 // A bigger, red-roofed stall with stock piled around it. TODO (docs/ROZWOJ.md): market hall with NPC traders.
                 FishStall(b, new Color(0.62f, 0.18f, 0.16f), "TARG RYBNY");
+                GoldenFish(b, new Vector3(0f, 5.1f, 0.2f));
                 Crates(b, new Vector3(3.2f, 0, 3.4f), 3);
                 Barrel(b, new Vector3(-3.0f, 0, 3.4f));
                 Barrel(b, new Vector3(-2.3f, 0, 3.7f));
@@ -413,6 +415,22 @@ public static class BuildingFactory
         Box(b, new Vector3(4.6f, 0.16f, 0.1f), new Vector3(0, 3.45f, d / 2f + 0.1f), white);
         Box(b, new Vector3(0.16f, 3.5f, 0.1f), new Vector3(0, 1.7f, d / 2f + 0.14f), white);
         Box(b, new Vector3(1.2f, 1.1f, 0.1f), new Vector3(0, h + 1.2f, d / 2f + 0.1f), Flat(new Color(0.1f, 0.08f, 0.07f)));
+    }
+
+    /// <summary>The fishmonger's emblem: a big golden carp mounted on the roof ridge, mouth open to the plaza.</summary>
+    private static void GoldenFish(Building b, Vector3 at)
+    {
+        var carp = GD.Load<FishSpecies>("res://data/fish/karp.tres");
+        if (carp == null)
+            return;
+        var fish = Fishing.FishModel.Create(carp, 9f);
+        float scale = 2.8f / fish.Length;
+        fish.Wiggle = 0f;
+        fish.Scale = new Vector3(scale, scale, scale);
+        fish.Position = at;
+        fish.RotationDegrees = new Vector3(0f, 90f, 0f);
+        b.AddChild(fish);
+        Box(b, new Vector3(0.12f, 0.9f, 0.12f), at + new Vector3(0, -0.6f, 0), Timber());
     }
 
     private static void FishStall(Building b, Color awningColor, string sign = "SKUP RYB")
