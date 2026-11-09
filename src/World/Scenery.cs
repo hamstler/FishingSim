@@ -188,6 +188,7 @@ public partial class Scenery : Node3D
         BuildingKind.Tackle or BuildingKind.General => new Color(0.95f, 0.75f, 0.2f),
         BuildingKind.Bait => new Color(0.5f, 0.9f, 0.35f),
         BuildingKind.FishBuyer => new Color(0.4f, 0.8f, 1f),
+        BuildingKind.Market => new Color(1f, 0.55f, 0.3f),
         BuildingKind.Office => new Color(1f, 0.45f, 0.45f),
         _ => new Color(0.85f, 0.85f, 0.95f),
     };

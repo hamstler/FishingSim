@@ -8,7 +8,7 @@ namespace FishingSim.Data;
 public enum BuildingKind
 {
     // functional
-    Tackle, Bait, FishBuyer, General, Office, BusStop,
+    Tackle, Bait, FishBuyer, Market, General, Office, BusStop,
     // scenery
     House, Barn, Windmill, Boathouse, Haystack, Lamp, Bench, Boat, Crates, Signpost, Fence,
 }
@@ -35,6 +35,7 @@ public sealed record BuildingSpec(BuildingKind Kind, Vector2 Position, float? Ya
     {
         BuildingKind.Tackle or BuildingKind.General or BuildingKind.Office => 9f,
         BuildingKind.Bait or BuildingKind.FishBuyer => 7f,
+        BuildingKind.Market => 8f,
         BuildingKind.House or BuildingKind.Boathouse => 8f,
         BuildingKind.Barn => 10f,
         BuildingKind.Windmill => 6f,

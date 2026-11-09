@@ -34,4 +34,4 @@ FlowerDensity = 1.0
 ReedDensity = 1.0
 RockDensity = 0.5
 PlazaCenter = Vector2(0, 28)
-Buildings = PackedStringArray("tackle,-22,24", "bait,-10,40", "fishbuyer,12,40", "office,24,22", "busstop,7,13", "house,-40,44", "house,38,46", "lamp,0,12", "lamp,0,20", "lamp,0,34", "lamp,-12,28", "lamp,12,28", "bench,-5,17", "bench,5,17", "crates,-15,33", "crates,17,33", "signpost,0,9", "boat,-38,3,70", "fence,-34,52,0", "fence,24,54,0")
+Buildings = PackedStringArray("tackle,-22,24", "bait,-10,40", "fishbuyer,12,40", "market,-2,57", "office,24,22", "busstop,7,13", "house,-40,44", "house,38,46", "lamp,0,12", "lamp,0,20", "lamp,0,34", "lamp,-12,28", "lamp,12,28", "bench,-5,17", "bench,5,17", "crates,-15,33", "crates,17,33", "signpost,0,9", "boat,-38,3,70", "fence,-34,52,0", "fence,24,54,0")

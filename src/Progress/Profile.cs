@@ -3,12 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using FishingSim.Core;
+using FishingSim.Core.Gear;
+using FishingSim.Core.Market;
 using FishingSim.Data;
 
 namespace FishingSim.Progress;
 
-/// <summary>A fish in the keepnet, waiting to be sold.</summary>
-public sealed record CatchRecord(string Species, float Weight, int Value);
+/// <summary>A fish in the keepnet, waiting to be sold. <paramref name="Value"/> is the fixed buyer's price;
+/// <paramref name="Condition"/> (1 = fresh, 0 = dead) drops while the fish sits in the net and lowers the market price.</summary>
+public sealed record CatchRecord(string Species, float Weight, int Value, float Condition = 1f);
 
 /// <summary>One line of the fishing journal.</summary>
 public sealed record JournalEntry(
@@ -26,8 +29,8 @@ public sealed record CatchContext(string? Location = null, string? Bait = null, 
 /// <summary>A finished tournament in the player's history.</summary>
 public sealed record TournamentRecord(string Name, int Rank, int Entrants, float Score, int PrizeMoney, int PrizeXp);
 
-/// <summary>Result of landing a fish.</summary>
-public readonly record struct CatchResult(bool Record, bool LevelUp, int Xp, int Value);
+/// <summary>Result of landing a fish. <paramref name="Released"/>: the keepnet was full, so the fish went back to the water.</summary>
+public readonly record struct CatchResult(bool Record, bool LevelUp, int Xp, int Value, bool Released = false);
 
 /// <summary>Player progression: money, XP/level, owned tackle, bait stock, keepnet, records and journal.</summary>
 public sealed class Profile
@@ -59,6 +62,18 @@ public sealed class Profile
     public Dictionary<string, int> BaitCounts { get; set; } = new();
     public Dictionary<string, string> Equipped { get; set; } = new();
 
+    /// <summary>Keepnets, landing nets and accessories.</summary>
+    public GearInventory Gear { get; set; } = new();
+
+    /// <summary>Live fish-market prices (saturation per species, market clock). Saved with the profile.</summary>
+    public FishMarket Market { get; set; } = new();
+
+    /// <summary>
+    /// Limits of the equipped keepnet, set by <see cref="GearCatalog"/>. Null = unlimited (plain profiles in tests
+    /// and tools behave like before keepnets existed).
+    /// </summary>
+    public KeepnetSpec? KeepnetLimit { get; set; }
+
     public Profile() => Reset();
 
     /// <summary>Raises <see cref="Changed"/> (UI refresh, autosave).</summary>
@@ -89,6 +104,8 @@ public sealed class Profile
         {
             ["rod"] = "junior", ["reel"] = "mlynek1000", ["line"] = "zylka025", ["hook"] = "hak5", ["bait"] = "worm",
         };
+        Gear = new GearInventory();
+        Market = new FishMarket();
     }
 
     // ------------------------------------------------------------------ economy
@@ -100,13 +117,64 @@ public sealed class Profile
 
     public float KeepnetWeight => Keepnet.Sum(f => f.Weight);
 
+    /// <summary>True when the equipped keepnet has room for one more fish of this weight.</summary>
+    public bool KeepnetFits(float weight) =>
+        KeepnetLimit is not KeepnetSpec spec || KeepnetModel.Fits(spec, Keepnet.Count, KeepnetWeight, weight);
+
+    /// <summary>Fish in the keepnet lose condition as time passes; the market recovers from earlier sales.</summary>
+    public void PassTime(float hours)
+    {
+        if (hours <= 0f)
+            return;
+        Market.AdvanceHours(hours);
+        if (KeepnetLimit is not KeepnetSpec spec || Keepnet.Count == 0)
+            return;
+        float fill = spec.MaxKg > 0f ? KeepnetWeight / spec.MaxKg : 1f;
+        for (int i = 0; i < Keepnet.Count; i++)
+            Keepnet[i] = Keepnet[i] with { Condition = KeepnetModel.Decay(Keepnet[i].Condition, spec, hours, fill) };
+    }
+
+    private static FishLot LotFor(CatchRecord fish, IEnumerable<FishSpecies> species)
+    {
+        var sp = species.FirstOrDefault(s => s.SpeciesName == fish.Species);
+        float perKg = sp?.PricePerKg ?? (fish.Weight > 0f ? fish.Value / fish.Weight : 0f);
+        return new FishLot(fish.Species, fish.Weight, perKg, sp?.TrophyThreshold ?? 0f, fish.Condition);
+    }
+
+    /// <summary>What the fish market would pay for one keepnet fish right now.</summary>
+    public int MarketQuote(CatchRecord fish, IEnumerable<FishSpecies> species) => Market.Quote(LotFor(fish, species));
+
+    /// <summary>Sells one keepnet fish at the market (live price). Returns the money earned, 0 for a bad index.</summary>
+    public int SellAtMarket(int index, IEnumerable<FishSpecies> species)
+    {
+        if (index < 0 || index >= Keepnet.Count)
+            return 0;
+        int paid = Market.Sell(LotFor(Keepnet[index], species));
+        Keepnet.RemoveAt(index);
+        Money += paid;
+        Changed?.Invoke();
+        return paid;
+    }
+
+    /// <summary>Sells the whole keepnet at the market, biggest fish first (they get the unsaturated price).</summary>
+    public int SellAllAtMarket(IEnumerable<FishSpecies> species)
+    {
+        var list = species.ToList();
+        int paid = Market.SellAll(Keepnet.OrderByDescending(f => f.Weight).Select(f => LotFor(f, list)).ToList());
+        Money += paid;
+        Keepnet = new();
+        Changed?.Invoke();
+        return paid;
+    }
     /// <summary>Adds a landed fish to the keepnet and the journal, awards XP and checks for records and level-ups.</summary>
     public CatchResult AddCatch(FishSpecies species, float weight, CatchContext? context = null)
     {
         string name = species.SpeciesName;
         int xpGain = Progression.FishXp(species, weight);
         int value = Progression.FishValue(species, weight);
-        Keepnet.Add(new CatchRecord(name, weight, value));
+        bool released = !KeepnetFits(weight);
+        if (!released)
+            Keepnet.Add(new CatchRecord(name, weight, value));
         CatchCounts[name] = CatchCounts.GetValueOrDefault(name) + 1;
         TotalCatches++;
 
@@ -121,7 +189,7 @@ public sealed class Profile
 
         bool leveled = GainXp(xpGain);
         Changed?.Invoke();
-        return new CatchResult(record, leveled, xpGain, value);
+        return new CatchResult(record, leveled, xpGain, value, released);
     }
 
     /// <summary>Adds XP and levels up as often as needed. Returns true when at least one level was gained.</summary>
@@ -176,6 +244,21 @@ public sealed class Profile
             BaitCounts[id] = BaitCounts.GetValueOrDefault(id) + pack;
         else
             Owned[slot.Key()].Add(id);
+        Changed?.Invoke();
+        return null;
+    }
+
+    /// <summary>Buys a keepnet, landing net or accessory. Returns null on success or a (Polish) error message.</summary>
+    public string? BuyGear(GearSlot slot, string id, int price, int requiredLevel)
+    {
+        if (Level < requiredLevel)
+            return $"Wymagany poziom {requiredLevel}";
+        if (Gear.Owns(slot, id))
+            return "Już to masz";
+        if (Money < price)
+            return "Za mało pieniędzy";
+        Money -= price;
+        Gear.Add(slot, id);
         Changed?.Invoke();
         return null;
     }

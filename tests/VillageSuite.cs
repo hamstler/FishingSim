@@ -212,7 +212,8 @@ public sealed class VillageSuite : ITestSuite
         int total = shop.Tabs.GetTabCount();
         foreach (var (kind, shown) in new[]
         {
-            (InteractKind.Tackle, 4), (InteractKind.Bait, 1), (InteractKind.FishBuyer, 2), (InteractKind.General, 7), (InteractKind.BusStop, 1),
+            (InteractKind.Tackle, 7), (InteractKind.Bait, 1), (InteractKind.FishBuyer, 2), (InteractKind.Market, 2), (InteractKind.General, 10),
+            (InteractKind.BusStop, 1),
         })
         {
             var spot = new Interactable { Kind = kind, Title = kind.ToString() };

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using FishingSim.Data;
 
@@ -145,6 +147,35 @@ public partial class FishModel : Node3D
             st.SetColor(color);
             st.AddVertex(v);
         }
+    }
+
+    private List<StandardMaterial3D>? _underwater;
+
+    /// <summary>
+    /// Switches the fish to its under-the-surface look: tinted by the water and drawn after the (transparent, non
+    /// depth-writing) water surface, so it shows through it while the lake bottom and the pier still hide it.
+    /// <paramref name="clarity"/> 0..1 fades it out with depth.
+    /// </summary>
+    public void SetUnderwater(Color tint, float clarity)
+    {
+        if (_underwater == null)
+        {
+            _underwater = new List<StandardMaterial3D>();
+            foreach (var mi in FindChildren("*", nameof(MeshInstance3D), true, false).OfType<MeshInstance3D>())
+            {
+                if (mi.MaterialOverride is not StandardMaterial3D src)
+                    continue;
+                var m = (StandardMaterial3D)src.Duplicate();
+                m.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+                m.RenderPriority = 1;
+                mi.MaterialOverride = m;
+                mi.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+                _underwater.Add(m);
+            }
+        }
+        float a = Math.Clamp(clarity, 0f, 1f) * 0.85f;
+        foreach (var m in _underwater)
+            m.AlbedoColor = new Color(tint.R, tint.G, tint.B, a);
     }
 
     public override void _Process(double delta)

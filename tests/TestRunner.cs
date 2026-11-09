@@ -22,6 +22,7 @@ public partial class TestRunner : Node
         new GameSuite(),
         new TournamentSuite(),
         new VillageSuite(),
+        new GearSuite(),
     };
 
     public override async void _Ready()

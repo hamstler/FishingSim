@@ -20,6 +20,7 @@ public static class BuildingFactory
         BuildingKind.General => "Sklep wędkarski i przynęty",
         BuildingKind.Bait => "Sklep z przynętami",
         BuildingKind.FishBuyer => "Skup ryb",
+        BuildingKind.Market => "Targ rybny",
         BuildingKind.Office => "Biuro zawodów",
         BuildingKind.BusStop => "Przystanek",
         _ => "",
@@ -58,7 +59,14 @@ public static class BuildingFactory
                 Crates(b, new Vector3(2.4f, 0, 3.4f), 2);
                 break;
             case BuildingKind.FishBuyer:
-                FishStall(b);
+                FishStall(b, new Color(0.18f, 0.4f, 0.55f));
+                break;
+            case BuildingKind.Market:
+                // A bigger, red-roofed stall with stock piled around it. TODO (docs/ROZWOJ.md): market hall with NPC traders.
+                FishStall(b, new Color(0.62f, 0.18f, 0.16f));
+                Crates(b, new Vector3(3.2f, 0, 3.4f), 3);
+                Barrel(b, new Vector3(-3.0f, 0, 3.4f));
+                Barrel(b, new Vector3(-2.3f, 0, 3.7f));
                 break;
             case BuildingKind.BusStop:
                 BusStop(b);
@@ -338,10 +346,10 @@ public static class BuildingFactory
         Box(b, new Vector3(1.2f, 1.1f, 0.1f), new Vector3(0, h + 1.2f, d / 2f + 0.1f), Flat(new Color(0.1f, 0.08f, 0.07f)));
     }
 
-    private static void FishStall(Building b)
+    private static void FishStall(Building b, Color awningColor)
     {
         var wood = Wood(new Color(0.65f, 0.5f, 0.36f));
-        var awning = Roof(new Color(0.18f, 0.4f, 0.55f));
+        var awning = Roof(awningColor);
         const float w = 8f, d = 5f;
         foreach (float sx in new[] { -1f, 1f })
             foreach (float sz in new[] { -1f, 1f })

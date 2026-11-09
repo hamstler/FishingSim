@@ -61,6 +61,9 @@ public partial class Water : MeshInstance3D
         _material.SetShaderParameter("rain", Rain);
     }
 
+    /// <summary>0..1: how much surface glare is removed (polarized glasses make fish easier to see).</summary>
+    public void SetGlareCut(float amount) => _material.SetShaderParameter("glare_cut", Math.Clamp(amount, 0f, 1f));
+
     /// <summary>Colours of the water over the shallows and over the deep parts (set per map).</summary>
     public void SetTint(Color shallow, Color deep)
     {

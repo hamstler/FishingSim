@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Godot;
 using FishingSim.Core;
+using FishingSim.Core.Gear;
 using FishingSim.Data;
 using FishingSim.Progress;
 using FishingSim.World;
@@ -21,7 +22,8 @@ public sealed record RodDependencies(
     Profile Profile,
     WorldState World,
     LakeBed Lake,
-    float WaterY);
+    float WaterY,
+    GearCatalog? Gear = null);
 
 /// <summary>
 /// The fishing loop as a state machine: charge, cast, wait, nibble, bite, hook, fight, land.
@@ -85,6 +87,9 @@ public partial class FishingRod : Node3D
     public Profile Profile { get; private set; } = null!;
     public WorldState World { get; private set; } = null!;
     public LakeBed Lake { get; private set; } = null!;
+
+    /// <summary>Keepnets, landing nets and accessories (null in minimal setups: landing by hand, unlimited net).</summary>
+    public GearCatalog? Gear { get; private set; }
     public IReadOnlyList<FishSpecies> Species => _species;
     public Bobber Bobber => _bobber;
 
@@ -139,6 +144,7 @@ public partial class FishingRod : Node3D
         World = deps.World;
         Lake = deps.Lake;
         _waterY = deps.WaterY;
+        Gear = deps.Gear;
         ApplyTackle();
     }
 
@@ -557,6 +563,13 @@ public partial class FishingRod : Node3D
                 BreakLine("Ryba wyciągnęła całą żyłkę!");
                 return;
             case FightOutcome.Landed:
+                if (!DevUnbreakable && LandingModel.Resolve(_rng, CurrentWeight, Gear?.LandingNetSpec, _fight.Stamina) == LandingOutcome.Escaped)
+                {
+                    BreakLine(Gear?.LandingNet == null
+                        ? "Ryba spadła przy wyjmowaniu ręką! Kup podbierak."
+                        : "Ryba nie zmieściła się w podbieraku i spadła!");
+                    return;
+                }
                 LandFish();
                 return;
         }
@@ -595,6 +608,8 @@ public partial class FishingRod : Node3D
             text += "\nNowy rekord gatunku!";
         if (result.LevelUp)
             text += $"\nAwans na poziom {Profile.Level}!";
+        if (result.Released)
+            text += "\nSiatka pełna: ryba wypuszczona. Sprzedaj ryby albo kup większą siatkę.";
         ShowBanner(text, 4.5f);
         _lineOutOutsideFight = 0f;
         _fight = null;

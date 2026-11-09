@@ -30,7 +30,7 @@ public static class ProfileSerializer
     {
         var keepnet = new JsonArray();
         foreach (var c in p.Keepnet)
-            keepnet.Add(new JsonObject { ["species"] = c.Species, ["weight"] = c.Weight, ["value"] = c.Value });
+            keepnet.Add(new JsonObject { ["species"] = c.Species, ["weight"] = c.Weight, ["value"] = c.Value, ["condition"] = c.Condition });
 
         var journal = new JsonArray();
         foreach (var e in p.Journal)
@@ -77,6 +77,21 @@ public static class ProfileSerializer
             ["owned"] = owned,
             ["bait_counts"] = FromMap(p.BaitCounts, v => v),
             ["equipped"] = FromMap(p.Equipped, v => v),
+            ["gear"] = new JsonObject
+            {
+                ["owned"] = FromMap(p.Gear.Owned, ids =>
+                {
+                    var arr = new JsonArray();
+                    foreach (var id in ids) arr.Add(id);
+                    return arr;
+                }),
+                ["equipped"] = FromMap(p.Gear.Equipped, v => v),
+            },
+            ["market"] = new JsonObject
+            {
+                ["hours"] = p.Market.Hours,
+                ["saturation"] = FromMap(p.Market.Saturation, v => v),
+            },
             ["location_idx"] = p.LocationIdx,
             ["hour"] = p.Hour,
         };
@@ -129,7 +144,7 @@ public static class ProfileSerializer
             foreach (var n in net)
             {
                 if (n is JsonObject o && o["species"] is JsonNode sp)
-                    p.Keepnet.Add(new CatchRecord(sp.GetValue<string>(), Float(o["weight"], 0f), Int(o["value"], 0)));
+                    p.Keepnet.Add(new CatchRecord(sp.GetValue<string>(), Float(o["weight"], 0f), Int(o["value"], 0), Float(o["condition"], 1f)));
             }
         }
         if (d["journal"] is JsonArray journal)
@@ -180,6 +195,31 @@ public static class ProfileSerializer
         {
             foreach (var (k, v) in eq)
                 if (v != null) p.Equipped[k] = v.GetValue<string>();
+        }
+        // Saves from before keepnets/landing nets keep the starter gear that Reset() gave them.
+        if (d["gear"] is JsonObject gear)
+        {
+            if (gear["owned"] is JsonObject gearOwned)
+            {
+                foreach (var (slot, node) in gearOwned)
+                {
+                    if (node is not JsonArray ids)
+                        continue;
+                    p.Gear.Owned.TryAdd(slot, new());
+                    foreach (var id in ids)
+                        if (Str(id) is string s && !p.Gear.Owned[slot].Contains(s)) p.Gear.Owned[slot].Add(s);
+                }
+            }
+            if (gear["equipped"] is JsonObject gearEq)
+            {
+                foreach (var (k, v) in gearEq)
+                    if (Str(v) is string s) p.Gear.Equipped[k] = s;
+            }
+        }
+        if (d["market"] is JsonObject market)
+        {
+            p.Market.Hours = Float(market["hours"], 0f);
+            ReadMap(market["saturation"], p.Market.Saturation, n => Float(n, 0f));
         }
     }
 

@@ -4,7 +4,7 @@ Original RF4-style fishing simulator, Godot 4.3 .NET (C#). Polish README in READ
 
 ## Build / test
 - `dotnet build` (Godot.NET.Sdk 4.3.0; in offline sandboxes restore via the bundled GodotSharp/Tools/nupkgs source).
-- Tests: `FISHSIM_NO_SAVE=1 godot --headless --path . res://tests/run_tests.tscn -- <suite>` (core, accounts, progress, world, game, tournaments, village).
+- Tests: `FISHSIM_NO_SAVE=1 godot --headless --path . res://tests/run_tests.tscn -- <suite>` (core, accounts, progress, world, game, tournaments, village, gear).
 - Screenshots: `tests/screenshot.tscn` (use xvfb-run + vulkan/lavapipe).
 
 ## Architecture

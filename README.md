@@ -31,26 +31,34 @@ Symulator wędkarski w Godot 4.3 (.NET) napisany w całości w C#. Poza kodem s�
   - *Staw Karpiowy* (poziom 3): łąka z kwiatami, gospodarstwo z wiatrakiem, stodołą i stogami siana.
   - *Górskie Jezioro* (poziom 4): sosny, skały, wysokie wzgórza ze śniegiem, górska chata.
 - **Budynki** (`src/World/Props/BuildingFactory.cs`, wszystko z prymitywów): sklepy, domy, stodoła, wiatrak z obracającymi się skrzydłami, skup ryb ze stoiskiem i suszarnią, biuro z flagą, przystanek, latarnie, ławki, łodzie, płoty, skrzynie i beczki. Okna i latarnie świecą po zmroku.
-- **Sklepy to budynki:** podejdź do drzwi i naciśnij E. Sklep wędkarski pokazuje sprzęt, sklep z przynętami przynęty, skup ryb sprzedaż i rekordy, przystanek zmianę łowiska, biuro zawodów turnieje (zakładka T działa też z daleka).
+- **Sklepy to budynki:** podejdź do drzwi i naciśnij E. Sklep wędkarski pokazuje sprzęt (wędki, kołowrotki, żyłki, haki, siatki, podbieraki, akcesoria), sklep z przynętami przynęty, skup ryb sprzedaż po stałej cenie, targ rybny (Jezioro Zielone) sprzedaż po cenach dnia z premią za świeże i trofeowe ryby, przystanek zmianę łowiska, biuro zawodów turnieje (zakładka T działa też z daleka).
+- **Siatka i podbierak:** siatka ma limit ryb i kilogramów (pełna = ryba wypuszczona), a ryby tracą w niej kondycję. Duże ryby bez odpowiedniego podbieraka często spadają przy wyjmowaniu.
+- **Ryby widać w wodzie:** ławice pływają przy brzegu i uciekają przed biegnącym wędkarzem. Okulary polaryzacyjne pokazują je dalej i głębiej.
+- **Tylko widok z oczu wędkarza:** kołysanie głowy w rytm kroków, oddech, widoczne ręce na wędce i kołowrotku.
+- Plan dalszej rozbudowy: [`docs/ROZWOJ.md`](docs/ROZWOJ.md).
 - **Dodawanie budynków:** wpis `"rodzaj,x,z[,obrót]"` w polu `Buildings` łowiska (np. `"tackle,-22,24"`). Budynki same obracają się twarzą do placu, teren pod nimi jest wyrównywany, a do drzwi prowadzi ścieżka.
 
 ## Struktura kodu
 ```
 src/
   Core/         logika bez zależności od sceny, w pełni testowalna
-                FightModel (hol), BiteModel (szanse brań), Progression (XP, wartość ryb), IRng
-  Data/         zasoby danych (.tres): FishSpecies, LocationData, RodData, ReelData, LineData, HookData, BaitData
+                FightModel (hol), BiteModel (szanse brań), Progression (XP, wartość ryb), IRng,
+                Market/FishMarket (targ), Gear/ (siatka, podbierak), Animation/BodyMotion (ruch ciała), FishAI/FishSwimModel (ławice)
+  Data/         zasoby danych (.tres): FishSpecies, LocationData, RodData, ReelData, LineData, HookData, BaitData,
+                KeepnetData, LandingNetData, AccessoryData
   Accounts/     UserStore (konta, hasze), Session (kto jest zalogowany, wybrana mapa)
-  Progress/     Profile (pieniądze, XP, sprzęt, siatka, rekordy, dziennik, turnieje), ProfileSerializer (JSON), TackleLoadout
+  Progress/     Profile (pieniądze, XP, sprzęt, siatka, rekordy, dziennik, turnieje, targ), ProfileSerializer (JSON), TackleLoadout,
+                GearInventory + GearCatalog (siatki, podbieraki, akcesoria)
   World/        LakeBed (teren, głębokość, place pod budynki, ścieżki), Water, SkyController (niebo, deszcz, gwiazdy), WorldState (czas, pogoda),
-                Scenery (pomost, wioska, roślinność wg biomu), InteractionManager (drzwi i klawisz E), Props/ (BuildingFactory, TreeFactory, tekstury)
-  Fishing/      FishingRod (maszyna stanów połowu), Bobber, Player, RodRig, FishModel (proceduralna ryba)
+                Scenery (pomost, wioska, roślinność wg biomu), InteractionManager (drzwi i klawisz E), Props/ (BuildingFactory, TreeFactory, tekstury),
+                FishPopulation (ryby widoczne w wodzie)
+  Fishing/      FishingRod (maszyna stanów połowu), Bobber, Player, FirstPersonBody (ręce), RodRig, FishModel (proceduralna ryba)
   Tournaments/  TournamentData, TournamentSession (boty i ranking), TournamentManager
   UI/           Menu (logowanie, wybór mapy), Hud, GameUI (ekwipunek, mapa, dziennik, turnieje), Shop, PauseMenu, UITheme
 data/           ryby, łowiska, sprzęt, turnieje (.tres): nowa ryba, mapa lub turniej to nowy plik
 tests/          zestawy testów i narzędzie do zrzutów ekranu
 ```
-Przy dodawaniu: nowa ryba = plik w `data/fish/` i wpis w `Main.SpeciesPaths`; nowa mapa = plik w `data/locations/` i wpis w `LakeBed.LocationPaths`; nowy sprzęt = plik w `data/tackle/...` i wpis w `TackleLoadout`; nowy turniej = plik w `data/tournaments/` i wpis w `TournamentManager.TournamentPaths`.
+Przy dodawaniu: nowa ryba = plik w `data/fish/` i wpis w `Main.SpeciesPaths`; nowa mapa = plik w `data/locations/` i wpis w `LakeBed.LocationPaths`; nowy sprzęt = plik w `data/tackle/...` i wpis w `TackleLoadout` (siatki, podbieraki, akcesoria: w `GearCatalog`); nowy turniej = plik w `data/tournaments/` i wpis w `TournamentManager.TournamentPaths`.
 
 ## Jak działa hol i branie
 - **Hol** (`FightModel`, w kg-sile): ryba ciągnie z siłą zależną od gatunku i wagi. Hamulec puszcza żyłkę tylko wtedy, gdy ciągnięcie przekracza jego ustawienie. Napięcie to limit hamulca plus 25% nadwyżki (pomniejszone o amortyzację wędki), więc zrywy mogą przeciążyć żyłkę. Zbyt wysoki hamulec zrywa żyłkę, zbyt niski oddaje rybie całą szpulę. Im dłużej trwa hol, tym szybciej ryba traci siły.
@@ -65,7 +73,7 @@ Przy dodawaniu: nowa ryba = plik w `data/fish/` i wpis w `Main.SpeciesPaths`; no
 godot --headless --path . res://tests/run_tests.tscn              # wszystkie zestawy
 godot --headless --path . res://tests/run_tests.tscn -- core game # wybrane zestawy
 ```
-Zestawy: `core` (hol, brania, postęp), `accounts`, `progress` (profil, sklep, zapis, zgodność ze starymi zapisami), `world` (teren, czas, pogoda, fale), `game` (logowanie, wybór mapy, pauza, ekran gracza, cały cykl połowu), `tournaments`, `village` (układ wiosek, wyrównany teren, ścieżki, biomy, chodzenie, drzwi i sklepy). Kod wyjścia to liczba nieudanych sprawdzeń. W trybie headless zapis na dysk jest wyłączony.
+Zestawy: `core` (hol, brania, postęp), `accounts`, `progress` (profil, sklep, zapis, zgodność ze starymi zapisami), `world` (teren, czas, pogoda, fale), `game` (logowanie, wybór mapy, pauza, ekran gracza, cały cykl połowu), `tournaments`, `village` (układ wiosek, wyrównany teren, ścieżki, biomy, chodzenie, drzwi i sklepy), `gear` (targ, siatki, podbieraki, akcesoria, animacja ciała, ryby w wodzie). Kod wyjścia to liczba nieudanych sprawdzeń. W trybie headless zapis na dysk jest wyłączony.
 
 Zrzuty ekranu (potrzebny ekran i OpenGL, np. `xvfb-run`):
 ```

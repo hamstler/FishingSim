@@ -12,6 +12,8 @@ uniform float max_depth = 16.0;
 uniform float wave_time = 0.0;
 uniform float amp = 0.03;
 uniform float rain = 0.0;
+// 0..1: polarized glasses cut the surface glare, the water looks clearer and fish below are easier to see.
+uniform float glare_cut = 0.0;
 uniform vec3 shallow_color : source_color = vec3(0.04, 0.26, 0.26);
 uniform vec3 deep_color : source_color = vec3(0.01, 0.07, 0.11);
 
@@ -61,6 +63,7 @@ void fragment() {
 	float foam = smoothstep(0.4, 0.0, d) * (0.5 + 0.5 * sin(wave_time * 2.0 + p.x * 1.3 + p.y * 1.1));
 	ALBEDO = mix(col, vec3(0.9), foam * 0.3);
 	ALPHA = clamp(mix(0.45, 0.95, smoothstep(0.0, 3.0, d)) + fres * 0.35, 0.0, 1.0) * smoothstep(0.0, 0.12, d);
+	ALPHA *= 1.0 - 0.35 * glare_cut * (1.0 - fres);
 	ALPHA = max(ALPHA, foam * 0.3 * smoothstep(0.0, 0.05, d));
 	ROUGHNESS = 0.06;
 	SPECULAR = 0.35;

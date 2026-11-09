@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Godot;
 using FishingSim.Accounts;
+using FishingSim.Core.Animation;
 using FishingSim.Data;
 using FishingSim.Fishing;
 using FishingSim.Progress;
@@ -29,12 +30,15 @@ public partial class Main : Node3D
     private WorldState _world = null!;
     private LakeBed _lake = null!;
     private TackleLoadout _loadout = null!;
+    private GearCatalog _gear = null!;
 
     public FishingRod Rod { get; private set; } = null!;
     public Player Player { get; private set; } = null!;
     public TournamentManager Tournaments { get; private set; } = null!;
     public Scenery Scenery { get; private set; } = null!;
     public InteractionManager Interactions { get; private set; } = null!;
+    public FishPopulation Fish { get; private set; } = null!;
+    public GearCatalog Gear => _gear;
 
     public override void _Ready()
     {
@@ -77,10 +81,22 @@ public partial class Main : Node3D
         _loadout = new TackleLoadout();
         _loadout.Attach(_profile);
 
+        _gear = new GearCatalog();
+        _gear.Attach(_profile);
+
+        var species = LoadSpecies();
         Rod = new FishingRod();
         Player.AddChild(Rod);
         Rod.Setup(new RodDependencies(
-            Player.Camera, Player.RodTip, Player.Rig, bobber, LoadSpecies(), _loadout, _profile, _world, _lake, WaterY));
+            Player.Camera, Player.RodTip, Player.Rig, bobber, species, _loadout, _profile, _world, _lake, WaterY, _gear));
+        Player.ActionSource = () => ActionFor(Rod.State);
+
+        Fish = new FishPopulation();
+        Fish.Setup(_lake, Player, species, WaterY);
+        AddChild(Fish);
+        _gear.GearChanged += ApplyGearEffects;
+        ApplyGearEffects();
+        _world.HoursAdvanced += _profile.PassTime;
 
         Tournaments = new TournamentManager();
         AddChild(Tournaments);
@@ -120,6 +136,23 @@ public partial class Main : Node3D
         Input.MouseMode = Input.MouseModeEnum.Captured;
     }
 
+    private static BodyAction ActionFor(RodState state) => state switch
+    {
+        RodState.Charging or RodState.Flying => BodyAction.Cast,
+        RodState.Fight => BodyAction.Fight,
+        RodState.Landed => BodyAction.Land,
+        _ => BodyAction.None,
+    };
+
+    /// <summary>Accessories that change the world: polarized glasses show fish further away and deeper.</summary>
+    private void ApplyGearEffects()
+    {
+        var glasses = _gear.Accessory(AccessoryKind.PolarizedGlasses);
+        Fish.VisibleRange = FishPopulation.BaseVisibleRange + (glasses?.Power ?? 0f);
+        Fish.VisibleDepth = FishPopulation.BaseVisibleDepth + (glasses != null ? 1.2f : 0f);
+        _water.SetGlareCut(glasses != null ? 1f : 0f);
+    }
+
     private void ApplyMood()
     {
         var loc = _lake.Location;
@@ -134,6 +167,7 @@ public partial class Main : Node3D
             case InteractKind.Tackle: shop.OpenFor(ShopKind.Tackle); break;
             case InteractKind.Bait: shop.OpenFor(ShopKind.Bait); break;
             case InteractKind.FishBuyer: shop.OpenFor(ShopKind.FishBuyer); break;
+            case InteractKind.Market: shop.OpenFor(ShopKind.Market); break;
             case InteractKind.General: shop.OpenFor(ShopKind.General); break;
             case InteractKind.BusStop: shop.OpenFor(ShopKind.Travel); break;
             case InteractKind.Office: gameUi.Open(3); break;
@@ -175,6 +209,8 @@ public partial class Main : Node3D
     public override void _ExitTree()
     {
         _profile.Changed -= Save;
+        _world.HoursAdvanced -= _profile.PassTime;
+        _gear.GearChanged -= ApplyGearEffects;
         _lake.Rebuilt -= RespawnPlayer;
         _lake.Rebuilt -= ApplyMood;
     }

@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="KeepnetData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/KeepnetData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Siatka karpiowa 4 m (bezwęzłowa)"
+MaxFish = 40
+MaxKg = 60.0
+ConditionLossPerHour = 0.02
+Price = 260
+RequiredLevel = 4
