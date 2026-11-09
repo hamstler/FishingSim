@@ -99,7 +99,8 @@ public partial class FishPopulation : Node3D
                     var p = centre + new System.Numerics.Vector2(_rng.Range(-1.5f, 1.5f), _rng.Range(-1.5f, 1.5f));
                     if (_bed.DepthAt(p.X, p.Y) < FishSwimModel.MinWaterDepth)
                         p = centre;
-                    float weight = _rng.Range(sp.MinWeight, MathF.Max(sp.MinWeight, sp.MaxWeight * 0.6f));
+                    // Mostly small and medium fish, now and then a big one (the same fish can later take your bait).
+                    float weight = sp.MinWeight + (sp.MaxWeight - sp.MinWeight) * MathF.Pow(_rng.NextFloat(), 2.2f);
                     float cruise = 0.35f + 0.25f * sp.Aggression;
                     var agent = _model.Spawn(sp.SpeciesName, weight, p, school, sp.MinDepth, sp.MaxDepth, cruise);
                     var view = FishModel.Create(sp, weight);
@@ -110,6 +111,65 @@ public partial class FishPopulation : Node3D
                 }
             }
         }
+    }
+
+    // ------------------------------------------------------------------ bites from the fish you see
+    private readonly Dictionary<string, FishSpecies> _byName = new();
+
+    public FishSpecies? SpeciesOf(FishAgent agent)
+    {
+        if (_byName.Count == 0)
+            foreach (var sp in _species)
+                _byName[sp.SpeciesName] = sp;
+        return _byName.TryGetValue(agent.Species, out var s) ? s : null;
+    }
+
+    /// <summary>Puts a bait in the water (or takes it out with null): interested fish nearby swim to it.</summary>
+    public void SetBait(Vector3? at, Func<FishSpecies, float>? interest)
+    {
+        if (_model == null)
+            return;
+        _model.Attractor = at is Vector3 p ? new System.Numerics.Vector2(p.X, p.Z) : null;
+        _model.Interest = interest == null ? null : a => SpeciesOf(a) is FishSpecies sp ? interest(sp) : 0f;
+    }
+
+    /// <summary>The fish near the bait that takes it, weighted by how much each species wants this bait; null = none.</summary>
+    public FishAgent? PickBiter(Vector3 at, float radius, Func<FishSpecies, float> weight) =>
+        _model?.PickNear(new System.Numerics.Vector2(at.X, at.Z), radius, a => SpeciesOf(a) is FishSpecies sp ? weight(sp) : 0f);
+
+    /// <summary>The fish is on the hook: hide it here, the fight draws its own model.</summary>
+    public void Hook(FishAgent agent)
+    {
+        agent.Hooked = true;
+        if (_views.TryGetValue(agent.Id, out var v))
+            v.Visible = false;
+    }
+
+    /// <summary>The fish got away (or let go of the bait): it swims off in fright from where it was.</summary>
+    public void Release(FishAgent agent, Vector3? at = null)
+    {
+        agent.Hooked = false;
+        agent.Fear = 5f;
+        if (at is Vector3 p && _bed.DepthAt(p.X, p.Z) >= FishSwimModel.MinWaterDepth)
+            agent.Position = new System.Numerics.Vector2(p.X, p.Z);
+    }
+
+    /// <summary>The fish was landed: it leaves the lake, and another of its kind appears somewhere out of sight.</summary>
+    public void Catch(FishAgent agent)
+    {
+        _model.Remove(agent);
+        if (_views.Remove(agent.Id, out var v))
+            v.QueueFree();
+        var sp = SpeciesOf(agent);
+        if (sp == null || !FindWater(sp, nearPier: false, out var spot))
+            return;
+        float weight = sp.MinWeight + (sp.MaxWeight - sp.MinWeight) * MathF.Pow(_rng.NextFloat(), 2.2f);
+        var fresh = _model.Spawn(sp.SpeciesName, weight, spot, agent.School, sp.MinDepth, sp.MaxDepth, agent.CruiseSpeed);
+        var view = FishModel.Create(sp, weight);
+        view.Scale = Vector3.One * ViewScale;
+        view.Visible = false;
+        AddChild(view);
+        _views[fresh.Id] = view;
     }
 
     /// <summary>

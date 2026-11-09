@@ -152,6 +152,32 @@ public sealed class GearSuite : ITestSuite
             swim.Step(1f / 30f, threat, 5f);
         t.Check(swim.Agents.Average(a => Vector2.Distance(a.Position, threat)) > d0, "a running angler scares the fish away");
 
+        t.Section("bites from the fish you see");
+        var lure = new FishSwimModel(water, new SystemRng(5));
+        for (int i = 0; i < 8; i++)
+            lure.Spawn(i < 4 ? "Płoć" : "Szczupak", 0.4f, new Vector2(-6f + i * 0.3f, 0f), i, 0.5f, 3f, 0.6f);
+        var bait = new Vector2(5f, 0f);
+        lure.Attractor = bait;
+        lure.Interest = a => a.Species == "Płoć" ? 1f : 0f;
+        float roachBefore = lure.Agents.Where(a => a.Species == "Płoć").Average(a => Vector2.Distance(a.Position, bait));
+        float pikeBefore = lure.Agents.Where(a => a.Species == "Szczupak").Average(a => Vector2.Distance(a.Position, bait));
+        for (int i = 0; i < 300; i++)
+            lure.Step(1f / 30f, new Vector2(100f, 100f), 0f);
+        float roachAfter = lure.Agents.Where(a => a.Species == "Płoć").Average(a => Vector2.Distance(a.Position, bait));
+        float pikeAfter = lure.Agents.Where(a => a.Species == "Szczupak").Average(a => Vector2.Distance(a.Position, bait));
+        t.Check(roachAfter < roachBefore * 0.6f && roachAfter < pikeAfter, $"fish that like the bait swim to it (roach {roachBefore:0.0} -> {roachAfter:0.0} m, pike {pikeBefore:0.0} -> {pikeAfter:0.0} m)");
+        var taker = lure.PickNear(bait, 7f, a => a.Species == "Płoć" ? 1f : 0f);
+        t.Check(taker != null && taker.Species == "Płoć", "the fish that takes the bait is one of those near it");
+        foreach (var a in lure.Agents)
+            a.Fear = 3f;
+        t.Check(lure.PickNear(bait, 7f, _ => 1f) == null, "frightened fish do not bite");
+        foreach (var a in lure.Agents)
+        {
+            a.Fear = 0f;
+            a.Hooked = true;
+        }
+        t.Check(lure.PickNear(bait, 7f, _ => 1f) == null, "a hooked fish cannot bite twice");
+
         await InGame(t);
     }
 
@@ -180,6 +206,37 @@ public sealed class GearSuite : ITestSuite
         await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
         t.Check(main.Fish.VisibleCount == 0, "fish out of range are hidden");
 
+        t.Check(main.Rod.Population == main.Fish, "the rod takes its bites from the fish in the water");
+        var rod = main.Rod;
+        rod.DevSpeciesIndex = -1;
+        rod.DevInstantBite = true;
+        rod.CastNow(0.35f);
+        for (int i = 0; i < 360 && rod.State != RodState.Waiting; i++)
+            await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+        var bob = rod.Bobber.GlobalPosition;
+        var roachAgent = main.Fish.Agents.FirstOrDefault(a => a.Species == "Płoć");
+        if (roachAgent != null)
+        {
+            foreach (var a in main.Fish.Agents.Where(a => a != roachAgent))
+                a.Position = new Vector2(bob.X + 20f, bob.Z - 15f);     // everyone else out of reach of the float
+            roachAgent.Position = new Vector2(bob.X + 0.5f, bob.Z);
+            roachAgent.Fear = 0f;
+        }
+        for (int i = 0; i < 360 && rod.State == RodState.Waiting; i++)
+        {
+            if (roachAgent != null)
+            {
+                roachAgent.Position = new Vector2(bob.X + 0.5f, bob.Z);
+                foreach (var a in main.Fish.Agents.Where(a => a != roachAgent))
+                    a.Position = new Vector2(bob.X + 20f, bob.Z - 15f);
+            }
+            await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        t.Check(roachAgent != null && rod.Biter == roachAgent && rod.CurrentSpecies?.SpeciesName == "Płoć" && rod.CurrentWeight == roachAgent.Weight,
+            "the roach next to the float is the fish that bites (same weight too)");
+        rod.ResetToIdle();
+        t.Check(roachAgent != null && !roachAgent.Hooked && roachAgent.Fear > 0f && rod.Biter == null, "when the line comes in, the fish swims off in fright");
+        rod.DevInstantBite = false;
         t.Check(main.Rod.Gear != null && main.Rod.Profile.KeepnetLimit != null, "the rod knows the landing net and the keepnet limits the profile");
         t.Check(main.Player.Body != null && main.Player.Camera.Current, "first-person body and camera are in place");
 

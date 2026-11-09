@@ -99,6 +99,7 @@ public partial class Main : Node3D
         Fish = new FishPopulation();
         Fish.Setup(_lake, Player, species, WaterY);
         AddChild(Fish);
+        Rod.Population = Fish;
         _gear.GearChanged += ApplyGearEffects;
         ApplyGearEffects();
         _world.HoursAdvanced += _profile.PassTime;

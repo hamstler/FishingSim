@@ -61,9 +61,10 @@ Ryby pod wodą są rysowane po powierzchni wody i barwione jej kolorem, więc pr
 
 Kolejność według wartości dla gracza; każdy punkt ma już miejsce w strukturze.
 
-1. **Brania z widocznych ryb.** Dziś `BiteModel` losuje rybę niezależnie od tych w wodzie. Następny krok:
-   ryby z `FishSwimModel` w pobliżu przynęty podpływają do niej (nowy cel sterowania), a gatunek i waga brania
-   pochodzą od konkretnej ryby; spłoszone ryby nie biorą.
+1. **Brania z widocznych ryb.** Zrobione: ryby, które lubią daną przynętę (gatunek, głębokość, pora), podpływają
+   do spławika (`FishSwimModel.Attractor`), a bierze konkretna ryba z okolicy (`PickNear`), z jej wagą. Spłoszone
+   i zahaczone ryby nie biorą; zerwana ryba ucieka w popłochu, złowiona znika z łowiska, a w innym miejscu pojawia
+   się nowa. Gdy przy spławiku nie ma chętnych, branie przychodzi „spoza wzroku” jak dawniej.
 2. **Model człowieka.** Zastąpić prymitywne przedramiona riggowanym modelem rąk (`.glb` + `AnimationTree`),
    sterowanym tymi samymi parametrami `BodyPose` / `BodyAction` (bez zmian w logice).
 3. **Dźwięki.** Kroki (`BodyMotion.Footstep`, rodzaj podłoża z `LakeBed`), plusk przynęty, terkot hamulca, otoczenie.

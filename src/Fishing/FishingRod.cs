@@ -90,6 +90,16 @@ public partial class FishingRod : Node3D
     public WorldState World { get; private set; } = null!;
     public LakeBed Lake { get; private set; } = null!;
 
+    /// <summary>The fish you can see; bites come from fish near the bait when there are any (null in minimal setups).</summary>
+    public FishPopulation? Population { get; set; }
+
+    private FishingSim.Core.FishAI.FishAgent? _biter;
+    private readonly Dictionary<FishSpecies, float> _interest = new();
+    private float _interestTimer;
+
+    /// <summary>The visible fish that is taking (or fighting on) the bait, if the bite came from one.</summary>
+    public FishingSim.Core.FishAI.FishAgent? Biter => _biter;
+
     /// <summary>Keepnets, landing nets and accessories (null in minimal setups: landing by hand, unlimited net).</summary>
     public GearCatalog? Gear { get; private set; }
     public IReadOnlyList<FishSpecies> Species => _species;
@@ -346,6 +356,7 @@ public partial class FishingRod : Node3D
         Reeling = ReelOverride || (captured && Input.IsMouseButtonPressed(MouseButton.Left));
         Lifting = LiftOverride || (captured && Input.IsMouseButtonPressed(MouseButton.Right));
         BannerTime = MathF.Max(BannerTime - dt, 0f);
+        UpdateBaitAttraction(dt);
         _stateTime += dt;
         switch (State)
         {
@@ -364,6 +375,38 @@ public partial class FishingRod : Node3D
         _bend = Mathf.Lerp(_bend, bendTarget, MathF.Min(dt * 8f, 1f));
         _rig.SetBend(_bend);
         UpdateLine();
+    }
+
+    /// <summary>While the float is in the water, nearby fish that like this bait (at this depth and hour) swim to it.</summary>
+    private void UpdateBaitAttraction(float dt)
+    {
+        if (Population == null)
+            return;
+        bool baitIn = State is RodState.Waiting or RodState.Nibble or RodState.Bite;
+        if (!baitIn)
+        {
+            Population.SetBait(null, null);
+            _interestTimer = 0f;
+            return;
+        }
+        _interestTimer -= dt;
+        if (_interestTimer <= 0f)
+        {
+            _interestTimer = 0.5f;
+            var ctx = MakeBiteContext(CurrentDepth());
+            _interest.Clear();
+            foreach (var sp in _species)
+                _interest[sp] = BiteModel.Weight(sp, ctx);
+            Population.SetBait(_bobber.GlobalPosition, sp => Math.Clamp(_interest.GetValueOrDefault(sp) * 0.8f, 0f, 1.2f));
+        }
+    }
+
+    /// <summary>The fish that was interested lets go: it swims off (a bite that came from a visible fish).</summary>
+    private void LoseBiter(Vector3? at = null)
+    {
+        if (_biter != null)
+            Population?.Release(_biter, at);
+        _biter = null;
     }
 
     private void SetState(RodState s)
@@ -393,6 +436,7 @@ public partial class FishingRod : Node3D
 
     public void ResetToIdle()
     {
+        LoseBiter();
         ClearHeldFish();
         _bobber.Stow();
         _fishNode.Visible = false;
@@ -473,10 +517,25 @@ public partial class FishingRod : Node3D
         if (_species.Count == 0)
             return false;
         float hookSize = Loadout.Hook.Size;
+        _biter = null;
         if (DevSpeciesIndex >= 0 && DevSpeciesIndex < _species.Count)
+        {
             CurrentSpecies = _species[DevSpeciesIndex];
+        }
         else
-            CurrentSpecies = BiteModel.Pick(_species, MakeBiteContext(CurrentDepth()), _rng);
+        {
+            // A fish you can see near the float takes it if one wants this bait; otherwise one from out of sight.
+            var ctx = MakeBiteContext(CurrentDepth());
+            var agent = Population?.PickBiter(_bobber.GlobalPosition, 7f, sp => BiteModel.Weight(sp, ctx));
+            if (agent != null && Population!.SpeciesOf(agent) is FishSpecies seen)
+            {
+                _biter = agent;
+                CurrentSpecies = seen;
+                CurrentWeight = agent.Weight;
+                return true;
+            }
+            CurrentSpecies = BiteModel.Pick(_species, ctx, _rng);
+        }
         if (CurrentSpecies == null)
             return false;
         CurrentWeight = BiteModel.RollWeight(CurrentSpecies, hookSize, _rng);
@@ -517,6 +576,7 @@ public partial class FishingRod : Node3D
         if (_stateTime < HookWindow)
             return;
         _bobber.ExtraForce = 0f;
+        LoseBiter(_bobber.GlobalPosition);
         ShowBanner("Za późno - ryba się zerwała");
         NewBiteTimer();
         SetState(RodState.Waiting);
@@ -528,6 +588,7 @@ public partial class FishingRod : Node3D
         {
             case RodState.Nibble:
                 _bobber.ExtraForce = 0f;
+                LoseBiter(_bobber.GlobalPosition);
                 ShowBanner("Za wcześnie! Ryba uciekła");
                 NewBiteTimer();
                 SetState(RodState.Waiting);
@@ -542,6 +603,7 @@ public partial class FishingRod : Node3D
                 else
                 {
                     _bobber.ExtraForce = 0f;
+                    LoseBiter(_bobber.GlobalPosition);
                     ShowBanner("Ryba spadła z haka");
                     NewBiteTimer();
                     SetState(RodState.Waiting);
@@ -563,6 +625,8 @@ public partial class FishingRod : Node3D
         {
             Unbreakable = DevUnbreakable,
         };
+        if (_biter != null)
+            Population?.Hook(_biter);
         _fishModel?.QueueFree();
         _fishModel = FishModel.Create(species, CurrentWeight);
         _fishNode.AddChild(_fishModel);
@@ -720,6 +784,9 @@ public partial class FishingRod : Node3D
             Lake.Location.DisplayName, Loadout.Bait.DisplayName, Loadout.Hook.DisplayName,
             MathF.Round(CurrentDepth() * 10f) / 10f, World.TimeText);
         var result = Profile.AddCatch(species, CurrentWeight, context);
+        if (_biter != null)
+            Population?.Catch(_biter);
+        _biter = null;
         string text = $"Złowiono: {species.SpeciesName}, {CurrentWeight:0.00} kg! +{result.Xp} XP";
         if (result.Record)
             text += "\nNowy rekord gatunku!";
@@ -740,6 +807,7 @@ public partial class FishingRod : Node3D
     private void BreakLine(string text)
     {
         ShowBanner(text, 3.5f);
+        LoseBiter(_fishNode.Visible ? _fishNode.GlobalPosition : null);
         _fight = null;
         _lineOutOutsideFight = 0f;
         _bobber.Stow();

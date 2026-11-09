@@ -31,6 +31,9 @@ public sealed class FishAgent
     /// <summary>Seconds of panic left after being spooked.</summary>
     public float Fear;
 
+    /// <summary>On the hook: the fight drives it, the swim model leaves it alone.</summary>
+    public bool Hooked;
+
     internal float WanderAngle;
 
     public float Heading => MathF.Atan2(Velocity.X, Velocity.Y);
@@ -62,6 +65,53 @@ public sealed class FishSwimModel
     }
 
     public void Clear() => _agents.Clear();
+
+    public void Remove(FishAgent agent) => _agents.Remove(agent);
+
+    /// <summary>A bait in the water: interested fish nearby swim to it (null = nothing in the water).</summary>
+    public Vector2? Attractor { get; set; }
+
+    /// <summary>How far (m) fish notice the bait.</summary>
+    public float AttractRadius { get; set; } = 12f;
+
+    /// <summary>0..1+ interest of a fish in the current bait (species, bait, depth, time of day); null = none.</summary>
+    public Func<FishAgent, float>? Interest { get; set; }
+
+    /// <summary>
+    /// Picks the fish that takes the bait: a weighted random choice among calm, unhooked fish within
+    /// <paramref name="radius"/> of <paramref name="at"/>, weighted by <paramref name="weight"/> and by closeness.
+    /// Returns null when no fish nearby wants it.
+    /// </summary>
+    public FishAgent? PickNear(Vector2 at, float radius, Func<FishAgent, float> weight)
+    {
+        float total = 0f;
+        var candidates = new List<(FishAgent Agent, float W)>();
+        foreach (var a in _agents)
+        {
+            if (a.Hooked)
+                continue;
+            if (a.Hooked || a.Fear > 0f)
+                continue;
+            float d = Vector2.Distance(a.Position, at);
+            if (d > radius)
+                continue;
+            float w = weight(a) * (1.5f - d / radius);
+            if (w <= 0f)
+                continue;
+            candidates.Add((a, w));
+            total += w;
+        }
+        if (total <= 0f)
+            return null;
+        float r = _rng.NextFloat() * total;
+        foreach (var (agent, w) in candidates)
+        {
+            r -= w;
+            if (r <= 0f)
+                return agent;
+        }
+        return candidates[^1].Agent;
+    }
 
     public FishAgent Spawn(string species, float weight, Vector2 position, int school, float minDepth, float maxDepth, float cruiseSpeed)
     {
@@ -105,6 +155,8 @@ public sealed class FishSwimModel
         float spook = SpookRadius * (0.5f + MathF.Min(threatSpeed / 3f, 1.5f));
         foreach (var a in _agents)
         {
+            if (a.Hooked)
+                continue;
             // Wander: a slowly drifting heading.
             a.WanderAngle += _rng.Range(-1.2f, 1.2f) * dt;
             var steer = new Vector2(MathF.Sin(a.WanderAngle), MathF.Cos(a.WanderAngle)) * a.CruiseSpeed;
@@ -131,6 +183,22 @@ public sealed class FishSwimModel
                 steer += (centre / mates - a.Position) * 0.4f;
                 steer += (heading / mates - a.Velocity) * 0.5f;
                 steer += push;
+            }
+
+            // Swim to a bait that interests this fish, and hover around it.
+            if (Attractor is Vector2 bait && Interest != null && a.Fear <= 0f)
+            {
+                var toBait = bait - a.Position;
+                float dist = toBait.Length();
+                if (dist < AttractRadius && dist > 1e-3f)
+                {
+                    float interest = Math.Clamp(Interest(a), 0f, 1.5f);
+                    if (interest > 0f)
+                    {
+                        float pull = dist > 1.2f ? 1.6f : -0.6f;     // come close, but do not crowd the float
+                        steer += toBait / dist * a.CruiseSpeed * pull * interest;
+                    }
+                }
             }
 
             // Flee the angler.
