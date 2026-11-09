@@ -838,11 +838,14 @@ public partial class FishingRod : Node3D
         float fit = MathF.Min(1f, 0.55f / model.Length);
         model.Scale = new Vector3(fit, fit, fit);
         model.Wiggle = 0.25f;
-        model.Position = new Vector3(0.05f, -0.32f, -0.85f);
-        model.RotationDegrees = new Vector3(-8f, -80f, 12f);
+        model.Position = new Vector3(-0.1f, -0.26f, -0.62f);
+        model.RotationDegrees = new Vector3(-6f, -75f, 10f);
         _camera.AddChild(model);
         _heldFish = model;
     }
+
+    /// <summary>The landed fish shown in front of the camera (held in the left hand), or null.</summary>
+    public Node3D? HeldFish => _heldFish;
 
     private void ClearHeldFish()
     {

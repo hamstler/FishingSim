@@ -280,6 +280,17 @@ public sealed class GearSuite : ITestSuite
         await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
         t.Check(main.Fish.VisibleCount == 0, "fish out of range are hidden");
 
+        t.Check(main.Lantern == null, "no lantern until one is bought");
+        main.Rod.Profile.Money += 100;
+        var lanternItem = main.Gear.Items(GearSlot.Accessory).First(i => i.ItemId == "latarka_czolowa");
+        t.Check(main.Gear.Buy(GearSlot.Accessory, lanternItem) == null && main.Lantern != null, "a bought lantern hangs at the angler's belt");
+        var worldState = main.GetChildren().OfType<WorldState>().First();
+        worldState.Hour = 23f;
+        await t.NextFrame();
+        bool litAtNight = main.Lantern!.Visible && main.Lantern.LightEnergy > 0.5f;
+        worldState.Hour = 12f;
+        await t.NextFrame();
+        t.Check(litAtNight && !main.Lantern.Visible, "the lantern burns at night and is out by day");
         t.Check(main.Rod.Population == main.Fish, "the rod takes its bites from the fish in the water");
         var rod = main.Rod;
         rod.DevSpeciesIndex = -1;

@@ -87,6 +87,7 @@ public partial class Main : Node3D
             Player.Camera, Player.RodTip, Player.Rig, bobber, species, _loadout, _profile, _world, _lake, WaterY, _gear));
         Player.ActionSource = () => ActionFor(Rod.State);
         Player.Body.RaiseSource = () => Rod.Lifting && Rod.State is RodState.Nibble or RodState.Bite or RodState.Fight or RodState.Close or RodState.Waiting ? 1f : 0f;
+        Player.Body.HeldFishSource = () => Rod.HeldFish;
         Player.Body.ReelingSource = () => Rod.Reeling && Rod.State is RodState.Waiting or RodState.Fight or RodState.Nibble or RodState.Bite;
 
         // Medieval pixel-art look: the world is drawn at low resolution and scaled up (HUD stays sharp).
@@ -154,9 +155,32 @@ public partial class Main : Node3D
         _ => BodyAction.None,
     };
 
-    /// <summary>Accessories that change the world: polarized glasses show fish further away and deeper.</summary>
+    private OmniLight3D? _lantern;
+
+    /// <summary>The bought lantern hangs at the angler's belt and lights up after dusk.</summary>
+    public OmniLight3D? Lantern => _lantern;
+
+    /// <summary>Accessories that change the world: the brimmed hat shows fish further and deeper, the lantern gives light.</summary>
     private void ApplyGearEffects()
     {
+        bool hasLantern = _gear.Has(AccessoryKind.Headlamp);
+        if (hasLantern && _lantern == null)
+        {
+            _lantern = new OmniLight3D
+            {
+                LightColor = new Color(1f, 0.72f, 0.4f),
+                OmniRange = 9f,
+                OmniAttenuation = 1.4f,
+                ShadowEnabled = true,
+                Position = new Vector3(-0.35f, 1.05f, -0.25f),
+            };
+            Player.AddChild(_lantern);
+        }
+        else if (!hasLantern && _lantern != null)
+        {
+            _lantern.QueueFree();
+            _lantern = null;
+        }
         var glasses = _gear.Accessory(AccessoryKind.PolarizedGlasses);
         float clarity = _lake.Location.WaterClarity;
         Fish.VisibleRange = FishPopulation.BaseVisibleRange + (glasses?.Power ?? 0f);
@@ -212,6 +236,17 @@ public partial class Main : Node3D
         _profile.LocationIdx = _lake.LocationIndex;
         _loadout.SyncToProfile();
         _profile.Autosave();
+    }
+
+    public override void _Process(double delta)
+    {
+        if (_lantern == null)
+            return;
+        // Lit only when it is dark; the tallow flame flickers.
+        float dark = Mathf.Clamp(1f - _world.Daylight * 2.5f, 0f, 1f);
+        float t = Time.GetTicksMsec() / 1000f;
+        _lantern.LightEnergy = dark * 1.6f * (0.88f + 0.08f * Mathf.Sin(t * 11f) + 0.04f * Mathf.Sin(t * 27f));
+        _lantern.Visible = dark > 0.01f;
     }
 
     public override void _Notification(int what)

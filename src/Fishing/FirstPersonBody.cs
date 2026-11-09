@@ -25,10 +25,14 @@ public partial class FirstPersonBody : Node3D
     private MeshInstance3D _rightArm = null!, _leftArm = null!, _rightCuff = null!, _leftCuff = null!;
     private Node3D _leftHand = null!;
     private StandardMaterial3D _skin = null!, _sleeve = null!;
-    private float _leftOnReel, _raise, _crank;
+    private float _leftOnReel, _raise, _crank, _leftOnFish;
+    private Vector3 _lastFishGrip;
 
     /// <summary>0..1 how far the rod should be raised (right mouse button); set by Main from the rod.</summary>
     public Func<float>? RaiseSource { get; set; }
+
+    /// <summary>The landed fish to hold in the left hand (camera child), or null.</summary>
+    public Func<Node3D?>? HeldFishSource { get; set; }
 
     /// <summary>True while the reel handle should turn (set by Main from the rod).</summary>
     public Func<bool>? ReelingSource { get; set; }
@@ -121,6 +125,12 @@ public partial class FirstPersonBody : Node3D
         var crankCentre = new Vector3(0.1f, 0.1f, -0.065f);
         var knob = crankCentre + new Vector3(0f, MathF.Sin(_crank) * 0.03f, MathF.Cos(_crank) * 0.03f - 0.025f);
         var leftAt = LeftRest.Lerp(ToLocal(_rig.ToGlobal(knob)), _leftOnReel);
+        // Holding the catch: the left hand grips the fish just behind its head.
+        var held = HeldFishSource?.Invoke();
+        _leftOnFish = Mathf.MoveToward(_leftOnFish, held != null ? 1f : 0f, dt * 6f);
+        if (held != null)
+            _lastFishGrip = ToLocal(held.GlobalPosition) + new Vector3(0.02f, -0.03f, 0.02f);
+        leftAt = leftAt.Lerp(_lastFishGrip, _leftOnFish);
         _leftHand.Position = leftAt;
         _leftHand.Rotation = new Vector3(0.3f, 0.4f, 0.2f);
         var leftElbow = leftAt + new Vector3(-0.12f, -0.22f, 0.3f);
