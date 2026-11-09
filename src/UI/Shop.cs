@@ -201,7 +201,7 @@ public partial class Shop : CanvasLayer
             CustomMinimumSize = new Vector2(150, 150),
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
+            TextureFilter = CanvasItem.TextureFilterEnum.Linear,
         };
         frame.AddChild(_detailIcon);
         _detailName = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart, HorizontalAlignment = HorizontalAlignment.Center };
@@ -335,7 +335,7 @@ public partial class Shop : CanvasLayer
             CustomMinimumSize = new Vector2(96, 96),
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
+            TextureFilter = CanvasItem.TextureFilterEnum.Linear,
             Modulate = dark ? new Color(0.08f, 0.06f, 0.05f) : Colors.White,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         });
@@ -654,7 +654,7 @@ public partial class Shop : CanvasLayer
             CustomMinimumSize = new Vector2(72, 54),
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
+            TextureFilter = CanvasItem.TextureFilterEnum.Linear,
         });
         var texts = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         var t = new Label { Text = title };
@@ -795,7 +795,7 @@ public partial class Shop : CanvasLayer
                 CustomMinimumSize = new Vector2(192, 108),
                 ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
                 StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered,
-                TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
+                TextureFilter = CanvasItem.TextureFilterEnum.Linear,
                 Modulate = locked ? new Color(0.45f, 0.45f, 0.45f) : Colors.White,
             });
             var texts = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };

@@ -446,6 +446,11 @@ public partial class FishModel : Node3D
     {
         _species = sp;
         Length = sp.LengthRef * MathF.Pow(MathF.Max(weight, 0.002f), 0.33f);
+        if (PhotoFish.For(sp) is { } photo)
+        {
+            BuildPhoto(sp, photo);
+            return;
+        }
         var shape = ShapeFor(sp, _detailed);
         var unit = new Node3D { Scale = new Vector3(Length, Length, Length) };
         AddChild(unit);
@@ -577,6 +582,158 @@ public partial class FishModel : Node3D
         }
     }
 
+    // ================================================================== photo fish
+    private sealed class PhotoShape
+    {
+        public ArrayMesh Body = null!, Card = null!;
+        public float MaxHeight, MaxWidth;
+    }
+
+    private static readonly Dictionary<(string, bool), PhotoShape> PhotoShapes = new();
+
+    /// <summary>
+    /// The body lofted to the photograph's own outline (fins removed), the photo projected onto both flanks (each
+    /// flank of a fish mirrors the other), closed with a rounded snout and tail stalk; plus a card through the middle of
+    /// the fish carrying the cut-out itself, which shows the fins and the tail beyond the body. Built at unit length.
+    /// </summary>
+    private static PhotoShape BuildPhotoShape(FishSpecies sp, PhotoFish photo, bool detailed)
+    {
+        var b = FishBody.Of(sp);
+        var shape = new PhotoShape();
+        var outline = photo.Outline;
+        float aspect = photo.Aspect;
+        float yc = 0f;
+        foreach (var (top, bottom) in outline)
+            yc += (top + bottom) * 0.5f;
+        yc /= outline.Count;
+        float Y(float img) => (yc - img) * aspect;               // photo row -> height on the model
+        float Z(float x) => 0.5f - x;                             // photo column -> along the model (nose at +z)
+
+        int step = detailed ? 1 : 4, segs = detailed ? 28 : 12;
+        var rings = new List<(float X, float Top, float Bottom)>();
+        for (int i = 0; i < outline.Count; i += step)
+        {
+            float x = Mathf.Lerp(photo.BodyStart, photo.BodyEnd, i / (float)(outline.Count - 1));
+            rings.Add((x, outline[i].Top, outline[i].Bottom));
+        }
+        if (rings[^1].X < photo.BodyEnd - 1e-4f)
+            rings.Add((photo.BodyEnd, outline[^1].Top, outline[^1].Bottom));
+
+        var st = new SurfaceTool();
+        st.Begin(Mesh.PrimitiveType.Triangles);
+        float nb = 2f + 3f * b.BellyFlat;
+        void Ring(float x, float top, float bottom, float k)
+        {
+            float centre = (top + bottom) * 0.5f, half = (bottom - top) * 0.5f * k;
+            // The tail stalk thins sideways into the plane of the tail fin (the card), so there is no cut-off end.
+            float tailward = Math.Clamp((x - (photo.BodyEnd - 0.12f)) / 0.12f, 0f, 1f);
+            float hh = half * aspect * 0.985f, hw = b.Width * hh * (1f - 0.85f * tailward * tailward);
+            shape.MaxHeight = MathF.Max(shape.MaxHeight, 2f * hh);
+            shape.MaxWidth = MathF.Max(shape.MaxWidth, 2f * hw);
+            for (int j = 0; j < segs; j++)
+            {
+                float a = Mathf.Tau * j / segs;
+                float s = MathF.Sin(a), c = MathF.Cos(a);
+                float n = s >= 0f ? 2f : nb;
+                float px = hw * MathF.Sign(c) * MathF.Pow(MathF.Abs(c), 2f / n);
+                float py = hh * MathF.Sign(s) * MathF.Pow(MathF.Abs(s), 2f / n);
+                // Planar projection from the side, slightly inside the outline so no background shows at the edge.
+                float v = centre - py / aspect * 0.96f;
+                st.SetUV(new Vector2(x, v));
+                st.AddVertex(new Vector3(px, Y(centre) + py, Z(x)));
+            }
+        }
+        // Rounded snout in front of the first ring, then the body, then a short taper into the tail stalk.
+        int cap = detailed ? 6 : 3;
+        var first = rings[0];
+        float noseLen = 0.5f * (first.Bottom - first.Top) * aspect;
+        for (int i = 0; i < cap; i++)
+        {
+            float phi = MathF.PI * 0.5f * i / cap;
+            float k = MathF.Max(MathF.Sin(phi), 0.02f);
+            Ring(first.X - noseLen * MathF.Cos(phi) * 0.4f, first.Top, first.Bottom, k);
+        }
+        foreach (var r in rings)
+            Ring(r.X, r.Top, r.Bottom, 1f);
+        int total = cap + rings.Count;
+        for (int i = 0; i < total - 1; i++)
+            for (int j = 0; j < segs; j++)
+            {
+                int a = i * segs + j, bb = i * segs + (j + 1) % segs, c = (i + 1) * segs + j, d = (i + 1) * segs + (j + 1) % segs;
+                st.AddIndex(a); st.AddIndex(c); st.AddIndex(bb);
+                st.AddIndex(bb); st.AddIndex(c); st.AddIndex(d);
+            }
+        var last = rings[^1];
+        int end = total * segs;
+        st.SetUV(new Vector2(last.X, (last.Top + last.Bottom) * 0.5f));
+        st.AddVertex(new Vector3(0f, Y((last.Top + last.Bottom) * 0.5f), Z(last.X) - 0.002f));
+        for (int j = 0; j < segs; j++)
+        {
+            st.AddIndex((total - 1) * segs + j);
+            st.AddIndex(end);
+            st.AddIndex((total - 1) * segs + (j + 1) % segs);
+        }
+        st.GenerateNormals();
+        st.GenerateTangents();
+        shape.Body = st.Commit();
+
+        // The card: the whole cut-out on the fish's mid-plane, in columns so it bends with the body.
+        var cst = new SurfaceTool();
+        cst.Begin(Mesh.PrimitiveType.Triangles);
+        int cols = detailed ? 96 : 24;
+        for (int k = 0; k < cols; k++)
+        {
+            float x0 = (float)k / cols, x1 = (float)(k + 1) / cols;
+            void V(float x, float y) { cst.SetUV(new Vector2(x, y)); cst.AddVertex(new Vector3(0f, Y(y), Z(x))); }
+            V(x0, 0f); V(x1, 0f); V(x1, 1f);
+            V(x0, 0f); V(x1, 1f); V(x0, 1f);
+        }
+        cst.GenerateNormals();
+        shape.Card = cst.Commit();
+        return shape;
+    }
+
+    private void BuildPhoto(FishSpecies sp, PhotoFish photo)
+    {
+        var key = (sp.SpeciesName, _detailed);
+        if (!PhotoShapes.TryGetValue(key, out var shape))
+            PhotoShapes[key] = shape = BuildPhotoShape(sp, photo, _detailed);
+        var unit = new Node3D { Scale = new Vector3(Length, Length, Length) };
+        AddChild(unit);
+        MaxHeight = shape.MaxHeight * Length;
+        MaxWidth = shape.MaxWidth * Length;
+        EyeDiameter = 0f;                      // the eye is in the photograph
+        HeadHeightAtEye = MaxHeight;
+        IsPhoto = true;
+
+        _bodyShader ??= GD.Load<Shader>("res://shaders/fish_body.gdshader");
+        _finShader ??= GD.Load<Shader>("res://shaders/fish_fin.gdshader");
+        var style = Graphics.FishSkin.StyleOf(sp);
+        _bodyShaderMaterial = new ShaderMaterial { Shader = _bodyShader };
+        _bodyShaderMaterial.SetShaderParameter("albedo_tex", photo.Texture);
+        _bodyShaderMaterial.SetShaderParameter("metallic", 0.05f + 0.15f * style.Silver);
+        _bodyShaderMaterial.SetShaderParameter("roughness", 0.45f);
+        _bodyShaderMaterial.SetShaderParameter("albedo_scale", 0.72f);
+        _bodyShaderMaterial.SetShaderParameter("clearcoat", _detailed ? 0.45f : 0f);
+        _skinUpgraded = true;
+        var card = new ShaderMaterial { Shader = _finShader };
+        card.SetShaderParameter("fin_tex", photo.Texture);
+        card.SetShaderParameter("albedo_scale", 0.72f);
+        float phase = (float)(GD.Randf() * Mathf.Tau);
+        foreach (var (mesh, material) in new (Mesh, Material)[] { (shape.Card, card), (shape.Body, _bodyShaderMaterial) })
+        {
+            var mi = new MeshInstance3D { Mesh = mesh, MaterialOverride = material };
+            mi.SetInstanceShaderParameter("swim_phase", phase);
+            unit.AddChild(mi);
+            _swimmers.Add(mi);
+        }
+    }
+
+    /// <summary>Built from a real photograph (assets/fish).</summary>
+    public bool IsPhoto { get; private set; }
+
+    private static Shader? _underwaterShader;
+
     private static readonly StandardMaterial3D CorneaMaterial = new()
     {
         AlbedoColor = new Color(0.9f, 0.95f, 1f, 0.08f),
@@ -661,6 +818,11 @@ public partial class FishModel : Node3D
     /// </summary>
     public void SetUnderwater(Color tint, float clarity)
     {
+        if (IsPhoto)
+        {
+            SetPhotoUnderwater(tint, clarity);
+            return;
+        }
         if (_underwater == null)
         {
             _underwater = new List<StandardMaterial3D>();
@@ -684,6 +846,36 @@ public partial class FishModel : Node3D
         _underwaterColor = c;
         foreach (var m in _underwater)
             m.AlbedoColor = c;
+    }
+
+    private List<ShaderMaterial>? _photoUnderwater;
+
+    private void SetPhotoUnderwater(Color tint, float clarity)
+    {
+        if (_photoUnderwater == null)
+        {
+            _underwaterShader ??= GD.Load<Shader>("res://shaders/fish_underwater.gdshader");
+            _photoUnderwater = new List<ShaderMaterial>();
+            foreach (var g in _swimmers)
+            {
+                if (g is not MeshInstance3D mi || mi.MaterialOverride is not ShaderMaterial src)
+                    continue;
+                bool isCard = src.Shader == _finShader;
+                var m = new ShaderMaterial { Shader = _underwaterShader, RenderPriority = 1 };
+                m.SetShaderParameter("tex", src.GetShaderParameter(isCard ? "fin_tex" : "albedo_tex"));
+                m.SetShaderParameter("use_alpha", isCard);
+                mi.MaterialOverride = m;
+                mi.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+                _photoUnderwater.Add(m);
+            }
+        }
+        float a = MathF.Round((0.25f + Math.Clamp(clarity, 0f, 1f) * 0.7f) * 20f) / 20f;
+        var c = new Color(tint.R, tint.G, tint.B, a);
+        if (c == _underwaterColor)
+            return;
+        _underwaterColor = c;
+        foreach (var m in _photoUnderwater)
+            m.SetShaderParameter("tint", c);
     }
 
     public override void _Process(double delta)

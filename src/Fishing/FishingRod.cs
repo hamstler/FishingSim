@@ -632,7 +632,7 @@ public partial class FishingRod : Node3D
         if (Gear?.Has(AccessoryKind.RodPod) == true)
             SoundCue?.Invoke(Core.Audio.OneShot.Bell, 1f);
         _pulseTimer = 0f;
-        if (CurrentSpecies != null)
+        if (CurrentSpecies != null && !PhotoFish.Has(CurrentSpecies))
             Graphics.FishSkin.Prewarm(CurrentSpecies);     // paint the close-up skin while the float twitches
         SetState(RodState.Nibble);
     }

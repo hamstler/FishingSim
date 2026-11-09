@@ -293,8 +293,33 @@ public static class Icons
     });
 
     // ------------------------------------------------------------------ fish
-    /// <summary>The species drawn side-on with its painted skin (FishSkin), fins and eye.</summary>
-    public static ImageTexture Fish(FishSpecies sp) => Cached("fish:" + sp.SpeciesName, c =>
+    /// <summary>
+    /// The species side-on: its real photograph when there is one (assets/fish, scaled into a 128 px tile), otherwise
+    /// drawn with its painted skin (FishSkin), fins and eye.
+    /// </summary>
+    public static ImageTexture Fish(FishSpecies sp)
+    {
+        string key = "photo:" + sp.SpeciesName;
+        if (Cache.TryGetValue(key, out var cached))
+            return cached;
+        if (Fishing.PhotoFish.For(sp) is { } photo)
+        {
+            var img = (Image)photo.Image.Duplicate();
+            img.ClearMipmaps();
+            const int size = 128;
+            int w = size, h = Math.Max((int)(size * photo.Aspect), 8);
+            img.Resize(w, h, Image.Interpolation.Lanczos);
+            var tile = Image.CreateEmpty(size, size, false, Image.Format.Rgba8);
+            tile.Fill(new Color(0, 0, 0, 0));
+            tile.BlendRect(img, new Rect2I(0, 0, w, h), new Vector2I(0, (size - h) / 2));
+            var tex = ImageTexture.CreateFromImage(tile);
+            Cache[key] = tex;
+            return tex;
+        }
+        return PaintedFish(sp);
+    }
+
+    private static ImageTexture PaintedFish(FishSpecies sp) => Cached("fish:" + sp.SpeciesName, c =>
     {
         var skin = FishSkin.For(sp).GetImage();
         float depth = Math.Clamp(sp.BodyDepth, 0.07f, 0.45f);

@@ -87,6 +87,24 @@ public sealed class GearSuite : ITestSuite
         t.Check(shaded >= 6, $"a close-up perch swims with its body and {shaded - 1} fins bending together (shader materials)");
         close.Free();
 
+        // Photo fish: species with a cut-out photograph in assets/fish are built from it.
+        var photographed = catalogue.Where(FishingSim.Fishing.PhotoFish.Has).ToList();
+        if (photographed.Count > 0)
+        {
+            var psp = photographed[0];
+            var photo = FishingSim.Fishing.PhotoFish.For(psp)!;
+            var pm = FishingSim.Fishing.FishModel.Create(psp, psp.MaxWeight * 0.5f, detailed: true);
+            int meshes = pm.FindChildren("*", nameof(MeshInstance3D), true, false).Count;
+            t.Check(pm.IsPhoto && meshes == 2 && photo.Outline.Count >= 64 && photo.Credit.Contains(photo.Licence) && photo.Author != "",
+                $"{photographed.Count} species are built from real photographs ({psp.SpeciesName}: body + fin card, credited to {photo.Author}, {photo.Licence})");
+            pm.SetUnderwater(new Color(0.7f, 0.8f, 0.8f), 0.5f);
+            t.Check(pm.FindChildren("*", nameof(MeshInstance3D), true, false).OfType<MeshInstance3D>()
+                    .All(m => m.MaterialOverride is ShaderMaterial sm && sm.Shader.ResourcePath.EndsWith("fish_underwater.gdshader")),
+                "a photo fish in the lake is drawn see-through, tinted by the water");
+            pm.Free();
+            t.Check(FishingSim.Graphics.Icons.Fish(psp).GetWidth() == 128, "its icon is the photograph");
+        }
+
         var homeless = catalogue.Where(s => maps.All(m => m.AbundanceOf(s.SpeciesName) <= 0f)).Select(s => s.SpeciesName).ToList();
         t.Check(homeless.Count == 0, $"every species lives on at least one map {string.Join(", ", homeless)}");
         var picky = catalogue.Where(s => baits.All(b => s.AffinityFor(b) <= 0f)).Select(s => s.SpeciesName).ToList();

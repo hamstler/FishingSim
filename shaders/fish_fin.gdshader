@@ -6,6 +6,7 @@ render_mode cull_disabled, depth_prepass_alpha, diffuse_burley, specular_schlick
 
 uniform sampler2D fin_tex : source_color, filter_linear_mipmap_anisotropic;
 uniform float flutter = 0.0;     // paired fins: a gentle beat of their own
+uniform float albedo_scale = 1.0;
 
 void vertex() {
 	VERTEX = fish_bend(VERTEX, TIME);
@@ -14,7 +15,7 @@ void vertex() {
 
 void fragment() {
 	vec4 c = texture(fin_tex, UV);
-	ALBEDO = c.rgb;
+	ALBEDO = c.rgb * albedo_scale;
 	ALPHA = c.a;
 	ROUGHNESS = 0.4;
 	SPECULAR = 0.45;
