@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Godot;
 
@@ -46,40 +47,61 @@ public partial class RodRig : Node3D
             Position = new Vector3(0.1f, 0f, -0.025f),
         });
 
-        // Blank: three sections, each a child of the previous so the bend accumulates.
+        // Blank: ten short sections, each a child of the previous so the bend accumulates along the rod.
         Node3D parent = this;
         float yOffset = 0.2f;
-        float[][] radii = { new[] { 0.017f, 0.012f }, new[] { 0.012f, 0.0085f }, new[] { 0.0085f, 0.004f } };
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < Joints; i++)
         {
+            float t0 = (float)i / Joints, t1 = (float)(i + 1) / Joints;
+            float r0 = Mathf.Lerp(0.017f, 0.004f, t0), r1 = Mathf.Lerp(0.017f, 0.004f, t1);
             var seg = new Node3D { Position = new Vector3(0, yOffset, 0) };
             parent.AddChild(seg);
-            Cyl(seg, radii[i][1], radii[i][0], 1f, new Vector3(0, 0.5f, 0), graphite);
-            Cyl(seg, radii[i][0] * 1.25f, radii[i][0] * 1.25f, 0.035f, new Vector3(0, 0.03f, 0), red);   // thread wrap
-            foreach (float gy in new[] { 0.45f, 0.85f })
+            Cyl(seg, r1, r0, SegmentLength, new Vector3(0, SegmentLength * 0.5f, 0), graphite);
+            if (i % 3 == 0)
+                Cyl(seg, r0 * 1.25f, r0 * 1.25f, 0.03f, new Vector3(0, 0.02f, 0), red);     // thread wrap
+            if (i % 2 == 1)
             {
-                float r = Mathf.Lerp(radii[i][0], radii[i][1], gy);
-                Box(seg, new Vector3(0.004f, 0.004f, 0.02f), new Vector3(0, gy, -r - 0.008f), metal);
+                // Guide ring under the blank.
+                Box(seg, new Vector3(0.004f, 0.004f, 0.02f), new Vector3(0, SegmentLength * 0.6f, -r1 - 0.008f), metal);
                 seg.AddChild(new MeshInstance3D
                 {
-                    Mesh = new TorusMesh { InnerRadius = 0.0065f, OuterRadius = 0.0105f, Rings = 10, RingSegments = 6 },
+                    Mesh = new TorusMesh { InnerRadius = 0.0055f, OuterRadius = 0.0095f, Rings = 10, RingSegments = 6 },
                     MaterialOverride = metal,
-                    Position = new Vector3(0, gy, -r - 0.02f),
+                    Position = new Vector3(0, SegmentLength * 0.6f, -r1 - 0.019f),
+                    CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
                 });
             }
             _segments.Add(seg);
             parent = seg;
-            yOffset = 1f;
+            yOffset = SegmentLength;
         }
-        Tip = new Node3D { Position = new Vector3(0, 1f, 0) };
+        Tip = new Node3D { Position = new Vector3(0, SegmentLength, 0) };
         parent.AddChild(Tip);
     }
 
-    /// <summary>0..1: how far the blank flexes (the tip droops towards the water).</summary>
+    /// <summary>Number of bending sections of the blank (matches <see cref="Core.Physics.RodBendModel"/>).</summary>
+    public const int Joints = Core.Physics.RodBendModel.DefaultJoints;
+
+    /// <summary>Length of one section; the blank is 3 m long above the handle.</summary>
+    public const float SegmentLength = 0.3f;
+
+    public const float BlankStart = 0.2f;
+
+    /// <summary>Applies the bend of every joint, rotating about <paramref name="axis"/> (rig space, perpendicular to the rod).</summary>
+    public void SetJointAngles(ReadOnlySpan<float> angles, Vector3 axis)
+    {
+        if (axis.LengthSquared() < 1e-6f)
+            axis = Vector3.Right;
+        axis = axis.Normalized();
+        for (int i = 0; i < _segments.Count && i < angles.Length; i++)
+            _segments[i].Basis = new Basis(axis, angles[i]);
+    }
+
+    /// <summary>Simple droop for tools: 0..1 bends every joint a little downwards.</summary>
     public void SetBend(float amount)
     {
         for (int i = 0; i < _segments.Count; i++)
-            _segments[i].Rotation = new Vector3(-amount * (0.07f + 0.07f * i), 0f, 0f);
+            _segments[i].Rotation = new Vector3(-amount * (0.02f + 0.03f * i / _segments.Count), 0f, 0f);
     }
 
     private static StandardMaterial3D Mat(Color color, float roughness, float metallic = 0f) =>

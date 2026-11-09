@@ -13,4 +13,7 @@ public partial class RodData : TackleItem
 
     /// <summary>How much of a sudden burst the rod absorbs (0..0.5).</summary>
     [Export(PropertyHint.Range, "0,0.5")] public float ShockAbsorb { get; set; } = 0.2f;
+
+    /// <summary>How the blank bends: 0 = fast (only the tip), 1 = slow/parabolic (the whole rod works).</summary>
+    [Export(PropertyHint.Range, "0,1")] public float Action { get; set; } = 0.5f;
 }
