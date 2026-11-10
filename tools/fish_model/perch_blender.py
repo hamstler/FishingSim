@@ -203,7 +203,7 @@ def build(work):
     eye_mat = material("Eye", iris, roughness=0.15)
     cornea_mat = clear_material("Cornea")
     for side, sign in (("Right", 1.0), ("Left", -1.0)):
-        for kind, (radius, offset, mat) in (("Eye", (R, 0.58, eye_mat)), ("Cornea", (R * 1.07, 0.5, cornea_mat))):
+        for kind, (radius, offset, mat) in (("Eye", (R, 0.58, eye_mat)), ("Cornea", (R * 1.015, 0.56, cornea_mat))):
             dpos, duv, dfaces = dome(radius, offset)
             dpos = dpos * np.array([sign, 1.0, 1.0])
             if sign < 0:

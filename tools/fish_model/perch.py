@@ -6,10 +6,11 @@ body), separate eyes, and the fins as rayed membranes (spiny first dorsal with i
 anal, forked tail, paired pectorals and pelvics splayed out from the body), each with a painted texture, and a
 painted body skin with a scale normal map.
 
-Shapes were traced on "Perche commune perca fluviatilis Alfort.jpg" (CC0), a side view with every fin raised; the
-colours and the bars come from "Perca fluviatilis - Perche commune - European perch Cropped.jpg" (CC BY-SA 2.5) and
-"Perca fluviatilis Aquarium Liege 30012016 1.jpg" (CC0), all on Wikimedia Commons. No photograph is copied into the
-model: its skin is painted from the measured colours.
+The proportions (body, head with the eye, the mouth reaching back under it and the gill cover, every fin, the bars)
+were measured on the perch illustration of AtlasRyb.online (https://atlasryb.online, Perca fluviatilis); the colours
+follow its description and the photographs "Perca fluviatilis - Perche commune - European perch Cropped.jpg"
+(CC BY-SA 2.5) and "Perca fluviatilis Aquarium Liege 30012016 1.jpg" (CC0) on Wikimedia Commons. No picture is copied
+into the model: the skin and fins are painted in code.
 
 Model space (as src/Fishing/FishModel.cs expects): unit total length, nose at +z 0.5, tail tip at -0.5, y up, x to
 the fish's right. Reference coordinates below are photo coordinates: x from the snout tip (0) to the tail tip (1),
@@ -28,73 +29,79 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from glb import Glb, vertex_normals  # noqa: E402
 
 AXIS = 0.23           # photo y of the body axis (the snout tip and the tail stalk lie on it)
-DEPTH_SCALE = 0.88    # the traced fish is a heavy old perch; the model is a medium one (FishModel grows it)
+DEPTH_SCALE = 0.95    # the reference is a grown perch; the model is a medium one (FishModel grows it)
 
-# Body outline without fins, traced every few percent of the length.
-TOP = [(0.004, 0.208), (0.02, 0.183), (0.05, 0.163), (0.08, 0.155), (0.10, 0.150), (0.12, 0.145), (0.15, 0.130),
-       (0.20, 0.110), (0.25, 0.098), (0.30, 0.095), (0.35, 0.093), (0.40, 0.095), (0.45, 0.105), (0.50, 0.114),
-       (0.55, 0.122), (0.60, 0.130), (0.65, 0.145), (0.70, 0.165), (0.75, 0.183), (0.80, 0.193), (0.835, 0.194)]
-BOTTOM = [(0.004, 0.246), (0.03, 0.256), (0.06, 0.270), (0.10, 0.285), (0.12, 0.300), (0.15, 0.320),
-          (0.20, 0.345), (0.25, 0.370), (0.30, 0.390), (0.35, 0.400), (0.40, 0.405), (0.45, 0.405), (0.50, 0.400),
-          (0.55, 0.373), (0.60, 0.338), (0.65, 0.313), (0.70, 0.293), (0.75, 0.276), (0.80, 0.268), (0.835, 0.266)]
-X0, X1 = 0.004, 0.835          # snout tip, end of the tail stalk (the caudal fin's base)
+# Body outline without fins, traced every few percent of the length on the perch of AtlasRyb.online (proportions
+# only; the illustration itself is not used).
+TOP = [(0.004, 0.221), (0.02, 0.193), (0.05, 0.171), (0.10, 0.154), (0.15, 0.140), (0.20, 0.118), (0.25, 0.093),
+       (0.30, 0.084), (0.35, 0.082), (0.40, 0.086), (0.45, 0.095), (0.50, 0.108), (0.55, 0.123), (0.60, 0.134),
+       (0.65, 0.151), (0.70, 0.171), (0.75, 0.190), (0.80, 0.204), (0.845, 0.207)]
+BOTTOM = [(0.004, 0.241), (0.02, 0.251), (0.05, 0.260), (0.10, 0.271), (0.15, 0.278), (0.20, 0.294), (0.25, 0.316),
+          (0.30, 0.344), (0.35, 0.361), (0.40, 0.366), (0.45, 0.367), (0.50, 0.365), (0.55, 0.355), (0.60, 0.341),
+          (0.65, 0.322), (0.70, 0.302), (0.75, 0.283), (0.80, 0.266), (0.845, 0.260)]
+X0, X1 = 0.004, 0.845          # snout tip, end of the tail stalk (the caudal fin's base)
 
 # Width / depth of the body along it: a broad head, a laterally flattened body.
-WIDTH = [(0.0, 0.92), (0.05, 0.78), (0.12, 0.68), (0.22, 0.60), (0.35, 0.47), (0.55, 0.44), (0.70, 0.44), (0.835, 0.5)]
-N_TOP, N_BOTTOM = 1.75, 2.3    # cross-section: a narrow back (the dorsal fins' base), a full rounded belly
+# Half width of the body (total lengths): a broad, blunt snout and head seen from above, a flattened body.
+HALF_WIDTH = [(0.0, 0.007), (0.012, 0.017), (0.03, 0.024), (0.06, 0.031), (0.10, 0.037), (0.15, 0.043),
+              (0.22, 0.050), (0.30, 0.056), (0.40, 0.059), (0.50, 0.057), (0.60, 0.050), (0.70, 0.040), (0.80, 0.026),
+              (0.845, 0.020)]
+# Cross-section: a broad rounded crown on the head, a narrow back under the dorsal fins, a full rounded belly.
+N_TOP_ALONG = [(0.0, 2.4), (0.2, 2.3), (0.32, 1.8), (1.0, 1.75)]
+N_BOTTOM = 2.3
 
 # Head.
-EYE = (0.089, 0.188)
-EYE_R = 0.0215 * 0.92
-GAPE = [(0.003, 0.228), (0.03, 0.236), (0.06, 0.248), (0.09, 0.262)]
-MAXILLA = [(0.035, 0.228), (0.06, 0.236), (0.09, 0.252)]
-NOSTRILS = [(0.045, 0.183), (0.056, 0.180)]
-PREOPERCLE = [(0.155, 0.165), (0.158, 0.21), (0.16, 0.25), (0.15, 0.275), (0.13, 0.288), (0.11, 0.292)]
-OPERCLE = [(0.205, 0.140), (0.228, 0.165), (0.245, 0.19), (0.255, 0.205), (0.245, 0.225), (0.235, 0.245),
-           (0.222, 0.265), (0.205, 0.284), (0.185, 0.297), (0.165, 0.303)]
-LATERAL_LINE = [(0.215, 0.155), (0.26, 0.148), (0.30, 0.145), (0.40, 0.142), (0.50, 0.152), (0.60, 0.170),
-                (0.70, 0.195), (0.78, 0.212), (0.835, 0.223)]
+EYE = (0.098, 0.187)
+EYE_R = 0.018
+GAPE = [(0.003, 0.231), (0.03, 0.237), (0.055, 0.244), (0.07, 0.250), (0.08, 0.257)]   # its corner under the eye
+MAXILLA = [(0.03, 0.234), (0.06, 0.242), (0.083, 0.253)]
+NOSTRILS = [(0.045, 0.186), (0.057, 0.183)]
+PREOPERCLE = [(0.155, 0.155), (0.158, 0.21), (0.15, 0.242), (0.125, 0.265), (0.10, 0.272)]
+OPERCLE = [(0.172, 0.142), (0.21, 0.155), (0.24, 0.175), (0.255, 0.190), (0.24, 0.215), (0.228, 0.235),
+           (0.21, 0.255), (0.19, 0.270), (0.168, 0.280)]
+LATERAL_LINE = [(0.25, 0.135), (0.30, 0.128), (0.40, 0.130), (0.50, 0.148), (0.60, 0.170), (0.70, 0.200),
+                (0.78, 0.218), (0.845, 0.226)]
 
 # Dark bars: centre at the back, half width at the back, how far down (fraction of the depth), forked at the top.
-BARS = [(0.278, 0.027, 0.62, True), (0.378, 0.028, 0.70, False), (0.49, 0.028, 0.72, True),
-        (0.61, 0.026, 0.70, False), (0.712, 0.021, 0.66, False), (0.792, 0.013, 0.52, False)]
+BARS = [(0.32, 0.025, 0.65, False), (0.415, 0.030, 0.75, True), (0.515, 0.030, 0.75, False),
+        (0.605, 0.026, 0.72, True), (0.685, 0.022, 0.68, False), (0.765, 0.017, 0.60, False), (0.835, 0.011, 0.5, False)]
 
 # Fins: rays from points along the base to points along the outer edge (both front to back, or top to bottom).
 FINS = {
-    "FinDorsal1": dict(base=[(0.250, 0.104), (0.30, 0.099), (0.40, 0.099), (0.48, 0.112), (0.532, 0.122)],
-                       tips=[(0.262, 0.055), (0.28, 0.025), (0.30, 0.010), (0.33, 0.006), (0.36, 0.012),
-                             (0.39, 0.020), (0.42, 0.027), (0.45, 0.034), (0.48, 0.045), (0.505, 0.058),
-                             (0.52, 0.080), (0.533, 0.108)], rays=15, kind="spiny"),
-    "FinDorsal2": dict(base=[(0.555, 0.126), (0.60, 0.134), (0.65, 0.149), (0.70, 0.169), (0.722, 0.180)],
-                       tips=[(0.575, 0.090), (0.60, 0.075), (0.64, 0.070), (0.665, 0.068), (0.685, 0.080),
-                             (0.715, 0.110), (0.74, 0.140), (0.76, 0.162)], rays=14, kind="soft"),
-    "FinAnal": dict(base=[(0.622, 0.318), (0.66, 0.304), (0.70, 0.289), (0.727, 0.279)],
-                    tips=[(0.66, 0.345), (0.69, 0.356), (0.715, 0.362), (0.735, 0.345), (0.745, 0.315),
-                          (0.746, 0.290)], rays=10, kind="soft", spines=2),
-    "FinCaudal": dict(base=[(0.822, 0.196), (0.832, 0.215), (0.835, 0.231), (0.832, 0.248), (0.822, 0.266)],
-                      tips=[(0.998, 0.162), (0.985, 0.185), (0.97, 0.21), (0.958, 0.232), (0.954, 0.244),
-                            (0.958, 0.258), (0.966, 0.278), (0.977, 0.300), (0.977, 0.312)], rays=19, kind="caudal"),
-    "FinPectoral": dict(base=[(0.243, 0.268), (0.245, 0.304)],
-                        tips=[(0.36, 0.266), (0.38, 0.278), (0.39, 0.295), (0.38, 0.312), (0.35, 0.326),
-                              (0.31, 0.332), (0.28, 0.325)], rays=13, kind="soft", splay=32.0),
-    "FinPelvic": dict(base=[(0.256, 0.368), (0.272, 0.376)],
-                      tips=[(0.300, 0.483), (0.32, 0.478), (0.34, 0.465), (0.356, 0.448), (0.366, 0.435)],
+    "FinDorsal1": dict(base=[(0.255, 0.098), (0.30, 0.089), (0.40, 0.091), (0.50, 0.113), (0.555, 0.128)],
+                       tips=[(0.262, 0.065), (0.276, 0.030), (0.29, 0.003), (0.318, -0.005), (0.357, -0.022),
+                             (0.394, -0.033), (0.43, -0.029), (0.455, -0.014), (0.477, 0.008), (0.497, 0.030),
+                             (0.515, 0.055), (0.53, 0.079), (0.553, 0.126)], rays=15, kind="spiny"),
+    "FinDorsal2": dict(base=[(0.575, 0.137), (0.62, 0.147), (0.67, 0.164), (0.72, 0.182), (0.736, 0.188)],
+                       tips=[(0.59, 0.105), (0.603, 0.093), (0.631, 0.098), (0.66, 0.110), (0.687, 0.123),
+                             (0.71, 0.138), (0.732, 0.154), (0.755, 0.166), (0.774, 0.174)], rays=14, kind="soft"),
+    "FinAnal": dict(base=[(0.605, 0.336), (0.65, 0.318), (0.70, 0.298), (0.745, 0.282)],
+                    tips=[(0.635, 0.358), (0.668, 0.365), (0.698, 0.367), (0.724, 0.365), (0.749, 0.361),
+                          (0.757, 0.335), (0.752, 0.306)], rays=10, kind="soft", spines=2),
+    "FinCaudal": dict(base=[(0.836, 0.206), (0.845, 0.220), (0.848, 0.234), (0.845, 0.248), (0.836, 0.261)],
+                      tips=[(0.992, 0.134), (0.972, 0.165), (0.95, 0.199), (0.933, 0.235), (0.95, 0.265),
+                            (0.975, 0.299), (0.989, 0.330)], rays=19, kind="caudal"),
+    "FinPectoral": dict(base=[(0.243, 0.266), (0.249, 0.288)],
+                        tips=[(0.30, 0.242), (0.345, 0.245), (0.372, 0.256), (0.383, 0.271), (0.372, 0.288),
+                              (0.34, 0.304), (0.30, 0.310), (0.27, 0.303)], rays=13, kind="soft", splay=30.0),
+    "FinPelvic": dict(base=[(0.245, 0.313), (0.270, 0.324)],
+                      tips=[(0.318, 0.435), (0.338, 0.425), (0.352, 0.410), (0.356, 0.385), (0.345, 0.362)],
                       rays=6, kind="soft", spines=1, droop=25.0),
 }
 
 # Colours (sRGB), measured on the reference photos and evened out.
-RIDGE, UPPER, MID, LOWER, BELLY = (0.16, 0.20, 0.11), (0.32, 0.37, 0.19), (0.50, 0.52, 0.28), (0.72, 0.72, 0.52), \
-    (0.92, 0.91, 0.84)
-MID2 = (0.60, 0.60, 0.37)
-BAR = (0.10, 0.13, 0.08)
-HEAD_TOP, CHEEK, THROAT, LIP = (0.22, 0.27, 0.13), (0.58, 0.56, 0.29), (0.88, 0.86, 0.74), (0.78, 0.70, 0.50)
+RIDGE, UPPER, MID, LOWER, BELLY = (0.09, 0.12, 0.10), (0.20, 0.24, 0.15), (0.62, 0.54, 0.21), (0.84, 0.80, 0.60), \
+    (0.94, 0.93, 0.88)
+MID2 = (0.74, 0.66, 0.32)
+BAR = (0.08, 0.11, 0.08)
+HEAD_TOP, CHEEK, THROAT, LIP = (0.14, 0.17, 0.12), (0.42, 0.41, 0.24), (0.86, 0.85, 0.77), (0.64, 0.63, 0.50)
 FIN_COLOURS = {
-    "FinDorsal1": dict(membrane=(0.21, 0.23, 0.19), ray=(0.10, 0.11, 0.08), alpha=0.94),
-    "FinDorsal2": dict(membrane=(0.52, 0.54, 0.30), ray=(0.32, 0.34, 0.20), alpha=0.72),
-    "FinAnal": dict(membrane=(0.93, 0.36, 0.12), ray=(0.78, 0.25, 0.08), alpha=0.82, spine=(0.95, 0.92, 0.82)),
-    "FinCaudal": dict(membrane=(0.45, 0.46, 0.27), ray=(0.30, 0.30, 0.18), alpha=0.85, lower=(0.92, 0.40, 0.14)),
-    "FinPectoral": dict(membrane=(0.88, 0.52, 0.22), ray=(0.62, 0.26, 0.08), alpha=0.6),
-    "FinPelvic": dict(membrane=(0.94, 0.38, 0.13), ray=(0.80, 0.27, 0.08), alpha=0.85, spine=(0.96, 0.94, 0.86)),
+    "FinDorsal1": dict(membrane=(0.44, 0.42, 0.37), ray=(0.18, 0.17, 0.14), alpha=0.9),
+    "FinDorsal2": dict(membrane=(0.64, 0.62, 0.38), ray=(0.36, 0.33, 0.20), alpha=0.72),
+    "FinAnal": dict(membrane=(0.93, 0.34, 0.13), ray=(0.74, 0.22, 0.08), alpha=0.85, spine=(0.95, 0.92, 0.82)),
+    "FinCaudal": dict(membrane=(0.90, 0.40, 0.17), ray=(0.68, 0.24, 0.09), alpha=0.88, lower=(0.94, 0.34, 0.13)),
+    "FinPectoral": dict(membrane=(0.86, 0.70, 0.46), ray=(0.56, 0.38, 0.24), alpha=0.65),
+    "FinPelvic": dict(membrane=(0.94, 0.36, 0.13), ray=(0.76, 0.23, 0.08), alpha=0.88, spine=(0.96, 0.94, 0.86)),
 }
 
 UV_W, UV_Y0, UV_H = 0.86, 0.07, 0.36     # the body skin covers photo x 0..0.86, y 0.07..0.43
@@ -147,7 +154,11 @@ def opercle_x(py, extend=False):
 
 
 def half_width(x):
-    return interp(WIDTH, x) * (interp(BOTTOM, x) - interp(TOP, x)) / 2
+    return interp(HALF_WIDTH, x)
+
+
+def n_top(x):
+    return interp(N_TOP_ALONG, x)
 
 
 def model(x, y, lateral):
@@ -174,7 +185,7 @@ def build_body(n_rings=190, n_seg=80):
     hw = hw * rings_k
     theta = np.linspace(0, 2 * math.pi, n_seg, endpoint=False)
     sn, cs = np.sin(theta), np.cos(theta)
-    n_exp = np.where(sn >= 0, N_TOP, N_BOTTOM)
+    n_exp = np.where(sn[None, :] >= 0, n_top(xc)[:, None], N_BOTTOM)
     lat = hw[:, None] * np.sign(cs) * np.abs(cs) ** (2 / n_exp)
     up = hh[:, None] * np.sign(sn) * np.abs(sn) ** (2 / n_exp)
     px = np.repeat(rings_x[:, None], n_seg, axis=1)
@@ -193,17 +204,32 @@ def build_body(n_rings=190, n_seg=80):
     return _close_body(pos, uv, idx, rings_x, n_seg, wrap=True)
 
 
+def mouth_cleft(px, py):
+    """How far the snout's surface is pushed back at the mouth: the gape opens across the front of the head."""
+    dy = py - interp(GAPE, np.clip(px, GAPE[0][0], GAPE[-1][0]))
+    return 0.008 * np.exp(-(dy / 0.003) ** 2) * smoothstep(X0 + 0.035, X0, px)
+
+
+def mouth_open(px, py):
+    """The jaws stand a little apart at the front, as a perch holds its mouth: upper lip up, lower lip down."""
+    dy = py - interp(GAPE, np.clip(px, GAPE[0][0], GAPE[-1][0]))
+    inside_cap = smoothstep(X0 - 0.0025, X0 + 0.002, px)      # the rounded tip in front of the first ring stays whole
+    return 0.0022 * np.tanh(dy / 0.002) * np.exp(-(dy / 0.008) ** 2) * smoothstep(0.06, X0, px) * inside_cap
+
+
 def sculpt_head(px, py, lat, cs):
     """The head's relief on the lofted surface: eye socket, gape and lips, the gill cover's ledge, the preopercle."""
     lat = lat.copy()
     side = np.abs(cs)[None, :] ** 0.5               # head details on the flanks, not on the crown or the throat
     # Eye socket: a hollow the eyeball sits in.
     d_eye = np.hypot(px - EYE[0], py - EYE[1]) / EYE_R
-    lat -= np.sign(lat) * side * 0.0045 * (1 - smoothstep(1.0, 1.5, d_eye))
+    lat -= np.sign(lat) * side * 0.006 * (1 - smoothstep(1.0, 1.45, d_eye))
     # Mouth: the gape as a groove between two lips.
     dm = polyline_distance(px, py, GAPE)
-    head = px < 0.1
-    lat -= np.sign(lat) * side * head * (0.0032 * np.exp(-(dm / 0.0024) ** 2) - 0.0022 * np.exp(-((dm - 0.006) / 0.0035) ** 2))
+    head = smoothstep(0.1, 0.085, px)
+    taper = 1.0 - 0.5 * np.clip(px / 0.08, 0, 1)                 # the gape is widest at the front
+    lat -= np.sign(lat) * side * head * (0.0045 * taper * np.exp(-(dm / 0.0022) ** 2)
+                                         - 0.0028 * np.exp(-((dm - 0.0055) / 0.0032) ** 2))
     # Gill cover: the body behind its rear edge sits lower, so the edge stands out as a ledge.
     ox = opercle_x(py)
     behind = np.nan_to_num(px - ox, nan=-1.0)
@@ -237,13 +263,13 @@ def build_body_unwrapped(n_rings=150, n_seg=96):
     theta = np.pi / 2 - 2 * np.pi * v
     sn, cs = np.sin(theta), np.cos(theta)
     cs = np.where(np.abs(cs) < 1e-9, 0.0, cs)
-    n_exp = np.where(sn >= 0, N_TOP, N_BOTTOM)
+    n_exp = np.where(sn[None, :] >= 0, n_top(xc)[:, None], N_BOTTOM)
     lat = hw[:, None] * np.sign(cs) * np.abs(cs) ** (2 / n_exp)
     up = hh[:, None] * np.sign(sn) * np.abs(sn) ** (2 / n_exp)
     px = np.repeat(rings_x[:, None], n_seg + 1, axis=1)
     py = yc[:, None] - up
     lat = sculpt_head(px, py, lat, cs)
-    pos = model(px, py, lat).reshape(-1, 3)
+    pos = model(px + mouth_cleft(px, py), py + mouth_open(px, py), lat).reshape(-1, 3)
     u = np.clip((rings_x - X0) / (X1 - X0), 0, 1)
     uv = np.stack([np.repeat(u[:, None], n_seg + 1, axis=1), np.repeat(v[None, :], len(rings_x), axis=0)], axis=-1).reshape(-1, 2)
     m = n_seg + 1
@@ -417,9 +443,9 @@ def unwrap_coords(w, h):
     yc, hh = (top + bottom) / 2, (bottom - top) / 2
     theta = np.pi / 2 - 2 * np.pi * v
     sn, cs = np.sin(theta), np.cos(theta)
-    n_exp = np.where(sn >= 0, N_TOP, N_BOTTOM)
-    lat = hw[None, :] * (np.sign(cs) * np.abs(cs) ** (2 / n_exp))[:, None]
-    up = hh[None, :] * (np.sign(sn) * np.abs(sn) ** (2 / n_exp))[:, None]
+    n_exp = np.where(sn[:, None] >= 0, n_top(x)[None, :], N_BOTTOM)
+    lat = hw[None, :] * np.sign(cs)[:, None] * np.abs(cs)[:, None] ** (2 / n_exp)
+    up = hh[None, :] * np.sign(sn)[:, None] * np.abs(sn)[:, None] ** (2 / n_exp)
     py = yc[None, :] - up
     step = np.hypot(np.diff(lat, axis=0), np.diff(up, axis=0))
     cum = np.vstack([np.zeros((1, w)), np.cumsum(step, axis=0)])
@@ -477,7 +503,7 @@ def skin(x, y, s):
     # Head: dark crown, brassy cheeks and gill cover, a pale throat.
     hc = np.array(CHEEK) * np.ones((h, w, 3))
     hc = hc * (1 - smoothstep(0.35, 0.05, rel))[..., None] + np.array(HEAD_TOP) * smoothstep(0.35, 0.05, rel)[..., None]
-    hc = hc * (1 - smoothstep(0.74, 0.95, rel))[..., None] + np.array(THROAT) * smoothstep(0.74, 0.95, rel)[..., None]
+    hc = hc * (1 - smoothstep(0.80, 0.97, rel))[..., None] + np.array(THROAT) * smoothstep(0.80, 0.97, rel)[..., None]
     gill = smoothstep(0.004, 0.0, np.abs(x - 0.5 * (np.nan_to_num(ox, nan=0.2) + 0.158)) - 0.5 * (np.nan_to_num(ox, nan=0.2) - 0.158))
     hc = hc * (1 + 0.08 * gill)[..., None]               # the gill cover a touch lighter, like polished brass
     c = c * (1 - head_w[..., None]) + hc * head_w[..., None]
@@ -522,9 +548,11 @@ def skin(x, y, s):
     # Head details: the gape with pale lips, the maxilla, nostrils, the preopercle with its serrated edge, the gill
     # cover's dark rear edge with a light rim, its spine, and the dark socket round the eye.
     dm = polyline_distance(x, y, GAPE)
-    lips = smoothstep(0.008, 0.003, dm)
-    c = c * (1 - 0.6 * lips[..., None]) + np.array(LIP) * 0.6 * lips[..., None]
-    c *= (1 - 0.85 * smoothstep(0.0024, 0.0008, dm))[..., None]
+    below = y > interp(GAPE, np.clip(x, GAPE[0][0], GAPE[-1][0]))
+    lips = smoothstep(0.007, 0.0025, dm) * below * smoothstep(0.09, 0.07, x)
+    c = c * (1 - 0.45 * lips[..., None]) + np.array(LIP) * 0.45 * lips[..., None]
+    gape = 0.0026 - 0.0012 * np.clip(x / 0.06, 0, 1) + 0.0010 * smoothstep(0.06, 0.08, x)
+    c *= (1 - 0.85 * smoothstep(gape + 0.001, gape - 0.0004, dm))[..., None]
     height -= 0.8 * smoothstep(0.002, 0.0, dm)
     c *= (1 - 0.35 * smoothstep(0.0014, 0.0005, polyline_distance(x, y, MAXILLA)))[..., None]
     for nx, ny in NOSTRILS:
@@ -533,14 +561,14 @@ def skin(x, y, s):
         height -= 0.6 * pit
     dp = polyline_distance(x, y, PREOPERCLE)
     c *= (1 - 0.3 * smoothstep(0.0018, 0.0006, dp))[..., None]
-    teeth = smoothstep(0.004, 0.0015, dp) * (np.sin((x + y) / 0.0035 * np.pi) > 0.7) * (y > 0.255)
+    teeth = smoothstep(0.004, 0.0015, dp) * (np.sin((x + y) / 0.0035 * np.pi) > 0.7) * (y > 0.235)
     c *= (1 - 0.3 * teeth)[..., None]
     height -= 0.5 * smoothstep(0.002, 0.0, dp)
     do = polyline_distance(x, y, OPERCLE)
     behind = np.nan_to_num(x - ox, nan=-1)
     c *= (1 - 0.55 * smoothstep(0.0022, 0.0008, do) * (behind >= -0.001))[..., None]
     c *= (1 + 0.15 * smoothstep(0.005, 0.0015, do) * (behind < 0))[..., None]
-    spine = smoothstep(0.004, 0.0015, np.hypot((x - 0.258) / 1.8, y - 0.205))
+    spine = smoothstep(0.004, 0.0015, np.hypot((x - 0.258) / 1.8, y - 0.190))
     c *= (1 - 0.7 * spine)[..., None]
     de = np.hypot(x - EYE[0], y - EYE[1]) / EYE_R
     c *= (1 - 0.5 * smoothstep(1.0, 1.08, de) * smoothstep(1.45, 1.15, de))[..., None]
@@ -559,7 +587,7 @@ def eye_centre():
     yc = (interp(TOP, EYE[0]) + interp(BOTTOM, EYE[0])) / 2
     hh = (interp(BOTTOM, EYE[0]) - interp(TOP, EYE[0])) / 2
     lat = half_width(EYE[0]) * math.sqrt(max(1 - ((EYE[1] - yc) / hh) ** 2, 0.05))
-    return model(np.array(EYE[0]), np.array(EYE[1]), np.array(lat - 0.0045))
+    return model(np.array(EYE[0]), np.array(EYE[1]), np.array(lat - 0.0068))
 
 
 def build_eye(segments=40, rings=12):
@@ -596,7 +624,7 @@ def paint_eye(size=512):
     ang = np.arctan2(yy - size / 2, xx - size / 2)
     rng = np.random.default_rng(3)
     streaks = np.interp(ang, np.linspace(-np.pi, np.pi, 90), rng.random(90))
-    gold = np.array([0.93, 0.72, 0.20]) * (0.8 + 0.3 * streaks)[..., None]
+    gold = np.array([0.93, 0.82, 0.38]) * (0.8 + 0.3 * streaks)[..., None]
     c = gold * (1 - smoothstep(0.62, 0.86, r))[..., None] + np.array([0.35, 0.28, 0.10]) * smoothstep(0.62, 0.86, r)[..., None]
     c = c * (1 - smoothstep(0.86, 0.95, r))[..., None] + np.array([0.10, 0.11, 0.07]) * smoothstep(0.86, 0.95, r)[..., None]
     pupil = smoothstep(0.42, 0.38, r)
@@ -630,7 +658,8 @@ def write_reference(path):
         "author": "; ".join(a for _, a, _, _ in SOURCES),
         "licence": "; ".join(lic for _, _, lic, _ in SOURCES),
         "source": " ".join(u for _, _, _, u in SOURCES),
-        "credit": "Model według zdjęć: " + ", ".join(f"{a} ({lic})" for _, a, lic, _ in SOURCES) + ", Wikimedia Commons",
+        "credit": "Proporcje według ilustracji okonia z AtlasRyb.online; barwy według zdjęć: "
+                  + ", ".join(f"{a} ({lic})" for _, a, lic, _ in SOURCES) + ", Wikimedia Commons",
     }
     json.dump(meta, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=0)
 
