@@ -479,26 +479,34 @@ public partial class FishModel : Node3D
         var (depthK, widthK, eyeK) = Proportions(growth);
         // A deeper, thicker body holds more weight for its length: the length follows the weight and the build.
         Length = sp.LengthRef * MathF.Pow(MathF.Max(weight, 0.002f) / (depthK * widthK), 0.33f);
-        var shape = ShapeFor(sp, _detailed);
+        // A close-up fish of a species with a hand-built model (tools/fish_model) uses it; others are lofted.
+        var asset = _detailed ? FishAsset.For(sp) : null;
+        var shape = asset == null ? ShapeFor(sp, _detailed) : null;
+        float eyeRadius = asset?.EyeRadius ?? shape!.EyeRadius, eyeHead = asset?.HeadHeightAtEye ?? shape!.EyeHeadHeight;
         // Sideways (x) the width, upwards (y) the depth: the cached unit-length shape grows with the fish.
         var unit = new Node3D { Scale = new Vector3(Length * widthK, Length * depthK, Length) };
         AddChild(unit);
         // Eyes keep their round shape (undo the unequal scale) and are relatively bigger on young fish, never bigger
         // than the head allows.
-        float eyeFit = 0.6f * shape.EyeHeadHeight * depthK / MathF.Max(2f * shape.EyeRadius, 1e-5f);
+        float eyeFit = 0.6f * eyeHead * depthK / MathF.Max(2f * eyeRadius, 1e-5f);
         _eyeScale = new Vector3(1f / widthK, 1f / depthK, 1f) * MathF.Min(eyeK, eyeFit);
-        EyeDiameter = shape.EyeRadius * 2f * Length * _eyeScale.Y * depthK;
-        HeadHeightAtEye = shape.EyeHeadHeight * Length * depthK;
-        MaxHeight = shape.MaxHeight * Length * depthK;
-        MaxWidth = shape.MaxWidth * Length * widthK;
+        EyeDiameter = eyeRadius * 2f * Length * _eyeScale.Y * depthK;
+        HeadHeightAtEye = eyeHead * Length * depthK;
+        MaxHeight = (asset?.MaxHeight ?? shape!.MaxHeight) * Length * depthK;
+        MaxWidth = (asset?.MaxWidth ?? shape!.MaxWidth) * Length * widthK;
 
         var style = Graphics.FishSkin.StyleOf(sp);
         var fin = Graphics.FishSkin.Vivid(sp.FinColor, 1.4f);
+        if (asset != null)
+        {
+            BuildAsset(sp, asset, unit, style);
+            return;
+        }
         if (_detailed)
-            BuildDetailed(sp, shape, unit, style, fin);
+            BuildDetailed(sp, shape!, unit, style, fin);
         else
-            BuildLight(sp, shape, unit, style, fin);
-        if (shape.Barbels != null)
+            BuildLight(sp, shape!, unit, style, fin);
+        if (shape!.Barbels != null)
         {
             var barbel = new StandardMaterial3D { AlbedoColor = Graphics.FishSkin.Vivid(sp.BellyColor).Lerp(fin, 0.4f).Darkened(0.2f), Roughness = 0.45f };
             unit.AddChild(new MeshInstance3D { Mesh = shape.Barbels, MaterialOverride = barbel });
@@ -547,6 +555,61 @@ public partial class FishModel : Node3D
                 Position = p + new Vector3(sx * r * 0.32f, 0f, r * 0.05f) * _eyeScale, Scale = new Vector3(0.45f, 1f, 1f) * _eyeScale,
             });
         }
+    }
+
+    /// <summary>
+    /// A close-up fish from its hand-built model (FishAsset): the painted body with its normal map and the wet,
+    /// silvery sheen, each fin with its own painted texture, all bending with the swimming wave; glossy eyes.
+    /// </summary>
+    private void BuildAsset(FishSpecies sp, FishAsset asset, Node3D unit, Graphics.SkinStyle style)
+    {
+        _bodyShader ??= GD.Load<Shader>("res://shaders/fish_body.gdshader");
+        _finShader ??= GD.Load<Shader>("res://shaders/fish_fin.gdshader");
+        _bodyShaderMaterial = new ShaderMaterial { Shader = _bodyShader };
+        if (asset.BodyAlbedo != null)
+            _bodyShaderMaterial.SetShaderParameter("albedo_tex", asset.BodyAlbedo);
+        if (asset.BodyNormal != null)
+        {
+            _bodyShaderMaterial.SetShaderParameter("normal_tex", asset.BodyNormal);
+            _bodyShaderMaterial.SetShaderParameter("use_normal", true);
+            _bodyShaderMaterial.SetShaderParameter("normal_strength", 0.5f);
+        }
+        _bodyShaderMaterial.SetShaderParameter("metallic", 0.08f + 0.3f * style.Silver);
+        _bodyShaderMaterial.SetShaderParameter("roughness", 0.36f);
+        _bodyShaderMaterial.SetShaderParameter("clearcoat", 0.5f);
+        _skinUpgraded = true;
+        float phase = (float)(GD.Randf() * Mathf.Tau);
+        void Swimmer(GeometryInstance3D g)
+        {
+            g.SetInstanceShaderParameter("swim_phase", phase);
+            _swimmers.Add(g);
+        }
+        var body = new MeshInstance3D { Mesh = asset.Body, MaterialOverride = _bodyShaderMaterial };
+        unit.AddChild(body);
+        Swimmer(body);
+        foreach (var (name, mesh, texture) in asset.Fins)
+        {
+            var m = new ShaderMaterial { Shader = _finShader };
+            if (texture != null)
+                m.SetShaderParameter("fin_tex", texture);
+            m.SetShaderParameter("flutter", name is "FinPectoral" or "FinPelvic" ? 1f : 0f);
+            var mi = new MeshInstance3D { Mesh = mesh, MaterialOverride = m };
+            unit.AddChild(mi);
+            Swimmer(mi);
+        }
+        var eyeMaterial = new StandardMaterial3D
+        {
+            AlbedoTexture = asset.Iris,
+            TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
+            Roughness = 0.08f,
+            MetallicSpecular = 0.9f,
+            ClearcoatEnabled = true,
+            Clearcoat = 1f,
+            ClearcoatRoughness = 0.05f,
+            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+        };
+        foreach (var (mesh, position) in asset.Eyes)
+            unit.AddChild(new MeshInstance3D { Mesh = mesh, MaterialOverride = eyeMaterial, Position = position, Scale = _eyeScale });
     }
 
     private static Shader? _bodyShader, _finShader;

@@ -105,11 +105,23 @@ public sealed class GearSuite : ITestSuite
                 float mid = MathF.Sqrt(msp.MinWeight * msp.MaxWeight);
                 var mm = FishingSim.Fishing.FishModel.Create(msp, mid, false);
                 float want = deepest * FishingSim.Fishing.FishModel.Proportions(FishingSim.Fishing.FishModel.Growth(msp, mid)).Depth;
-                if (MathF.Abs(mm.MaxHeight / mm.Length - want) > want * 0.08f || r.Author == "" || !r.Credit.Contains(r.Licence))
+                if (MathF.Abs(mm.MaxHeight / mm.Length - want) > want * 0.08f || r.Author == "" || !r.Licence.Split(';').All(l => r.Credit.Contains(l.Trim())))
                     off.Add($"{msp.SpeciesName} {mm.MaxHeight / mm.Length:0.000} vs {want:0.000}");
                 mm.Free();
             }
             t.Check(off.Count == 0, $"their depth matches the measured fish, and the photographer is credited {string.Join(", ", off)}");
+        }
+        // Hand-built models (tools/fish_model): the close-up perch is the model made from photos of real perch.
+        var perchAsset = FishingSim.Fishing.FishAsset.For(perch);
+        t.Check(perchAsset != null && perchAsset.Fins.Count == 6 && perchAsset.Eyes.Count == 2 && perchAsset.BodyNormal != null,
+            $"the perch has its own model: body with a normal map, {perchAsset?.Fins.Count ?? 0} fins, {perchAsset?.Eyes.Count ?? 0} eyes");
+        if (perchAsset != null)
+        {
+            var pm = FishingSim.Fishing.FishModel.Create(perch, 0.4f, detailed: true);
+            int parts = pm.FindChildren("*", nameof(MeshInstance3D), true, false).Count;
+            t.Check(parts == 9 && pm.MaxHeight / pm.Length > 0.22f && pm.MaxHeight / pm.Length < 0.32f && pm.EyeDiameter < 0.62f * pm.HeadHeightAtEye,
+                $"a close-up perch is built from it ({parts} parts, H/L {pm.MaxHeight / pm.Length:0.00}, eye {pm.EyeDiameter * 1000f:0} mm in a {pm.HeadHeightAtEye * 1000f:0} mm head)");
+            pm.Free();
         }
         // Growth: a heavy fish is deeper and thicker for its length than a young one, which has bigger eyes.
         var growCarp = catalogue.First(sp => sp.SpeciesName == "Karp");

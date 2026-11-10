@@ -43,7 +43,9 @@ public sealed class FishReference
     public string Source { get; private init; } = "";
 
     /// <summary>For the atlas: whose photograph the shape and colours were measured from.</summary>
-    public string Credit => $"Kształt i barwy według zdjęcia: {Author} ({Licence}), Wikimedia Commons";
+    public string Credit => _credit != "" ? _credit : $"Kształt i barwy według zdjęcia: {Author} ({Licence}), Wikimedia Commons";
+
+    private string _credit = "";
 
     private static readonly Dictionary<string, FishReference?> Cache = new();
 
@@ -89,6 +91,7 @@ public sealed class FishReference
                     Author = meta["author"]?.GetValue<string>() ?? "",
                     Licence = meta["licence"]?.GetValue<string>() ?? "",
                     Source = meta["source"]?.GetValue<string>() ?? "",
+                    _credit = meta["credit"]?.GetValue<string>() ?? "",
                 };
         }
         Cache[id] = found;
