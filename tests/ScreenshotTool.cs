@@ -37,7 +37,12 @@ public partial class ScreenshotTool : Node
         float px = hasPos ? float.Parse(Arg(9, "0"), System.Globalization.CultureInfo.InvariantCulture) : 0f;
         float pz = hasPos ? float.Parse(Arg(10, "0"), System.Globalization.CultureInfo.InvariantCulture) : 0f;
 
-        GetWindow().Size = new Vector2I(1280, 720);
+        // FISHSIM_SHOT_SIZE=WxH renders a bigger shot (e.g. 2560x1440 to check the fish at QHD).
+        var size = new Vector2I(1280, 720);
+        var asked = System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_SIZE")?.Split('x');
+        if (asked is { Length: 2 } && int.TryParse(asked[0], out int shotW) && int.TryParse(asked[1], out int shotH))
+            size = new Vector2I(shotW, shotH);
+        GetWindow().Size = size;
         UserStore.Path = "/tmp/fishsim_shot_users.json";
         await NextFrame();
 

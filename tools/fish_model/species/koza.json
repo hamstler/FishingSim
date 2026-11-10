@@ -572,7 +572,7 @@
  ],
  "eye": [
   0.0849,
-  -0.0402
+  -0.0424
  ],
  "eye_r": 0.0139,
  "gape": [
@@ -707,6 +707,7 @@
  ],
  "serrated_preopercle": false,
  "opercle_spine": false,
+ "cheek_scales": false,
  "half_width": [
   [
    0.0,

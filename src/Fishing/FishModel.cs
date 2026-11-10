@@ -599,13 +599,12 @@ public partial class FishModel : Node3D
         }
         var eyeMaterial = new StandardMaterial3D
         {
+            // The iris is satin; the gloss is the cornea's over it (two glossy layers made a white, glassy eye).
             AlbedoTexture = asset.Iris,
             TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
-            Roughness = 0.08f,
-            MetallicSpecular = 0.9f,
-            ClearcoatEnabled = true,
-            Clearcoat = 1f,
-            ClearcoatRoughness = 0.05f,
+            Roughness = 0.4f,
+            Metallic = 0.25f,
+            MetallicSpecular = 0.4f,
             CullMode = BaseMaterial3D.CullModeEnum.Disabled,
         };
         foreach (var (mesh, position) in asset.Eyes)
@@ -686,7 +685,7 @@ public partial class FishModel : Node3D
 
     private static readonly StandardMaterial3D CorneaMaterial = new()
     {
-        AlbedoColor = new Color(0.9f, 0.95f, 1f, 0.08f),
+        AlbedoColor = new Color(0.9f, 0.95f, 1f, 0.03f),
         Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
         Roughness = 0.02f,
         MetallicSpecular = 1f,

@@ -27,6 +27,11 @@ import numpy as np
 N = 480                     # samples along the fish
 # Pictures that show more than one fish: the band of the picture (fractions of its height) holding the one to measure.
 CROPS = {"ciernik": (0.08, 0.47)}
+# Where to look for the eye (along the fish, in total lengths) when the game's table puts it too far from where the picture
+# has it and a dark spot nearby would take its place (the salmon's spotted gill cover).
+# Some pictures draw the eye much smaller than the game's table makes it: the smallest size the eye is looked for at.
+EYE_HINT = {"losos": 0.062, "karas": 0.098}
+EYE_SMALL = {"losos": 0.4}
 
 
 def silhouette(rgb):
@@ -388,15 +393,30 @@ def measure(data, sid, picture, flip=None):
             smooth_body(body, xs, si)
     fins, comps = find_fins()
 
-    # The eye: the darkest round spot in the upper head.
+    # The eye: a dark round pupil inside a lighter ring (the iris), set in the head. Matched with a disc-and-ring
+    # filter at three sizes round the table's eye size (a plain dark-spot filter also answers to a dark forehead or a
+    # shadow on the snout).
     lum = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY).astype(np.float32)
     body_len = stalk_x
     r_px = max(2.0, 0.58 * sp["Eye"] * body_len * L)
-    inner = cv2.GaussianBlur(lum, (0, 0), max(0.6, 0.45 * r_px))
-    outer = cv2.GaussianBlur(lum, (0, 0), 1.6 * r_px)
-    resp = outer - inner
+
+    def ring_kernel(r0, r1):
+        n = int(np.ceil(r1)) + 1
+        yy, xx = np.mgrid[-n:n + 1, -n:n + 1]
+        d = np.hypot(xx, yy)
+        k = ((d >= r0) & (d <= r1)).astype(np.float32)
+        return k / max(k.sum(), 1.0)
+
+    resp = None
+    for k in (EYE_SMALL.get(sid, 0.55), 0.75, 1.0, 1.3):
+        r = r_px * k
+        pupil = cv2.filter2D(lum, -1, ring_kernel(0.0, max(1.0, 0.45 * r)))
+        iris = cv2.filter2D(lum, -1, ring_kernel(0.6 * r, max(1.6, 1.05 * r)))
+        skin = cv2.filter2D(lum, -1, ring_kernel(1.2 * r, max(2.2, 1.6 * r)))
+        rk = (iris - pupil) + 0.5 * (skin - pupil)
+        resp = rk if resp is None else np.maximum(resp, rk)
     # Search around where the game's table puts the eye (along the body and up the head), favouring the middle.
-    ex0 = sp["EyeAt"] * body_len
+    ex0 = EYE_HINT.get(sid, sp["EyeAt"] * body_len)
     region = np.zeros_like(lum, dtype=bool)
     prior = np.zeros_like(lum)
     for i in range(N):
@@ -411,7 +431,7 @@ def measure(data, sid, picture, flip=None):
             prior[ya:yb, xa:xa + 2] = (-((x - ex0) / (0.5 * ex0 + 0.01)) ** 2
                                        - ((yy - ey0) / (0.45 * (body_up[i] + body_down[i]) * L + 1e-6)) ** 2)[:, None]
     spread = np.percentile(resp[region], 99) - np.percentile(resp[region], 50) if region.any() else 1.0
-    resp = resp + 0.5 * spread * prior
+    resp = resp + 1.0 * spread * prior
     resp[~region] = -1e9
     ey, ex = np.unravel_index(int(np.argmax(resp)), resp.shape)
     eye = P(ex, ey)

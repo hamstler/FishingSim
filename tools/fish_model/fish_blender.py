@@ -102,10 +102,13 @@ def clear_material(name):
     m = bpy.data.materials.new(name)
     m.use_nodes = True
     bsdf = m.node_tree.nodes["Principled BSDF"]
-    bsdf.inputs["Base Color"].default_value = (0.9, 0.95, 1.0, 1.0)
-    bsdf.inputs["Alpha"].default_value = 0.1
-    bsdf.inputs["Roughness"].default_value = 0.03
-    m.blend_method = "BLEND"
+    bsdf.inputs["Base Color"].default_value = (1.0, 1.0, 1.0, 1.0)
+    bsdf.inputs["Roughness"].default_value = 0.02
+    bsdf.inputs["IOR"].default_value = 1.376
+    for key in ("Transmission Weight", "Transmission"):           # clear as water: only its gloss shows
+        if key in bsdf.inputs:
+            bsdf.inputs[key].default_value = 1.0
+            break
     return m
 
 
@@ -249,12 +252,16 @@ def build(work):
 
     # Eyes: iris dome under a clear cornea, in the sockets on both sides of the head.
     centre = P.eye_centre()
+    tilt = P.eye_tilt()
     R = P.EYE_R * 1.08 * P.DEPTH_SCALE
     eye_mat = material("Eye", iris, roughness=0.15)
     cornea_mat = clear_material("Cornea")
     for side, sign in (("Right", 1.0), ("Left", -1.0)):
-        for kind, (radius, offset, mat) in (("Eye", (R, 0.58, eye_mat)), ("Cornea", (R * 1.015, 0.56, cornea_mat))):
+        for kind, (radius, offset, mat) in (("Eye", (R, 0.64, eye_mat)), ("Cornea", (R * 1.012, 0.62, cornea_mat))):
             dpos, duv, dfaces = dome(radius, offset)
+            # Turned to face the way the head's surface does there (eyes high on a round head look up a little).
+            ct, st = math.cos(tilt), math.sin(tilt)
+            dpos = np.stack([dpos[:, 0] * ct - dpos[:, 1] * st, dpos[:, 0] * st + dpos[:, 1] * ct, dpos[:, 2]], axis=1)
             dpos = dpos * np.array([sign, 1.0, 1.0])
             if sign < 0:
                 dfaces = [tuple(reversed(f)) for f in dfaces]
@@ -268,7 +275,8 @@ def export(objects, out):
     for ob in bpy.context.scene.objects:
         ob.select_set(ob in objects)
     bpy.ops.export_scene.gltf(filepath=out, export_format="GLB", use_selection=True, export_apply=True,
-                              export_tangents=True, export_yup=True, export_image_format="AUTO",
+                              export_tangents=True, export_yup=True, export_image_format="WEBP",
+                              export_image_quality=92, export_image_webp_fallback=False,
                               export_materials="EXPORT", export_cameras=False, export_lights=False)
 
 

@@ -43,7 +43,8 @@ OWN = {"amur", "bolen", "brzana", "certa", "cierniczek", "ciernik", "glowacica",
 # How a relative's shape is adjusted: body depth, head length.
 # Own pictures may be corrected too: the atlas crucian is drawn at the slender end of the species, the roach at the deep
 # end, and in the game a crucian has to read as round next to a roach.
-ADJUST = {"karas": dict(depth=1.1), "ploc": dict(depth=0.92), "karas_srebrzysty": dict(depth=0.88), "sapa": dict(depth=0.85), "rozpior": dict(depth=0.82),
+ADJUST = {"karas": dict(depth=1.1), "ploc": dict(depth=0.92), "karas_srebrzysty": dict(depth=0.88),
+          "ciernik": dict(eye=0.78), "cierniczek": dict(eye=0.8),      # the table's sticklebacks have outsize eyes "sapa": dict(depth=0.85), "rozpior": dict(depth=0.82),
           "pstrag": dict(depth=1.02), "troc": dict(depth=0.98), "troc_wedrowna": dict(depth=0.95),
           "palia": dict(depth=0.95), "pstrag_zrodlany": dict(depth=1.0), "ciosa": dict(depth=0.95),
           "strzebla": dict(depth=0.95), "strzebla_blotna": dict(depth=1.05), "rozanka": dict(depth=0.95),
@@ -269,6 +270,7 @@ def compose(sid, data, measure_dir, tpl):
     table_r = 0.58 * fb["Eye"] * x1
     if meas is None or sid not in OWN or abs(eye_r - table_r) > 0.5 * table_r:
         eye_r = table_r
+    eye_r *= adjust.get("eye", 1.0)
     if sid not in OWN and meas is not None:
         eye[0] = fb["EyeAt"] * x1
         ht, hb = interp(top, eye[0]), interp(bottom, eye[0])
@@ -312,6 +314,7 @@ def compose(sid, data, measure_dir, tpl):
         "maxilla": [], "nostrils": mp(tpl["nostrils"]), "preopercle": mp(tpl["preopercle"]),
         "opercle": mp(tpl["opercle"]), "lateral_line": mp(tpl["lateral_line"]),
         "serrated_preopercle": sid in SPINY_GILLS, "opercle_spine": sid in SPINY_GILLS,
+        "cheek_scales": sid in PERCIDS,                         # perches have scaled cheeks, carps and others bare ones
     }
     # Half width: the game's width-to-height ratio of the body, broader heads where the table says so.
     hw = []

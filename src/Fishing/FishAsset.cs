@@ -139,7 +139,12 @@ public sealed class FishAsset
             var bytes = new byte[length];
             Array.Copy(glb, bin + offset, bytes, 0, length);
             var image = new Image();
-            var error = (string?)node["mimeType"] == "image/png" ? image.LoadPngFromBuffer(bytes) : image.LoadJpgFromBuffer(bytes);
+            var error = (string?)node["mimeType"] switch
+            {
+                "image/png" => image.LoadPngFromBuffer(bytes),
+                "image/webp" => image.LoadWebpFromBuffer(bytes),
+                _ => image.LoadJpgFromBuffer(bytes),
+            };
             if (error != Error.Ok)
                 continue;
             string name = (string?)node["name"] ?? "";
