@@ -29,7 +29,7 @@ sys.path.insert(0, HERE)
 import perch as P  # noqa: E402
 
 FIN_THICKNESS = 0.0011        # of the fish's length
-RAY_RADIUS = {"spiny": 0.0021, "soft": 0.0011, "caudal": 0.0012}
+RAY_RADIUS = {"spiny": 0.0026, "soft": 0.0010, "caudal": 0.0011}
 
 
 def to_blender(p):
@@ -173,7 +173,7 @@ def build(work):
 
     # Body.
     pos, uv, faces = P.build_body_unwrapped()
-    body = make_object("Body", pos, uv, faces, material("Body", albedo, normal, roughness=0.35, coat=0.5))
+    body = make_object("Body", pos, uv, faces, material("Body", albedo, normal, roughness=0.45, coat=0.2))
     objects.append(body)
 
     # Fins: membrane with thickness, rays standing out of it, paired fins mirrored.
@@ -188,7 +188,7 @@ def build(work):
         apply_modifiers(fin)
         grid = fpos.reshape(spec["rays"], segs + 1, 3)
         uvg = fuv.reshape(spec["rays"], segs + 1, 2)
-        rpos, ruv, rfaces = ray_tubes(grid, uvg, RAY_RADIUS[spec["kind"]], reach=0.06 if spec["kind"] == "spiny" else 0.0)
+        rpos, ruv, rfaces = ray_tubes(grid, uvg, RAY_RADIUS[spec["kind"]], reach=0.12 if spec["kind"] == "spiny" else 0.0)
         rays = make_object(name + "Rays", rpos, ruv, rfaces, mat, recalc=False)
         join(fin, [rays])
         if "splay" in spec or "droop" in spec:

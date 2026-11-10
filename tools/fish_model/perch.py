@@ -83,25 +83,26 @@ FINS = {
                             (0.975, 0.299), (0.989, 0.330)], rays=19, kind="caudal"),
     "FinPectoral": dict(base=[(0.243, 0.266), (0.249, 0.288)],
                         tips=[(0.30, 0.242), (0.345, 0.245), (0.372, 0.256), (0.383, 0.271), (0.372, 0.288),
-                              (0.34, 0.304), (0.30, 0.310), (0.27, 0.303)], rays=13, kind="soft", splay=30.0),
+                              (0.34, 0.304), (0.30, 0.310), (0.27, 0.303)], rays=13, kind="soft", splay=30.0,
+                        camber=0.004),
     "FinPelvic": dict(base=[(0.245, 0.313), (0.270, 0.324)],
                       tips=[(0.318, 0.435), (0.338, 0.425), (0.352, 0.410), (0.356, 0.385), (0.345, 0.362)],
                       rays=6, kind="soft", spines=1, droop=25.0),
 }
 
 # Colours (sRGB), measured on the reference photos and evened out.
-RIDGE, UPPER, MID, LOWER, BELLY = (0.09, 0.12, 0.10), (0.20, 0.24, 0.15), (0.62, 0.54, 0.21), (0.84, 0.80, 0.60), \
+RIDGE, UPPER, MID, LOWER, BELLY = (0.07, 0.10, 0.08), (0.16, 0.20, 0.12), (0.62, 0.54, 0.21), (0.84, 0.80, 0.60), \
     (0.94, 0.93, 0.88)
 MID2 = (0.74, 0.66, 0.32)
 BAR = (0.08, 0.11, 0.08)
 HEAD_TOP, CHEEK, THROAT, LIP = (0.14, 0.17, 0.12), (0.42, 0.41, 0.24), (0.86, 0.85, 0.77), (0.64, 0.63, 0.50)
 FIN_COLOURS = {
-    "FinDorsal1": dict(membrane=(0.44, 0.42, 0.37), ray=(0.18, 0.17, 0.14), alpha=0.9),
-    "FinDorsal2": dict(membrane=(0.64, 0.62, 0.38), ray=(0.36, 0.33, 0.20), alpha=0.72),
-    "FinAnal": dict(membrane=(0.93, 0.34, 0.13), ray=(0.74, 0.22, 0.08), alpha=0.85, spine=(0.95, 0.92, 0.82)),
-    "FinCaudal": dict(membrane=(0.90, 0.40, 0.17), ray=(0.68, 0.24, 0.09), alpha=0.88, lower=(0.94, 0.34, 0.13)),
-    "FinPectoral": dict(membrane=(0.86, 0.70, 0.46), ray=(0.56, 0.38, 0.24), alpha=0.65),
-    "FinPelvic": dict(membrane=(0.94, 0.36, 0.13), ray=(0.76, 0.23, 0.08), alpha=0.88, spine=(0.96, 0.94, 0.86)),
+    "FinDorsal1": dict(membrane=(0.27, 0.25, 0.21), ray=(0.66, 0.60, 0.48), alpha=0.72),
+    "FinDorsal2": dict(membrane=(0.46, 0.39, 0.24), ray=(0.25, 0.20, 0.12), alpha=0.62),
+    "FinAnal": dict(membrane=(0.95, 0.42, 0.17), ray=(0.62, 0.16, 0.06), alpha=0.72, spine=(0.95, 0.92, 0.82)),
+    "FinCaudal": dict(membrane=(0.92, 0.45, 0.20), ray=(0.58, 0.17, 0.07), alpha=0.75, lower=(0.95, 0.40, 0.16)),
+    "FinPectoral": dict(membrane=(0.90, 0.72, 0.52), ray=(0.60, 0.36, 0.22), alpha=0.5),
+    "FinPelvic": dict(membrane=(0.95, 0.42, 0.17), ray=(0.62, 0.16, 0.06), alpha=0.75, spine=(0.96, 0.94, 0.86)),
 }
 
 UV_W, UV_Y0, UV_H = 0.86, 0.07, 0.36     # the body skin covers photo x 0..0.86, y 0.07..0.43
@@ -233,7 +234,7 @@ def sculpt_head(px, py, lat, cs):
     # Gill cover: the body behind its rear edge sits lower, so the edge stands out as a ledge.
     ox = opercle_x(py)
     behind = np.nan_to_num(px - ox, nan=-1.0)
-    lat -= np.sign(lat) * side * np.where(behind > 0, 0.003 * (1 - smoothstep(0.0, 0.035, behind)), 0.0)
+    lat -= np.sign(lat) * side * np.where(behind > 0, 0.0045 * (1 - smoothstep(0.0, 0.03, behind)), 0.0)
     # Preopercle: a shallow groove.
     dp = polyline_distance(px, py, PREOPERCLE)
     lat -= np.sign(lat) * side * 0.0012 * np.exp(-(dp / 0.0025) ** 2)
@@ -335,6 +336,9 @@ def build_fin(spec, segs=10, pleat=0.0012):
     px, py = pts[..., 0], pts[..., 1]
     # Pleats: the membrane folds between the rays, so the fin catches the light ray by ray.
     lat = pleat * np.where(np.arange(n) % 2 == 0, 1.0, -1.0)[:, None] * np.sin(np.pi * k)[None, :] * 0.7
+    # A fin is never a flat plate: it bows a little across its rays and towards its edge.
+    across = np.linspace(0, 1, n)[:, None]
+    lat = lat + spec.get("camber", 0.006) * np.sin(np.pi * across) * k[None, :] ** 1.5
     uv = np.stack([np.repeat(np.linspace(0, 1, n)[:, None], segs + 1, axis=1), np.repeat(k[None, :], n, axis=0)], axis=-1)
     idx = []
     for i in range(n - 1):
@@ -374,9 +378,10 @@ def paint_fin(name, spec, w=640, h=320):
     rng = np.random.default_rng(len(name))
     # The membrane stops short of the rays' tips: deep notches between the spines, a gentle scallop elsewhere.
     jitter = rng.uniform(-0.02, 0.02, n + 1)[ray_i.astype(int)]
-    edge = 1.0 - (0.22 if spiny else 0.05) * np.sin(np.pi * du) ** (0.7 if spiny else 1.2) + jitter * (du < 0.5)
-    membrane = smoothstep(edge, edge - 0.025, v)
-    ray_w = (0.16 if spiny else 0.11) * (1 - 0.5 * v)
+    notch = 0.42 if spiny else (0.02 if spec["kind"] == "caudal" else 0.035)
+    edge = 1.0 - notch * np.sin(np.pi * du) ** (0.6 if spiny else 1.4) + jitter * (du < 0.5) * (1.0 if spiny else 0.3)
+    membrane = smoothstep(edge, edge - 0.02, v)
+    ray_w = (0.15 if spiny else 0.12) * (1 - 0.55 * v)
     if spec["kind"] == "soft" or spec["kind"] == "caudal":
         # Soft rays fork towards the edge and are segmented (fine light joints).
         sd = f - ray_i
@@ -392,6 +397,8 @@ def paint_fin(name, spec, w=640, h=320):
     if "lower" in col:                                    # tail: olive above, orange-red lower lobe
         c = c * (1 - smoothstep(0.35, 0.8, u))[..., None] + np.array(col["lower"]) * smoothstep(0.35, 0.8, u)[..., None]
     c = c * (0.82 + 0.18 * v)[..., None]                  # the membrane brightens towards the edge
+    if spec["kind"] == "caudal":                          # the tail's base is olive like the stalk
+        c = c * (1 - smoothstep(0.25, 0.0, v))[..., None] + np.array([0.36, 0.36, 0.20]) * smoothstep(0.25, 0.0, v)[..., None]
     ray_c = np.array(col["ray"])
     c = c * (1 - ray[..., None]) + ray_c * ray[..., None]
     if spiny:
@@ -405,7 +412,8 @@ def paint_fin(name, spec, w=640, h=320):
         c = c * (1 - sp[..., None]) + np.array(col["spine"]) * sp[..., None]
         ray = np.maximum(ray, sp)
     c *= (1 + rng.normal(0, 0.025, (h, w)))[..., None]
-    alpha = np.maximum(membrane * col["alpha"] * (0.9 + 0.1 * (1 - v)), ray)
+    # Rays are opaque; the membrane between them thins out towards the edge.
+    alpha = np.maximum(membrane * col["alpha"] * (1.0 - 0.3 * v), ray * 0.98)
     alpha *= smoothstep(0.0, 0.015, u) * smoothstep(1.0, 0.985, u) if spec["kind"] == "caudal" else 1
     rgba = np.dstack([np.clip(c, 0, 1), np.clip(alpha, 0, 1)])
     return Image.fromarray((rgba * 255).astype(np.uint8), "RGBA")
@@ -452,15 +460,15 @@ def unwrap_coords(w, h):
     total = cum[-1] + np.hypot(lat[0] - lat[-1], up[0] - up[-1])
     s = np.minimum(cum, total[None, :] - cum)
     ds = np.gradient(cum, axis=0)
-    return np.broadcast_to(x[None, :], (h, w)), py, s, ds
+    return np.broadcast_to(x[None, :], (h, w)), py, s, ds, np.broadcast_to(np.abs(cs)[:, None] ** 0.5, (h, w))
 
 
 def write_textures(work, w=4096, h=2048):
     """Textures for the Blender build (perch_blender.py): the unwrapped skin and its normal map, fins, iris."""
     from PIL import Image
     os.makedirs(work, exist_ok=True)
-    x, y, s, ds = unwrap_coords(w, h)
-    c, height = skin(x, y, s)
+    x, y, s, ds, side = unwrap_coords(w, h)
+    c, height = skin(x, y, s, side)
     Image.fromarray((np.clip(c, 0, 1) * 255).astype(np.uint8), "RGB").save(os.path.join(work, "body_albedo.jpg"), quality=93)
     # Normal map from the heights, in real lengths along u and round the body (OpenGL convention: green up the image).
     k = 0.00062
@@ -478,13 +486,52 @@ def write_textures(work, w=4096, h=2048):
     print(f"textures in {work}")
 
 
-def skin(x, y, s):
+def _hash(i, j, k=0):
+    """A repeatable pseudo-random number in [0, 1) per scale."""
+    v = np.sin(i * 127.1 + j * 311.7 + k * 74.7) * 43758.5453
+    return v - np.floor(v)
+
+
+def scale_field(x, s, a, rows=0.74, slope=0.22):
+    """
+    Overlapping fish scales on the skin. Scales sit on a staggered lattice whose rows run obliquely (down towards the
+    tail); each is a disc a little larger than its cell, and where discs overlap the scale nearer the head lies on
+    top (as on a fish, each scale covers the front of the one behind it), so what shows of each scale is its rounded
+    free rear part. Returns per pixel: the visible scale's centre (x), its lattice indices, the position inside it
+    (dx along the fish -1..1, distance d from its centre 0..1).
+    """
+    b = a * rows
+    sp = s - slope * x
+    j0 = np.floor(sp / b)
+    shape = np.shape(x)
+    best = np.full(shape, np.inf, dtype=np.float32)
+    out = {k: np.zeros(shape, dtype=np.float32) for k in ("cx", "i", "j", "dx", "dy", "d")}
+    rx, rs = 0.70 * a, 1.08 * b
+    for dj in (-1, 0, 1):
+        j = j0 + dj
+        off = 0.5 * np.mod(j, 2)
+        i0 = np.floor(x / a - off)
+        for di in (-1, 0, 1, 2):
+            i = i0 + di
+            cx = (i + off) * a
+            dx = (x - cx) / rx
+            dy = (sp - (j + 0.5) * b) / rs
+            d = np.hypot(dx, dy)
+            take = (d < 1.0) & (cx < best)
+            best = np.where(take, cx, best)
+            for k, v in (("cx", cx), ("i", i), ("j", j), ("dx", dx), ("dy", dy), ("d", d)):
+                out[k] = np.where(take, v, out[k])
+    return out
+
+
+def skin(x, y, s, side=None):
     """
     Colour and bump of the skin at photo points (x, y) of the side view; s runs over the skin across the body (the
     scale rows follow it).
     """
-    from PIL import Image
+    from PIL import Image, ImageFilter
     h, w = np.shape(x)
+    side = np.ones((h, w)) if side is None else side          # 1 on the flanks, 0 on the crown and the throat
     xc = np.clip(x, X0, X1)
     top, bottom = interp(TOP, xc), interp(BOTTOM, xc)
     rel = np.clip((y - top) / (bottom - top), -0.2, 1.2)
@@ -508,55 +555,73 @@ def skin(x, y, s):
     hc = hc * (1 + 0.08 * gill)[..., None]               # the gill cover a touch lighter, like polished brass
     c = c * (1 - head_w[..., None]) + hc * head_w[..., None]
 
-    # Scales: staggered rows of small ctenoid scales whose free rear edges catch the light; tiny ones on the cheeks.
-    for size, mask in ((0.0105, 1 - head_w), (0.0062, head_w * smoothstep(0.12, 0.17, x) * (rel > 0.15))):
-        sy = size * 0.72
-        ys = s - 0.16 * x                                  # scale rows run obliquely down towards the head
-        row = np.floor(ys / sy)
-        gx = x / size + 0.5 * (row % 2)
-        fx, fy = gx - np.floor(gx), ys / sy - row
-        r = np.hypot((fx - 0.35) / 0.75, (fy - 0.5) / 0.62)
-        cell = (np.floor(gx) * 7.3 + row * 3.1) % 1.0          # each scale a little lighter or darker
-        rim = smoothstep(0.62, 0.95, r) * (fx > 0.35)
-        shade = 1 - 0.08 * rim + 0.04 * smoothstep(0.7, 0.0, r) + 0.05 * (cell - 0.5)
-        c *= (1 + (shade - 1) * mask)[..., None]
-        height += mask * (0.4 * smoothstep(1.0, 0.0, r) - 0.35 * rim)
+    # Scales: small ctenoid scales, each showing its rounded free rear part with a dark, rough rim, a lighter, glinting
+    # middle, its own tint and a few pigment cells; tiny ones on the cheeks and the upper gill cover.
+    sc = {}
+    for name, size, mask in (("body", 0.0092, 1 - head_w),
+                             ("cheek", 0.0048, head_w * smoothstep(0.11, 0.15, x) * smoothstep(0.30, 0.42, rel)
+                              * smoothstep(0.92, 0.75, rel))):
+        f = scale_field(x, s, size)
+        sc[name] = f
+        h1, h2, h3 = _hash(f["i"], f["j"]), _hash(f["i"], f["j"], 1), _hash(f["i"], f["j"], 2)
+        # The free edge darkens (pigment along the scale's rim, the shadow it casts on the scale behind).
+        rim = smoothstep(0.78, 1.0, f["d"]) * smoothstep(-0.1, 0.45, f["dx"])
+        glint = np.exp(-((f["dx"] - 0.1) ** 2 + f["dy"] ** 2) / 0.10)
+        shade = 1 - 0.26 * rim + 0.07 * glint + 0.08 * (h1 - 0.5)
+        tint = np.stack([1 + 0.05 * (h2 - 0.5), 1 + 0.02 * (h1 - 0.5), 1 - 0.06 * (h2 - 0.5)], axis=-1)
+        c = c * (1 + (shade[..., None] * tint - 1) * mask[..., None])
+        # Each scale a plate rising towards its free edge, which drops onto the scale behind it.
+        height += mask * (0.25 + 0.45 * np.clip(f["dx"], -1, 1) - 0.6 * smoothstep(0.9, 1.0, f["d"]))
 
     # Bars, darkest at the back, fading down the flank; the first and third fork at the top.
-    bar = np.zeros((h, w))
-    for cx, hw, end, fork in BARS:
-        centre = cx + 0.012 * (rel - 0.3) + 0.004 * np.sin(rel * 9 + cx * 40)
-        width = hw * (1 - 0.45 * np.clip(rel, 0, 1) / end)
-        strength = smoothstep(end, end - 0.15, rel) * smoothstep(-0.05, 0.06, rel)
-        if fork:
-            f = smoothstep(0.34, 0.1, rel)
-            d = np.minimum(np.abs(x - centre - 0.013 * f), np.abs(x - centre + 0.013 * f))
-            width = width * (1 - 0.35 * f)
-        else:
-            d = np.abs(x - centre)
-        bar = np.maximum(bar, smoothstep(width, width - 0.006, d + 0.002 * rng.normal(0, 1, (h, w))) * strength)
+    # The bars are made of dark scales: whether a scale is dark is decided at its centre, so the bars' edges follow the
+    # scales, ragged; they fade down the flank and some fork at the top.
+    def bars_at(xq):
+        out = np.zeros((h, w))
+        for cx, hw, end, fork in BARS:
+            centre = cx + 0.014 * (rel - 0.3) + 0.004 * np.sin(rel * 9 + cx * 40)
+            width = hw * (1 - 0.6 * np.clip(rel, 0, 1) / end)          # wedge-shaped: broad at the back
+            strength = smoothstep(end, end - 0.25, rel) * smoothstep(-0.05, 0.06, rel)
+            if fork:
+                f = smoothstep(0.34, 0.1, rel)
+                d = np.minimum(np.abs(xq - centre - 0.013 * f), np.abs(xq - centre + 0.013 * f))
+                width = width * (1 - 0.35 * f)
+            else:
+                d = np.abs(xq - centre)
+            out = np.maximum(out, smoothstep(width + 0.004, width - 0.006, d) * strength)
+        return out
+    b = sc["body"]
+    jitter = 0.25 * (_hash(b["i"], b["j"], 3) - 0.5)
+    # Mostly decided per scale (ragged, scale-by-scale edges), with a soft part so the bars shade into the flank.
+    bar = np.clip(0.75 * np.clip(bars_at(b["cx"]) + jitter, 0, 1) + 0.25 * bars_at(x), 0, 1)
     bar *= 1 - head_w
-    c = c * (1 - 0.85 * bar[..., None]) + np.array(BAR) * 0.85 * bar[..., None]
+    c = c * (1 - 0.82 * bar[..., None]) + np.array(BAR) * 0.82 * bar[..., None]
+    # Fine dark speckles on the back.
+    speck = (rng.random((h, w)) > 0.9965) * smoothstep(0.45, 0.1, rel)
+    speck = np.asarray(Image.fromarray((speck * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(3))) / 255.0
+    c *= (1 - 0.35 * speck)[..., None]
 
     # Lateral line: a row of pale, pored scales.
+    # Lateral line: the scales along it each carry a short tube (a pale ridge with a dark pore at its end).
     ll = interp(LATERAL_LINE, x)
-    on_line = smoothstep(0.0022, 0.0008, np.abs(y - ll)) * (x > 0.215) * (x < X1)
-    pore = (np.sin(x / 0.0105 * 2 * np.pi) > 0.6)
-    c = c * (1 + 0.18 * on_line * (1 - pore))[..., None] * (1 - 0.35 * on_line * pore)[..., None]
-    height -= 0.6 * on_line * pore
+    near = smoothstep(0.004, 0.0015, np.abs(y - ll)) * (x > 0.25) * (x < X1) * (1 - head_w)
+    tube = smoothstep(0.32, 0.12, np.abs(b["dy"])) * smoothstep(-0.55, -0.3, b["dx"]) * smoothstep(0.55, 0.3, b["dx"])
+    pore = smoothstep(0.2, 0.08, np.hypot(b["dx"] - 0.45, b["dy"]))
+    c = c * (1 + 0.16 * near * tube)[..., None] * (1 - 0.45 * near * pore)[..., None]
+    height += near * (0.5 * tube - 0.6 * pore)
 
     # Head details: the gape with pale lips, the maxilla, nostrils, the preopercle with its serrated edge, the gill
     # cover's dark rear edge with a light rim, its spine, and the dark socket round the eye.
     dm = polyline_distance(x, y, GAPE)
     below = y > interp(GAPE, np.clip(x, GAPE[0][0], GAPE[-1][0]))
     lips = smoothstep(0.007, 0.0025, dm) * below * smoothstep(0.09, 0.07, x)
-    c = c * (1 - 0.45 * lips[..., None]) + np.array(LIP) * 0.45 * lips[..., None]
+    c = c * (1 - 0.25 * lips[..., None]) + np.array(LIP) * 0.25 * lips[..., None]
     gape = 0.0026 - 0.0012 * np.clip(x / 0.06, 0, 1) + 0.0010 * smoothstep(0.06, 0.08, x)
     c *= (1 - 0.85 * smoothstep(gape + 0.001, gape - 0.0004, dm))[..., None]
     height -= 0.8 * smoothstep(0.002, 0.0, dm)
     c *= (1 - 0.35 * smoothstep(0.0014, 0.0005, polyline_distance(x, y, MAXILLA)))[..., None]
     for nx, ny in NOSTRILS:
-        pit = smoothstep(0.0028, 0.0012, np.hypot(x - nx, y - ny))
+        pit = smoothstep(0.0028, 0.0012, np.hypot(x - nx, y - ny)) * smoothstep(0.3, 0.55, side)
         c *= (1 - 0.7 * pit)[..., None]
         height -= 0.6 * pit
     dp = polyline_distance(x, y, PREOPERCLE)
@@ -570,6 +635,44 @@ def skin(x, y, s):
     c *= (1 + 0.15 * smoothstep(0.005, 0.0015, do) * (behind < 0))[..., None]
     spine = smoothstep(0.004, 0.0015, np.hypot((x - 0.258) / 1.8, y - 0.190))
     c *= (1 - 0.7 * spine)[..., None]
+    # The gill cover's bone: fine rays fanning out from its joint, on its lower, scaleless part.
+    operc = (behind < 0) * smoothstep(0.155, 0.17, x) * smoothstep(0.19, 0.215, y)
+    ang = np.arctan2(y - 0.165, x - 0.185)
+    rays = 0.5 + 0.5 * np.sin(ang * 70 + 3 * np.sin(np.hypot(x - 0.185, y - 0.165) * 300))
+    c *= (1 + 0.07 * (rays - 0.5) * operc)[..., None]
+    height += 0.25 * (rays - 0.5) * operc
+    # The red gill membrane showing under the lower rear edge of the gill cover.
+    membrane = smoothstep(0.0040, 0.0018, do) * (behind >= -0.0005) * smoothstep(0.22, 0.25, y)
+    c = c * (1 - 0.45 * membrane[..., None]) + np.array([0.70, 0.32, 0.28]) * 0.45 * membrane[..., None]
+    # The upper jaw's bone (maxilla): a paler plate above the gape, widening to its rounded end under the eye, outlined.
+    mx = np.clip(x, MAXILLA[0][0], MAXILLA[-1][0])
+    gy_ = interp(GAPE, np.clip(x, GAPE[0][0], GAPE[-1][0]))
+    plate_w = 0.0025 + 0.0075 * np.clip((x - 0.03) / 0.055, 0, 1)
+    above = gy_ - y
+    maxilla = smoothstep(-0.0005, 0.0008, above) * smoothstep(plate_w + 0.0008, plate_w - 0.0008, above) \
+        * smoothstep(0.028, 0.036, x) * smoothstep(0.088, 0.082, x) * smoothstep(0.6, 0.8, side)
+    c = c * (1 - 0.3 * maxilla[..., None]) + np.array([0.70, 0.66, 0.46]) * 0.3 * maxilla[..., None]
+    outline = maxilla * (1 - smoothstep(0.0, 0.0012, np.minimum(above, plate_w - above)))
+    c *= (1 - 0.4 * outline)[..., None]
+    height += 0.5 * maxilla - 0.4 * outline
+    # The gill cover: a bronze plate, darker towards its rim.
+    plate = (behind < 0) * smoothstep(0.158, 0.17, x) * smoothstep(0.145, 0.16, y) * smoothstep(0.285, 0.27, y)
+    c = c * (1 - 0.25 * plate[..., None]) + np.array([0.46, 0.38, 0.20]) * 0.25 * plate[..., None]
+    c *= (1 - 0.25 * plate * smoothstep(0.012, 0.0, do))[..., None]
+    # Mottling on the crown and cheeks.
+    blot = np.asarray(Image.fromarray((rng.random((max(h // 40, 2), max(w // 40, 2))) * 255).astype(np.uint8))
+                      .resize((w, h), Image.BICUBIC)) / 255.0
+    fine = np.asarray(Image.fromarray((rng.random((max(h // 12, 2), max(w // 12, 2))) * 255).astype(np.uint8))
+                      .resize((w, h), Image.BICUBIC)) / 255.0
+    c *= (1 - 0.07 * head_w * (smoothstep(0.5, 0.85, blot) + smoothstep(0.55, 0.9, fine)))[..., None]
+    # Sensory pores: rows of small pits along the preopercle, under the eye and along the lower jaw.
+    pores = [(0.148, 0.165 + 0.012 * k) for k in range(8)] + \
+            [(0.045 + 0.012 * k, 0.212 + 0.0015 * k) for k in range(7)] + \
+            [(0.02 + 0.011 * k, 0.246 + 0.0019 * k) for k in range(5)]
+    for px_, py_ in pores:
+        pit = smoothstep(0.0019, 0.0008, np.hypot(x - px_, y - py_)) * smoothstep(0.72, 0.88, side)
+        c *= (1 - 0.55 * pit)[..., None]
+        height -= 0.5 * pit
     de = np.hypot(x - EYE[0], y - EYE[1]) / EYE_R
     c *= (1 - 0.5 * smoothstep(1.0, 1.08, de) * smoothstep(1.45, 1.15, de))[..., None]
     height += 0.6 * smoothstep(1.0, 1.15, de) * smoothstep(1.5, 1.2, de)
@@ -624,10 +727,10 @@ def paint_eye(size=512):
     ang = np.arctan2(yy - size / 2, xx - size / 2)
     rng = np.random.default_rng(3)
     streaks = np.interp(ang, np.linspace(-np.pi, np.pi, 90), rng.random(90))
-    gold = np.array([0.93, 0.82, 0.38]) * (0.8 + 0.3 * streaks)[..., None]
+    gold = np.array([0.96, 0.76, 0.22]) * (0.75 + 0.35 * streaks)[..., None]
     c = gold * (1 - smoothstep(0.62, 0.86, r))[..., None] + np.array([0.35, 0.28, 0.10]) * smoothstep(0.62, 0.86, r)[..., None]
     c = c * (1 - smoothstep(0.86, 0.95, r))[..., None] + np.array([0.10, 0.11, 0.07]) * smoothstep(0.86, 0.95, r)[..., None]
-    pupil = smoothstep(0.42, 0.38, r)
+    pupil = smoothstep(0.46, 0.42, r)
     c = c * (1 - pupil[..., None]) + np.array([0.01, 0.01, 0.015]) * pupil[..., None]
     c *= (1 - 0.25 * smoothstep(0.38, 0.5, r) * smoothstep(0.62, 0.5, r))[..., None]   # dark ring round the pupil
     return Image.fromarray((np.clip(c, 0, 1) * 255).astype(np.uint8), "RGB")

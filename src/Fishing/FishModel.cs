@@ -572,11 +572,11 @@ public partial class FishModel : Node3D
         {
             _bodyShaderMaterial.SetShaderParameter("normal_tex", asset.BodyNormal);
             _bodyShaderMaterial.SetShaderParameter("use_normal", true);
-            _bodyShaderMaterial.SetShaderParameter("normal_strength", 0.5f);
+            _bodyShaderMaterial.SetShaderParameter("normal_strength", 0.8f);
         }
         _bodyShaderMaterial.SetShaderParameter("metallic", 0.08f + 0.3f * style.Silver);
-        _bodyShaderMaterial.SetShaderParameter("roughness", 0.36f);
-        _bodyShaderMaterial.SetShaderParameter("clearcoat", 0.5f);
+        _bodyShaderMaterial.SetShaderParameter("roughness", 0.42f);
+        _bodyShaderMaterial.SetShaderParameter("clearcoat", 0.3f);
         _skinUpgraded = true;
         float phase = (float)(GD.Randf() * Mathf.Tau);
         void Swimmer(GeometryInstance3D g)
