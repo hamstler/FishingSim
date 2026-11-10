@@ -33,28 +33,36 @@ DEPTH_SCALE = 0.95    # the reference is a grown perch; the model is a medium on
 
 # Body outline without fins, traced every few percent of the length on the perch of AtlasRyb.online (proportions
 # only; the illustration itself is not used).
-TOP = [(0.004, 0.221), (0.02, 0.193), (0.05, 0.171), (0.10, 0.154), (0.15, 0.140), (0.20, 0.118), (0.25, 0.093),
+TOP = [(0.0, 0.223), (0.0012, 0.214), (0.003, 0.207), (0.006, 0.201), (0.01, 0.197), (0.02, 0.191), (0.03, 0.186), (0.05, 0.176), (0.075, 0.163),
+       (0.10, 0.151), (0.125, 0.143), (0.15, 0.136), (0.20, 0.116), (0.25, 0.093),
        (0.30, 0.084), (0.35, 0.082), (0.40, 0.086), (0.45, 0.095), (0.50, 0.108), (0.55, 0.123), (0.60, 0.134),
        (0.65, 0.151), (0.70, 0.171), (0.75, 0.190), (0.80, 0.204), (0.845, 0.207)]
-BOTTOM = [(0.004, 0.241), (0.02, 0.251), (0.05, 0.260), (0.10, 0.271), (0.15, 0.278), (0.20, 0.294), (0.25, 0.316),
+BOTTOM = [(0.0, 0.236), (0.0012, 0.244), (0.003, 0.251), (0.006, 0.256), (0.01, 0.260), (0.02, 0.264), (0.03, 0.268), (0.05, 0.274),
+          (0.075, 0.281), (0.10, 0.287), (0.125, 0.292), (0.15, 0.298), (0.20, 0.314), (0.25, 0.330),
           (0.30, 0.344), (0.35, 0.361), (0.40, 0.366), (0.45, 0.367), (0.50, 0.365), (0.55, 0.355), (0.60, 0.341),
           (0.65, 0.322), (0.70, 0.302), (0.75, 0.283), (0.80, 0.266), (0.845, 0.260)]
-X0, X1 = 0.004, 0.845          # snout tip, end of the tail stalk (the caudal fin's base)
+X0, X1 = 0.0, 0.845
+CAP_LENGTH = 0.0008            # the snout's outline itself rounds off to its tip; the cap only closes it          # snout tip, end of the tail stalk (the caudal fin's base)
 
 # Width / depth of the body along it: a broad head, a laterally flattened body.
 # Half width of the body (total lengths): a broad, blunt snout and head seen from above, a flattened body.
-HALF_WIDTH = [(0.0, 0.007), (0.012, 0.017), (0.03, 0.024), (0.06, 0.031), (0.10, 0.037), (0.15, 0.043),
+HALF_WIDTH = [(0.0, 0.004), (0.0012, 0.009), (0.003, 0.013), (0.006, 0.016), (0.012, 0.021), (0.03, 0.026), (0.06, 0.031), (0.10, 0.037), (0.15, 0.043),
               (0.22, 0.050), (0.30, 0.056), (0.40, 0.059), (0.50, 0.057), (0.60, 0.050), (0.70, 0.040), (0.80, 0.026),
               (0.845, 0.020)]
 # Cross-section: a broad rounded crown on the head, a narrow back under the dorsal fins, a full rounded belly.
 N_TOP_ALONG = [(0.0, 2.4), (0.2, 2.3), (0.32, 1.8), (1.0, 1.75)]
-N_BOTTOM = 2.3
+N_BOTTOM_ALONG = [(0.0, 1.85), (0.15, 1.95), (0.3, 2.3), (1.0, 2.3)]   # a rounded chin and throat
 
 # Head.
-EYE = (0.098, 0.187)
-EYE_R = 0.018
-GAPE = [(0.003, 0.231), (0.03, 0.237), (0.055, 0.244), (0.07, 0.250), (0.08, 0.257)]   # its corner under the eye
-MAXILLA = [(0.03, 0.234), (0.06, 0.242), (0.083, 0.253)]
+EYE = (0.092, 0.186)
+EYE_R = 0.0205
+GAPE = [(0.002, 0.230), (0.02, 0.237), (0.04, 0.247), (0.058, 0.256), (0.068, 0.263)]   # short, sloping down
+# The lips' folds and the upper jaw bone (maxilla), which ends in a rounded plate under the front of the eye.
+UPPER_LIP_FOLD = [(0.004, 0.216), (0.015, 0.222), (0.028, 0.229)]
+LOWER_LIP_FOLD = [(0.006, 0.246), (0.02, 0.251), (0.035, 0.257)]
+MAXILLA_EDGE = [(0.035, 0.227), (0.06, 0.236), (0.085, 0.244), (0.100, 0.252), (0.106, 0.261), (0.103, 0.270),
+                (0.094, 0.274), (0.082, 0.272), (0.068, 0.264)]
+MAXILLA = [(0.025, 0.230), (0.05, 0.240), (0.075, 0.252), (0.092, 0.262)]
 NOSTRILS = [(0.045, 0.186), (0.057, 0.183)]
 PREOPERCLE = [(0.155, 0.155), (0.158, 0.21), (0.15, 0.242), (0.125, 0.265), (0.10, 0.272)]
 OPERCLE = [(0.172, 0.142), (0.21, 0.155), (0.24, 0.175), (0.255, 0.190), (0.24, 0.215), (0.228, 0.235),
@@ -95,7 +103,7 @@ RIDGE, UPPER, MID, LOWER, BELLY = (0.07, 0.10, 0.08), (0.16, 0.20, 0.12), (0.62,
     (0.94, 0.93, 0.88)
 MID2 = (0.74, 0.66, 0.32)
 BAR = (0.08, 0.11, 0.08)
-HEAD_TOP, CHEEK, THROAT, LIP = (0.14, 0.17, 0.12), (0.42, 0.41, 0.24), (0.86, 0.85, 0.77), (0.64, 0.63, 0.50)
+HEAD_TOP, CHEEK, THROAT, LIP = (0.13, 0.16, 0.12), (0.36, 0.38, 0.25), (0.84, 0.84, 0.77), (0.55, 0.56, 0.45)
 FIN_COLOURS = {
     "FinDorsal1": dict(membrane=(0.27, 0.25, 0.21), ray=(0.66, 0.60, 0.48), alpha=0.72),
     "FinDorsal2": dict(membrane=(0.46, 0.39, 0.24), ray=(0.25, 0.20, 0.12), alpha=0.62),
@@ -162,6 +170,10 @@ def n_top(x):
     return interp(N_TOP_ALONG, x)
 
 
+def n_bottom(x):
+    return interp(N_BOTTOM_ALONG, x)
+
+
 def model(x, y, lateral):
     """Photo coordinates (+ lateral offset, photo units) -> model space."""
     return np.stack([lateral * DEPTH_SCALE, (AXIS - y) * DEPTH_SCALE, 0.5 - x], axis=-1)
@@ -186,7 +198,7 @@ def build_body(n_rings=190, n_seg=80):
     hw = hw * rings_k
     theta = np.linspace(0, 2 * math.pi, n_seg, endpoint=False)
     sn, cs = np.sin(theta), np.cos(theta)
-    n_exp = np.where(sn[None, :] >= 0, n_top(xc)[:, None], N_BOTTOM)
+    n_exp = np.where(sn[None, :] >= 0, n_top(xc)[:, None], n_bottom(xc)[:, None])
     lat = hw[:, None] * np.sign(cs) * np.abs(cs) ** (2 / n_exp)
     up = hh[:, None] * np.sign(sn) * np.abs(sn) ** (2 / n_exp)
     px = np.repeat(rings_x[:, None], n_seg, axis=1)
@@ -206,16 +218,32 @@ def build_body(n_rings=190, n_seg=80):
 
 
 def mouth_cleft(px, py):
-    """How far the snout's surface is pushed back at the mouth: the gape opens across the front of the head."""
+    """
+    How far the front of the head moves along the fish at the mouth: the crease between the lips is pushed back, the
+    fleshy lips either side of it stand forward, so the snout ends in two rounded lips, not in a point.
+    """
     dy = py - interp(GAPE, np.clip(px, GAPE[0][0], GAPE[-1][0]))
-    return 0.008 * np.exp(-(dy / 0.003) ** 2) * smoothstep(X0 + 0.035, X0, px)
+    front = smoothstep(X0 + 0.022, X0 + 0.004, px) * smoothstep(X0, X0 + 0.0025, px)
+    lips = np.exp(-((np.abs(dy) - 0.0055) / 0.0035) ** 2)
+    return (0.0016 * np.exp(-(dy / 0.0014) ** 2) - 0.0016 * lips) * front
 
 
 def mouth_open(px, py):
     """The jaws stand a little apart at the front, as a perch holds its mouth: upper lip up, lower lip down."""
     dy = py - interp(GAPE, np.clip(px, GAPE[0][0], GAPE[-1][0]))
     inside_cap = smoothstep(X0 - 0.0025, X0 + 0.002, px)      # the rounded tip in front of the first ring stays whole
-    return 0.0022 * np.tanh(dy / 0.002) * np.exp(-(dy / 0.008) ** 2) * smoothstep(0.06, X0, px) * inside_cap
+    return 0.0006 * np.tanh(dy / 0.002) * np.exp(-(dy / 0.008) ** 2) * smoothstep(0.05, X0, px) * inside_cap
+
+
+def maxilla_mask(px, py):
+    """Inside the upper jaw bone's plate: below its upper edge, above the gape, between its front and rounded end."""
+    edge = np.array(MAXILLA_EDGE)
+    top = np.interp(px, edge[:4, 0], edge[:4, 1])
+    lower = interp(GAPE, np.clip(px, GAPE[0][0], GAPE[-1][0]))
+    end = np.hypot((px - 0.094) / 1.0, (py - 0.262) / 1.15)
+    body = smoothstep(top - 0.0008, top + 0.0012, py) * smoothstep(lower + 0.012, lower + 0.009, py) \
+        * smoothstep(0.035, 0.045, px) * smoothstep(0.094, 0.088, px)
+    return np.maximum(body, smoothstep(0.012, 0.010, end) * smoothstep(0.085, 0.09, px)) * smoothstep(0.03, 0.04, px)
 
 
 def sculpt_head(px, py, lat, cs):
@@ -228,16 +256,21 @@ def sculpt_head(px, py, lat, cs):
     # Mouth: the gape as a groove between two lips.
     dm = polyline_distance(px, py, GAPE)
     head = smoothstep(0.1, 0.085, px)
-    taper = 1.0 - 0.5 * np.clip(px / 0.08, 0, 1)                 # the gape is widest at the front
-    lat -= np.sign(lat) * side * head * (0.0045 * taper * np.exp(-(dm / 0.0022) ** 2)
-                                         - 0.0028 * np.exp(-((dm - 0.0055) / 0.0032) ** 2))
+    # Closed mouth: thick, rounded lips either side of a narrow crease that deepens into the corner.
+    corner = smoothstep(0.072, 0.064, px)
+    lat -= np.sign(lat) * side * head * corner * (0.0022 * np.exp(-(dm / 0.0011) ** 2)
+                                                  - 0.0034 * np.exp(-((dm - 0.0050) / 0.0032) ** 2))
+    # The lips' folds as grooves; the upper jaw bone as a raised plate inside its outline, with a groove round it.
+    for fold in (UPPER_LIP_FOLD, LOWER_LIP_FOLD, MAXILLA_EDGE):
+        lat -= np.sign(lat) * side * 0.0011 * np.exp(-(polyline_distance(px, py, fold) / 0.0012) ** 2)
+    lat += np.sign(lat) * side * 0.0016 * maxilla_mask(px, py)
     # Gill cover: the body behind its rear edge sits lower, so the edge stands out as a ledge.
     ox = opercle_x(py)
     behind = np.nan_to_num(px - ox, nan=-1.0)
     lat -= np.sign(lat) * side * np.where(behind > 0, 0.0045 * (1 - smoothstep(0.0, 0.03, behind)), 0.0)
     # Preopercle: a shallow groove.
     dp = polyline_distance(px, py, PREOPERCLE)
-    lat -= np.sign(lat) * side * 0.0012 * np.exp(-(dp / 0.0025) ** 2)
+    lat += np.sign(lat) * side * (0.0014 * np.exp(-((dp - 0.002) / 0.0025) ** 2) - 0.0010 * np.exp(-(dp / 0.0012) ** 2))
     return lat
 
 
@@ -249,11 +282,11 @@ def build_body_unwrapped(n_rings=150, n_seg=96):
     """
     s = np.linspace(0, 1, n_rings)
     xs = X0 + (X1 - X0) * s ** 1.3
-    cap = 6
+    cap = 10
     rings_x, rings_k = [], []
     for k in range(cap, 0, -1):
         phi = math.pi / 2 * k / cap
-        rings_x.append(X0 - 0.0028 * math.sin(phi))
+        rings_x.append(X0 - CAP_LENGTH * math.sin(phi))
         rings_k.append(max(math.cos(phi), 0.02))
     rings_x = np.array(rings_x + list(xs))
     rings_k = np.array(rings_k + [1.0] * len(xs))
@@ -264,13 +297,16 @@ def build_body_unwrapped(n_rings=150, n_seg=96):
     theta = np.pi / 2 - 2 * np.pi * v
     sn, cs = np.sin(theta), np.cos(theta)
     cs = np.where(np.abs(cs) < 1e-9, 0.0, cs)
-    n_exp = np.where(sn[None, :] >= 0, n_top(xc)[:, None], N_BOTTOM)
+    n_exp = np.where(sn[None, :] >= 0, n_top(xc)[:, None], n_bottom(xc)[:, None])
     lat = hw[:, None] * np.sign(cs) * np.abs(cs) ** (2 / n_exp)
     up = hh[:, None] * np.sign(sn) * np.abs(sn) ** (2 / n_exp)
     px = np.repeat(rings_x[:, None], n_seg + 1, axis=1)
     py = yc[:, None] - up
-    lat = sculpt_head(px, py, lat, cs)
-    pos = model(px + mouth_cleft(px, py), py + mouth_open(px, py), lat).reshape(-1, 3)
+    # The rounded tip in front of the first ring closes over the mouth: it follows the head's relief and the lips less
+    # the nearer it is to its centre, so the front stays smooth.
+    weight = rings_k[:, None] ** 3
+    lat = lat + (sculpt_head(px, py, lat, cs) - lat) * weight
+    pos = model(px + mouth_cleft(px, py) * weight, py + mouth_open(px, py), lat).reshape(-1, 3)
     u = np.clip((rings_x - X0) / (X1 - X0), 0, 1)
     uv = np.stack([np.repeat(u[:, None], n_seg + 1, axis=1), np.repeat(v[None, :], len(rings_x), axis=0)], axis=-1).reshape(-1, 2)
     m = n_seg + 1
@@ -280,7 +316,7 @@ def build_body_unwrapped(n_rings=150, n_seg=96):
             a = i * m + j
             faces.append((a, a + m, a + m + 1, a + 1))
     tip = len(pos)
-    pos = np.vstack([pos, model(np.array([X0 - 0.003]), np.array([(interp(TOP, X0) + interp(BOTTOM, X0)) / 2]), np.zeros(1))])
+    pos = np.vstack([pos, model(np.array([X0 - CAP_LENGTH - 0.0002]), np.array([(interp(TOP, X0) + interp(BOTTOM, X0)) / 2]), np.zeros(1))])
     uv = np.vstack([uv, [[0.0, 0.5]]])
     faces += [(tip, j + 1, j) for j in range(n_seg)]
     end = len(pos)
@@ -451,7 +487,7 @@ def unwrap_coords(w, h):
     yc, hh = (top + bottom) / 2, (bottom - top) / 2
     theta = np.pi / 2 - 2 * np.pi * v
     sn, cs = np.sin(theta), np.cos(theta)
-    n_exp = np.where(sn[:, None] >= 0, n_top(x)[None, :], N_BOTTOM)
+    n_exp = np.where(sn[:, None] >= 0, n_top(x)[None, :], n_bottom(x)[None, :])
     lat = hw[None, :] * np.sign(cs)[:, None] * np.abs(cs)[:, None] ** (2 / n_exp)
     up = hh[None, :] * np.sign(sn)[:, None] * np.abs(sn)[:, None] ** (2 / n_exp)
     py = yc[None, :] - up
@@ -613,12 +649,13 @@ def skin(x, y, s, side=None):
     # Head details: the gape with pale lips, the maxilla, nostrils, the preopercle with its serrated edge, the gill
     # cover's dark rear edge with a light rim, its spine, and the dark socket round the eye.
     dm = polyline_distance(x, y, GAPE)
-    below = y > interp(GAPE, np.clip(x, GAPE[0][0], GAPE[-1][0]))
-    lips = smoothstep(0.007, 0.0025, dm) * below * smoothstep(0.09, 0.07, x)
-    c = c * (1 - 0.25 * lips[..., None]) + np.array(LIP) * 0.25 * lips[..., None]
-    gape = 0.0026 - 0.0012 * np.clip(x / 0.06, 0, 1) + 0.0010 * smoothstep(0.06, 0.08, x)
-    c *= (1 - 0.85 * smoothstep(gape + 0.001, gape - 0.0004, dm))[..., None]
-    height -= 0.8 * smoothstep(0.002, 0.0, dm)
+    in_mouth = smoothstep(0.074, 0.066, x)
+    lips = smoothstep(0.0085, 0.0035, dm) * in_mouth
+    c = c * (1 - 0.3 * lips[..., None]) + np.array(LIP) * 0.3 * lips[..., None]
+    crease = 0.0007 + 0.0005 * smoothstep(0.04, 0.066, x)
+    c *= (1 - 0.8 * smoothstep(crease + 0.0007, crease - 0.0002, dm) * in_mouth)[..., None]
+    height -= 0.8 * smoothstep(0.0015, 0.0, dm) * in_mouth
+    height += 0.5 * smoothstep(0.009, 0.004, dm) * smoothstep(0.0012, 0.003, dm) * in_mouth
     c *= (1 - 0.35 * smoothstep(0.0014, 0.0005, polyline_distance(x, y, MAXILLA)))[..., None]
     for nx, ny in NOSTRILS:
         pit = smoothstep(0.0028, 0.0012, np.hypot(x - nx, y - ny)) * smoothstep(0.3, 0.55, side)
@@ -644,17 +681,14 @@ def skin(x, y, s, side=None):
     # The red gill membrane showing under the lower rear edge of the gill cover.
     membrane = smoothstep(0.0040, 0.0018, do) * (behind >= -0.0005) * smoothstep(0.22, 0.25, y)
     c = c * (1 - 0.45 * membrane[..., None]) + np.array([0.70, 0.32, 0.28]) * 0.45 * membrane[..., None]
-    # The upper jaw's bone (maxilla): a paler plate above the gape, widening to its rounded end under the eye, outlined.
-    mx = np.clip(x, MAXILLA[0][0], MAXILLA[-1][0])
-    gy_ = interp(GAPE, np.clip(x, GAPE[0][0], GAPE[-1][0]))
-    plate_w = 0.0025 + 0.0075 * np.clip((x - 0.03) / 0.055, 0, 1)
-    above = gy_ - y
-    maxilla = smoothstep(-0.0005, 0.0008, above) * smoothstep(plate_w + 0.0008, plate_w - 0.0008, above) \
-        * smoothstep(0.028, 0.036, x) * smoothstep(0.088, 0.082, x) * smoothstep(0.6, 0.8, side)
-    c = c * (1 - 0.3 * maxilla[..., None]) + np.array([0.70, 0.66, 0.46]) * 0.3 * maxilla[..., None]
-    outline = maxilla * (1 - smoothstep(0.0, 0.0012, np.minimum(above, plate_w - above)))
-    c *= (1 - 0.4 * outline)[..., None]
-    height += 0.5 * maxilla - 0.4 * outline
+    # The lips' folds and the upper jaw bone's outline as fine dark grooves; the bone a touch paler, catching light.
+    for fold in (UPPER_LIP_FOLD, LOWER_LIP_FOLD, MAXILLA_EDGE):
+        groove = smoothstep(0.0016, 0.0005, polyline_distance(x, y, fold)) * smoothstep(0.5, 0.75, side)
+        c *= (1 - 0.14 * groove)[..., None]
+        height -= 0.6 * groove
+    mxp = maxilla_mask(x, y) * smoothstep(0.5, 0.75, side)
+    c = c * (1 - 0.15 * mxp[..., None]) + np.array([0.60, 0.60, 0.46]) * 0.15 * mxp[..., None]
+    height += 0.3 * mxp
     # The gill cover: a bronze plate, darker towards its rim.
     plate = (behind < 0) * smoothstep(0.158, 0.17, x) * smoothstep(0.145, 0.16, y) * smoothstep(0.285, 0.27, y)
     c = c * (1 - 0.25 * plate[..., None]) + np.array([0.46, 0.38, 0.20]) * 0.25 * plate[..., None]
@@ -666,9 +700,7 @@ def skin(x, y, s, side=None):
                       .resize((w, h), Image.BICUBIC)) / 255.0
     c *= (1 - 0.07 * head_w * (smoothstep(0.5, 0.85, blot) + smoothstep(0.55, 0.9, fine)))[..., None]
     # Sensory pores: rows of small pits along the preopercle, under the eye and along the lower jaw.
-    pores = [(0.148, 0.165 + 0.012 * k) for k in range(8)] + \
-            [(0.045 + 0.012 * k, 0.212 + 0.0015 * k) for k in range(7)] + \
-            [(0.02 + 0.011 * k, 0.246 + 0.0019 * k) for k in range(5)]
+    pores = []
     for px_, py_ in pores:
         pit = smoothstep(0.0019, 0.0008, np.hypot(x - px_, y - py_)) * smoothstep(0.72, 0.88, side)
         c *= (1 - 0.55 * pit)[..., None]
@@ -681,6 +713,13 @@ def skin(x, y, s, side=None):
     noise = np.asarray(Image.fromarray((rng.random((max(h // 16, 2), max(w // 16, 2))) * 255).astype(np.uint8)).resize((w, h), Image.BICUBIC)) / 255.0
     c *= (0.94 + 0.12 * noise)[..., None]
     c *= (1 - 0.25 * smoothstep(0.08, -0.05, rel))[..., None]
+    # The very front of the snout: every column of the skin meets at its tip, so it fades to one colour there.
+    tip = smoothstep(X0 + 0.004, X0, x)[..., None]
+    k = max(h // 12, 1)
+    soft = np.cumsum(np.pad(c, ((k, k), (0, 0), (0, 0)), mode="wrap"), axis=0)
+    soft = (soft[2 * k:] - soft[:-2 * k]) / (2 * k)
+    c = c * (1 - tip) + soft[:h] * tip
+    height *= 1 - tip[..., 0]
     return c, height
 
 
