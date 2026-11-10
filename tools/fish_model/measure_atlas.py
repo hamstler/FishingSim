@@ -25,6 +25,8 @@ import cv2
 import numpy as np
 
 N = 480                     # samples along the fish
+# Pictures that show more than one fish: the band of the picture (fractions of its height) holding the one to measure.
+CROPS = {"ciernik": (0.08, 0.47)}
 
 
 def silhouette(rgb):
@@ -108,9 +110,20 @@ def fin_spans(prof, xs, start, end):
     return spans
 
 
+def smooth_body(body, xs, si):
+    """Smooths a body profile lightly (in place), leaving the snout's tip as it is."""
+    kern = np.exp(-0.5 * (np.arange(-4, 5) / 1.6) ** 2)
+    kern /= kern.sum()
+    sm = np.convolve(np.pad(body[:si + 1], 4, mode="edge"), kern, mode="valid")
+    body[:si + 1] = np.where(xs[:si + 1] > 0.02, sm, body[:si + 1])
+
+
 def measure(data, sid, picture, flip=None):
     sp = data[sid]
     rgb = cv2.cvtColor(cv2.imread(picture), cv2.COLOR_BGR2RGB)
+    if sid in CROPS:
+        h = rgb.shape[0]
+        rgb = np.ascontiguousarray(rgb[int(CROPS[sid][0] * h):int(CROPS[sid][1] * h)])
     mask = silhouette(rgb)
     if flip is None:
         flip = not head_on_left(mask)
@@ -168,166 +181,212 @@ def measure(data, sid, picture, flip=None):
     xs = (xs_px - x0) / L
     body_up, body_down = up.copy(), down.copy()
     lam = 2.0e4
-    for prof, body, start in ((up, body_up, 0.12), (down, body_down, 0.14)):
-        spans = fin_spans(prof[:si + 1], xs[:si + 1], start, xs[si] - 0.03)
-        z = als(prof[:si + 1], lam, exclude=spans)
-        fin = ((prof[:si + 1] - z > 0.004) | spans) & (xs[:si + 1] > start)
+    for prof, body, start in ((up, body_up, 0.22), (down, body_down, 0.14)):
+        p, xb = prof[:si + 1], xs[:si + 1]
+        spans = fin_spans(p, xb, start, xs[si] - 0.03)
+        z = als(p, lam, exclude=spans)
+        fin = ((p - z > 0.004) | spans) & (xb > start)
         # Grow the fin spans a little so their bases are bridged too.
         fin = np.convolve(fin.astype(float), np.ones(5), mode="same") > 0
-        body[:si + 1] = np.where(fin, np.minimum(z, prof[:si + 1]), prof[:si + 1])
-        # Smooth lightly.
-        kern = np.exp(-0.5 * (np.arange(-4, 5) / 1.6) ** 2)
-        kern /= kern.sum()
-        sm = np.convolve(np.pad(body[:si + 1], 4, mode="edge"), kern, mode="valid")
-        body[:si + 1] = np.where(xs[:si + 1] > 0.02, sm, body[:si + 1])
+        body[:si + 1] = np.where(fin, np.minimum(z, p), p)
+        smooth_body(body, xs, si)
 
-    # Body mask (in pixels) from the body profiles; fins are the rest of the full mask.
-    H, W = mask.shape
-    body_mask = np.zeros_like(mask)
-    for i in range(si + 1):
-        xa = int(round(xs_px[i]))
-        xb = int(round(xs_px[min(i + 1, N - 1)])) + 1
-        ya = int(round(axis_y[i] - body_up[i] * L)) + 1
-        yb = int(round(axis_y[i] + body_down[i] * L))
-        body_mask[max(ya, 0):max(yb, 0), xa:xb] = 1
-    fins_mask = (mask > 0) & (body_mask == 0)
-    stalk_px = xs_px[si]
-    fins_mask[:, :int(x0 + 0.005 * L)] = False
+    def find_fins():
+        # Body mask (in pixels) from the body profiles; fins are the rest of the full mask.
+        H, W = mask.shape
+        body_mask = np.zeros_like(mask)
+        for i in range(si + 1):
+            xa = int(round(xs_px[i]))
+            xb = int(round(xs_px[min(i + 1, N - 1)])) + 1
+            ya = int(round(axis_y[i] - body_up[i] * L)) + 1
+            yb = int(round(axis_y[i] + body_down[i] * L))
+            body_mask[max(ya, 0):max(yb, 0), xa:xb] = 1
+        fins_mask = (mask > 0) & (body_mask == 0)
+        stalk_px = xs_px[si]
+        fins_mask[:, :int(x0 + 0.005 * L)] = False
 
-    def body_edge(xf, which):
-        i = np.clip((xf * L) / (L / (N - 1)), 0, N - 1)
-        u = np.interp(i, np.arange(N), body_up if which == "top" else body_down)
-        ay = np.interp(i, np.arange(N), axis_y)
-        return ((ay - u * L) if which == "top" else (ay + u * L) - tip_y) / L if False else \
-            (((ay - u * L) - tip_y) / L if which == "top" else ((ay + u * L) - tip_y) / L)
+        def body_edge(xf, which):
+            i = np.clip((xf * L) / (L / (N - 1)), 0, N - 1)
+            u = np.interp(i, np.arange(N), body_up if which == "top" else body_down)
+            ay = np.interp(i, np.arange(N), axis_y)
+            return ((ay - u * L) if which == "top" else (ay + u * L) - tip_y) / L if False else \
+                (((ay - u * L) - tip_y) / L if which == "top" else ((ay + u * L) - tip_y) / L)
 
-    # Fin shapes.
-    fm = fins_mask.astype(np.uint8)
-    kk = max(3, int(0.006 * L) | 1)
-    fm = cv2.morphologyEx(fm, cv2.MORPH_OPEN, np.ones((kk, kk), np.uint8))
-    n, lab, stats, cents = cv2.connectedComponentsWithStats(fm, 8)
-    comps = []
-    for k in range(1, n):
-        area = stats[k, cv2.CC_STAT_AREA] / L ** 2
-        if area < 0.0004:
-            continue
-        cx, cy = P(*cents[k])
-        ys_, xs_ = np.nonzero(lab == k)
-        fx, fy = (xs_ - x0) / L, (ys_ - tip_y) / L
-        side = "tail" if cx > stalk_x - 0.01 and fx.max() > stalk_x + 0.02 else \
-            ("top" if cy < (body_edge(cx, "top") + body_edge(cx, "bottom")) / 2 else "bottom")
-        # How far the shape stands out of the body: low bumps along the back (the nape) are not fins.
-        if side == "top":
-            stand = float(np.max(body_edge(fx, "top") - fy))
-        elif side == "bottom":
-            stand = float(np.max(fy - body_edge(fx, "bottom")))
-        else:
-            stand = 1.0
-        if stand < 0.014 and not (sp["Adipose"] and side == "top" and cx > 0.6):
-            continue
-        comps.append(dict(k=k, area=area, cx=cx, cy=cy, side=side, fx=fx, fy=fy))
-
-    rays_by = {"FinDorsal1": 12, "FinDorsal2": 12, "FinAdipose": 6, "FinAnal": 10, "FinCaudal": 19, "FinPectoral": 12,
-               "FinPelvic": 7}
-
-    def fin_from(c, name, kind):
-        fx, fy = c["fx"], c["fy"]
-        which = "top" if c["side"] == "top" else "bottom"
-        # Contact with the body: fin pixels next to the body edge.
-        edge_y = body_edge(fx, which)
-        near = np.abs(fy - edge_y) < 0.006
-        if near.sum() < 3:
-            near = np.abs(fy - edge_y) < 0.015
-        bx = fx[near] if near.any() else fx
-        xa, xb = np.percentile(bx, 1), np.percentile(bx, 99)
-        if xb - xa < 0.01:
-            xb = xa + 0.01
-        base = [(float(x), float(body_edge(x, which))) for x in np.linspace(xa, xb, 6)]
-        # Outer edge: the extreme pixel per column, from the front of the base to the rear end of the fin.
-        cols_ = np.round(fx * 400).astype(int)
-        tips = []
-        for cc in range(cols_.min(), cols_.max() + 1):
-            sel = cols_ == cc
-            if not sel.any():
+        # Fin shapes.
+        fm = fins_mask.astype(np.uint8)
+        kk = max(3, int(0.006 * L) | 1)
+        fm = cv2.morphologyEx(fm, cv2.MORPH_OPEN, np.ones((kk, kk), np.uint8))
+        n, lab, stats, cents = cv2.connectedComponentsWithStats(fm, 8)
+        comps = []
+        for k in range(1, n):
+            area = stats[k, cv2.CC_STAT_AREA] / L ** 2
+            if area < 0.0004:
                 continue
-            y_out = fy[sel].min() if which == "top" else fy[sel].max()
-            tips.append((cc / 400.0, float(y_out)))
-        tips = np.array(tips)
-        tips = tips[tips[:, 0] >= xa - 0.004]
-        # Smooth the edge a touch (ray tips), keep 14 points.
-        if len(tips) > 5:
-            kern = np.ones(3) / 3
-            tips[:, 1] = np.convolve(np.pad(tips[:, 1], 1, mode="edge"), kern, mode="valid")
-        idx = np.linspace(0, len(tips) - 1, min(14, len(tips))).round().astype(int)
-        return dict(base=[list(map(lambda v: round(v, 4), p)) for p in base],
-                    tips=[[round(float(x), 4), round(float(y), 4)] for x, y in tips[idx]],
-                    rays=rays_by.get(name, 10), kind=kind)
+            cx, cy = P(*cents[k])
+            ys_, xs_ = np.nonzero(lab == k)
+            fx, fy = (xs_ - x0) / L, (ys_ - tip_y) / L
+            side = "tail" if cx > stalk_x - 0.01 and fx.max() > stalk_x + 0.02 else \
+                ("top" if cy < (body_edge(cx, "top") + body_edge(cx, "bottom")) / 2 else "bottom")
+            # How far the shape stands out of the body: low bumps along the back (the nape) are not fins.
+            if side == "top":
+                stand = float(np.max(body_edge(fx, "top") - fy))
+            elif side == "bottom":
+                stand = float(np.max(fy - body_edge(fx, "bottom")))
+            else:
+                stand = 1.0
+            if stand < 0.014 and not (sp["Adipose"] and side == "top" and cx > 0.6):
+                continue
+            comps.append(dict(k=k, area=area, cx=cx, cy=cy, side=side, fx=fx, fy=fy))
 
-    fins = {}
-    top_c = sorted([c for c in comps if c["side"] == "top"], key=lambda c: c["cx"])
-    bot_c = sorted([c for c in comps if c["side"] == "bottom"], key=lambda c: c["cx"])
-    tail_c = [c for c in comps if c["side"] == "tail"]
-    spiny = sp["Dorsal"] in ("Spiny", "Spines")
-    if sp["Adipose"] and len(top_c) >= 2 and top_c[-1]["area"] < 0.004 and top_c[-1]["cx"] > 0.6:
-        fins["FinAdipose"] = fin_from(top_c.pop(), "FinAdipose", "adipose")
-    if sp["Dorsal"] == "Spines" and len(top_c) >= 2:
-        # Stickleback: free spines in front of the soft dorsal.
-        soft = max(top_c, key=lambda c: c["area"])
-        spines = [c for c in top_c if c is not soft and c["cx"] < soft["cx"]]
-        if spines:
-            fx = np.concatenate([c["fx"] for c in spines])
-            fy = np.concatenate([c["fy"] for c in spines])
-            fins["FinDorsal1"] = fin_from(dict(fx=fx, fy=fy, side="top"), "FinDorsal1", "spines")
-            fins["FinDorsal1"]["rays"] = len(spines) * 3
-        fins["FinDorsal2"] = fin_from(soft, "FinDorsal2", "soft")
-    elif top_c:
-        two = spiny or sid in ("mietus", "babka_bycza", "glowacz", "glowacz_pregoplety")
-        if not two:
-            # One dorsal fin: the biggest shape on the back (pieces of it close together are joined).
-            main_c = max(top_c, key=lambda c: c["area"])
-            parts = [c for c in top_c if abs(c["cx"] - main_c["cx"]) < 0.08]
-            fx = np.concatenate([c["fx"] for c in parts])
-            fy = np.concatenate([c["fy"] for c in parts])
-            fins["FinDorsal1"] = fin_from(dict(fx=fx, fy=fy, side="top", cx=main_c["cx"]), "FinDorsal1", "soft")
-        else:
-            fins["FinDorsal1"] = fin_from(top_c[0], "FinDorsal1", "spiny" if spiny else "soft")
-            if spiny:
-                fins["FinDorsal1"]["rays"] = 14
-            if len(top_c) >= 2:
-                fins["FinDorsal2"] = fin_from(top_c[1], "FinDorsal2", "soft")
-    if sp["Adipose"] and "FinAdipose" not in fins:
-        # Too small to see: a small fleshy fin a little before the tail stalk.
-        xa = stalk_x - 0.11
-        base = [(round(xa + 0.012 * i, 4), round(float(body_edge(xa + 0.012 * i, "top")), 4)) for i in range(5)]
-        tips = [(round(x + 0.01, 4), round(y - 0.018 * math.sin(math.pi * (0.15 + 0.7 * i / 4)), 4)) for i, (x, y) in enumerate(base)]
-        fins["FinAdipose"] = dict(base=base, tips=tips, rays=6, kind="adipose")
-    # Under the body: the anal fin is the last one; a fin near the head is a pectoral showing below the belly.
-    if bot_c:
-        anal = max(bot_c, key=lambda c: c["cx"])
-        if anal["cx"] > 0.45:
-            fins["FinAnal"] = fin_from(anal, "FinAnal", "soft")
-            bot_c.remove(anal)
+        rays_by = {"FinDorsal1": 12, "FinDorsal2": 12, "FinAdipose": 6, "FinAnal": 10, "FinCaudal": 19, "FinPectoral": 12,
+                   "FinPelvic": 7}
+
+        def fin_from(c, name, kind):
+            fx, fy = c["fx"], c["fy"]
+            which = "top" if c["side"] == "top" else "bottom"
+            # Contact with the body: fin pixels next to the body edge.
+            edge_y = body_edge(fx, which)
+            near = np.abs(fy - edge_y) < 0.006
+            if near.sum() < 3:
+                near = np.abs(fy - edge_y) < 0.015
+            bx = fx[near] if near.any() else fx
+            xa, xb = np.percentile(bx, 1), np.percentile(bx, 99)
+            if xb - xa < 0.01:
+                xb = xa + 0.01
+            base = [(float(x), float(body_edge(x, which))) for x in np.linspace(xa, xb, 6)]
+            # Outer edge: the extreme pixel per column, from the front of the base to the rear end of the fin.
+            cols_ = np.round(fx * 400).astype(int)
+            tips = []
+            for cc in range(cols_.min(), cols_.max() + 1):
+                sel = cols_ == cc
+                if not sel.any():
+                    continue
+                y_out = fy[sel].min() if which == "top" else fy[sel].max()
+                tips.append((cc / 400.0, float(y_out)))
+            tips = np.array(tips)
+            tips = tips[tips[:, 0] >= xa - 0.004]
+            # Smooth the edge a touch (ray tips), keep 14 points.
+            if len(tips) > 5:
+                kern = np.ones(3) / 3
+                tips[:, 1] = np.convolve(np.pad(tips[:, 1], 1, mode="edge"), kern, mode="valid")
+            idx = np.linspace(0, len(tips) - 1, min(14, len(tips))).round().astype(int)
+            return dict(base=[list(map(lambda v: round(v, 4), p)) for p in base],
+                        tips=[[round(float(x), 4), round(float(y), 4)] for x, y in tips[idx]],
+                        rays=rays_by.get(name, 10), kind=kind)
+
+        fins = {}
+        top_c = sorted([c for c in comps if c["side"] == "top"], key=lambda c: c["cx"])
+        bot_c = sorted([c for c in comps if c["side"] == "bottom"], key=lambda c: c["cx"])
+        tail_c = [c for c in comps if c["side"] == "tail"]
+        spiny = sp["Dorsal"] in ("Spiny", "Spines")
+        if sp["Adipose"] and len(top_c) >= 2 and top_c[-1]["area"] < 0.004 and top_c[-1]["cx"] > 0.6:
+            fins["FinAdipose"] = fin_from(top_c.pop(), "FinAdipose", "adipose")
+        if sp["Dorsal"] == "Spines" and len(top_c) >= 2:
+            # Stickleback: free spines in front of the soft dorsal.
+            soft = max(top_c, key=lambda c: c["area"])
+            spines = [c for c in top_c if c is not soft and c["cx"] < soft["cx"]]
+            if spines:
+                fx = np.concatenate([c["fx"] for c in spines])
+                fy = np.concatenate([c["fy"] for c in spines])
+                fins["FinDorsal1"] = fin_from(dict(fx=fx, fy=fy, side="top"), "FinDorsal1", "spines")
+                fins["FinDorsal1"]["rays"] = len(spines) * 3
+            fins["FinDorsal2"] = fin_from(soft, "FinDorsal2", "soft")
+        elif top_c:
+            two = spiny or sid in ("mietus", "babka_bycza", "glowacz", "glowacz_pregoplety")
+            if not two:
+                # One dorsal fin: the biggest shape on the back (pieces of it close together are joined).
+                main_c = max(top_c, key=lambda c: c["area"])
+                parts = [c for c in top_c if abs(c["cx"] - main_c["cx"]) < 0.08]
+                fx = np.concatenate([c["fx"] for c in parts])
+                fy = np.concatenate([c["fy"] for c in parts])
+                fins["FinDorsal1"] = fin_from(dict(fx=fx, fy=fy, side="top", cx=main_c["cx"]), "FinDorsal1", "soft")
+            else:
+                fins["FinDorsal1"] = fin_from(top_c[0], "FinDorsal1", "spiny" if spiny else "soft")
+                if spiny:
+                    fins["FinDorsal1"]["rays"] = 14
+                if len(top_c) >= 2:
+                    fins["FinDorsal2"] = fin_from(top_c[1], "FinDorsal2", "soft")
+        if sp["Adipose"] and "FinAdipose" not in fins:
+            # Too small to see: a small fleshy fin a little before the tail stalk.
+            xa = stalk_x - 0.11
+            base = [(round(xa + 0.012 * i, 4), round(float(body_edge(xa + 0.012 * i, "top")), 4)) for i in range(5)]
+            tips = [(round(x + 0.01, 4), round(y - 0.018 * math.sin(math.pi * (0.15 + 0.7 * i / 4)), 4)) for i, (x, y) in enumerate(base)]
+            fins["FinAdipose"] = dict(base=base, tips=tips, rays=6, kind="adipose")
+        # Under the body: the anal fin is the last one; a fin near the head is a pectoral showing below the belly.
         if bot_c:
-            pel = [c for c in bot_c if c["cx"] > 0.2]
-            if pel:
-                fins["FinPelvic"] = fin_from(max(pel, key=lambda c: c["area"]), "FinPelvic", "soft")
-                fins["FinPelvic"]["droop"] = 20.0
-    if tail_c:
-        fx = np.concatenate([c["fx"] for c in tail_c])
-        fy = np.concatenate([c["fy"] for c in tail_c])
-        ys_, xs_ = fy, fx
-        st_t, st_b = body_edge(stalk_x, "top"), body_edge(stalk_x, "bottom")
-        rows = np.round(fy * 400).astype(int)
-        tips = []
-        for r in range(rows.min(), rows.max() + 1):
-            sel = rows == r
-            if sel.any():
-                tips.append((float(fx[sel].max()), r / 400.0))
-        tips = np.array(tips)
-        idx = np.linspace(0, len(tips) - 1, min(16, len(tips))).round().astype(int)
-        base = [(round(stalk_x - 0.008 * math.sin(math.pi * t), 4), round(st_t + (st_b - st_t) * t, 4)) for t in np.linspace(0, 1, 5)]
-        fins["FinCaudal"] = dict(base=[list(p) for p in base], tips=[[round(x, 4), round(y, 4)] for x, y in tips[idx]],
-                                 rays=19, kind="caudal")
+            anal = max(bot_c, key=lambda c: c["cx"])
+            if anal["cx"] > 0.45:
+                fins["FinAnal"] = fin_from(anal, "FinAnal", "soft")
+                bot_c.remove(anal)
+            if bot_c:
+                pel = [c for c in bot_c if c["cx"] > 0.2]
+                if pel:
+                    fins["FinPelvic"] = fin_from(max(pel, key=lambda c: c["area"]), "FinPelvic", "soft")
+                    fins["FinPelvic"]["droop"] = 20.0
+        if tail_c:
+            fx = np.concatenate([c["fx"] for c in tail_c])
+            fy = np.concatenate([c["fy"] for c in tail_c])
+            ys_, xs_ = fy, fx
+            st_t, st_b = body_edge(stalk_x, "top"), body_edge(stalk_x, "bottom")
+            rows = np.round(fy * 400).astype(int)
+            tips = []
+            for r in range(rows.min(), rows.max() + 1):
+                sel = rows == r
+                if sel.any():
+                    tips.append((float(fx[sel].max()), r / 400.0))
+            tips = np.array(tips)
+            idx = np.linspace(0, len(tips) - 1, min(16, len(tips))).round().astype(int)
+            base = [(round(stalk_x - 0.008 * math.sin(math.pi * t), 4), round(st_t + (st_b - st_t) * t, 4)) for t in np.linspace(0, 1, 5)]
+            fins["FinCaudal"] = dict(base=[list(p) for p in base], tips=[[round(x, 4), round(y, 4)] for x, y in tips[idx]],
+                                     rays=19, kind="caudal")
+        return fins, comps
+
+    fins, comps = find_fins()
+    # Second pass: the fins found, the back and the belly under each of them are fitted again. A fin's first rays are
+    # short, so the silhouette leaves the body a little before the fin's steep front edge, and its last rays hang over
+    # the body behind its base; left in, they make a hump at the fin and a step behind it. So the outline is left out
+    # from a little before each fin to a little behind it and bridged there by the smoother (the body's own curve
+    # carried on under the fin), and the fins are found again against that body.
+    for which, prof, body in (("top", up, body_up), ("bottom", down, body_down)):
+        bases = sorted((f["base"][0][0], f["base"][-1][0]) for name, f in fins.items()
+                       if name not in ("FinCaudal", "FinPectoral")
+                       and (which == "top") == (name.startswith("FinDorsal") or name == "FinAdipose"))
+        if which == "top" and sp["Dorsal"] == "Long" and "FinDorsal1" in fins:
+            # A long dorsal fin (carp, crucian) runs back as a low band of rays over the back almost to the tail stalk,
+            # where its last ray drops steeply to the body: the fin's base ends there, not where its high front ends.
+            fa, fb_ = fins["FinDorsal1"]["base"][0][0], fins["FinDorsal1"]["base"][-1][0]
+            k = np.exp(-0.5 * (np.arange(-3, 4) / 1.2) ** 2)
+            sm = np.convolve(np.pad(prof[:si + 1], 3, mode="edge"), k / k.sum(), mode="valid")
+            slope = np.gradient(sm, xs[1] - xs[0])
+            look = np.nonzero((xs[:si + 1] > fb_ + 0.03) & (xs[:si + 1] < xs[si] - 0.003))[0]
+            if len(look) and slope[look].min() < -1.2:
+                rear = float(xs[look[int(np.argmin(slope[look]))]])
+                bases = [(a_, rear if abs(a_ - fa) < 1e-6 else b_) for a_, b_ in bases]
+        spans = [[fa - min(0.012 + 0.3 * (fb_ - fa), 0.05), fb_ + min(0.01 + 0.25 * (fb_ - fa), 0.04)] for fa, fb_ in bases]
+        # Fins that stand apart (pelvic and anal fins) keep some of the body between them as it is drawn; where two fins
+        # meet (a perch's two dorsals), the body is not lowered at the notch between them, so they stay two fins.
+        joints = []
+        for k in range(len(bases) - 1):
+            if bases[k + 1][0] - bases[k][1] <= 0.035:
+                joints.append((bases[k][1] - 0.012, bases[k + 1][0] + 0.012))
+            else:
+                mid = 0.5 * (bases[k][1] + bases[k + 1][0])
+                spans[k][1] = min(spans[k][1], mid - 0.012)
+                spans[k + 1][0] = max(spans[k + 1][0], mid + 0.012)
+        gap = np.zeros(si + 1, dtype=bool)
+        for ga, gb in spans:
+            gap |= (xs[:si + 1] > ga) & (xs[:si + 1] < gb)
+        gap &= (xs[:si + 1] > 0.06) & (xs[:si + 1] < xs[si] - 0.02)
+        if gap.any():
+            first = body[:si + 1].copy()
+            z = als(first.copy(), lam, p=0.5, iters=1, exclude=gap)
+            z = np.minimum(z, prof[:si + 1] + 0.004)
+            for ja, jb in joints:
+                at = (xs[:si + 1] > ja) & (xs[:si + 1] < jb)
+                z = np.where(at, np.maximum(z, first), z)
+            body[:si + 1] = np.where(gap, z, first)
+            smooth_body(body, xs, si)
+    fins, comps = find_fins()
 
     # The eye: the darkest round spot in the upper head.
     lum = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY).astype(np.float32)
@@ -396,19 +455,27 @@ def measure(data, sid, picture, flip=None):
             c = min(cand, key=lambda c: abs(c["cx"] - fxm) + (0 if (c["side"] == "top") == (name.startswith("FinDorsal") or name == "FinAdipose") else 1))
             mem, ray = c["col"]
             fin_cols[name] = dict(membrane=[round(float(v), 3) for v in mem], ray=[round(float(v), 3) for v in ray])
+    # The outline is measured from the snout-to-stalk axis; the fins and the eye from the level of the snout's tip. When the
+    # picture was not turned level (the fish lay within 0.8 degrees of it), the two differ along the fish: give the fins
+    # and the eye in the axis' frame too, so that they sit on the body as drawn.
+    tilt = (axis_y[si] - tip_y) / L / max(stalk_x, 1e-6)
+    for f in fins.values():
+        for key in ("base", "tips"):
+            f[key] = [[px, round(py - tilt * px, 4)] for px, py in f[key]]
+    eye = (eye[0], eye[1] - tilt * eye[0])
     return dict(L=L, x0=x0, tip_y=tip_y, flip=flip, rgb=rgb, stalk_x=stalk_x, xs=xs, body_up=body_up,
-                body_down=body_down, fins=fins, eye=eye, eye_r=eye_r, colours=colours, fin_colours=fin_cols)
+                body_down=body_down, fins=fins, eye=eye, eye_r=eye_r, colours=colours, fin_colours=fin_cols, tilt=tilt)
 
 
 def overlay(m, path):
     rgb = m["rgb"].copy()
     L, x0, tip_y = m["L"], m["x0"], m["tip_y"]
 
-    def Q(x, y):
-        return int(round(x * L + x0)), int(round(y * L + tip_y))
+    def Q(x, y):                    # fish units (the axis' frame) -> pixels
+        return int(round(x * L + x0)), int(round((y + m["tilt"] * x) * L + tip_y))
     xs = m["xs"]
     si = int(np.searchsorted(xs, m["stalk_x"]))
-    axis = np.interp(xs, [0, m["stalk_x"]], [0, 0])
+    axis = np.zeros_like(xs)
     pts_t = [Q(x, a - u) for x, a, u in zip(xs[:si], axis[:si], m["body_up"][:si])]
     pts_b = [Q(x, a + d) for x, a, d in zip(xs[:si], axis[:si], m["body_down"][:si])]
     cv2.polylines(rgb, [np.array(pts_t)], False, (255, 0, 0), 2)
@@ -434,7 +501,7 @@ def main():
         overlay(m, ov)
     xs = m["xs"]
     si = int(np.searchsorted(xs, m["stalk_x"]))
-    sel = np.unique(np.concatenate([np.linspace(0, 12, 7).astype(int), np.linspace(12, si, 34).astype(int)]))
+    sel = np.unique(np.concatenate([np.linspace(0, 12, 7).astype(int), np.linspace(12, si, 64).astype(int)]))
     res = {
         "id": sid, "source": "AtlasRyb.online", "picture": picture.split("/")[-1],
         "x1": round(float(m["stalk_x"]), 4),

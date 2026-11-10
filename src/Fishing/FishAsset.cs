@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using System.Text.Json.Nodes;
+using System.Threading.Tasks;
 using Godot;
 using FishingSim.Data;
 
@@ -34,36 +37,123 @@ public sealed class FishAsset
     public float MaxHeight { get; private init; }
     public float MaxWidth { get; private init; }
 
+    // A few species' models stay loaded (their textures are large); the one used longest ago is let go.
+    private const int CacheSize = 6;
+    private static readonly object Gate = new();
     private static readonly Dictionary<string, FishAsset?> Cache = new();
+    private static readonly LinkedList<string> Recent = new();
+    private static readonly Dictionary<string, Task<Dictionary<string, Image>>> Decoding = new();
 
     public static bool Has(FishSpecies sp) => For(sp) != null;
+
+    /// <summary>
+    /// Starts decoding a species' pictures on a worker thread (when a fish takes the bait), so that its model is ready
+    /// without a hitch when the fish is hooked.
+    /// </summary>
+    public static void Prefetch(FishSpecies sp)
+    {
+        string id = FishReference.IdOf(sp);
+        string path = PathOf(id);
+        lock (Gate)
+        {
+            if (id == "" || Cache.ContainsKey(id) || Decoding.ContainsKey(id) || !FileAccess.FileExists(path))
+                return;
+            Decoding[id] = Task.Run(() => DecodeImages(FileAccess.GetFileAsBytes(path)));
+        }
+    }
 
     public static FishAsset? For(FishSpecies sp)
     {
         string id = FishReference.IdOf(sp);
-        if (Cache.TryGetValue(id, out var cached))
-            return cached;
+        lock (Gate)
+        {
+            if (Cache.TryGetValue(id, out var cached))
+            {
+                Touch(id);
+                return cached;
+            }
+        }
         FishAsset? asset = null;
-        string path = $"res://assets/fish/models/{id}.glb";
+        string path = PathOf(id);
         if (id != "" && FileAccess.FileExists(path))
         {
             try
             {
-                asset = Load(path);
+                Task<Dictionary<string, Image>>? pending;
+                lock (Gate)
+                    Decoding.Remove(id, out pending);
+                Dictionary<string, Image>? images = null;
+                try
+                {
+                    images = pending?.Result;
+                }
+                catch (AggregateException)
+                {
+                    images = null;     // decoded again below
+                }
+                asset = Load(path, images);
             }
             catch (Exception e)
             {
                 GD.PushWarning($"fish model {path}: {e.Message}");
             }
         }
-        Cache[id] = asset;
+        lock (Gate)
+        {
+            Cache[id] = asset;
+            Touch(id);
+            while (Recent.Count > CacheSize)
+            {
+                Cache.Remove(Recent.Last!.Value);
+                Recent.RemoveLast();
+            }
+        }
         return asset;
     }
 
-    private static FishAsset? Load(string path)
+    private static void Touch(string id)
     {
+        Recent.Remove(id);
+        Recent.AddFirst(id);
+    }
+
+    private static string PathOf(string id) => $"res://assets/fish/models/{id}.glb";
+
+    /// <summary>
+    /// The model's pictures by name, decoded here with their mipmaps: GLTFDocument makes textures without them, and the
+    /// fine scales of a 4096-texel skin would shimmer whenever the fish is small on the screen.
+    /// </summary>
+    private static Dictionary<string, Image> DecodeImages(byte[] glb)
+    {
+        var images = new Dictionary<string, Image>();
+        int jsonLength = BitConverter.ToInt32(glb, 12);
+        var json = JsonNode.Parse(Encoding.UTF8.GetString(glb, 20, jsonLength))!;
+        int bin = 28 + jsonLength;      // the binary chunk's data: after the JSON chunk and its own length and type
+        var views = json["bufferViews"]?.AsArray();
+        foreach (var node in json["images"]?.AsArray() ?? new JsonArray())
+        {
+            if (node?["bufferView"] is not JsonNode viewIndex || views == null)
+                continue;
+            var view = views[(int)viewIndex]!;
+            int offset = (int?)view["byteOffset"] ?? 0, length = (int)view["byteLength"]!;
+            var bytes = new byte[length];
+            Array.Copy(glb, bin + offset, bytes, 0, length);
+            var image = new Image();
+            var error = (string?)node["mimeType"] == "image/png" ? image.LoadPngFromBuffer(bytes) : image.LoadJpgFromBuffer(bytes);
+            if (error != Error.Ok)
+                continue;
+            string name = (string?)node["name"] ?? "";
+            image.GenerateMipmaps(renormalize: name.EndsWith("normal"));
+            images[name] = image;
+        }
+        return images;
+    }
+
+    private static FishAsset? Load(string path, Dictionary<string, Image>? images)
+    {
+        images ??= DecodeImages(FileAccess.GetFileAsBytes(path));
         var doc = new GltfDocument();
-        var state = new GltfState();
+        var state = new GltfState { HandleBinaryImage = 0 };    // the pictures are decoded above, with their mipmaps
         if (doc.AppendFromFile(path, state) != Error.Ok)
             return null;
         var root = doc.GenerateScene(state) as Node3D;
@@ -83,7 +173,10 @@ public sealed class FishAsset
         }
         root.Free();
 
-        static Texture2D? Albedo(Mesh m) => (m.SurfaceGetMaterial(0) as BaseMaterial3D)?.AlbedoTexture;
+        Texture2D? Picture(string name) =>
+            images.TryGetValue(name, out var image) || images.TryGetValue(name.Split('.')[0], out image)
+                ? ImageTexture.CreateFromImage(image)
+                : null;
         var body = parts.FirstOrDefault(p => p.Name == "Body");
         var eyes = parts.Where(p => p.Name.ToString().StartsWith("Eye")).OrderBy(p => p.Name == "EyeLeft").ToList();
         if (body.Mesh == null || eyes.Count == 0)
@@ -103,10 +196,10 @@ public sealed class FishAsset
         return new FishAsset
         {
             Body = body.Mesh,
-            BodyAlbedo = Albedo(body.Mesh),
-            BodyNormal = (body.Mesh.SurfaceGetMaterial(0) as BaseMaterial3D)?.NormalTexture,
-            Fins = parts.Where(p => p.Name.StartsWith("Fin")).Select(p => (p.Name, p.Mesh, Albedo(p.Mesh))).ToList(),
-            Iris = Albedo(eyes[0].Mesh),
+            BodyAlbedo = Picture("body_albedo"),
+            BodyNormal = Picture("body_normal"),
+            Fins = parts.Where(p => p.Name.StartsWith("Fin")).Select(p => (p.Name, p.Mesh, Picture(p.Name))).ToList(),
+            Iris = Picture("iris"),
             Eyes = eyes.Select(p => (p.Mesh, p.Transform.Origin)).ToList(),
             Corneas = parts.Where(p => p.Name.StartsWith("Cornea")).Select(p => (p.Mesh, p.Transform.Origin)).ToList(),
             EyeRadius = eyeAabb.Size.Y * 0.5f,

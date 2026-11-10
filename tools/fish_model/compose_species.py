@@ -386,6 +386,17 @@ def compose(sid, data, measure_dir, tpl):
     if sid in ("palia", "pstrag_zrodlany"):
         for name in ("FinPelvic", "FinAnal", "FinPectoral"):
             fcols[name]["lead"] = True
+    # Every fin's base sits on the outline, a touch inside the body (so no fin stands off it), its tips moved with it.
+    for name, f in fins.items():
+        if name in ("FinCaudal", "FinPectoral"):
+            continue
+        on_top = name.startswith("FinDorsal") or name == "FinAdipose"
+        edge = top if on_top else bottom
+        inset = 0.0015 if on_top else -0.0015
+        shift = [interp(edge, x) + inset - y for x, y in f["base"]]
+        xs_b = [x for x, _ in f["base"]]
+        f["base"] = [[round(x, 5), round(y + d, 5)] for (x, y), d in zip(f["base"], shift)]
+        f["tips"] = [[round(x, 5), round(y + float(np.interp(x, xs_b, shift)), 5)] for x, y in f["tips"]]
     sp["fins"] = fins
     sp["fin_colours"] = fcols
     # Skin.

@@ -37,10 +37,10 @@ def load_species(path_or_dict):
     tup = lambda pts: [tuple(p) for p in pts]
     g["AXIS"] = sp.get("axis", 0.0)
     g["DEPTH_SCALE"] = sp.get("depth_scale", 1.0)
-    g["TOP"], g["BOTTOM"] = tup(sp["top"]), tup(sp["bottom"])
+    g["TOP"], g["BOTTOM"] = smooth_outline(sp["top"]), smooth_outline(sp["bottom"])
     g["X0"], g["X1"] = sp.get("x0", 0.0), sp["x1"]
     g["CAP_LENGTH"] = sp.get("cap_length", 0.0008)
-    g["HALF_WIDTH"] = tup(sp["half_width"])
+    g["HALF_WIDTH"] = smooth_outline(sp["half_width"])
     g["N_TOP_ALONG"], g["N_BOTTOM_ALONG"] = tup(sp["n_top"]), tup(sp["n_bottom"])
     g["EYE"], g["EYE_R"] = tuple(sp["eye"]), sp["eye_r"]
     for key in ("gape", "upper_lip_fold", "lower_lip_fold", "maxilla_edge", "maxilla", "nostrils", "preopercle",
@@ -71,6 +71,31 @@ def load_species(path_or_dict):
 
 
 # ------------------------------------------------------------------ helpers
+def smooth_outline(points, n=720):
+    """
+    A measured outline (x rising) as a dense polyline along a smooth curve through its points: a monotone cubic
+    (Fritsch-Carlson), so the body has no corners at the measured points and does not swing past them either.
+    """
+    p = np.array(points, dtype=np.float64)
+    p = p[np.concatenate([[True], np.diff(p[:, 0]) > 1e-9])]
+    if len(p) < 3:
+        return [tuple(q) for q in p]
+    x, y = p[:, 0], p[:, 1]
+    h = np.diff(x)
+    d = np.diff(y) / h
+    m = np.zeros_like(y)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        m[1:-1] = np.where(d[:-1] * d[1:] > 0,
+                           (h[:-1] + h[1:]) * 3 / ((2 * h[1:] + h[:-1]) / d[:-1] + (h[1:] + 2 * h[:-1]) / d[1:]), 0.0)
+    m[0], m[-1] = d[0], d[-1]
+    xs = np.unique(np.concatenate([x, x[0] + (x[-1] - x[0]) * np.linspace(0, 1, n) ** 1.4]))
+    k = np.clip(np.searchsorted(x, xs, side="right") - 1, 0, len(x) - 2)
+    t = (xs - x[k]) / h[k]
+    ys = (2 * t ** 3 - 3 * t ** 2 + 1) * y[k] + (t ** 3 - 2 * t ** 2 + t) * h[k] * m[k] \
+        + (3 * t ** 2 - 2 * t ** 3) * y[k + 1] + (t ** 3 - t ** 2) * h[k] * m[k + 1]
+    return [(float(a), float(b)) for a, b in zip(xs, ys)]
+
+
 def interp(points, x):
     p = np.array(points)
     return np.interp(x, p[:, 0], p[:, 1])
@@ -241,8 +266,8 @@ def build_body_unwrapped(n_rings=None, n_seg=None):
     stalk, v from the dorsal midline round the right flank, the belly and the left flank back to it), so the texture
     neither stretches over the back nor the belly. Returns model-space positions, UVs and faces (quads and triangles).
     """
-    n_rings = n_rings or SPECIES.get("mesh", (110, 72))[0]
-    n_seg = n_seg or SPECIES.get("mesh", (110, 72))[1]
+    n_rings = n_rings or SPECIES.get("mesh", (150, 96))[0]
+    n_seg = n_seg or SPECIES.get("mesh", (150, 96))[1]
     s = np.linspace(0, 1, n_rings)
     xs = X0 + (X1 - X0) * s ** 1.3
     cap = 10
@@ -675,9 +700,15 @@ def skin(x, y, s, side=None):
             if name == "body":
                 b = f
             h1, h2 = _hash(f["i"], f["j"]), _hash(f["i"], f["j"], 1)
+            # Big scales (carp, roach) show crisply, each with a thin dark edge and a lighter middle, as an illustration
+            # draws them; tiny ones (tench, trout) stay a fine, quiet texture.
+            vis = float(np.clip((size - 0.004) / 0.012, 0.15, 1.0)) if name == "body" else 0.3
             rim = smoothstep(0.78, 1.0, f["d"]) * smoothstep(-0.1, 0.45, f["dx"])
+            edge = np.exp(-((f["d"] - 0.955) / 0.032) ** 2) * smoothstep(-0.2, 0.35, f["dx"])
+            middle = (1 - np.clip(f["d"], 0, 1) ** 2) * smoothstep(-0.7, 0.1, f["dx"])
             glint = np.exp(-((f["dx"] - 0.1) ** 2 + f["dy"] ** 2) / 0.10)
-            shade = 1 - 0.26 * rim + (0.07 + 0.08 * SILVER) * glint + 0.08 * (h1 - 0.5)
+            shade = 1 - (0.16 + 0.06 * vis) * rim - (0.16 + 0.26 * vis) * edge + (0.03 + 0.07 * vis) * middle \
+                + (0.07 + 0.08 * SILVER) * glint + 0.08 * (h1 - 0.5)
             tint = np.stack([1 + 0.05 * (h2 - 0.5), 1 + 0.02 * (h1 - 0.5), 1 - 0.06 * (h2 - 0.5)], axis=-1)
             c = c * (1 + (shade[..., None] * tint - 1) * mask[..., None])
             height += mask * (0.25 + 0.45 * np.clip(f["dx"], -1, 1) - 0.6 * smoothstep(0.9, 1.0, f["d"]))

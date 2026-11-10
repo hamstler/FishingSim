@@ -633,7 +633,10 @@ public partial class FishingRod : Node3D
             SoundCue?.Invoke(Core.Audio.OneShot.Bell, 1f);
         _pulseTimer = 0f;
         if (CurrentSpecies != null)
+        {
             Graphics.FishSkin.Prewarm(CurrentSpecies);     // paint the close-up skin while the float twitches
+            FishAsset.Prefetch(CurrentSpecies);            // and decode the species' model pictures
+        }
         SetState(RodState.Nibble);
     }
 

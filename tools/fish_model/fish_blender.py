@@ -320,7 +320,7 @@ def main():
     previews = argv[2] if len(argv) > 2 else None
     sp = P.load_species(species)
     work = tempfile.mkdtemp(prefix="fish_")
-    size = str(sp.get("texture_size", 2048))
+    size = str(sp.get("texture_size", 4096))
     subprocess.run(["python3", os.path.join(HERE, "fishgen.py"), "--textures", species, work, size], check=True)
     objects = build(work)
     export(objects, out)
