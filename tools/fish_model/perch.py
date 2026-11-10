@@ -23,7 +23,6 @@ import os
 import sys
 
 import numpy as np
-from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from glb import Glb, vertex_normals  # noqa: E402
@@ -180,8 +179,24 @@ def build_body(n_rings=190, n_seg=80):
     up = hh[:, None] * np.sign(sn) * np.abs(sn) ** (2 / n_exp)
     px = np.repeat(rings_x[:, None], n_seg, axis=1)
     py = yc[:, None] - up
-    side = np.abs(cs)[None, :] ** 0.5               # head details on the flanks, not on the crown or the throat
+    lat = sculpt_head(px, py, lat, cs)
+    pos = model(px, py, lat).reshape(-1, 3)
+    uv = np.stack([px / UV_W, (py - UV_Y0) / UV_H], axis=-1).reshape(-1, 2)
+    idx = []
+    nr = len(rings_x)
+    for i in range(nr - 1):
+        a = i * n_seg + np.arange(n_seg)
+        b = i * n_seg + (np.arange(n_seg) + 1) % n_seg
+        c = a + n_seg
+        d = b + n_seg
+        idx.append(np.stack([a, b, c, b, d, c], axis=1).reshape(-1, 3))
+    return _close_body(pos, uv, idx, rings_x, n_seg, wrap=True)
 
+
+def sculpt_head(px, py, lat, cs):
+    """The head's relief on the lofted surface: eye socket, gape and lips, the gill cover's ledge, the preopercle."""
+    lat = lat.copy()
+    side = np.abs(cs)[None, :] ** 0.5               # head details on the flanks, not on the crown or the throat
     # Eye socket: a hollow the eyeball sits in.
     d_eye = np.hypot(px - EYE[0], py - EYE[1]) / EYE_R
     lat -= np.sign(lat) * side * 0.0045 * (1 - smoothstep(1.0, 1.5, d_eye))
@@ -196,17 +211,61 @@ def build_body(n_rings=190, n_seg=80):
     # Preopercle: a shallow groove.
     dp = polyline_distance(px, py, PREOPERCLE)
     lat -= np.sign(lat) * side * 0.0012 * np.exp(-(dp / 0.0025) ** 2)
+    return lat
 
+
+def build_body_unwrapped(n_rings=150, n_seg=96):
+    """
+    The body for the Blender build: quads, the skin unwrapped once round the body (u from the snout to the tail
+    stalk, v from the dorsal midline round the right flank, the belly and the left flank back to it), so the texture
+    neither stretches over the back nor the belly. Returns model-space positions, UVs and faces (quads and triangles).
+    """
+    s = np.linspace(0, 1, n_rings)
+    xs = X0 + (X1 - X0) * s ** 1.3
+    cap = 6
+    rings_x, rings_k = [], []
+    for k in range(cap, 0, -1):
+        phi = math.pi / 2 * k / cap
+        rings_x.append(X0 - 0.0028 * math.sin(phi))
+        rings_k.append(max(math.cos(phi), 0.02))
+    rings_x = np.array(rings_x + list(xs))
+    rings_k = np.array(rings_k + [1.0] * len(xs))
+    xc = np.clip(rings_x, X0, X1)
+    top, bottom, hw = interp(TOP, xc), interp(BOTTOM, xc), half_width(xc) * rings_k
+    yc, hh = (top + bottom) / 2, (bottom - top) / 2 * rings_k
+    v = np.arange(n_seg + 1) / n_seg                  # the seam (v = 0 and 1) on the dorsal midline
+    theta = np.pi / 2 - 2 * np.pi * v
+    sn, cs = np.sin(theta), np.cos(theta)
+    cs = np.where(np.abs(cs) < 1e-9, 0.0, cs)
+    n_exp = np.where(sn >= 0, N_TOP, N_BOTTOM)
+    lat = hw[:, None] * np.sign(cs) * np.abs(cs) ** (2 / n_exp)
+    up = hh[:, None] * np.sign(sn) * np.abs(sn) ** (2 / n_exp)
+    px = np.repeat(rings_x[:, None], n_seg + 1, axis=1)
+    py = yc[:, None] - up
+    lat = sculpt_head(px, py, lat, cs)
     pos = model(px, py, lat).reshape(-1, 3)
-    uv = np.stack([px / UV_W, (py - UV_Y0) / UV_H], axis=-1).reshape(-1, 2)
-    idx = []
+    u = np.clip((rings_x - X0) / (X1 - X0), 0, 1)
+    uv = np.stack([np.repeat(u[:, None], n_seg + 1, axis=1), np.repeat(v[None, :], len(rings_x), axis=0)], axis=-1).reshape(-1, 2)
+    m = n_seg + 1
+    faces = []
+    for i in range(len(rings_x) - 1):
+        for j in range(n_seg):
+            a = i * m + j
+            faces.append((a, a + m, a + m + 1, a + 1))
+    tip = len(pos)
+    pos = np.vstack([pos, model(np.array([X0 - 0.003]), np.array([(interp(TOP, X0) + interp(BOTTOM, X0)) / 2]), np.zeros(1))])
+    uv = np.vstack([uv, [[0.0, 0.5]]])
+    faces += [(tip, j + 1, j) for j in range(n_seg)]
+    end = len(pos)
+    pos = np.vstack([pos, model(np.array([X1 + 0.002]), np.array([(interp(TOP, X1) + interp(BOTTOM, X1)) / 2]), np.zeros(1))])
+    uv = np.vstack([uv, [[1.0, 0.5]]])
+    last = (len(rings_x) - 1) * m
+    faces += [(end, last + j, last + j + 1) for j in range(n_seg)]
+    return pos.astype(np.float32), uv.astype(np.float32), faces
+
+
+def _close_body(pos, uv, idx, rings_x, n_seg, wrap):
     nr = len(rings_x)
-    for i in range(nr - 1):
-        a = i * n_seg + np.arange(n_seg)
-        b = i * n_seg + (np.arange(n_seg) + 1) % n_seg
-        c = a + n_seg
-        d = b + n_seg
-        idx.append(np.stack([a, b, c, b, d, c], axis=1).reshape(-1, 3))
     # Close the snout tip and the tail stalk with a centre vertex each.
     tip = len(pos)
     pos = np.vstack([pos, model(np.array([X0 - 0.003]), np.array([interp(TOP, X0) / 2 + interp(BOTTOM, X0) / 2]), np.zeros(1))])
@@ -276,7 +335,8 @@ def build_fin(spec, segs=10, pleat=0.0012):
     return pos, uv.reshape(-1, 2), idx
 
 
-def paint_fin(name, spec, w=1024, h=512):
+def paint_fin(name, spec, w=640, h=320):
+    from PIL import Image
     n = spec["rays"]
     col = FIN_COLOURS[name]
     v, u = np.mgrid[0:h, 0:w].astype(np.float64)
@@ -327,10 +387,78 @@ def paint_fin(name, spec, w=1024, h=512):
 
 # ------------------------------------------------------------------ body skin
 def paint_body(w=3072):
+    """The skin in side projection (u = photo x, v = photo y), for the model this script writes itself."""
+    from PIL import Image
     h = int(round(w * UV_H / UV_W))
     yy, xx = np.mgrid[0:h, 0:w].astype(np.float64)
     x = (xx + 0.5) / w * UV_W
     y = UV_Y0 + (yy + 0.5) / h * UV_H
+    c, height = skin(x, y, y)
+    albedo = Image.fromarray((np.clip(c, 0, 1) * 255).astype(np.uint8), "RGB")
+    gx = (np.roll(height, -1, axis=1) - np.roll(height, 1, axis=1)) * 0.5
+    gy = (np.roll(height, -1, axis=0) - np.roll(height, 1, axis=0)) * 0.5
+    n = np.dstack([-gx * 2.2, gy * 2.2, np.ones_like(height)])
+    n /= np.linalg.norm(n, axis=2, keepdims=True)
+    normal = Image.fromarray(((n * 0.5 + 0.5) * 255).astype(np.uint8), "RGB")
+    return albedo, normal
+
+
+def unwrap_coords(w, h):
+    """
+    The body's unwrapped skin (as the Blender model maps it): u from the snout to the tail stalk, v once round the
+    body from the dorsal midline (0) down the right flank, under the belly (0.5) and up the left flank (1). For each
+    texel: photo x and y of that point of the body (seen from the side) and its distance from the dorsal midline over
+    the skin (s, for scale rows that do not stretch over the back and the belly), and the arc length per texel row.
+    """
+    u = (np.arange(w) + 0.5) / w
+    v = (np.arange(h) + 0.5) / h
+    x = X0 + (X1 - X0) * u
+    top, bottom, hw = interp(TOP, x), interp(BOTTOM, x), half_width(x)
+    yc, hh = (top + bottom) / 2, (bottom - top) / 2
+    theta = np.pi / 2 - 2 * np.pi * v
+    sn, cs = np.sin(theta), np.cos(theta)
+    n_exp = np.where(sn >= 0, N_TOP, N_BOTTOM)
+    lat = hw[None, :] * (np.sign(cs) * np.abs(cs) ** (2 / n_exp))[:, None]
+    up = hh[None, :] * (np.sign(sn) * np.abs(sn) ** (2 / n_exp))[:, None]
+    py = yc[None, :] - up
+    step = np.hypot(np.diff(lat, axis=0), np.diff(up, axis=0))
+    cum = np.vstack([np.zeros((1, w)), np.cumsum(step, axis=0)])
+    total = cum[-1] + np.hypot(lat[0] - lat[-1], up[0] - up[-1])
+    s = np.minimum(cum, total[None, :] - cum)
+    ds = np.gradient(cum, axis=0)
+    return np.broadcast_to(x[None, :], (h, w)), py, s, ds
+
+
+def write_textures(work, w=4096, h=2048):
+    """Textures for the Blender build (perch_blender.py): the unwrapped skin and its normal map, fins, iris."""
+    from PIL import Image
+    os.makedirs(work, exist_ok=True)
+    x, y, s, ds = unwrap_coords(w, h)
+    c, height = skin(x, y, s)
+    Image.fromarray((np.clip(c, 0, 1) * 255).astype(np.uint8), "RGB").save(os.path.join(work, "body_albedo.jpg"), quality=93)
+    # Normal map from the heights, in real lengths along u and round the body (OpenGL convention: green up the image).
+    k = 0.00062
+    dx = (X1 - X0) / w
+    gx = (np.roll(height, -1, axis=1) - np.roll(height, 1, axis=1)) * 0.5 / dx
+    gy = (np.roll(height, -1, axis=0) - np.roll(height, 1, axis=0)) * 0.5 / np.maximum(ds, 1e-6)
+    n = np.dstack([-gx * k, gy * k, np.ones_like(height)])
+    n /= np.linalg.norm(n, axis=2, keepdims=True)
+    Image.fromarray(((n * 0.5 + 0.5) * 255).astype(np.uint8), "RGB").resize((w // 2, h // 2), Image.LANCZOS) \
+        .save(os.path.join(work, "body_normal.jpg"), quality=93)
+    for name, spec in FINS.items():
+        paint_fin(name, spec).save(os.path.join(work, name + ".png"))
+    paint_eye().save(os.path.join(work, "iris.png"))
+    write_reference(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "assets", "fish", "okon.json"))
+    print(f"textures in {work}")
+
+
+def skin(x, y, s):
+    """
+    Colour and bump of the skin at photo points (x, y) of the side view; s runs over the skin across the body (the
+    scale rows follow it).
+    """
+    from PIL import Image
+    h, w = np.shape(x)
     xc = np.clip(x, X0, X1)
     top, bottom = interp(TOP, xc), interp(BOTTOM, xc)
     rel = np.clip((y - top) / (bottom - top), -0.2, 1.2)
@@ -357,7 +485,7 @@ def paint_body(w=3072):
     # Scales: staggered rows of small ctenoid scales whose free rear edges catch the light; tiny ones on the cheeks.
     for size, mask in ((0.0105, 1 - head_w), (0.0062, head_w * smoothstep(0.12, 0.17, x) * (rel > 0.15))):
         sy = size * 0.72
-        ys = y - 0.16 * x                                  # scale rows run obliquely down towards the head
+        ys = s - 0.16 * x                                  # scale rows run obliquely down towards the head
         row = np.floor(ys / sy)
         gx = x / size + 0.5 * (row % 2)
         fx, fy = gx - np.floor(gx), ys / sy - row
@@ -419,22 +547,21 @@ def paint_body(w=3072):
     height += 0.6 * smoothstep(1.0, 1.15, de) * smoothstep(1.5, 1.2, de)
 
     # A touch of mottling, and the dorsal ridge darker.
-    noise = np.asarray(Image.fromarray((rng.random((h // 16, w // 16)) * 255).astype(np.uint8)).resize((w, h), Image.BICUBIC)) / 255.0
+    noise = np.asarray(Image.fromarray((rng.random((max(h // 16, 2), max(w // 16, 2))) * 255).astype(np.uint8)).resize((w, h), Image.BICUBIC)) / 255.0
     c *= (0.94 + 0.12 * noise)[..., None]
     c *= (1 - 0.25 * smoothstep(0.08, -0.05, rel))[..., None]
-    albedo = Image.fromarray((np.clip(c, 0, 1) * 255).astype(np.uint8), "RGB")
-
-    # Normal map from the heights (OpenGL convention, as Godot uses).
-    hs = height * 1.0
-    gx = (np.roll(hs, -1, axis=1) - np.roll(hs, 1, axis=1)) * 0.5
-    gy = (np.roll(hs, -1, axis=0) - np.roll(hs, 1, axis=0)) * 0.5
-    n = np.dstack([-gx * 2.2, gy * 2.2, np.ones_like(hs)])
-    n /= np.linalg.norm(n, axis=2, keepdims=True)
-    normal = Image.fromarray(((n * 0.5 + 0.5) * 255).astype(np.uint8), "RGB")
-    return albedo, normal
+    return c, height
 
 
 # ------------------------------------------------------------------ eye
+def eye_centre():
+    """Where the right eye sits: in its socket on the side of the head (model space)."""
+    yc = (interp(TOP, EYE[0]) + interp(BOTTOM, EYE[0])) / 2
+    hh = (interp(BOTTOM, EYE[0]) - interp(TOP, EYE[0])) / 2
+    lat = half_width(EYE[0]) * math.sqrt(max(1 - ((EYE[1] - yc) / hh) ** 2, 0.05))
+    return model(np.array(EYE[0]), np.array(EYE[1]), np.array(lat - 0.0045))
+
+
 def build_eye(segments=40, rings=12):
     """A shallow dome (cornea over the iris), centred on the eye, facing +x."""
     R = EYE_R * 1.08 * DEPTH_SCALE
@@ -463,6 +590,7 @@ def build_eye(segments=40, rings=12):
 
 
 def paint_eye(size=512):
+    from PIL import Image
     yy, xx = np.mgrid[0:size, 0:size].astype(np.float64)
     r = np.hypot(xx + 0.5 - size / 2, yy + 0.5 - size / 2) / (size / 2)
     ang = np.arctan2(yy - size / 2, xx - size / 2)
@@ -509,6 +637,9 @@ def write_reference(path):
 
 # ------------------------------------------------------------------ main
 def main():
+    if sys.argv[1] == "--textures":
+        write_textures(sys.argv[2])
+        return
     out = sys.argv[1]
     preview = sys.argv[2] if len(sys.argv) > 2 else None
     g = Glb()
@@ -542,10 +673,7 @@ def main():
     # The left eye is a mirrored copy (not a negative scale, which would light it inside out).
     mirror = np.array([-1, 1, 1], dtype=np.float32)
     eml = g.mesh("EyeLeft", epos * mirror, enrm * mirror, euv, eidx[:, [0, 2, 1]], eye_mat)
-    # The eye sits in its socket on the side of the head.
-    lat = half_width(EYE[0]) * math.sqrt(max(1 - ((EYE[1] - (interp(TOP, EYE[0]) + interp(BOTTOM, EYE[0])) / 2)
-                                                   / ((interp(BOTTOM, EYE[0]) - interp(TOP, EYE[0])) / 2)) ** 2, 0.05))
-    centre = model(np.array(EYE[0]), np.array(EYE[1]), np.array(lat - 0.0045))
+    centre = eye_centre()
     g.node("EyeRight", em, translation=centre)
     g.node("EyeLeft", eml, translation=centre * np.array([-1, 1, 1]))
 

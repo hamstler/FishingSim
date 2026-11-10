@@ -16,7 +16,7 @@
 
 **Ryby według prawdziwych okazów:** kształt ciała i barwy (grzbiet, bok, brzuch) części gatunków są zmierzone na wolnych zdjęciach z Wikimedia Commons (`assets/fish`, narzędzia w `tools/fish_photos`), a ryba nadal jest malowana w stylu gry; same zdjęcia nie trafiają do gry, autorzy są w `assets/fish/CREDITS.md` i w atlasie. **Ryba rośnie z wagą:** cięższa jest dłuższa, wyższa i grubsza, młoda smukła z większymi oczami, a złowioną rybę trzymasz w prawdziwej wielkości.
 
-**Ręcznie zbudowane modele:** okoń ma własny model 3D (`assets/fish/models/okon.glb`, generator `tools/fish_model/perch.py`): ciało, głowa z okiem, pyskiem i pokrywą skrzelową oraz każda płetwa (kolczasta grzbietowa z czarną plamą, miękka grzbietowa, odbytowa, ogonowa, piersiowe i brzuszne) są odrysowane ze zdjęć prawdziwych okoni, a tekstury namalowane w ich barwach.
+**Ręcznie zbudowane modele:** okoń ma własny model 3D zbudowany w Blenderze (`assets/fish/models/okon.glb`, dane i tekstury `tools/fish_model/perch.py`, model `tools/fish_model/perch_blender.py`; płetwy z grubością i promieniami, oczy pod rogówką): ciało, głowa z okiem, pyskiem i pokrywą skrzelową oraz każda płetwa (kolczasta grzbietowa z czarną plamą, miękka grzbietowa, odbytowa, ogonowa, piersiowe i brzuszne) są odrysowane ze zdjęć prawdziwych okoni, a tekstury namalowane w ich barwach.
 
 **Tekstury QHD:** tekstury świata mają 1024 px na 2 m i filtrowanie anizotropowe; malują się wielowątkowo i są zapisywane w pamięci podręcznej (`user://texcache`). Okno startuje zmaksymalizowane, a świat renderuje się w natywnej rozdzielczości.
 

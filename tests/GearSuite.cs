@@ -114,12 +114,12 @@ public sealed class GearSuite : ITestSuite
         // Hand-built models (tools/fish_model): the close-up perch is the model made from photos of real perch.
         var perchAsset = FishingSim.Fishing.FishAsset.For(perch);
         t.Check(perchAsset != null && perchAsset.Fins.Count == 6 && perchAsset.Eyes.Count == 2 && perchAsset.BodyNormal != null,
-            $"the perch has its own model: body with a normal map, {perchAsset?.Fins.Count ?? 0} fins, {perchAsset?.Eyes.Count ?? 0} eyes");
+            $"the perch has its own model (built in Blender): body with a normal map, {perchAsset?.Fins.Count ?? 0} fins, {perchAsset?.Eyes.Count ?? 0} eyes under corneas");
         if (perchAsset != null)
         {
             var pm = FishingSim.Fishing.FishModel.Create(perch, 0.4f, detailed: true);
             int parts = pm.FindChildren("*", nameof(MeshInstance3D), true, false).Count;
-            t.Check(parts == 9 && pm.MaxHeight / pm.Length > 0.22f && pm.MaxHeight / pm.Length < 0.32f && pm.EyeDiameter < 0.62f * pm.HeadHeightAtEye,
+            t.Check(parts == 9 + perchAsset.Corneas.Count && perchAsset.Corneas.Count == 2 && pm.MaxHeight / pm.Length > 0.22f && pm.MaxHeight / pm.Length < 0.32f && pm.EyeDiameter < 0.62f * pm.HeadHeightAtEye,
                 $"a close-up perch is built from it ({parts} parts, H/L {pm.MaxHeight / pm.Length:0.00}, eye {pm.EyeDiameter * 1000f:0} mm in a {pm.HeadHeightAtEye * 1000f:0} mm head)");
             pm.Free();
         }

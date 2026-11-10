@@ -610,6 +610,12 @@ public partial class FishModel : Node3D
         };
         foreach (var (mesh, position) in asset.Eyes)
             unit.AddChild(new MeshInstance3D { Mesh = mesh, MaterialOverride = eyeMaterial, Position = position, Scale = _eyeScale });
+        foreach (var (mesh, position) in asset.Corneas)
+            unit.AddChild(new MeshInstance3D
+            {
+                Mesh = mesh, MaterialOverride = CorneaMaterial, Position = position, Scale = _eyeScale,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            });
     }
 
     private static Shader? _bodyShader, _finShader;

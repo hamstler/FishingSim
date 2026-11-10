@@ -26,6 +26,9 @@ public sealed class FishAsset
     /// <summary>The eyes (right, then left) and where they sit.</summary>
     public IReadOnlyList<(Mesh Mesh, Vector3 Position)> Eyes { get; private init; } = Array.Empty<(Mesh, Vector3)>();
 
+    /// <summary>The clear corneas over the eyes, when the model has them.</summary>
+    public IReadOnlyList<(Mesh Mesh, Vector3 Position)> Corneas { get; private init; } = Array.Empty<(Mesh, Vector3)>();
+
     public float EyeRadius { get; private init; }
     public float HeadHeightAtEye { get; private init; }
     public float MaxHeight { get; private init; }
@@ -105,6 +108,7 @@ public sealed class FishAsset
             Fins = parts.Where(p => p.Name.StartsWith("Fin")).Select(p => (p.Name, p.Mesh, Albedo(p.Mesh))).ToList(),
             Iris = Albedo(eyes[0].Mesh),
             Eyes = eyes.Select(p => (p.Mesh, p.Transform.Origin)).ToList(),
+            Corneas = parts.Where(p => p.Name.StartsWith("Cornea")).Select(p => (p.Mesh, p.Transform.Origin)).ToList(),
             EyeRadius = eyeAabb.Size.Y * 0.5f,
             HeadHeightAtEye = hi > lo ? hi - lo : aabb.Size.Y * 0.5f,
             MaxHeight = aabb.Size.Y,
