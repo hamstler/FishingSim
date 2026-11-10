@@ -1,23 +1,71 @@
-# Reference photographs
+# Fish model references
 
-The painted fish of these species are lofted to the body outline and painted in the colours measured from
-these photographs on Wikimedia Commons. The photographs themselves are not part of the game.
+Every fish is modelled and painted in code (tools/fish_model). Its proportions were measured on the reference
+named here; no picture is copied into the game. AtlasRyb.online illustrations were used for measurements only.
 
-- `amur`: "File:Ctenopharyngodon idella.jpg" by Dezidor, CC BY 3.0 (https://creativecommons.org/licenses/by/3.0), https://commons.wikimedia.org/wiki/File:Ctenopharyngodon_idella.jpg
-- `bolen`: "File:Aspius aspius Prague Vltava 3.jpg" by Karelj, Public domain (), https://commons.wikimedia.org/wiki/File:Aspius_aspius_Prague_Vltava_3.jpg
-- `jazgarz`: "File:Gymnocephalus cernuus Pärnu River Estonia 2010-01-06.jpg" by Tiit Hunt, CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0), https://commons.wikimedia.org/wiki/File:Gymnocephalus_cernuus_P%C3%A4rnu_River_Estonia_2010-01-06.jpg
-- `karas`: "File:CarassiusCarassius8.JPG" by Viridiflavus, CC BY-SA 3.0 (http://creativecommons.org/licenses/by-sa/3.0/), https://commons.wikimedia.org/wiki/File:CarassiusCarassius8.JPG
-- `karas_srebrzysty`: "File:Carassius gibelio dark 2009 G1.jpg" by George Chernilevsky, Public domain (), https://commons.wikimedia.org/wiki/File:Carassius_gibelio_dark_2009_G1.jpg
-- `karp`: "File:Cyprinus carpio 2008 G1.jpg" by George Chernilevsky, CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0), https://commons.wikimedia.org/wiki/File:Cyprinus_carpio_2008_G1.jpg
-- `karp_lustrzen`: "File:"Mirror Carp" (Cyprinus carpio) (cropped).jpg" by USFWS Mountain Prairie, Public domain (), https://commons.wikimedia.org/wiki/File:%22Mirror_Carp%22_(Cyprinus_carpio)_(cropped).jpg
-- `klen`: "File:Squalius cephalus Prague Vltava 1.jpg" by Karelj, Public domain (), https://commons.wikimedia.org/wiki/File:Squalius_cephalus_Prague_Vltava_1.jpg
-- `krap`: "File:Blicca bjoerkna transparent bg.png" by Blicca_bjoerkna.jpg: Algirdas
-derivative work: Andreas Plank, CC BY-SA 3.0 (http://creativecommons.org/licenses/by-sa/3.0/), https://commons.wikimedia.org/wiki/File:Blicca_bjoerkna_transparent_bg.png
-- `leszcz`: "File:AbramisBramaCarpBream.JPG" by Piet Spaans, CC BY 2.5 (https://creativecommons.org/licenses/by/2.5), https://commons.wikimedia.org/wiki/File:AbramisBramaCarpBream.JPG
-- `lipien`: "File:Thymallus baikalensis, Baikal-Museum, Listvyanka, Irkutsk Oblast, Russia - 20080405.jpg" by Octagon, CC BY 3.0 (https://creativecommons.org/licenses/by/3.0), https://commons.wikimedia.org/wiki/File:Thymallus_baikalensis,_Baikal-Museum,_Listvyanka,_Irkutsk_Oblast,_Russia_-_20080405.jpg
-- `okon`: "File:Perche commune perca fluviatilis Alfort.jpg; File:Perca fluviatilis - Perche commune - European perch Cropped.jpg; File:Perca fluviatilis Aquarium Liège 30012016 1.jpg" by Jebulon; Gilles San Martin; Vassil, CC0; CC BY-SA 2.5; CC0 (), https://commons.wikimedia.org/wiki/File:Perche_commune_perca_fluviatilis_Alfort.jpg https://commons.wikimedia.org/wiki/File:Perca_fluviatilis_-_Perche_commune_-_European_perch_Cropped.jpg https://commons.wikimedia.org/wiki/File:Perca_fluviatilis_Aquarium_Li%C3%A8ge_30012016_1.jpg
-- `ploc`: "File:Rutilus rutilus 2009 G3.jpg" by George Chernilevsky, Public domain (), https://commons.wikimedia.org/wiki/File:Rutilus_rutilus_2009_G3.jpg
-- `sandacz`: "File:Sander lucioperca 1.jpg" by eLNuko, Public domain (), https://commons.wikimedia.org/wiki/File:Sander_lucioperca_1.jpg
-- `szczupak`: "File:Esox lucius 2007.jpg" by Arz, Public domain (), https://commons.wikimedia.org/wiki/File:Esox_lucius_2007.jpg
-- `ukleja`: "File:Alburnus alburnus 01 by-dpc.jpg" by David Perez, CC BY 3.0 (https://creativecommons.org/licenses/by/3.0), https://commons.wikimedia.org/wiki/File:Alburnus_alburnus_01_by-dpc.jpg
-- `wzdrega`: "File:Scardinius erythropthalmus 2009 G1.jpg" by George Chernilevsky, Public domain (), https://commons.wikimedia.org/wiki/File:Scardinius_erythropthalmus_2009_G1.jpg
+- `amur` (Amur biały): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `babka_bycza` (Babka bycza): Kształt według tabeli budowy gatunku
+- `bass` (Bass wielkogębowy): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `bolen` (Boleń): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `brzana` (Brzana): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `brzanka` (Brzanka): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `certa` (Certa): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `cierniczek` (Cierniczek): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `ciernik` (Ciernik): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `ciosa` (Ciosa): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `czop` (Czop): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `glowacica` (Głowacica): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `glowacz` (Głowacz białopłetwy): Kształt według tabeli budowy gatunku
+- `glowacz_pregoplety` (Głowacz pręgopłetwy): Kształt według tabeli budowy gatunku
+- `jaz` (Jaź): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `jazgarz` (Jazgarz): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `jelec` (Jelec): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `jesiotr` (Jesiotr ostronosy): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `karas` (Karaś złocisty): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `karas_srebrzysty` (Karaś srebrzysty): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `karp` (Karp): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `karp_lustrzen` (Karp lustrzeń): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `kielb` (Kiełb): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `kielb_bialoplety` (Kiełb białopłetwy): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `klen` (Kleń): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `koza` (Koza): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `krap` (Krąp): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `leszcz` (Leszcz): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `lin` (Lin): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `lipien` (Lipień): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `losos` (Łosoś): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `mietus` (Miętus): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `okon` (Okoń): Proporcje według ilustracji okonia z AtlasRyb.online; barwy według zdjęć: Gilles San Martin (CC BY-SA 2.5), Vassil (CC0), Wikimedia Commons (https://atlasryb.online https://commons.wikimedia.org/wiki/File:Perca_fluviatilis_-_Perche_commune_-_European_perch_Cropped.jpg https://commons.wikimedia.org/wiki/File:Perca_fluviatilis_Aquarium_Li%C3%A8ge_30012016_1.jpg)
+- `orfa` (Orfa): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `palia` (Palia): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `piskorz` (Piskorz): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `ploc` (Płoć): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `pstrag` (Pstrąg potokowy): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `pstrag_teczowy` (Pstrąg tęczowy): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `pstrag_zrodlany` (Pstrąg źródlany): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `rozanka` (Różanka): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `rozpior` (Rozpiór): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `sandacz` (Sandacz): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `sandacz_wolzanski` (Sandacz wołżański): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `sapa` (Sapa): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `sazan` (Sazan): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `sieja` (Sieja): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `sielawa` (Sielawa): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `sliz` (Śliz): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `slonecznica` (Słonecznica): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `sterlet` (Sterlet): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `strzebla` (Strzebla potokowa): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `strzebla_blotna` (Strzebla błotna): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `stynka` (Stynka): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `sum` (Sum): Kształt według tabeli budowy gatunku
+- `sumik_kanalowy` (Sumik kanałowy): Kształt według tabeli budowy gatunku
+- `sumik_karlowaty` (Sumik karłowaty): Kształt według tabeli budowy gatunku
+- `swinka` (Świnka): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `szczupak` (Szczupak): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `tolpyga_biala` (Tołpyga biała): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `tolpyga_pstra` (Tołpyga pstra): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `troc` (Troć jeziorowa): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `troc_wedrowna` (Troć wędrowna): Proporcje według ilustracji pokrewnego gatunku z AtlasRyb.online (https://atlasryb.online)
+- `ukleja` (Ukleja): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)
+- `wegorz` (Węgorz): Kształt według tabeli budowy gatunku
+- `wzdrega` (Wzdręga): Proporcje według ilustracji z AtlasRyb.online (https://atlasryb.online)

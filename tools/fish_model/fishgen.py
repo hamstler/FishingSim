@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
 """
-The European perch (Perca fluviatilis) as a game model, built from reference photographs and written as a .glb:
-a lofted body with its head modelled (eye socket, the mouth's gape and lips, the gill cover's edge standing over the
-body), separate eyes, and the fins as rayed membranes (spiny first dorsal with its black spot, soft second dorsal,
-anal, forked tail, paired pectorals and pelvics splayed out from the body), each with a painted texture, and a
-painted body skin with a scale normal map.
+The fish model generator: one species file (tools/fish_model/species/<id>.json) in, the textures for the Blender build
+(fish_blender.py) out. A species file holds numbers only, measured on a side-view reference (the outline of the body
+without its fins, each fin's base and outer edge, the eye) and placed from it (the mouth, lips, the upper jaw bone, the
+gill cover, nostrils, the lateral line), with the colours, the skin pattern, scale size and barbels.
 
-The proportions (body, head with the eye, the mouth reaching back under it and the gill cover, every fin, the bars)
-were measured on the perch illustration of AtlasRyb.online (https://atlasryb.online, Perca fluviatilis); the colours
-follow its description and the photographs "Perca fluviatilis - Perche commune - European perch Cropped.jpg"
-(CC BY-SA 2.5) and "Perca fluviatilis Aquarium Liege 30012016 1.jpg" (CC0) on Wikimedia Commons. No picture is copied
-into the model: the skin and fins are painted in code.
+The body is lofted to the outline; its skin is unwrapped once round the fish and painted here: overlapping scales (or
+smooth skin), the species' markings (bars, spots, stripes, marbling, scutes, mirror scales ...), the head's anatomy and
+a normal map. Fins are rayed, pleated membranes with their own painted textures; the eyes are irises under corneas.
 
-Model space (as src/Fishing/FishModel.cs expects): unit total length, nose at +z 0.5, tail tip at -0.5, y up, x to
-the fish's right. Reference coordinates below are photo coordinates: x from the snout tip (0) to the tail tip (1),
-y downwards, both in total lengths.
+Photo coordinates: x from the snout tip (0) along the fish (the whole fish = 1), y downwards, in total lengths.
+Model space (as src/Fishing/FishModel.cs expects): unit total length, nose at +z 0.5, y up, x to the fish's right.
 
-Usage: python3 tools/fish_model/perch.py assets/fish/models/okon.glb [<preview_dir>]
-(also rewrites assets/fish/okon.json: the same outline and colours for the lofted perch in the lake, and the credit)
+Usage: python3 tools/fish_model/fishgen.py --textures <species.json> <work_dir> [<size>]
+       python3 tools/fish_model/fishgen.py --reference <species.json> assets/fish/<id>.json   (the lake model's outline)
 """
+import json
 import math
 import os
 import sys
@@ -26,94 +23,51 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from glb import Glb, vertex_normals  # noqa: E402
+from glb import vertex_normals  # noqa: E402,F401
 
-AXIS = 0.23           # photo y of the body axis (the snout tip and the tail stalk lie on it)
-DEPTH_SCALE = 0.95    # the reference is a grown perch; the model is a medium one (FishModel grows it)
+SPECIES = {}
+FIN_TEX = (320, 160)
 
-# Body outline without fins, traced every few percent of the length on the perch of AtlasRyb.online (proportions
-# only; the illustration itself is not used).
-TOP = [(0.0, 0.223), (0.0012, 0.214), (0.003, 0.207), (0.006, 0.201), (0.01, 0.197), (0.02, 0.191), (0.03, 0.186), (0.05, 0.176), (0.075, 0.163),
-       (0.10, 0.151), (0.125, 0.143), (0.15, 0.136), (0.20, 0.116), (0.25, 0.093),
-       (0.30, 0.084), (0.35, 0.082), (0.40, 0.086), (0.45, 0.095), (0.50, 0.108), (0.55, 0.123), (0.60, 0.134),
-       (0.65, 0.151), (0.70, 0.171), (0.75, 0.190), (0.80, 0.204), (0.845, 0.207)]
-BOTTOM = [(0.0, 0.236), (0.0012, 0.244), (0.003, 0.251), (0.006, 0.256), (0.01, 0.260), (0.02, 0.264), (0.03, 0.268), (0.05, 0.274),
-          (0.075, 0.281), (0.10, 0.287), (0.125, 0.292), (0.15, 0.298), (0.20, 0.314), (0.25, 0.330),
-          (0.30, 0.344), (0.35, 0.361), (0.40, 0.366), (0.45, 0.367), (0.50, 0.365), (0.55, 0.355), (0.60, 0.341),
-          (0.65, 0.322), (0.70, 0.302), (0.75, 0.283), (0.80, 0.266), (0.845, 0.260)]
-X0, X1 = 0.0, 0.845
-CAP_LENGTH = 0.0008            # the snout's outline itself rounds off to its tip; the cap only closes it          # snout tip, end of the tail stalk (the caudal fin's base)
 
-# Width / depth of the body along it: a broad head, a laterally flattened body.
-# Half width of the body (total lengths): a broad, blunt snout and head seen from above, a flattened body.
-HALF_WIDTH = [(0.0, 0.004), (0.0012, 0.009), (0.003, 0.013), (0.006, 0.016), (0.012, 0.021), (0.03, 0.026), (0.06, 0.031), (0.10, 0.037), (0.15, 0.043),
-              (0.22, 0.050), (0.30, 0.056), (0.40, 0.059), (0.50, 0.057), (0.60, 0.050), (0.70, 0.040), (0.80, 0.026),
-              (0.845, 0.020)]
-# Cross-section: a broad rounded crown on the head, a narrow back under the dorsal fins, a full rounded belly.
-N_TOP_ALONG = [(0.0, 2.4), (0.2, 2.3), (0.32, 1.8), (1.0, 1.75)]
-N_BOTTOM_ALONG = [(0.0, 1.85), (0.15, 1.95), (0.3, 2.3), (1.0, 2.3)]   # a rounded chin and throat
-
-# Head.
-EYE = (0.092, 0.186)
-EYE_R = 0.0205
-GAPE = [(0.002, 0.230), (0.02, 0.237), (0.04, 0.247), (0.058, 0.256), (0.068, 0.263)]   # short, sloping down
-# The lips' folds and the upper jaw bone (maxilla), which ends in a rounded plate under the front of the eye.
-UPPER_LIP_FOLD = [(0.004, 0.216), (0.015, 0.222), (0.028, 0.229)]
-LOWER_LIP_FOLD = [(0.006, 0.246), (0.02, 0.251), (0.035, 0.257)]
-MAXILLA_EDGE = [(0.035, 0.227), (0.06, 0.236), (0.085, 0.244), (0.100, 0.252), (0.106, 0.261), (0.103, 0.270),
-                (0.094, 0.274), (0.082, 0.272), (0.068, 0.264)]
-MAXILLA = [(0.025, 0.230), (0.05, 0.240), (0.075, 0.252), (0.092, 0.262)]
-NOSTRILS = [(0.045, 0.186), (0.057, 0.183)]
-PREOPERCLE = [(0.155, 0.155), (0.158, 0.21), (0.15, 0.242), (0.125, 0.265), (0.10, 0.272)]
-OPERCLE = [(0.172, 0.142), (0.21, 0.155), (0.24, 0.175), (0.255, 0.190), (0.24, 0.215), (0.228, 0.235),
-           (0.21, 0.255), (0.19, 0.270), (0.168, 0.280)]
-LATERAL_LINE = [(0.25, 0.135), (0.30, 0.128), (0.40, 0.130), (0.50, 0.148), (0.60, 0.170), (0.70, 0.200),
-                (0.78, 0.218), (0.845, 0.226)]
-
-# Dark bars: centre at the back, half width at the back, how far down (fraction of the depth), forked at the top.
-BARS = [(0.32, 0.025, 0.65, False), (0.415, 0.030, 0.75, True), (0.515, 0.030, 0.75, False),
-        (0.605, 0.026, 0.72, True), (0.685, 0.022, 0.68, False), (0.765, 0.017, 0.60, False), (0.835, 0.011, 0.5, False)]
-
-# Fins: rays from points along the base to points along the outer edge (both front to back, or top to bottom).
-FINS = {
-    "FinDorsal1": dict(base=[(0.255, 0.098), (0.30, 0.089), (0.40, 0.091), (0.50, 0.113), (0.555, 0.128)],
-                       tips=[(0.262, 0.065), (0.276, 0.030), (0.29, 0.003), (0.318, -0.005), (0.357, -0.022),
-                             (0.394, -0.033), (0.43, -0.029), (0.455, -0.014), (0.477, 0.008), (0.497, 0.030),
-                             (0.515, 0.055), (0.53, 0.079), (0.553, 0.126)], rays=15, kind="spiny"),
-    "FinDorsal2": dict(base=[(0.575, 0.137), (0.62, 0.147), (0.67, 0.164), (0.72, 0.182), (0.736, 0.188)],
-                       tips=[(0.59, 0.105), (0.603, 0.093), (0.631, 0.098), (0.66, 0.110), (0.687, 0.123),
-                             (0.71, 0.138), (0.732, 0.154), (0.755, 0.166), (0.774, 0.174)], rays=14, kind="soft"),
-    "FinAnal": dict(base=[(0.605, 0.336), (0.65, 0.318), (0.70, 0.298), (0.745, 0.282)],
-                    tips=[(0.635, 0.358), (0.668, 0.365), (0.698, 0.367), (0.724, 0.365), (0.749, 0.361),
-                          (0.757, 0.335), (0.752, 0.306)], rays=10, kind="soft", spines=2),
-    "FinCaudal": dict(base=[(0.836, 0.206), (0.845, 0.220), (0.848, 0.234), (0.845, 0.248), (0.836, 0.261)],
-                      tips=[(0.992, 0.134), (0.972, 0.165), (0.95, 0.199), (0.933, 0.235), (0.95, 0.265),
-                            (0.975, 0.299), (0.989, 0.330)], rays=19, kind="caudal"),
-    "FinPectoral": dict(base=[(0.243, 0.266), (0.249, 0.288)],
-                        tips=[(0.30, 0.242), (0.345, 0.245), (0.372, 0.256), (0.383, 0.271), (0.372, 0.288),
-                              (0.34, 0.304), (0.30, 0.310), (0.27, 0.303)], rays=13, kind="soft", splay=30.0,
-                        camber=0.004),
-    "FinPelvic": dict(base=[(0.245, 0.313), (0.270, 0.324)],
-                      tips=[(0.318, 0.435), (0.338, 0.425), (0.352, 0.410), (0.356, 0.385), (0.345, 0.362)],
-                      rays=6, kind="soft", spines=1, droop=25.0),
-}
-
-# Colours (sRGB), measured on the reference photos and evened out.
-RIDGE, UPPER, MID, LOWER, BELLY = (0.07, 0.10, 0.08), (0.16, 0.20, 0.12), (0.62, 0.54, 0.21), (0.84, 0.80, 0.60), \
-    (0.94, 0.93, 0.88)
-MID2 = (0.74, 0.66, 0.32)
-BAR = (0.08, 0.11, 0.08)
-HEAD_TOP, CHEEK, THROAT, LIP = (0.13, 0.16, 0.12), (0.36, 0.38, 0.25), (0.84, 0.84, 0.77), (0.55, 0.56, 0.45)
-FIN_COLOURS = {
-    "FinDorsal1": dict(membrane=(0.27, 0.25, 0.21), ray=(0.66, 0.60, 0.48), alpha=0.72),
-    "FinDorsal2": dict(membrane=(0.46, 0.39, 0.24), ray=(0.25, 0.20, 0.12), alpha=0.62),
-    "FinAnal": dict(membrane=(0.95, 0.42, 0.17), ray=(0.62, 0.16, 0.06), alpha=0.72, spine=(0.95, 0.92, 0.82)),
-    "FinCaudal": dict(membrane=(0.92, 0.45, 0.20), ray=(0.58, 0.17, 0.07), alpha=0.75, lower=(0.95, 0.40, 0.16)),
-    "FinPectoral": dict(membrane=(0.90, 0.72, 0.52), ray=(0.60, 0.36, 0.22), alpha=0.5),
-    "FinPelvic": dict(membrane=(0.95, 0.42, 0.17), ray=(0.62, 0.16, 0.06), alpha=0.75, spine=(0.96, 0.94, 0.86)),
-}
-
-UV_W, UV_Y0, UV_H = 0.86, 0.07, 0.36     # the body skin covers photo x 0..0.86, y 0.07..0.43
+def load_species(path_or_dict):
+    """Loads a species file and sets the generator's globals from it."""
+    sp = json.load(open(path_or_dict, encoding="utf-8")) if isinstance(path_or_dict, str) else path_or_dict
+    g = globals()
+    g["SPECIES"] = sp
+    tup = lambda pts: [tuple(p) for p in pts]
+    g["AXIS"] = sp.get("axis", 0.0)
+    g["DEPTH_SCALE"] = sp.get("depth_scale", 1.0)
+    g["TOP"], g["BOTTOM"] = tup(sp["top"]), tup(sp["bottom"])
+    g["X0"], g["X1"] = sp.get("x0", 0.0), sp["x1"]
+    g["CAP_LENGTH"] = sp.get("cap_length", 0.0008)
+    g["HALF_WIDTH"] = tup(sp["half_width"])
+    g["N_TOP_ALONG"], g["N_BOTTOM_ALONG"] = tup(sp["n_top"]), tup(sp["n_bottom"])
+    g["EYE"], g["EYE_R"] = tuple(sp["eye"]), sp["eye_r"]
+    for key in ("gape", "upper_lip_fold", "lower_lip_fold", "maxilla_edge", "maxilla", "nostrils", "preopercle",
+                "opercle", "lateral_line"):
+        g[key.upper()] = tup(sp.get(key, []))
+    g["FINS"] = sp["fins"]
+    col = sp["colours"]
+    for key in ("ridge", "upper", "mid", "mid2", "lower", "belly", "bar", "head_top", "cheek", "throat", "lip"):
+        g[key.upper()] = tuple(col[key])
+    g["IRIS"] = tuple(sp.get("iris", (0.85, 0.7, 0.3)))
+    g["FIN_COLOURS"] = sp["fin_colours"]
+    g["SCALE"] = sp.get("scale", 0.0)
+    g["PATTERN"] = sp.get("pattern", {"type": "plain"})
+    g["SILVER"] = sp.get("silver", 0.5)
+    g["UV_W"], g["UV_Y0"], g["UV_H"] = sp.get("uv", (X1 + 0.02, -0.25, 0.5))
+    # Landmarks of the head, from its outline.
+    op = np.array(OPERCLE)
+    g["OP_X"] = float(op[:, 0].max())
+    g["OP_TOP"], g["OP_BOT"] = tuple(op[0]), tuple(op[-1])
+    g["OP_MID_Y"] = float((op[0, 1] + op[-1, 1]) / 2)
+    g["SPINE"] = tuple(op[int(np.argmax(op[:, 0]))])
+    pre = np.array(PREOPERCLE)
+    g["PREOP_X"] = float(pre[:, 0].mean())
+    g["PREOP_MID_Y"] = float(pre[:, 1].mean())
+    g["MOUTH_END"] = float(GAPE[-1][0])
+    g["HS"] = float(np.clip(OP_X / 0.255, 0.5, 1.4))       # head size against the perch the details were drawn on
+    return sp
 
 
 # ------------------------------------------------------------------ helpers
@@ -232,18 +186,24 @@ def mouth_open(px, py):
     """The jaws stand a little apart at the front, as a perch holds its mouth: upper lip up, lower lip down."""
     dy = py - interp(GAPE, np.clip(px, GAPE[0][0], GAPE[-1][0]))
     inside_cap = smoothstep(X0 - 0.0025, X0 + 0.002, px)      # the rounded tip in front of the first ring stays whole
-    return 0.0006 * np.tanh(dy / 0.002) * np.exp(-(dy / 0.008) ** 2) * smoothstep(0.05, X0, px) * inside_cap
+    return 0.0006 * np.tanh(dy / 0.002) * np.exp(-(dy / 0.008) ** 2) * smoothstep(0.75 * MOUTH_END, X0, px) * inside_cap
 
 
 def maxilla_mask(px, py):
     """Inside the upper jaw bone's plate: below its upper edge, above the gape, between its front and rounded end."""
+    if len(MAXILLA_EDGE) < 5:
+        return np.zeros(np.shape(px))
     edge = np.array(MAXILLA_EDGE)
     top = np.interp(px, edge[:4, 0], edge[:4, 1])
     lower = interp(GAPE, np.clip(px, GAPE[0][0], GAPE[-1][0]))
-    end = np.hypot((px - 0.094) / 1.0, (py - 0.262) / 1.15)
-    body = smoothstep(top - 0.0008, top + 0.0012, py) * smoothstep(lower + 0.012, lower + 0.009, py) \
-        * smoothstep(0.035, 0.045, px) * smoothstep(0.094, 0.088, px)
-    return np.maximum(body, smoothstep(0.012, 0.010, end) * smoothstep(0.085, 0.09, px)) * smoothstep(0.03, 0.04, px)
+    ex, ey = edge[3:, 0].mean(), edge[3:, 1].mean()
+    er = 0.75 * np.max(np.hypot(edge[3:, 0] - ex, edge[3:, 1] - ey))
+    end = np.hypot((px - ex) / 1.0, (py - ey) / 1.15)
+    x_front = edge[0, 0]
+    body = smoothstep(top - 0.0008, top + 0.0012, py) * smoothstep(lower + 0.012 * HS, lower + 0.009 * HS, py) \
+        * smoothstep(x_front, x_front + 0.01, px) * smoothstep(ex, ex - 0.006, px)
+    return np.maximum(body, smoothstep(er, er * 0.83, end) * smoothstep(ex - 0.009, ex - 0.004, px)) \
+        * smoothstep(x_front - 0.005, x_front + 0.005, px)
 
 
 def sculpt_head(px, py, lat, cs):
@@ -252,17 +212,18 @@ def sculpt_head(px, py, lat, cs):
     side = np.abs(cs)[None, :] ** 0.5               # head details on the flanks, not on the crown or the throat
     # Eye socket: a hollow the eyeball sits in.
     d_eye = np.hypot(px - EYE[0], py - EYE[1]) / EYE_R
-    lat -= np.sign(lat) * side * 0.006 * (1 - smoothstep(1.0, 1.45, d_eye))
+    lat -= np.sign(lat) * side * 0.3 * EYE_R * (1 - smoothstep(1.0, 1.45, d_eye))
     # Mouth: the gape as a groove between two lips.
     dm = polyline_distance(px, py, GAPE)
-    head = smoothstep(0.1, 0.085, px)
+    head = smoothstep(MOUTH_END + 0.032, MOUTH_END + 0.017, px)
     # Closed mouth: thick, rounded lips either side of a narrow crease that deepens into the corner.
-    corner = smoothstep(0.072, 0.064, px)
+    corner = smoothstep(MOUTH_END + 0.004, MOUTH_END - 0.004, px)
     lat -= np.sign(lat) * side * head * corner * (0.0022 * np.exp(-(dm / 0.0011) ** 2)
                                                   - 0.0034 * np.exp(-((dm - 0.0050) / 0.0032) ** 2))
     # The lips' folds as grooves; the upper jaw bone as a raised plate inside its outline, with a groove round it.
     for fold in (UPPER_LIP_FOLD, LOWER_LIP_FOLD, MAXILLA_EDGE):
-        lat -= np.sign(lat) * side * 0.0011 * np.exp(-(polyline_distance(px, py, fold) / 0.0012) ** 2)
+        if len(fold) >= 2:
+            lat -= np.sign(lat) * side * 0.0011 * np.exp(-(polyline_distance(px, py, fold) / 0.0012) ** 2)
     lat += np.sign(lat) * side * 0.0016 * maxilla_mask(px, py)
     # Gill cover: the body behind its rear edge sits lower, so the edge stands out as a ledge.
     ox = opercle_x(py)
@@ -274,12 +235,14 @@ def sculpt_head(px, py, lat, cs):
     return lat
 
 
-def build_body_unwrapped(n_rings=150, n_seg=96):
+def build_body_unwrapped(n_rings=None, n_seg=None):
     """
     The body for the Blender build: quads, the skin unwrapped once round the body (u from the snout to the tail
     stalk, v from the dorsal midline round the right flank, the belly and the left flank back to it), so the texture
     neither stretches over the back nor the belly. Returns model-space positions, UVs and faces (quads and triangles).
     """
+    n_rings = n_rings or SPECIES.get("mesh", (110, 72))[0]
+    n_seg = n_seg or SPECIES.get("mesh", (110, 72))[1]
     s = np.linspace(0, 1, n_rings)
     xs = X0 + (X1 - X0) * s ** 1.3
     cap = 10
@@ -401,7 +364,9 @@ def build_fin(spec, segs=10, pleat=0.0012):
     return pos, uv.reshape(-1, 2), idx
 
 
-def paint_fin(name, spec, w=640, h=320):
+
+def paint_fin(name, spec, w=None, h=None):
+    w, h = w or FIN_TEX[0], h or FIN_TEX[1]
     from PIL import Image
     n = spec["rays"]
     col = FIN_COLOURS[name]
@@ -410,11 +375,12 @@ def paint_fin(name, spec, w=640, h=320):
     f = u * (n - 1)
     ray_i = np.round(f)
     du = np.abs(f - ray_i)                               # 0 on a ray, 0.5 halfway between two
-    spiny = spec["kind"] == "spiny"
+    spiny = spec["kind"] in ("spiny", "spines")
+    fleshy = spec["kind"] == "adipose"
     rng = np.random.default_rng(len(name))
     # The membrane stops short of the rays' tips: deep notches between the spines, a gentle scallop elsewhere.
     jitter = rng.uniform(-0.02, 0.02, n + 1)[ray_i.astype(int)]
-    notch = 0.42 if spiny else (0.02 if spec["kind"] == "caudal" else 0.035)
+    notch = (0.85 if spec["kind"] == "spines" else 0.42) if spiny else (0.02 if spec["kind"] == "caudal" else 0.035)
     edge = 1.0 - notch * np.sin(np.pi * du) ** (0.6 if spiny else 1.4) + jitter * (du < 0.5) * (1.0 if spiny else 0.3)
     membrane = smoothstep(edge, edge - 0.02, v)
     ray_w = (0.15 if spiny else 0.12) * (1 - 0.55 * v)
@@ -428,16 +394,29 @@ def paint_fin(name, spec, w=640, h=320):
     else:
         ray = smoothstep(ray_w, ray_w * 0.35, du)
     ray *= smoothstep(1.0, 0.97, v)
+    if fleshy:                                            # the adipose fin: a fleshy flap, no rays
+        ray *= 0.0
+        membrane = smoothstep(1.0, 0.9, v)
     base_c = np.array(col["membrane"])
     c = np.ones((h, w, 3)) * base_c
     if "lower" in col:                                    # tail: olive above, orange-red lower lobe
         c = c * (1 - smoothstep(0.35, 0.8, u))[..., None] + np.array(col["lower"]) * smoothstep(0.35, 0.8, u)[..., None]
     c = c * (0.82 + 0.18 * v)[..., None]                  # the membrane brightens towards the edge
-    if spec["kind"] == "caudal":                          # the tail's base is olive like the stalk
-        c = c * (1 - smoothstep(0.25, 0.0, v))[..., None] + np.array([0.36, 0.36, 0.20]) * smoothstep(0.25, 0.0, v)[..., None]
+    if spec["kind"] == "caudal":                          # the tail's base takes the stalk's colour
+        stalk = np.array(col.get("base", np.array(col["membrane"]) * 0.75))
+        c = c * (1 - smoothstep(0.25, 0.0, v))[..., None] + stalk * smoothstep(0.25, 0.0, v)[..., None]
     ray_c = np.array(col["ray"])
     c = c * (1 - ray[..., None]) + ray_c * ray[..., None]
-    if spiny:
+    if "edge" in col:                                     # a pale or dark margin (white-edged fins of chars)
+        margin = smoothstep(0.82, 0.92, v) if spec["kind"] != "pelvic_front" else 0
+        c = c * (1 - margin[..., None]) + np.array(col["edge"]) * margin[..., None]
+    if col.get("lead"):                                   # a white leading edge (chars, brook trout)
+        lead = smoothstep(0.06, 0.02, u)
+        c = c * (1 - lead[..., None]) + np.array([0.97, 0.97, 0.95]) * lead[..., None]
+    for sx, sy, sr, scol in spec.get("dots", []):         # spots painted on the fin (trout, grayling, ruffe)
+        dot = smoothstep(sr, sr * 0.6, np.hypot((u - sx) * w / h, v - sy))
+        c = c * (1 - dot[..., None]) + np.array(scol) * dot[..., None]
+    if spec.get("spot"):
         # The perch's black spot at the back of the first dorsal fin, and a dusky edge.
         spot = smoothstep(1.0, 0.6, np.hypot((u - 0.88) / 0.13, (v - 0.42) / 0.33))
         c = c * (1 - 0.92 * spot[..., None]) + np.array([0.03, 0.03, 0.03]) * 0.92 * spot[..., None]
@@ -447,7 +426,7 @@ def paint_fin(name, spec, w=640, h=320):
         sp = smoothstep(0.14, 0.05, np.abs(f - k)) * smoothstep(1.0, 0.95, v)
         c = c * (1 - sp[..., None]) + np.array(col["spine"]) * sp[..., None]
         ray = np.maximum(ray, sp)
-    c *= (1 + rng.normal(0, 0.025, (h, w)))[..., None]
+    c *= (1 + rng.normal(0, 0.012, (h, w)))[..., None]
     # Rays are opaque; the membrane between them thins out towards the edge.
     alpha = np.maximum(membrane * col["alpha"] * (1.0 - 0.3 * v), ray * 0.98)
     alpha *= smoothstep(0.0, 0.015, u) * smoothstep(1.0, 0.985, u) if spec["kind"] == "caudal" else 1
@@ -456,22 +435,6 @@ def paint_fin(name, spec, w=640, h=320):
 
 
 # ------------------------------------------------------------------ body skin
-def paint_body(w=3072):
-    """The skin in side projection (u = photo x, v = photo y), for the model this script writes itself."""
-    from PIL import Image
-    h = int(round(w * UV_H / UV_W))
-    yy, xx = np.mgrid[0:h, 0:w].astype(np.float64)
-    x = (xx + 0.5) / w * UV_W
-    y = UV_Y0 + (yy + 0.5) / h * UV_H
-    c, height = skin(x, y, y)
-    albedo = Image.fromarray((np.clip(c, 0, 1) * 255).astype(np.uint8), "RGB")
-    gx = (np.roll(height, -1, axis=1) - np.roll(height, 1, axis=1)) * 0.5
-    gy = (np.roll(height, -1, axis=0) - np.roll(height, 1, axis=0)) * 0.5
-    n = np.dstack([-gx * 2.2, gy * 2.2, np.ones_like(height)])
-    n /= np.linalg.norm(n, axis=2, keepdims=True)
-    normal = Image.fromarray(((n * 0.5 + 0.5) * 255).astype(np.uint8), "RGB")
-    return albedo, normal
-
 
 def unwrap_coords(w, h):
     """
@@ -498,28 +461,6 @@ def unwrap_coords(w, h):
     ds = np.gradient(cum, axis=0)
     return np.broadcast_to(x[None, :], (h, w)), py, s, ds, np.broadcast_to(np.abs(cs)[:, None] ** 0.5, (h, w))
 
-
-def write_textures(work, w=4096, h=2048):
-    """Textures for the Blender build (perch_blender.py): the unwrapped skin and its normal map, fins, iris."""
-    from PIL import Image
-    os.makedirs(work, exist_ok=True)
-    x, y, s, ds, side = unwrap_coords(w, h)
-    c, height = skin(x, y, s, side)
-    Image.fromarray((np.clip(c, 0, 1) * 255).astype(np.uint8), "RGB").save(os.path.join(work, "body_albedo.jpg"), quality=93)
-    # Normal map from the heights, in real lengths along u and round the body (OpenGL convention: green up the image).
-    k = 0.00062
-    dx = (X1 - X0) / w
-    gx = (np.roll(height, -1, axis=1) - np.roll(height, 1, axis=1)) * 0.5 / dx
-    gy = (np.roll(height, -1, axis=0) - np.roll(height, 1, axis=0)) * 0.5 / np.maximum(ds, 1e-6)
-    n = np.dstack([-gx * k, gy * k, np.ones_like(height)])
-    n /= np.linalg.norm(n, axis=2, keepdims=True)
-    Image.fromarray(((n * 0.5 + 0.5) * 255).astype(np.uint8), "RGB").resize((w // 2, h // 2), Image.LANCZOS) \
-        .save(os.path.join(work, "body_normal.jpg"), quality=93)
-    for name, spec in FINS.items():
-        paint_fin(name, spec).save(os.path.join(work, name + ".png"))
-    paint_eye().save(os.path.join(work, "iris.png"))
-    write_reference(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "assets", "fish", "okon.json"))
-    print(f"textures in {work}")
 
 
 def _hash(i, j, k=0):
@@ -560,6 +501,135 @@ def scale_field(x, s, a, rows=0.74, slope=0.22):
     return out
 
 
+
+
+def _noise(rng, h, w, cell):
+    from PIL import Image
+    small = (rng.random((max(h // cell, 2), max(w // cell, 2))) * 255).astype(np.uint8)
+    return np.asarray(Image.fromarray(small).resize((w, h), Image.BICUBIC)) / 255.0
+
+
+def _blend(c, colour, amount):
+    return c * (1 - amount[..., None]) + np.array(colour) * amount[..., None]
+
+
+def paint_pattern(c, height, x, y, s, rel, head_w, b, rng):
+    """The species' markings over the scales (b: the body's scale field, or None for smooth skin)."""
+    p = PATTERN
+    kind = p.get("type", "plain")
+    h, w = np.shape(x)
+    body = (1 - head_w) * (x < X1 + 0.005)
+    span0, span1 = OP_X + 0.01, X1 - 0.01
+    xq = b["cx"] + 0.004 * (_hash(b["i"], b["j"], 3) - 0.5) if b is not None else x
+    dark = np.array(BAR)
+
+    def spots(count, size, r0, r1, colour, amount, seed, halo=None, aspect=1.0, x0=None, x1=None, mask=None):
+        nonlocal c
+        g = np.random.default_rng(seed)
+        out = np.zeros((h, w))
+        xa, xb = (x0 if x0 is not None else span0), (x1 if x1 is not None else span1)
+        for _ in range(count):
+            sx = g.uniform(xa, xb)
+            sr = g.uniform(r0, r1)
+            sz = size * g.uniform(0.7, 1.3)
+            d = np.hypot((x - sx) / aspect, (rel - sr) * (interp(BOTTOM, np.clip(x, X0, X1)) - interp(TOP, np.clip(x, X0, X1))))
+            out = np.maximum(out, smoothstep(sz, sz * 0.7, d))
+            if halo is not None:
+                ring = smoothstep(sz * 1.6, sz * 1.15, d) * (1 - smoothstep(sz, sz * 0.7, d))
+                c = _blend(c, halo, 0.7 * ring * (mask if mask is not None else body))
+        c = _blend(c, colour, amount * out * (mask if mask is not None else body))
+        return out
+
+    if kind in ("bars", "saddles"):
+        n = p.get("count", 6)
+        bars = p.get("bars") or [(span0 + (span1 - span0) * (i + 0.5) / n, 0.022 * (1 - 0.3 * i / max(n, 1)),
+                                  0.38 if kind == "saddles" else 0.7, False) for i in range(n)]
+
+        def bars_at(xx):
+            out = np.zeros((h, w))
+            for cx, hw, end, fork in bars:
+                centre = cx + 0.014 * (rel - 0.3) + 0.004 * np.sin(rel * 9 + cx * 40)
+                width = hw * (1 - 0.6 * np.clip(rel, 0, 1) / end)
+                strength = smoothstep(end, end - 0.25, rel) * smoothstep(-0.05, 0.06, rel)
+                if fork:
+                    f = smoothstep(0.34, 0.1, rel)
+                    d = np.minimum(np.abs(xx - centre - 0.013 * f), np.abs(xx - centre + 0.013 * f))
+                    width = width * (1 - 0.35 * f)
+                else:
+                    d = np.abs(xx - centre)
+                out = np.maximum(out, smoothstep(width + 0.004, width - 0.006, d) * strength)
+            return out
+        jitter = 0.25 * (_hash(b["i"], b["j"], 3) - 0.5) if b is not None else 0
+        bar = np.clip(0.75 * np.clip(bars_at(xq) + jitter, 0, 1) + 0.25 * bars_at(x), 0, 1) * body
+        c = _blend(c, dark, p.get("strength", 0.82) * bar)
+    elif kind == "light_spots":               # pike: rows of pale bean-shaped spots
+        spots(int(p.get("count", 420)), p.get("size", 0.0038), 0.12, 0.82, p.get("colour", (0.82, 0.80, 0.55)), 0.7, 11,
+              aspect=1.9)
+    elif kind == "red_spots":                 # brown trout: red spots with pale halos, black spots above
+        spots(70, 0.0042, 0.05, 0.55, (0.08, 0.07, 0.06), 0.85, 12, x0=EYE[0], x1=span1)
+        spots(45, 0.004, 0.35, 0.75, (0.78, 0.16, 0.10), 0.9, 13, halo=(0.92, 0.88, 0.80))
+    elif kind == "dark_spots":                # salmon, trout, grayling, ruffe: black spots, mostly above the line
+        spots(int(p.get("count", 90)), p.get("size", 0.0035), 0.05, p.get("depth", 0.55), dark * 0.6, 0.85, 14,
+              x0=EYE[0] + 0.01, x1=span1)
+    elif kind == "rainbow":                   # rainbow trout: a pink band along the flank, small black spots all over
+        band = np.exp(-((rel - 0.48) / 0.12) ** 2) * body
+        c = _blend(c, (0.86, 0.45, 0.55), 0.55 * band)
+        c = _blend(c, (0.78, 0.40, 0.50), 0.35 * np.exp(-((rel - 0.5) / 0.14) ** 2) * head_w * (x > EYE[0]))
+        spots(260, 0.0025, 0.0, 0.7, (0.06, 0.06, 0.05), 0.9, 15, x0=0.02, x1=X1 + 0.15)
+    elif kind == "vermiculated":              # brook trout: pale worm-like lines on a dark back, red spots in blue halos
+        n = _noise(rng, h, w, 18)
+        worms = smoothstep(0.03, 0.0, np.abs(n - 0.5)) * smoothstep(0.55, 0.2, rel) * body
+        c = _blend(c, (0.78, 0.74, 0.52), 0.7 * worms)
+        spots(40, 0.0035, 0.35, 0.7, (0.86, 0.22, 0.12), 0.9, 16, halo=(0.35, 0.45, 0.75))
+        spots(60, 0.003, 0.2, 0.7, (0.86, 0.82, 0.55), 0.6, 17)
+    elif kind == "marbled":                   # catfish, burbot, sculpins, gobies: irregular dark blotches
+        n = 0.6 * _noise(rng, h, w, 34) + 0.4 * _noise(rng, h, w, 12)
+        blot = smoothstep(p.get("threshold", 0.55), p.get("threshold", 0.55) + 0.1, n) * smoothstep(0.95, 0.6, rel)
+        c = _blend(c, dark, p.get("strength", 0.7) * blot * (body + 0.6 * head_w))
+    elif kind == "stripe":                    # bleak, sunbleak, bitterling, smelt: a band along the flank
+        band = np.exp(-((rel - p.get("at", 0.48)) / p.get("width", 0.07)) ** 2) * body
+        band *= smoothstep(p.get("from", 0.0), p.get("from", 0.0) + 0.1, (x - OP_X) / (X1 - OP_X))
+        c = _blend(c, p.get("colour", (0.70, 0.78, 0.82)), p.get("strength", 0.6) * band)
+    elif kind == "stripes":                   # weatherfish: several dark bands along the body
+        for at, wd in ((0.18, 0.035), (0.42, 0.06), (0.68, 0.03)):
+            band = np.exp(-((rel - at) / wd) ** 2) * (body + head_w * 0.5)
+            c = _blend(c, dark, 0.7 * band)
+    elif kind == "spot_rows":                 # gudgeon, spined loach: a row of dark blotches along the side
+        n = p.get("count", 10)
+        for i in range(n):
+            cx = span0 + (span1 - span0) * (i + 0.5) / n
+            d = np.hypot((x - cx) / 1.4, (rel - 0.5) * 0.12)
+            c = _blend(c, dark, 0.8 * smoothstep(0.012, 0.008, d) * body)
+        spots(120, 0.002, 0.05, 0.45, dark, 0.6, 18)
+    elif kind == "band":                      # largemouth bass: a dark, ragged band along the side
+        n = _noise(rng, h, w, 16)
+        band = smoothstep(0.1 + 0.05 * n, 0.04, np.abs(rel - 0.5)) * body
+        c = _blend(c, dark, 0.65 * band)
+    elif kind == "scutes":                    # sturgeons: rows of bony plates on smooth skin
+        for at, n, size in ((0.0, 13, 0.016), (0.5, 34, 0.010), (0.92, 11, 0.010)):
+            for i in range(n):
+                cx = OP_X + 0.01 + (X1 - OP_X - 0.04) * (i + 0.5) / n
+                d = np.hypot((x - cx) / 1.0, (rel - at) * (interp(BOTTOM, np.clip(x, X0, X1)) - interp(TOP, np.clip(x, X0, X1))))
+                plate = smoothstep(size, size * 0.6, d)
+                c = _blend(c, (0.88, 0.85, 0.75), 0.7 * plate * body)
+                height += 1.2 * plate * body
+    elif kind == "mirror":                    # mirror carp: a few big, glinting scales on bare skin
+        g = np.random.default_rng(19)
+        for row_rel, n in ((0.05, 9), (0.5, 7), (0.88, 4)):
+            for i in range(n):
+                if g.random() < 0.25:
+                    continue
+                cx = span0 + (span1 - span0) * (i + g.uniform(0.2, 0.8)) / n
+                sz = g.uniform(0.016, 0.026)
+                d = np.hypot((x - cx), (rel - row_rel - g.uniform(-0.05, 0.05)) * (interp(BOTTOM, np.clip(x, X0, X1)) - interp(TOP, np.clip(x, X0, X1))))
+                plate = smoothstep(sz, sz * 0.8, d) * body
+                rim = plate * smoothstep(sz * 0.8, sz, d + 0.004)
+                c = _blend(c, np.array(MID) * 1.25, 0.6 * plate)
+                c = c * (1 - 0.35 * rim)[..., None]
+                height += 0.8 * plate - 0.6 * rim
+    return c, height
+
+
 def skin(x, y, s, side=None):
     """
     Colour and bump of the skin at photo points (x, y) of the side view; s runs over the skin across the body (the
@@ -583,137 +653,120 @@ def skin(x, y, s, side=None):
 
     ox = opercle_x(y)
     head_w = smoothstep(0.004, -0.004, x - opercle_x(y, extend=True))
-    # Head: dark crown, brassy cheeks and gill cover, a pale throat.
+    # Head: dark crown, cheeks and gill cover, a pale throat.
     hc = np.array(CHEEK) * np.ones((h, w, 3))
     hc = hc * (1 - smoothstep(0.35, 0.05, rel))[..., None] + np.array(HEAD_TOP) * smoothstep(0.35, 0.05, rel)[..., None]
     hc = hc * (1 - smoothstep(0.80, 0.97, rel))[..., None] + np.array(THROAT) * smoothstep(0.80, 0.97, rel)[..., None]
-    gill = smoothstep(0.004, 0.0, np.abs(x - 0.5 * (np.nan_to_num(ox, nan=0.2) + 0.158)) - 0.5 * (np.nan_to_num(ox, nan=0.2) - 0.158))
-    hc = hc * (1 + 0.08 * gill)[..., None]               # the gill cover a touch lighter, like polished brass
+    gill = smoothstep(0.004, 0.0, np.abs(x - 0.5 * (np.nan_to_num(ox, nan=OP_X) + PREOP_X)) - 0.5 * (np.nan_to_num(ox, nan=OP_X) - PREOP_X))
+    hc = hc * (1 + 0.08 * gill)[..., None]               # the gill cover a touch lighter
+    # The head shares the body's colours to a degree (a fish's head is not a mask of its own colour).
+    keep = SPECIES.get("head_blend", 0.0)
+    hc = hc * (1 - keep) + c * keep
     c = c * (1 - head_w[..., None]) + hc * head_w[..., None]
 
-    # Scales: small ctenoid scales, each showing its rounded free rear part with a dark, rough rim, a lighter, glinting
-    # middle, its own tint and a few pigment cells; tiny ones on the cheeks and the upper gill cover.
-    sc = {}
-    for name, size, mask in (("body", 0.0092, 1 - head_w),
-                             ("cheek", 0.0048, head_w * smoothstep(0.11, 0.15, x) * smoothstep(0.30, 0.42, rel)
-                              * smoothstep(0.92, 0.75, rel))):
-        f = scale_field(x, s, size)
-        sc[name] = f
-        h1, h2, h3 = _hash(f["i"], f["j"]), _hash(f["i"], f["j"], 1), _hash(f["i"], f["j"], 2)
-        # The free edge darkens (pigment along the scale's rim, the shadow it casts on the scale behind).
-        rim = smoothstep(0.78, 1.0, f["d"]) * smoothstep(-0.1, 0.45, f["dx"])
-        glint = np.exp(-((f["dx"] - 0.1) ** 2 + f["dy"] ** 2) / 0.10)
-        shade = 1 - 0.26 * rim + 0.07 * glint + 0.08 * (h1 - 0.5)
-        tint = np.stack([1 + 0.05 * (h2 - 0.5), 1 + 0.02 * (h1 - 0.5), 1 - 0.06 * (h2 - 0.5)], axis=-1)
-        c = c * (1 + (shade[..., None] * tint - 1) * mask[..., None])
-        # Each scale a plate rising towards its free edge, which drops onto the scale behind it.
-        height += mask * (0.25 + 0.45 * np.clip(f["dx"], -1, 1) - 0.6 * smoothstep(0.9, 1.0, f["d"]))
+    # Scales (or smooth skin), each showing its rounded free rear part with a dark rim, a glint and its own tint.
+    b = None
+    if SCALE > 0:
+        cheek_size = min(SCALE * 0.52, 0.006)
+        for name, size, mask in (("body", SCALE, 1 - head_w),
+                                 ("cheek", cheek_size, head_w * smoothstep(EYE[0] + 1.2 * EYE_R, EYE[0] + 2.4 * EYE_R, x)
+                                  * smoothstep(0.30, 0.42, rel) * smoothstep(0.92, 0.75, rel))):
+            f = scale_field(x, s, size)
+            if name == "body":
+                b = f
+            h1, h2 = _hash(f["i"], f["j"]), _hash(f["i"], f["j"], 1)
+            rim = smoothstep(0.78, 1.0, f["d"]) * smoothstep(-0.1, 0.45, f["dx"])
+            glint = np.exp(-((f["dx"] - 0.1) ** 2 + f["dy"] ** 2) / 0.10)
+            shade = 1 - 0.26 * rim + (0.07 + 0.08 * SILVER) * glint + 0.08 * (h1 - 0.5)
+            tint = np.stack([1 + 0.05 * (h2 - 0.5), 1 + 0.02 * (h1 - 0.5), 1 - 0.06 * (h2 - 0.5)], axis=-1)
+            c = c * (1 + (shade[..., None] * tint - 1) * mask[..., None])
+            height += mask * (0.25 + 0.45 * np.clip(f["dx"], -1, 1) - 0.6 * smoothstep(0.9, 1.0, f["d"]))
+    else:
+        # Smooth, slimy skin: a fine, soft grain and tiny pores.
+        grain = _noise(rng, h, w, 6)
+        c *= (0.96 + 0.08 * grain)[..., None]
+        height += 0.15 * grain
 
-    # Bars, darkest at the back, fading down the flank; the first and third fork at the top.
-    # The bars are made of dark scales: whether a scale is dark is decided at its centre, so the bars' edges follow the
-    # scales, ragged; they fade down the flank and some fork at the top.
-    def bars_at(xq):
-        out = np.zeros((h, w))
-        for cx, hw, end, fork in BARS:
-            centre = cx + 0.014 * (rel - 0.3) + 0.004 * np.sin(rel * 9 + cx * 40)
-            width = hw * (1 - 0.6 * np.clip(rel, 0, 1) / end)          # wedge-shaped: broad at the back
-            strength = smoothstep(end, end - 0.25, rel) * smoothstep(-0.05, 0.06, rel)
-            if fork:
-                f = smoothstep(0.34, 0.1, rel)
-                d = np.minimum(np.abs(xq - centre - 0.013 * f), np.abs(xq - centre + 0.013 * f))
-                width = width * (1 - 0.35 * f)
-            else:
-                d = np.abs(xq - centre)
-            out = np.maximum(out, smoothstep(width + 0.004, width - 0.006, d) * strength)
-        return out
-    b = sc["body"]
-    jitter = 0.25 * (_hash(b["i"], b["j"], 3) - 0.5)
-    # Mostly decided per scale (ragged, scale-by-scale edges), with a soft part so the bars shade into the flank.
-    bar = np.clip(0.75 * np.clip(bars_at(b["cx"]) + jitter, 0, 1) + 0.25 * bars_at(x), 0, 1)
-    bar *= 1 - head_w
-    c = c * (1 - 0.82 * bar[..., None]) + np.array(BAR) * 0.82 * bar[..., None]
+    c, height = paint_pattern(c, height, x, y, s, rel, head_w, b, rng)
+
     # Fine dark speckles on the back.
     speck = (rng.random((h, w)) > 0.9965) * smoothstep(0.45, 0.1, rel)
     speck = np.asarray(Image.fromarray((speck * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(3))) / 255.0
     c *= (1 - 0.35 * speck)[..., None]
 
-    # Lateral line: a row of pale, pored scales.
-    # Lateral line: the scales along it each carry a short tube (a pale ridge with a dark pore at its end).
-    ll = interp(LATERAL_LINE, x)
-    near = smoothstep(0.004, 0.0015, np.abs(y - ll)) * (x > 0.25) * (x < X1) * (1 - head_w)
-    tube = smoothstep(0.32, 0.12, np.abs(b["dy"])) * smoothstep(-0.55, -0.3, b["dx"]) * smoothstep(0.55, 0.3, b["dx"])
-    pore = smoothstep(0.2, 0.08, np.hypot(b["dx"] - 0.45, b["dy"]))
-    c = c * (1 + 0.16 * near * tube)[..., None] * (1 - 0.45 * near * pore)[..., None]
-    height += near * (0.5 * tube - 0.6 * pore)
+    # Lateral line: the scales along it each carry a short tube (a pale ridge with a dark pore); on smooth skin a row
+    # of pores.
+    if len(LATERAL_LINE) >= 2:
+        ll = interp(LATERAL_LINE, x)
+        near = smoothstep(0.004, 0.0015, np.abs(y - ll)) * (x > OP_X - 0.005) * (x < X1) * (1 - head_w)
+        if b is not None:
+            tube = smoothstep(0.32, 0.12, np.abs(b["dy"])) * smoothstep(-0.55, -0.3, b["dx"]) * smoothstep(0.55, 0.3, b["dx"])
+            pore = smoothstep(0.2, 0.08, np.hypot(b["dx"] - 0.45, b["dy"]))
+        else:
+            tube = near * 0
+            pore = (np.sin(x / 0.008 * 2 * np.pi) > 0.85) * smoothstep(0.0015, 0.0005, np.abs(y - ll))
+        c = c * (1 + 0.16 * near * tube)[..., None] * (1 - 0.45 * near * pore)[..., None]
+        height += near * (0.5 * tube - 0.6 * pore)
 
-    # Head details: the gape with pale lips, the maxilla, nostrils, the preopercle with its serrated edge, the gill
-    # cover's dark rear edge with a light rim, its spine, and the dark socket round the eye.
+    # Head details: the mouth's lips and crease, nostrils, the preopercle with its serrated edge, the gill cover's dark
+    # rear edge with a light rim, its spine, rays on its bone, the red gill membrane, the lips' folds and the upper jaw
+    # bone, the gill cover's plate, mottling, the dark socket round the eye.
     dm = polyline_distance(x, y, GAPE)
-    in_mouth = smoothstep(0.074, 0.066, x)
-    lips = smoothstep(0.0085, 0.0035, dm) * in_mouth
+    in_mouth = smoothstep(MOUTH_END + 0.006, MOUTH_END - 0.002, x)
+    lips = smoothstep(0.0085 * HS, 0.0035 * HS, dm) * in_mouth
     c = c * (1 - 0.3 * lips[..., None]) + np.array(LIP) * 0.3 * lips[..., None]
-    crease = 0.0007 + 0.0005 * smoothstep(0.04, 0.066, x)
+    crease = 0.0007 + 0.0005 * smoothstep(MOUTH_END - 0.028, MOUTH_END - 0.002, x)
     c *= (1 - 0.8 * smoothstep(crease + 0.0007, crease - 0.0002, dm) * in_mouth)[..., None]
     height -= 0.8 * smoothstep(0.0015, 0.0, dm) * in_mouth
     height += 0.5 * smoothstep(0.009, 0.004, dm) * smoothstep(0.0012, 0.003, dm) * in_mouth
-    c *= (1 - 0.35 * smoothstep(0.0014, 0.0005, polyline_distance(x, y, MAXILLA)))[..., None]
     for nx, ny in NOSTRILS:
-        pit = smoothstep(0.0028, 0.0012, np.hypot(x - nx, y - ny)) * smoothstep(0.3, 0.55, side)
+        pit = smoothstep(0.0028 * HS, 0.0012 * HS, np.hypot(x - nx, y - ny)) * smoothstep(0.3, 0.55, side)
         c *= (1 - 0.7 * pit)[..., None]
         height -= 0.6 * pit
     dp = polyline_distance(x, y, PREOPERCLE)
     c *= (1 - 0.3 * smoothstep(0.0018, 0.0006, dp))[..., None]
-    teeth = smoothstep(0.004, 0.0015, dp) * (np.sin((x + y) / 0.0035 * np.pi) > 0.7) * (y > 0.235)
-    c *= (1 - 0.3 * teeth)[..., None]
+    if SPECIES.get("serrated_preopercle", False):
+        teeth = smoothstep(0.004, 0.0015, dp) * (np.sin((x + y) / 0.0035 * np.pi) > 0.7) * (y > PREOP_MID_Y)
+        c *= (1 - 0.3 * teeth)[..., None]
     height -= 0.5 * smoothstep(0.002, 0.0, dp)
     do = polyline_distance(x, y, OPERCLE)
     behind = np.nan_to_num(x - ox, nan=-1)
     c *= (1 - 0.55 * smoothstep(0.0022, 0.0008, do) * (behind >= -0.001))[..., None]
     c *= (1 + 0.15 * smoothstep(0.005, 0.0015, do) * (behind < 0))[..., None]
-    spine = smoothstep(0.004, 0.0015, np.hypot((x - 0.258) / 1.8, y - 0.190))
-    c *= (1 - 0.7 * spine)[..., None]
-    # The gill cover's bone: fine rays fanning out from its joint, on its lower, scaleless part.
-    operc = (behind < 0) * smoothstep(0.155, 0.17, x) * smoothstep(0.19, 0.215, y)
-    ang = np.arctan2(y - 0.165, x - 0.185)
-    rays = 0.5 + 0.5 * np.sin(ang * 70 + 3 * np.sin(np.hypot(x - 0.185, y - 0.165) * 300))
+    if SPECIES.get("opercle_spine", False):
+        spine = smoothstep(0.004, 0.0015, np.hypot((x - SPINE[0]) / 1.8, y - SPINE[1]))
+        c *= (1 - 0.7 * spine)[..., None]
+    operc = (behind < 0) * smoothstep(PREOP_X, PREOP_X + 0.015, x) * smoothstep(OP_MID_Y - 0.02, OP_MID_Y + 0.005, y)
+    ox0, oy0 = OP_X - 0.07 * HS, OP_TOP[1] + 0.023 * HS
+    ang = np.arctan2(y - oy0, x - ox0)
+    rays = 0.5 + 0.5 * np.sin(ang * 70 + 3 * np.sin(np.hypot(x - ox0, y - oy0) * 300))
     c *= (1 + 0.07 * (rays - 0.5) * operc)[..., None]
     height += 0.25 * (rays - 0.5) * operc
-    # The red gill membrane showing under the lower rear edge of the gill cover.
-    membrane = smoothstep(0.0040, 0.0018, do) * (behind >= -0.0005) * smoothstep(0.22, 0.25, y)
+    membrane = smoothstep(0.0040, 0.0018, do) * (behind >= -0.0005) * smoothstep(OP_MID_Y + 0.01, OP_MID_Y + 0.04, y)
     c = c * (1 - 0.45 * membrane[..., None]) + np.array([0.70, 0.32, 0.28]) * 0.45 * membrane[..., None]
-    # The lips' folds and the upper jaw bone's outline as fine dark grooves; the bone a touch paler, catching light.
     for fold in (UPPER_LIP_FOLD, LOWER_LIP_FOLD, MAXILLA_EDGE):
-        groove = smoothstep(0.0016, 0.0005, polyline_distance(x, y, fold)) * smoothstep(0.5, 0.75, side)
-        c *= (1 - 0.14 * groove)[..., None]
-        height -= 0.6 * groove
+        if len(fold) >= 2:
+            groove = smoothstep(0.0016, 0.0005, polyline_distance(x, y, fold)) * smoothstep(0.5, 0.75, side)
+            c *= (1 - 0.14 * groove)[..., None]
+            height -= 0.6 * groove
     mxp = maxilla_mask(x, y) * smoothstep(0.5, 0.75, side)
-    c = c * (1 - 0.15 * mxp[..., None]) + np.array([0.60, 0.60, 0.46]) * 0.15 * mxp[..., None]
+    c = c * (1 - 0.15 * mxp[..., None]) + (np.array(CHEEK) * 1.4).clip(0, 1) * 0.15 * mxp[..., None]
     height += 0.3 * mxp
-    # The gill cover: a bronze plate, darker towards its rim.
-    plate = (behind < 0) * smoothstep(0.158, 0.17, x) * smoothstep(0.145, 0.16, y) * smoothstep(0.285, 0.27, y)
-    c = c * (1 - 0.25 * plate[..., None]) + np.array([0.46, 0.38, 0.20]) * 0.25 * plate[..., None]
-    c *= (1 - 0.25 * plate * smoothstep(0.012, 0.0, do))[..., None]
-    # Mottling on the crown and cheeks.
-    blot = np.asarray(Image.fromarray((rng.random((max(h // 40, 2), max(w // 40, 2))) * 255).astype(np.uint8))
-                      .resize((w, h), Image.BICUBIC)) / 255.0
-    fine = np.asarray(Image.fromarray((rng.random((max(h // 12, 2), max(w // 12, 2))) * 255).astype(np.uint8))
-                      .resize((w, h), Image.BICUBIC)) / 255.0
+    plate = (behind < 0) * smoothstep(PREOP_X + 0.003, PREOP_X + 0.015, x) * smoothstep(OP_TOP[1], OP_TOP[1] + 0.015, y) \
+        * smoothstep(OP_BOT[1] + 0.005, OP_BOT[1] - 0.01, y)
+    c *= (1 - 0.18 * plate * smoothstep(0.012, 0.0, do))[..., None]
+    blot = _noise(rng, h, w, 40)
+    fine = _noise(rng, h, w, 12)
     c *= (1 - 0.07 * head_w * (smoothstep(0.5, 0.85, blot) + smoothstep(0.55, 0.9, fine)))[..., None]
-    # Sensory pores: rows of small pits along the preopercle, under the eye and along the lower jaw.
-    pores = []
-    for px_, py_ in pores:
-        pit = smoothstep(0.0019, 0.0008, np.hypot(x - px_, y - py_)) * smoothstep(0.72, 0.88, side)
-        c *= (1 - 0.55 * pit)[..., None]
-        height -= 0.5 * pit
     de = np.hypot(x - EYE[0], y - EYE[1]) / EYE_R
     c *= (1 - 0.5 * smoothstep(1.0, 1.08, de) * smoothstep(1.45, 1.15, de))[..., None]
     height += 0.6 * smoothstep(1.0, 1.15, de) * smoothstep(1.5, 1.2, de)
 
     # A touch of mottling, and the dorsal ridge darker.
-    noise = np.asarray(Image.fromarray((rng.random((max(h // 16, 2), max(w // 16, 2))) * 255).astype(np.uint8)).resize((w, h), Image.BICUBIC)) / 255.0
+    noise = _noise(rng, h, w, 16)
     c *= (0.94 + 0.12 * noise)[..., None]
     c *= (1 - 0.25 * smoothstep(0.08, -0.05, rel))[..., None]
-    # The very front of the snout: every column of the skin meets at its tip, so it fades to one colour there.
+    # The very front of the snout: every column of the skin meets at its tip, so it blends round the body there.
     tip = smoothstep(X0 + 0.004, X0, x)[..., None]
     k = max(h // 12, 1)
     soft = np.cumsum(np.pad(c, ((k, k), (0, 0), (0, 0)), mode="wrap"), axis=0)
@@ -728,8 +781,10 @@ def eye_centre():
     """Where the right eye sits: in its socket on the side of the head (model space)."""
     yc = (interp(TOP, EYE[0]) + interp(BOTTOM, EYE[0])) / 2
     hh = (interp(BOTTOM, EYE[0]) - interp(TOP, EYE[0])) / 2
-    lat = half_width(EYE[0]) * math.sqrt(max(1 - ((EYE[1] - yc) / hh) ** 2, 0.05))
-    return model(np.array(EYE[0]), np.array(EYE[1]), np.array(lat - 0.0068))
+    u = min(abs(EYE[1] - yc) / hh, 0.97)
+    n = n_top(EYE[0]) if EYE[1] < yc else n_bottom(EYE[0])
+    lat = half_width(EYE[0]) * (1 - u ** n) ** (1 / n)       # the head's surface there (its superellipse section)
+    return model(np.array(EYE[0]), np.array(EYE[1]), np.array(lat - 0.33 * EYE_R))
 
 
 def build_eye(segments=40, rings=12):
@@ -759,6 +814,7 @@ def build_eye(segments=40, rings=12):
     return pos, nrm, np.array(uv, dtype=np.float32), idx
 
 
+
 def paint_eye(size=512):
     from PIL import Image
     yy, xx = np.mgrid[0:size, 0:size].astype(np.float64)
@@ -766,8 +822,8 @@ def paint_eye(size=512):
     ang = np.arctan2(yy - size / 2, xx - size / 2)
     rng = np.random.default_rng(3)
     streaks = np.interp(ang, np.linspace(-np.pi, np.pi, 90), rng.random(90))
-    gold = np.array([0.96, 0.76, 0.22]) * (0.75 + 0.35 * streaks)[..., None]
-    c = gold * (1 - smoothstep(0.62, 0.86, r))[..., None] + np.array([0.35, 0.28, 0.10]) * smoothstep(0.62, 0.86, r)[..., None]
+    iris = np.array(IRIS) * (0.75 + 0.35 * streaks)[..., None]
+    c = iris * (1 - smoothstep(0.62, 0.86, r))[..., None] + np.array(IRIS) * 0.38 * smoothstep(0.62, 0.86, r)[..., None]
     c = c * (1 - smoothstep(0.86, 0.95, r))[..., None] + np.array([0.10, 0.11, 0.07]) * smoothstep(0.86, 0.95, r)[..., None]
     pupil = smoothstep(0.46, 0.42, r)
     c = c * (1 - pupil[..., None]) + np.array([0.01, 0.01, 0.015]) * pupil[..., None]
@@ -775,20 +831,35 @@ def paint_eye(size=512):
     return Image.fromarray((np.clip(c, 0, 1) * 255).astype(np.uint8), "RGB")
 
 
-# ------------------------------------------------------------------ reference for the lake model
-SOURCES = [
-    ("File:Perche commune perca fluviatilis Alfort.jpg", "Jebulon", "CC0",
-     "https://commons.wikimedia.org/wiki/File:Perche_commune_perca_fluviatilis_Alfort.jpg"),
-    ("File:Perca fluviatilis - Perche commune - European perch Cropped.jpg", "Gilles San Martin", "CC BY-SA 2.5",
-     "https://commons.wikimedia.org/wiki/File:Perca_fluviatilis_-_Perche_commune_-_European_perch_Cropped.jpg"),
-    ("File:Perca fluviatilis Aquarium Liège 30012016 1.jpg", "Vassil", "CC0",
-     "https://commons.wikimedia.org/wiki/File:Perca_fluviatilis_Aquarium_Li%C3%A8ge_30012016_1.jpg"),
-]
+def write_textures(work, w=2048, h=1024):
+    """Textures for the Blender build: the unwrapped skin and its normal map, fins, iris, barbels."""
+    from PIL import Image
+    os.makedirs(work, exist_ok=True)
+    x, y, s, ds, side = unwrap_coords(w, h)
+    c, height = skin(x, y, s, side)
+    Image.fromarray((np.clip(c, 0, 1) * 255).astype(np.uint8), "RGB").save(os.path.join(work, "body_albedo.jpg"),
+                                                                          quality=92 if w > 2048 else 86)
+    k = 0.00062
+    dx = (X1 - X0) / w
+    gx = (np.roll(height, -1, axis=1) - np.roll(height, 1, axis=1)) * 0.5 / dx
+    gy = (np.roll(height, -1, axis=0) - np.roll(height, 1, axis=0)) * 0.5 / np.maximum(ds, 1e-6)
+    n = np.dstack([-gx * k, gy * k, np.ones_like(height)])
+    n /= np.linalg.norm(n, axis=2, keepdims=True)
+    Image.fromarray(((n * 0.5 + 0.5) * 255).astype(np.uint8), "RGB").resize((w // 2, h // 2), Image.LANCZOS) \
+        .save(os.path.join(work, "body_normal.jpg"), quality=88)
+    for name, spec in FINS.items():
+        paint_fin(name, spec).save(os.path.join(work, name + ".png"))
+    paint_eye(256 if w <= 2048 else 512).save(os.path.join(work, "iris.png"))
+    if SPECIES.get("barbels"):
+        col = np.array(SPECIES.get("barbel_colour", np.array(LIP) * 0.9))
+        img = np.ones((16, 64, 3)) * col
+        img *= (0.8 + 0.2 * np.linspace(0, 1, 64))[None, :, None]
+        Image.fromarray((img.clip(0, 1) * 255).astype(np.uint8), "RGB").save(os.path.join(work, "FinBarbels.png"))
+    print(f"textures in {work}")
 
 
 def write_reference(path):
-    """The same outline and colours for the lofted perch of the lake (FishReference), with the photos' credit."""
-    import json
+    """The same outline and colours for the lofted fish of the lake (FishReference), with the reference's credit."""
     xs = np.linspace(X0, X1, 32)
     up, down = (AXIS - interp(TOP, xs)) * DEPTH_SCALE, (interp(BOTTOM, xs) - AXIS) * DEPTH_SCALE
     meta = {
@@ -796,68 +867,26 @@ def write_reference(path):
         "outline": [[round(float(AXIS - u), 4), round(float(AXIS + d), 4)] for u, d in zip(up, down)],
         "profile": [[round(float(u), 4), round(float(d), 4)] for u, d in zip(up, down)],
         "palette": {"back": list(UPPER), "flank": list(MID), "belly": list(BELLY)},
-        "title": "; ".join(t for t, _, _, _ in SOURCES),
-        "author": "; ".join(a for _, a, _, _ in SOURCES),
-        "licence": "; ".join(lic for _, _, lic, _ in SOURCES),
-        "source": " ".join(u for _, _, _, u in SOURCES),
-        "credit": "Proporcje według ilustracji okonia z AtlasRyb.online; barwy według zdjęć: "
-                  + ", ".join(f"{a} ({lic})" for _, a, lic, _ in SOURCES) + ", Wikimedia Commons",
+        "author": SPECIES.get("credit_author", "AtlasRyb.online"), "licence": SPECIES.get("credit_licence", ""),
+        "source": SPECIES.get("credit_source", "https://atlasryb.online"),
+        "credit": SPECIES.get("credit", "Proporcje według ilustracji z AtlasRyb.online"),
     }
     json.dump(meta, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=0)
 
 
-# ------------------------------------------------------------------ main
 def main():
-    if sys.argv[1] == "--textures":
-        write_textures(sys.argv[2])
+    if sys.argv[1] == "--reference":
+        load_species(sys.argv[2])
+        write_reference(sys.argv[3])
         return
-    out = sys.argv[1]
-    preview = sys.argv[2] if len(sys.argv) > 2 else None
-    g = Glb()
-    pos, nrm, uv, idx = build_body()
-    albedo, normal = paint_body()
-    body_mat = g.material("Body", g.image(albedo, "body", jpeg=True), g.image(normal, "body_normal", jpeg=True), roughness=0.4)
-    mesh = g.mesh("Body", pos, nrm, uv, idx, body_mat)
-    g.doc["meshes"][mesh]["primitives"][0]["attributes"]["TANGENT"] = g._accessor(tangents(nrm), "VEC4", 34962)
-    g.node("Body", mesh)
-
-    for name, spec in FINS.items():
-        fpos, fuv, fidx = build_fin(spec)
-        tex = paint_fin(name, spec)
-        mat = g.material(name, g.image(tex, name), blend=True, roughness=0.45)
-        if preview:
-            tex.save(os.path.join(preview, name + ".png"))
-        if "splay" in spec or "droop" in spec:
-            # Paired fins: the right one, and the left one mirrored across the fish.
-            mirror = fpos * np.array([-1, 1, 1], dtype=np.float32)
-            both = np.vstack([fpos, mirror])
-            bidx = np.vstack([fidx, fidx[:, [0, 2, 1]] + len(fpos)])
-            m = g.mesh(name, both, vertex_normals(both, bidx), np.vstack([fuv, fuv]), bidx, mat)
-        else:
-            m = g.mesh(name, fpos, vertex_normals(fpos, fidx), fuv, fidx, mat)
-        g.node(name, m)
-
-    epos, enrm, euv, eidx = build_eye()
-    eye_tex = paint_eye()
-    eye_mat = g.material("Eye", g.image(eye_tex, "iris"), roughness=0.15)
-    em = g.mesh("EyeRight", epos, enrm, euv, eidx, eye_mat)
-    # The left eye is a mirrored copy (not a negative scale, which would light it inside out).
-    mirror = np.array([-1, 1, 1], dtype=np.float32)
-    eml = g.mesh("EyeLeft", epos * mirror, enrm * mirror, euv, eidx[:, [0, 2, 1]], eye_mat)
-    centre = eye_centre()
-    g.node("EyeRight", em, translation=centre)
-    g.node("EyeLeft", eml, translation=centre * np.array([-1, 1, 1]))
-
-    g.save(out, extras={"species": "okon", "eye_radius": EYE_R * 1.08 * DEPTH_SCALE,
-                        "sources": ["File:Perche commune perca fluviatilis Alfort.jpg",
-                                    "File:Perca fluviatilis - Perche commune - European perch Cropped.jpg",
-                                    "File:Perca fluviatilis Aquarium Liège 30012016 1.jpg"]})
-    write_reference(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(out))), "okon.json"))
-    if preview:
-        albedo.save(os.path.join(preview, "body.jpg"), quality=90)
-        normal.save(os.path.join(preview, "body_normal.png"))
-        eye_tex.save(os.path.join(preview, "eye.png"))
-    print(f"{out}: body {len(pos)} vertices, {os.path.getsize(out) // 1024} KB")
+    if sys.argv[1] == "--textures":
+        load_species(sys.argv[2])
+        size = int(sys.argv[4]) if len(sys.argv) > 4 else 2048
+        if size > 2048:
+            globals()["FIN_TEX"] = (640, 320)
+        write_textures(sys.argv[3], size, size // 2)
+        return
+    raise SystemExit(__doc__)
 
 
 if __name__ == "__main__":
