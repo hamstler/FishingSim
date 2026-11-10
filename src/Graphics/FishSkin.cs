@@ -217,18 +217,35 @@ public static class FishSkin
     {
         private readonly SkinStyle _s;
         private readonly Color _back, _belly, _fin, _sheen;
+        private readonly Color? _flank;        // the measured middle of the flank, when a real fish was measured
         private readonly float _flankH;        // physical height of the flank relative to the body length
         private readonly uint _seed;
 
         public Painter(FishSpecies sp, SkinStyle style)
         {
             _s = style;
-            _back = Vivid(sp.BackColor) * 0.9f;
-            _belly = Vivid(sp.BellyColor, 1.1f);
+            // Colours measured on a real fish of the species (FishReference) when there is one, a little richer so
+            // they read well in the game's light; otherwise the species' own colours.
+            // Measured colours are blended with the species' own, which steadies a photo's highlights and casts.
+            var reference = Fishing.FishReference.For(sp);
+            _back = Vivid(reference?.Back is { } back ? sp.BackColor.Lerp(back, 0.6f) : sp.BackColor, 1.2f) * 0.9f;
+            _belly = Vivid(reference?.Belly is { } belly ? sp.BellyColor.Lerp(belly, 0.6f) : sp.BellyColor, 1.1f);
+            _flank = reference?.Flank is { } flank ? Vivid(sp.BellyColor.Lerp(sp.BackColor, 0.4f).Lerp(flank, 0.6f), 1.2f) : null;
             _fin = Vivid(sp.FinColor, 1.4f);
             // Silvery fish shine cool white along the flank; others take a warm, golden glow from the belly colour.
-            _sheen = new Color(0.86f, 0.9f, 0.95f).Lerp(_belly.Lightened(0.15f), 1f - style.Silver);
-            _flankH = 1.3f * MathF.Max(sp.BodyDepth, 0.06f);
+            _sheen = new Color(0.86f, 0.9f, 0.95f).Lerp((_flank ?? _belly).Lightened(0.15f), 1f - style.Silver);
+            float depth = sp.BodyDepth;
+            if (reference != null)
+            {
+                float axis = reference.Axis;
+                depth = 0f;
+                for (int i = 0; i <= 40; i++)
+                {
+                    var (top, bottom) = reference.EdgesAt(i / 40f, axis);
+                    depth = MathF.Max(depth, top + bottom);
+                }
+            }
+            _flankH = 1.3f * MathF.Max(depth, 0.06f);
             _seed = (uint)Math.Abs(sp.SpeciesName.GetHashCode());
             var body = Fishing.FishBody.Of(sp);
             _eyeU = body.EyeAt;
@@ -248,11 +265,14 @@ public static class FishSkin
             float bump = 0f;
 
             // --- countershading: dark back, pale belly, a soft sheen along the flank ---
-            float t = Smooth(0.36f, 0.74f, v);
-            var c = _belly.Lerp(_back, t);
+            Color c;
+            if (_flank is { } flank)
+                c = v < 0.5f ? _belly.Lerp(flank, Smooth(0.14f, 0.46f, v)) : flank.Lerp(_back, Smooth(0.56f, 0.86f, v));
+            else
+                c = _belly.Lerp(_back, Smooth(0.36f, 0.74f, v));
             c = c.Darkened(Smooth(0.86f, 1f, v) * 0.18f);                        // dorsal ridge
             float sheenBand = MathF.Exp(-MathF.Pow((v - 0.5f) / 0.16f, 2f)) * (0.25f + 0.55f * _s.Silver);
-            c = c.Lerp(_sheen, sheenBand * 0.55f);
+            c = c.Lerp(_sheen, sheenBand * (_flank != null ? 0.25f : 0.55f));     // a measured flank already shines
             c = c.Lerp(_belly.Lightened(0.1f), Smooth(0.3f, 0f, v) * 0.4f);       // white throat and belly
 
             // --- head: smooth skin, darker crown, the gill cover as a raised plate, the eye socket, nostrils, mouth ---

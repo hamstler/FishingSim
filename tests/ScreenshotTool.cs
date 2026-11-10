@@ -278,7 +278,10 @@ public partial class ScreenshotTool : Node
             if (mode == 2)
             {
                 var carp = GD.Load<FishSpecies>("res://data/fish/karp.tres");
-                rod.ForceLand(GD.Load<FishSpecies>($"res://data/fish/{(arg > 0 ? FishingSim.Data.SpeciesCatalog.Paths[arg].GetFile().GetBaseName() : "karp")}.tres"), arg > 0 ? 1.2f : 4.7f);
+                // FISHSIM_SHOT_WEIGHT sets the landed fish's weight (to compare a small and a big one).
+                float landed = float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_WEIGHT"), System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out float wanted) ? wanted : arg > 0 ? 1.2f : 4.7f;
+                rod.ForceLand(GD.Load<FishSpecies>($"res://data/fish/{(arg > 0 ? FishingSim.Data.SpeciesCatalog.Paths[arg].GetFile().GetBaseName() : "karp")}.tres"), landed);
                 // Wait for the detailed skin painted in the background.
                 for (int i = 0; i < 600 && !(rod.HeldFishModel?.HasDetailedSkin ?? true); i++)
                     await NextFrame();

@@ -125,10 +125,13 @@ public partial class FirstPersonBody : Node3D
         var crankCentre = new Vector3(0.1f, 0.1f, -0.065f);
         var knob = crankCentre + new Vector3(0f, MathF.Sin(_crank) * 0.03f, MathF.Cos(_crank) * 0.03f - 0.025f);
         var leftAt = LeftRest.Lerp(ToLocal(_rig.ToGlobal(knob)), _leftOnReel);
-        // Holding the catch: the left hand grips the fish just behind its head.
+        // Holding the catch: the left hand supports the fish from below, under the belly behind the head, so the
+        // fish itself stays in view.
         var held = HeldFishSource?.Invoke();
         _leftOnFish = Mathf.MoveToward(_leftOnFish, held != null ? 1f : 0f, dt * 6f);
-        if (held != null)
+        if (held is FishModel fm)
+            _lastFishGrip = ToLocal(fm.ToGlobal(new Vector3(0f, -0.5f * fm.MaxHeight, 0.12f * fm.Length))) + new Vector3(0f, -0.02f, 0f);
+        else if (held != null)
             _lastFishGrip = ToLocal(held.GlobalPosition) + new Vector3(0.02f, -0.03f, 0.02f);
         leftAt = leftAt.Lerp(_lastFishGrip, _leftOnFish);
         _leftHand.Position = leftAt;

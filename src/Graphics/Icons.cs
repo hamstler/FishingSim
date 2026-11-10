@@ -293,37 +293,26 @@ public static class Icons
     });
 
     // ------------------------------------------------------------------ fish
-    /// <summary>
-    /// The species side-on: its real photograph when there is one (assets/fish, scaled into a 128 px tile), otherwise
-    /// drawn with its painted skin (FishSkin), fins and eye.
-    /// </summary>
-    public static ImageTexture Fish(FishSpecies sp)
-    {
-        string key = "photo:" + sp.SpeciesName;
-        if (Cache.TryGetValue(key, out var cached))
-            return cached;
-        if (Fishing.PhotoFish.For(sp) is { } photo)
-        {
-            var img = (Image)photo.Image.Duplicate();
-            img.ClearMipmaps();
-            const int size = 128;
-            int w = size, h = Math.Max((int)(size * photo.Aspect), 8);
-            img.Resize(w, h, Image.Interpolation.Lanczos);
-            var tile = Image.CreateEmpty(size, size, false, Image.Format.Rgba8);
-            tile.Fill(new Color(0, 0, 0, 0));
-            tile.BlendRect(img, new Rect2I(0, 0, w, h), new Vector2I(0, (size - h) / 2));
-            var tex = ImageTexture.CreateFromImage(tile);
-            Cache[key] = tex;
-            return tex;
-        }
-        return PaintedFish(sp);
-    }
-
-    private static ImageTexture PaintedFish(FishSpecies sp) => Cached("fish:" + sp.SpeciesName, c =>
+    /// <summary>The species drawn side-on with its painted skin (FishSkin), fins and eye, in its measured outline when
+    /// a real fish of the species was measured (FishReference).</summary>
+    public static ImageTexture Fish(FishSpecies sp) => Cached("fish:" + sp.SpeciesName, c =>
     {
         var skin = FishSkin.For(sp).GetImage();
+        var reference = Fishing.FishReference.For(sp);
+        float axis = reference?.Axis ?? 0f;
         float depth = Math.Clamp(sp.BodyDepth, 0.07f, 0.45f);
         float bodyLen = 46f, h = MathF.Max(bodyLen * depth, 5f);
+        float pxPerLength = reference != null ? bodyLen / reference.BodyLength : 0f;
+        if (reference != null)
+        {
+            float deepest = 0f;
+            for (int i = 0; i <= 40; i++)
+            {
+                var (tp, bt) = reference.EdgesAt(i / 40f, axis);
+                deepest = MathF.Max(deepest, tp + bt);
+            }
+            h = MathF.Max(deepest * pxPerLength, 5f);
+        }
         float x0 = 6f, cy = 32f;
         var fin = FishSkin.Vivid(sp.FinColor, 1.5f);
         // Tail and fins first, the body is drawn over them.
@@ -338,11 +327,20 @@ public static class Icons
             for (int x = (int)x0; x <= x0 + bodyLen; x++)
             {
                 float u = (x - x0) / bodyLen;                                  // 0 nose, 1 tail
-                float profile = MathF.Pow(MathF.Sin(MathF.PI * MathF.Pow(Math.Clamp(u, 0.001f, 1f), 0.75f)), 0.8f) * 0.88f + 0.12f * u;
-                float half = h * 0.5f * profile;
-                if (MathF.Abs(y - cy) > half)
+                float upper, lower;
+                if (reference != null)
+                {
+                    var (tp, bt) = reference.EdgesAt(u, axis);
+                    (upper, lower) = (tp * pxPerLength, bt * pxPerLength);
+                }
+                else
+                {
+                    float profile = MathF.Pow(MathF.Sin(MathF.PI * MathF.Pow(Math.Clamp(u, 0.001f, 1f), 0.75f)), 0.8f) * 0.88f + 0.12f * u;
+                    upper = lower = h * 0.5f * profile;
+                }
+                if (y < cy - upper || y > cy + lower)
                     continue;
-                float v = (y - (cy - half)) / MathF.Max(2f * half, 1f);       // 0 back, 1 belly
+                float v = (y - (cy - upper)) / MathF.Max(upper + lower, 1f);   // 0 back, 1 belly
                 int sw = skin.GetWidth(), sh = skin.GetHeight();
                 var col = skin.GetPixel(Math.Clamp((int)(u * (sw - 1)), 0, sw - 1), Math.Clamp((int)(v * (sh - 1)), 0, sh - 1));
                 c.Px(x, y, col);

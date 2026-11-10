@@ -253,7 +253,7 @@ public partial class FishAtlas : Control
             + $"Skup: {sp.PricePerKg:0} gr/kg   ·   siła w holu: {Stars(sp.PullFactor, 0.4f, 1.7f)}   ·   waleczność: {Stars(sp.Aggression, 0.3f, 0.9f)}\n"
             + $"{GameUI.SpeciesTips(sp)}\n"
             + $"Łowiska: {(homes.Count > 0 ? string.Join(", ", homes) : "-")}"
-            + (Fishing.PhotoFish.For(sp) is { } photo ? $"\n{photo.Credit}" : "");
+            + (Fishing.FishReference.For(sp) is { } reference ? $"\n{reference.Credit}" : "");
         if (_profile != null)
         {
             int n = _profile.CatchCounts.GetValueOrDefault(sp.SpeciesName);

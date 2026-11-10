@@ -44,15 +44,14 @@ public sealed class GearSuite : ITestSuite
             $"{catalogue.Count} species load, all with unique names");
         var undescribed = catalogue.Where(s => s.LatinName == "" || s.Description.Length < 40).Select(s => s.SpeciesName).ToList();
         t.Check(undescribed.Count == 0, $"every species has a Latin name and an atlas description {string.Join(", ", undescribed)}");
-        // Painted fish models (used where there is no photograph): every species has its own build and eyes in
-        // proportion to the head.
+        // Fish models: every species has its own build and eyes in proportion to the head.
         var oversizedEyes = new List<string>();
         var builds = new Dictionary<string, (float H, float W)>();
         foreach (var sp in catalogue)
         {
             foreach (bool detailed in new[] { false, true })
             {
-                var m = FishingSim.Fishing.FishModel.Create(sp, sp.MinWeight, detailed, painted: true);
+                var m = FishingSim.Fishing.FishModel.Create(sp, sp.MinWeight, detailed);
                 if (m.EyeDiameter > 0.62f * m.HeadHeightAtEye || m.EyeDiameter > 0.12f * m.Length)
                     oversizedEyes.Add($"{sp.SpeciesName} {m.EyeDiameter * 1000f:0.0} mm / head {m.HeadHeightAtEye * 1000f:0.0} mm");
                 if (!detailed)
@@ -83,28 +82,45 @@ public sealed class GearSuite : ITestSuite
         var pupil = iris.GetPixel(128, 128);
         var irisRing = iris.GetPixel(128 + 85, 128);
         t.Check(pupil.R < 0.05f && irisRing.R > irisRing.B * 2f, "a roach's eye: black pupil in a red iris");
-        var close = FishingSim.Fishing.FishModel.Create(perch, 0.5f, detailed: true, painted: true);
+        var close = FishingSim.Fishing.FishModel.Create(perch, 0.5f, detailed: true);
         int shaded = close.FindChildren("*", nameof(MeshInstance3D), true, false).OfType<MeshInstance3D>().Count(m => m.MaterialOverride is ShaderMaterial);
         t.Check(shaded >= 6, $"a close-up perch swims with its body and {shaded - 1} fins bending together (shader materials)");
         close.Free();
 
-        // Photo fish: species with a cut-out photograph in assets/fish are built from it.
-        var photographed = catalogue.Where(FishingSim.Fishing.PhotoFish.Has).ToList();
-        if (photographed.Count > 0)
+        // Measured species: the painted model follows the side view of a real fish (FishReference) and is credited.
+        var measured = catalogue.Where(FishingSim.Fishing.FishReference.Has).ToList();
+        t.Check(measured.Count >= 15, $"{measured.Count} species are lofted to the outline of a real fish");
+        if (measured.Count > 0)
         {
-            var psp = photographed[0];
-            var photo = FishingSim.Fishing.PhotoFish.For(psp)!;
-            var pm = FishingSim.Fishing.FishModel.Create(psp, psp.MaxWeight * 0.5f, detailed: true);
-            int meshes = pm.FindChildren("*", nameof(MeshInstance3D), true, false).Count;
-            t.Check(pm.IsPhoto && meshes == 2 && photo.Outline.Count >= 64 && photo.Credit.Contains(photo.Licence) && photo.Author != "",
-                $"{photographed.Count} species are built from real photographs ({psp.SpeciesName}: body + fin card, credited to {photo.Author}, {photo.Licence})");
-            pm.SetUnderwater(new Color(0.7f, 0.8f, 0.8f), 0.5f);
-            t.Check(pm.FindChildren("*", nameof(MeshInstance3D), true, false).OfType<MeshInstance3D>()
-                    .All(m => m.MaterialOverride is ShaderMaterial sm && sm.Shader.ResourcePath.EndsWith("fish_underwater.gdshader")),
-                "a photo fish in the lake is drawn see-through, tinted by the water");
-            pm.Free();
-            t.Check(FishingSim.Graphics.Icons.Fish(psp).GetWidth() == 128, "its icon is the photograph");
+            var off = new List<string>();
+            foreach (var msp in measured)
+            {
+                var r = FishingSim.Fishing.FishReference.For(msp)!;
+                float axis = r.Axis, deepest = 0f;
+                for (int i = 0; i <= 60; i++)
+                {
+                    var (top, bottom) = r.EdgesAt(i / 60f, axis);
+                    deepest = MathF.Max(deepest, top + bottom);
+                }
+                float mid = MathF.Sqrt(msp.MinWeight * msp.MaxWeight);
+                var mm = FishingSim.Fishing.FishModel.Create(msp, mid, false);
+                float want = deepest * FishingSim.Fishing.FishModel.Proportions(FishingSim.Fishing.FishModel.Growth(msp, mid)).Depth;
+                if (MathF.Abs(mm.MaxHeight / mm.Length - want) > want * 0.08f || r.Author == "" || !r.Credit.Contains(r.Licence))
+                    off.Add($"{msp.SpeciesName} {mm.MaxHeight / mm.Length:0.000} vs {want:0.000}");
+                mm.Free();
+            }
+            t.Check(off.Count == 0, $"their depth matches the measured fish, and the photographer is credited {string.Join(", ", off)}");
         }
+        // Growth: a heavy fish is deeper and thicker for its length than a young one, which has bigger eyes.
+        var growCarp = catalogue.First(sp => sp.SpeciesName == "Karp");
+        var young = FishingSim.Fishing.FishModel.Create(growCarp, growCarp.MinWeight, false);
+        var grown = FishingSim.Fishing.FishModel.Create(growCarp, growCarp.MaxWeight, false);
+        t.Check(grown.Length > young.Length * 1.5f && grown.MaxHeight / grown.Length > young.MaxHeight / young.Length * 1.12f
+                && grown.MaxWidth / grown.Length > young.MaxWidth / young.Length * 1.2f
+                && young.EyeDiameter / young.Length > grown.EyeDiameter / grown.Length * 1.1f,
+            $"a carp grows with its weight: {young.Length:0.00} m slim young fish, {grown.Length:0.00} m deep, thick old one (H/L {young.MaxHeight / young.Length:0.000} -> {grown.MaxHeight / grown.Length:0.000})");
+        young.Free();
+        grown.Free();
 
         var homeless = catalogue.Where(s => maps.All(m => m.AbundanceOf(s.SpeciesName) <= 0f)).Select(s => s.SpeciesName).ToList();
         t.Check(homeless.Count == 0, $"every species lives on at least one map {string.Join(", ", homeless)}");

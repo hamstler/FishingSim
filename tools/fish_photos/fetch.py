@@ -5,7 +5,8 @@ candidate thumbnails for picking. One API request per species (search + image in
 and retried politely (Wikimedia rate-limits shared addresses). Writes candidates.json next to the downloads.
 
 Usage: python3 tools/fish_photos/fetch.py search <species.json> <out_dir> [ids...]
-       python3 tools/fish_photos/fetch.py previews <out_dir> [per_species]   (330 px previews of the best-ranked)
+       python3 tools/fish_photos/fetch.py previews <out_dir> [per_species [ids...]]   (330 px previews of the best-ranked)
+       python3 tools/fish_photos/fetch.py more <out_dir> <id> <term>...   (more candidates from other terms)
        python3 tools/fish_photos/fetch.py download <out_dir> <picks.json>   (picks: {"species_id": [candidate indices]})
 """
 import json
@@ -167,10 +168,11 @@ def score(c):
     return s
 
 
-def previews(out_dir, per_species=5):
+def previews(out_dir, per_species=5, only=()):
     """Small (330 px) previews of the best-ranked candidates, for picking by eye."""
     found = json.load(open(os.path.join(out_dir, "candidates.json"), encoding="utf-8"))
     order = [s for s in PRIORITY if s in found] + [s for s in found if s not in PRIORITY]
+    order = [s for s in order if not only or s in only]
     for sid in order:
         ranked = sorted(range(len(found[sid])), key=lambda i: -score(found[sid][i]))[:per_species]
         for i in ranked:
@@ -187,9 +189,29 @@ def previews(out_dir, per_species=5):
             time.sleep(3)
 
 
+def more(out_dir, sid, terms):
+    """Adds the results of other search terms to a species' candidates (new ones get the next indices)."""
+    cand_path = os.path.join(out_dir, "candidates.json")
+    found = json.load(open(cand_path, encoding="utf-8"))
+    have = found.setdefault(sid, [])
+    seen = {c["title"] for c in have}
+    for term in terms:
+        print(f"{sid}: searching '{term}'", flush=True)
+        for c in search(term):
+            if c["title"] not in seen:
+                seen.add(c["title"])
+                have.append(c)
+        time.sleep(8)
+    json.dump(found, open(cand_path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    print(f"{sid}: {len(have)} candidates", flush=True)
+
+
 def main():
+    if sys.argv[1] == "more":
+        more(sys.argv[2], sys.argv[3], sys.argv[4:])
+        return
     if sys.argv[1] == "previews":
-        previews(sys.argv[2], int(sys.argv[3]) if len(sys.argv) > 3 else 5)
+        previews(sys.argv[2], int(sys.argv[3]) if len(sys.argv) > 3 else 5, set(sys.argv[4:]))
         return
     if sys.argv[1] == "search":
         search_all(sys.argv[2], sys.argv[3], set(sys.argv[4:]))

@@ -12,15 +12,13 @@ uniform float metallic = 0.2;
 uniform float roughness = 0.32;
 uniform float clearcoat = 0.6;
 uniform float clearcoat_roughness = 0.16;
-// Photographs already contain light: they are dimmed so the scene's light does not burn them out.
-uniform float albedo_scale = 1.0;
 
 void vertex() {
 	VERTEX = fish_bend(VERTEX, TIME);
 }
 
 void fragment() {
-	ALBEDO = texture(albedo_tex, UV).rgb * albedo_scale;
+	ALBEDO = texture(albedo_tex, UV).rgb;
 	METALLIC = metallic;
 	SPECULAR = 0.6;
 	ROUGHNESS = roughness;

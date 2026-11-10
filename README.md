@@ -14,6 +14,8 @@
 
 **Ryby z bliska:** ryba na haku, w dłoni i w atlasie ma skórę 4096×2048 z mapą wypukłości łusek, płetwy malowane promień po promieniu (przezroczysta błona, postrzępiona krawędź, wzory gatunku: czarna plama okonia, cętki szczupaka, białe krawędzie płetw pstrąga, żagiel lipienia), szparę pyska z wargami, nozdrza, wypukłą pokrywę skrzelową, oczodół i oko z kolorową tęczówką pod błyszczącą rogówką. Całe ciało z płetwami wygina się jedną falą podczas pływania (shadery `fish_body`/`fish_fin`).
 
+**Ryby według prawdziwych okazów:** kształt ciała i barwy (grzbiet, bok, brzuch) części gatunków są zmierzone na wolnych zdjęciach z Wikimedia Commons (`assets/fish`, narzędzia w `tools/fish_photos`), a ryba nadal jest malowana w stylu gry; same zdjęcia nie trafiają do gry, autorzy są w `assets/fish/CREDITS.md` i w atlasie. **Ryba rośnie z wagą:** cięższa jest dłuższa, wyższa i grubsza, młoda smukła z większymi oczami, a złowioną rybę trzymasz w prawdziwej wielkości.
+
 **Tekstury QHD:** tekstury świata mają 1024 px na 2 m i filtrowanie anizotropowe; malują się wielowątkowo i są zapisywane w pamięci podręcznej (`user://texcache`). Okno startuje zmaksymalizowane, a świat renderuje się w natywnej rozdzielczości.
 
 **Minimalistyczny interfejs:** podczas zwykłego rozglądania na ekranie jest tylko mała kropka celownika. Stan wędki i cienki pasek napięcia pojawiają się w trakcie łowienia, sakiewka i siatka na chwilę po zmianie, a sprzęt na chwilę po przełączeniu. Tab pokazuje wszystko naraz, H sterowanie.
@@ -34,7 +36,7 @@ Symulator wędkarski w Godot 4.3 (.NET) napisany w całości w C#. Poza kodem s�
 | PPM (przytrzymaj) | podniesienie wędki: zacięcie przy braniu, pompowanie w holu, a gdy ryba jest przy brzegu, podciąganie jej do góry. Ryba jest złowiona, gdy dotknie wędkarza; ciężka zerwie przy tym linkę |
 | Spacja | kasarek (podbierak): wyjmuje rybę przy brzegu. Trzeba go kupić; bez kasarka Spacja nic nie robi |
 | Kółko myszy | hamulec (wartość w procentach w prawym dolnym rogu) |
-| R (zaraz po złowieniu) | wypuszczenie ryby (zwalnia miejsce w siatce, +3 XP) |
+| E / R (zaraz po złowieniu) | ryba do siatki / do wody (+3 XP) |
 | 1-5 (Shift = wstecz) | wędka, kołowrotek, żyłka, hak, przynęta (tylko przed rzutem) |
 | I / M / J / T | ekwipunek, mapa, dziennik, turnieje |
 | E | wejście do kramu, gildii, na targ lub na postój wozów (przy drzwiach budynku) |

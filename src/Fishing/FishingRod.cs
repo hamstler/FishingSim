@@ -632,7 +632,7 @@ public partial class FishingRod : Node3D
         if (Gear?.Has(AccessoryKind.RodPod) == true)
             SoundCue?.Invoke(Core.Audio.OneShot.Bell, 1f);
         _pulseTimer = 0f;
-        if (CurrentSpecies != null && !PhotoFish.Has(CurrentSpecies))
+        if (CurrentSpecies != null)
             Graphics.FishSkin.Prewarm(CurrentSpecies);     // paint the close-up skin while the float twitches
         SetState(RodState.Nibble);
     }
@@ -981,12 +981,15 @@ public partial class FishingRod : Node3D
     private void ShowHeldFish(FishSpecies species, float weight)
     {
         ClearHeldFish();
+        // Held up side-on above the catch panel, like a photo of the catch, at its real size: a bigger, heavier fish
+        // fills more of the view (only a giant is held further off so it still fits).
         var model = FishModel.Create(species, weight, detailed: true);
-        float fit = MathF.Min(1f, 0.55f / model.Length);
+        float fit = MathF.Min(1f, 1.15f / model.Length);
+        float shown = model.Length * fit, distance = Math.Clamp(0.42f + 0.32f * shown, 0.42f, 0.8f);
         model.Scale = new Vector3(fit, fit, fit);
         model.Wiggle = 0.25f;
-        model.Position = new Vector3(-0.1f, -0.26f, -0.62f);
-        model.RotationDegrees = new Vector3(-6f, -75f, 10f);
+        model.Position = new Vector3(0.02f, 0.1f * distance / 0.6f, -distance);
+        model.RotationDegrees = new Vector3(-4f, -80f, 6f);
         _camera.AddChild(model);
         _heldFish = model;
     }

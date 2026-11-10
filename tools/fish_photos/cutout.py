@@ -148,7 +148,12 @@ def segment_isnet(img, model, box_frac=None, opening=5):
     whole = ~flood_from_border(mask)
     holes = Image.fromarray((whole & ~mask).astype(np.uint8) * 255).filter(ImageFilter.MaxFilter(3)).resize(img.size, Image.BILINEAR)
     # Stray blobs away from the fish are dropped; holes inside it (silver highlights) are filled.
-    soft_arr = np.asarray(soft).astype(np.float32) * (np.asarray(keep) / 255.0)
+    # The model's edge is a little wider than the fish: the faint outer fringe (background, not fish) is cut and the
+    # rest stretched, so see-through fins stay soft but no background halo is left.
+    soft_arr = np.clip((np.asarray(soft).astype(np.float32) - 50.0) * (255.0 / 155.0), 0, 255)
+    soft_arr = soft_arr * (np.asarray(keep) / 255.0)
+    # Upscaled from the model's 1024 px, the edge also sits a pixel or two outside the fish: pulled in.
+    soft_arr = np.asarray(Image.fromarray(soft_arr.astype(np.uint8)).filter(ImageFilter.MinFilter(5))).astype(np.float32)
     filled = np.maximum(soft_arr, np.asarray(holes).astype(np.float32))
     return whole, small.size, Image.fromarray(filled.clip(0, 255).astype(np.uint8))
 
@@ -285,8 +290,8 @@ def main():
         rgba.putalpha(a)
     h = int(round(rgba.height * OUT_WIDTH / rgba.width))
     rgba = rgba.resize((OUT_WIDTH, h), Image.LANCZOS)
-    # A soft model edge keeps the real colour of see-through fins; only the faint fringe is replaced.
-    rgba = bleed(rgba, solid=235 if soft is None else 96)
+    # The edge pixels take the colour of the solid fish next to them, so no background tint is left at the rim.
+    rgba = bleed(rgba, solid=235 if soft is None else 200)
     rgba.save(f"{out_dir}/{sid}.webp", quality=92, alpha_quality=100, method=6)
 
     # Body outline (fins removed) at 128 points, in image fractions.
