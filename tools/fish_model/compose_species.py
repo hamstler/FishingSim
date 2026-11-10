@@ -238,7 +238,7 @@ def compose(sid, data, measure_dir, tpl):
             base = [[x, float(interp(top, x)) if sign < 0 else float(interp(bottom, x))] for x, _ in base]
             tips = [[x + 0.01, y + sign * h * min(1, (x - a) / 0.05)] for x, y in base]
             return dict(base=base, tips=tips, rays=rays, kind="soft")
-        fins = {"FinDorsal1": ribbon(0.33, 0.955, 0.016, -1, 60), "FinAnal": ribbon(0.45, 0.955, 0.014, 1, 50)}
+        fins = {"FinDorsal1": ribbon(0.31, 0.955, 0.024, -1, 60), "FinAnal": ribbon(0.44, 0.955, 0.02, 1, 50)}
         fins["FinCaudal"] = dict(base=[[0.955, -0.008], [0.957, 0.0], [0.955, 0.008]],
                                  tips=[[0.975, -0.022], [0.995, -0.01], [1.0, 0.0], [0.995, 0.01], [0.975, 0.02]],
                                  rays=12, kind="caudal")

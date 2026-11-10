@@ -78,7 +78,10 @@ public partial class ScreenshotTool : Node
             root3d.AddChild(new DirectionalLight3D { RotationDegrees = new Vector3(-40, 35, 0), LightEnergy = 1.6f, ShadowEnabled = true });
             root3d.AddChild(new DirectionalLight3D { RotationDegrees = new Vector3(-15, -150, 0), LightEnergy = 0.7f, LightColor = new Color(0.65f, 0.8f, 1f) });
             var sp = GD.Load<FishSpecies>(FishingSim.Data.SpeciesCatalog.Paths[Math.Clamp(arg, 0, FishingSim.Data.SpeciesCatalog.Paths.Length - 1)]);
+            var watch = System.Diagnostics.Stopwatch.StartNew();
             var fish = FishModel.Create(sp, sp.MinWeight + (sp.MaxWeight - sp.MinWeight) * 0.5f, detailed: true);
+            if (System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_DEBUG") == "1")
+                GD.Print($"close-up model built in {watch.ElapsedMilliseconds} ms");
             float sc = 1f / fish.Length;
             fish.Scale = new Vector3(sc, sc, sc);
             fish.RotationDegrees = new Vector3(0, 90, 0);
@@ -99,6 +102,10 @@ public partial class ScreenshotTool : Node
                 await NextFrame();
             GetViewport().GetTexture().GetImage().SavePng(output.Replace(".png", "_head.png"));
             GD.Print($"saved {output} (detailed skin {fish.HasDetailedSkin})");
+            if (System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_DEBUG") == "1")
+                foreach (var n in fish.FindChildren("*", "MeshInstance3D", true, false))
+                    if (n is MeshInstance3D mi)
+                        GD.Print($"  {mi.Name} pos {mi.Position} scale {mi.Scale} aabb {mi.GetAabb()} mat {mi.MaterialOverride?.GetType().Name}");
             GetTree().Quit();
             return;
         }

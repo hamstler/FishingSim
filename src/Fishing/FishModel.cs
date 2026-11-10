@@ -24,6 +24,7 @@ public partial class FishModel : Node3D
     private Node3D? _tail;
     private float _time;
     private Vector3 _eyeScale = Vector3.One;
+    private float _widthK = 1f;
     private bool _detailed;
     private FishSpecies? _species;
     private StandardMaterial3D? _bodyMaterial;
@@ -489,7 +490,12 @@ public partial class FishModel : Node3D
         // Eyes keep their round shape (undo the unequal scale) and are relatively bigger on young fish, never bigger
         // than the head allows.
         float eyeFit = 0.6f * eyeHead * depthK / MathF.Max(2f * eyeRadius, 1e-5f);
+        // A hand-built model's eye fills its socket: it may grow smaller on a big fish, never bigger than the socket
+        // (a bigger one would run under the socket's rim).
+        if (asset != null)
+            eyeFit = MathF.Min(eyeFit, 1f);
         _eyeScale = new Vector3(1f / widthK, 1f / depthK, 1f) * MathF.Min(eyeK, eyeFit);
+        _widthK = widthK;
         EyeDiameter = eyeRadius * 2f * Length * _eyeScale.Y * depthK;
         HeadHeightAtEye = eyeHead * Length * depthK;
         MaxHeight = (asset?.MaxHeight ?? shape!.MaxHeight) * Length * depthK;
@@ -597,27 +603,34 @@ public partial class FishModel : Node3D
             unit.AddChild(mi);
             Swimmer(mi);
         }
-        var eyeMaterial = new StandardMaterial3D
+        // Eyes and corneas sway with the head (shaders/fish_eye, fish_cornea share the body's swimming wave).
+        _eyeShader ??= GD.Load<Shader>("res://shaders/fish_eye.gdshader");
+        _corneaShader ??= GD.Load<Shader>("res://shaders/fish_cornea.gdshader");
+        // Sideways the eye grows with the head (its socket deepens with a thicker fish, so the eye keeps standing out of
+        // it as built); round across its face, as big as the growth makes it.
+        var eyeScale = new Vector3(_eyeScale.X * _widthK, _eyeScale.Y, _eyeScale.Z);
+        void Eye(Mesh mesh, Vector3 position, Shader shader)
         {
-            // The iris is satin; the gloss is the cornea's over it (two glossy layers made a white, glassy eye).
-            AlbedoTexture = asset.Iris,
-            TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
-            Roughness = 0.4f,
-            Metallic = 0.25f,
-            MetallicSpecular = 0.4f,
-            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-        };
-        foreach (var (mesh, position) in asset.Eyes)
-            unit.AddChild(new MeshInstance3D { Mesh = mesh, MaterialOverride = eyeMaterial, Position = position, Scale = _eyeScale });
-        foreach (var (mesh, position) in asset.Corneas)
-            unit.AddChild(new MeshInstance3D
+            var m = new ShaderMaterial { Shader = shader };
+            if (asset.Iris != null)
+                m.SetShaderParameter("iris_tex", asset.Iris);
+            m.SetShaderParameter("eye_origin", position);
+            m.SetShaderParameter("eye_scale", eyeScale);
+            var mi = new MeshInstance3D
             {
-                Mesh = mesh, MaterialOverride = CorneaMaterial, Position = position, Scale = _eyeScale,
-                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-            });
+                Mesh = mesh, MaterialOverride = m, Position = position, Scale = eyeScale,
+                CastShadow = shader == _corneaShader ? GeometryInstance3D.ShadowCastingSetting.Off : GeometryInstance3D.ShadowCastingSetting.On,
+            };
+            unit.AddChild(mi);
+            Swimmer(mi);
+        }
+        foreach (var (mesh, position) in asset.Eyes)
+            Eye(mesh, position, _eyeShader);
+        foreach (var (mesh, position) in asset.Corneas)
+            Eye(mesh, position, _corneaShader);
     }
 
-    private static Shader? _bodyShader, _finShader;
+    private static Shader? _bodyShader, _finShader, _eyeShader, _corneaShader;
     private ShaderMaterial? _bodyShaderMaterial;
     private readonly List<GeometryInstance3D> _swimmers = new();
     private float _sentWiggle = -1f;

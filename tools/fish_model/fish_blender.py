@@ -112,7 +112,7 @@ def clear_material(name):
     return m
 
 
-def ray_tubes(grid, uvg, radius, reach=0.0, sides=6):
+def ray_tubes(grid, uvg, radius, reach=0.0, sides=6, taper=0.75):
     """Each ray as a tube along the membrane, tapering to its tip (which may reach past the membrane's edge)."""
     n, m, _ = grid.shape
     pos, uv, faces = [], [], []
@@ -131,7 +131,7 @@ def ray_tubes(grid, uvg, radius, reach=0.0, sides=6):
             nf = np.cross(d, across)
             nf /= max(np.linalg.norm(nf), 1e-9)
             b = np.cross(d, nf)
-            r = radius * (1.0 - 0.75 * k / max(k_n - 1, 1))
+            r = radius * (1.0 - taper * k / max(k_n - 1, 1))
             if reach > 0 and k == k_n - 1:
                 r = radius * 0.05
             for q in range(sides):
@@ -194,7 +194,7 @@ def build(work):
         radius = RAY_RADIUS.get(spec["kind"], 0.001) * P.HS ** 0.5
         if radius > 0:
             reach = 0.12 if spec["kind"] == "spiny" else (0.2 if spec["kind"] == "spines" else 0.0)
-            rpos, ruv, rfaces = ray_tubes(grid, uvg, radius, reach=reach)
+            rpos, ruv, rfaces = ray_tubes(grid, uvg, radius, reach=reach, taper=0.92 if spec["kind"] == "spines" else 0.75)
             rays = make_object(name + "Rays", rpos, ruv, rfaces, mat, recalc=False)
             join(fin, [rays])
         if "splay" in spec or "droop" in spec:
@@ -257,7 +257,7 @@ def build(work):
     eye_mat = material("Eye", iris, roughness=0.15)
     cornea_mat = clear_material("Cornea")
     for side, sign in (("Right", 1.0), ("Left", -1.0)):
-        for kind, (radius, offset, mat) in (("Eye", (R, 0.64, eye_mat)), ("Cornea", (R * 1.012, 0.62, cornea_mat))):
+        for kind, (radius, offset, mat) in (("Eye", (R, 0.62, eye_mat)), ("Cornea", (R * 1.012, 0.60, cornea_mat))):
             dpos, duv, dfaces = dome(radius, offset)
             # Turned to face the way the head's surface does there (eyes high on a round head look up a little).
             ct, st = math.cos(tilt), math.sin(tilt)

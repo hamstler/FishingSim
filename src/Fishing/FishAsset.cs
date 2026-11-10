@@ -43,6 +43,7 @@ public sealed class FishAsset
     private static readonly Dictionary<string, FishAsset?> Cache = new();
     private static readonly LinkedList<string> Recent = new();
     private static readonly Dictionary<string, Task<Dictionary<string, Image>>> Decoding = new();
+    private static readonly LinkedList<string> DecodeOrder = new();
 
     public static bool Has(FishSpecies sp) => For(sp) != null;
 
@@ -58,8 +59,23 @@ public sealed class FishAsset
         {
             if (id == "" || Cache.ContainsKey(id) || Decoding.ContainsKey(id) || !FileAccess.FileExists(path))
                 return;
+            // Decoded pictures wait for their model at most four at a time (browsing the atlas decodes ahead).
+            while (Decoding.Count >= 4 && DecodeOrder.First != null)
+            {
+                Decoding.Remove(DecodeOrder.First.Value);
+                DecodeOrder.RemoveFirst();
+            }
             Decoding[id] = Task.Run(() => DecodeImages(FileAccess.GetFileAsBytes(path)));
+            DecodeOrder.AddLast(id);
         }
+    }
+
+    /// <summary>Whether <see cref="For"/> would return at once (the model is loaded, or its pictures are decoded).</summary>
+    public static bool IsReady(FishSpecies sp)
+    {
+        string id = FishReference.IdOf(sp);
+        lock (Gate)
+            return Cache.ContainsKey(id) || !Decoding.TryGetValue(id, out var task) || task.IsCompleted;
     }
 
     public static FishAsset? For(FishSpecies sp)
@@ -81,7 +97,10 @@ public sealed class FishAsset
             {
                 Task<Dictionary<string, Image>>? pending;
                 lock (Gate)
+                {
                     Decoding.Remove(id, out pending);
+                    DecodeOrder.Remove(id);
+                }
                 Dictionary<string, Image>? images = null;
                 try
                 {
@@ -119,6 +138,9 @@ public sealed class FishAsset
 
     private static string PathOf(string id) => $"res://assets/fish/models/{id}.glb";
 
+    /// <summary>Whether the pictures are block compressed for the GPU (FISHSIM_RAW_FISH_TEXTURES=1 keeps them plain).</summary>
+    public static bool CompressTextures { get; set; } = System.Environment.GetEnvironmentVariable("FISHSIM_RAW_FISH_TEXTURES") != "1";
+
     /// <summary>
     /// The model's pictures by name, decoded here with their mipmaps: GLTFDocument makes textures without them, and the
     /// fine scales of a 4096-texel skin would shimmer whenever the fish is small on the screen.
@@ -148,7 +170,13 @@ public sealed class FishAsset
             if (error != Error.Ok)
                 continue;
             string name = (string?)node["name"] ?? "";
-            image.GenerateMipmaps(renormalize: name.EndsWith("normal"));
+            bool normal = name.EndsWith("normal");
+            image.GenerateMipmaps(renormalize: normal);
+            // On the GPU a 4096-texel skin with its normal map takes ~90 MB as plain pixels and about a fifth of it block
+            // compressed (BC1/BC3 for colours, BC5 for the normal map). Where the engine has no compressor (an export
+            // without one), the pictures stay as they are.
+            if (CompressTextures && image.GetWidth() >= 512)
+                image.Compress(Image.CompressMode.S3Tc, normal ? Image.CompressSource.Normal : Image.CompressSource.Srgb);
             images[name] = image;
         }
         return images;

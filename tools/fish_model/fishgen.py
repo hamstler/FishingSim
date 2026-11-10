@@ -267,9 +267,10 @@ def sculpt_head(px, py, lat, cs):
     """The head's relief on the lofted surface: eye socket, gape and lips, the gill cover's ledge, the preopercle."""
     lat = lat.copy()
     side = np.abs(cs)[None, :] ** 0.5               # head details on the flanks, not on the crown or the throat
-    # Eye socket: a hollow the eyeball sits in, no wider than the eye (the eye lies flush with the head).
+    # Eye socket: a hollow the eyeball sits in, deep enough that the eye's dome rises out of its floor beyond the iris
+    # (in the dark edge round it), so the skin never cuts into the iris, however coarse the mesh is there.
     d_eye = np.hypot(px - EYE[0], py - EYE[1]) / EYE_R
-    lat -= np.sign(lat) * side * 0.3 * EYE_R * (1 - smoothstep(0.95, 1.12, d_eye))
+    lat -= np.sign(lat) * side * 0.45 * EYE_R * (1 - smoothstep(1.0, 1.35, d_eye))
     # Mouth: the gape as a groove between two lips, all of it in proportion to the mouth.
     dm = polyline_distance(px, py, GAPE)
     head = smoothstep(MOUTH_END + 0.032 * ML, MOUTH_END + 0.017 * ML, px)
@@ -304,8 +305,8 @@ def build_body_unwrapped(n_rings=None, n_seg=None):
     stalk, v from the dorsal midline round the right flank, the belly and the left flank back to it), so the texture
     neither stretches over the back nor the belly. Returns model-space positions, UVs and faces (quads and triangles).
     """
-    n_rings = n_rings or SPECIES.get("mesh", (150, 96))[0]
-    n_seg = n_seg or SPECIES.get("mesh", (150, 96))[1]
+    n_rings = n_rings or SPECIES.get("mesh", (190, 128))[0]          # dense enough to round an eye's socket
+    n_seg = n_seg or SPECIES.get("mesh", (190, 128))[1]
     s = np.linspace(0, 1, n_rings)
     xs = X0 + (X1 - X0) * s ** 1.3
     cap = 10
@@ -396,9 +397,29 @@ def tangents(nrm):
 
 
 # ------------------------------------------------------------------ fins
+def spine_tips(spec, n):
+    """A stickleback's free spines: the n highest points of the measured edge, each a spine's tip (front to back)."""
+    t, b = np.array(spec["tips"]), np.array(spec["base"])
+    height = np.abs(np.interp(t[:, 0], b[:, 0], b[:, 1]) - t[:, 1])
+    peaks = [i for i in range(len(t)) if height[i] >= height[max(i - 1, 0)] and height[i] >= height[min(i + 1, len(t) - 1)]
+             and height[i] > 0.3 * height.max()]
+    peaks = sorted(sorted(peaks, key=lambda i: -height[i])[:n], key=lambda i: t[i, 0])
+    if len(peaks) < n:
+        return None
+    return t[peaks]
+
+
 def build_fin(spec, segs=10, pleat=0.0012):
     n = spec["rays"]
     base, tips = resample(spec["base"], n), resample(spec["tips"], n)
+    if spec["kind"] == "spines":
+        # Free spines stand straight up from the back, each to its own tip (not spread evenly along the edge).
+        st = spine_tips(spec, n)
+        if st is not None:
+            b = np.array(spec["base"])
+            tips = st
+            base = np.stack([np.clip(st[:, 0], b[:, 0].min(), b[:, 0].max()),
+                             np.interp(np.clip(st[:, 0], b[:, 0].min(), b[:, 0].max()), b[:, 0], b[:, 1])], axis=1)
     k = np.linspace(0, 1, segs + 1)
     pts = base[:, None, :] + (tips - base)[:, None, :] * k[None, :, None]   # (rays, segs+1, 2)
     px, py = pts[..., 0], pts[..., 1]
@@ -452,6 +473,8 @@ def paint_fin(name, spec, w=None, h=None):
     notch = (0.85 if spec["kind"] == "spines" else 0.42) if spiny else (0.02 if spec["kind"] == "caudal" else 0.035)
     edge = 1.0 - notch * np.sin(np.pi * du) ** (0.6 if spiny else 1.4) + jitter * (du < 0.5) * (1.0 if spiny else 0.3)
     membrane = smoothstep(edge, edge - 0.02, v)
+    if spec["kind"] == "spines":
+        membrane = smoothstep(0.3, 0.18, v)              # free spines: only a low web at their feet
     ray_w = (0.15 if spiny else 0.12) * (1 - 0.55 * v)
     if spec["kind"] == "soft" or spec["kind"] == "caudal":
         # Soft rays fork towards the edge and are segmented (fine light joints).
@@ -475,6 +498,8 @@ def paint_fin(name, spec, w=None, h=None):
         stalk = np.array(col.get("base", np.array(col["membrane"]) * 0.75))
         c = c * (1 - smoothstep(0.25, 0.0, v))[..., None] + stalk * smoothstep(0.25, 0.0, v)[..., None]
     ray_c = np.array(col["ray"])
+    if spec["kind"] == "spines":                          # bony spines are pale, horn-coloured
+        ray_c = np.array(col.get("spine", [0.84, 0.8, 0.64]))
     c = c * (1 - ray[..., None]) + ray_c * ray[..., None]
     if "edge" in col:                                     # a pale or dark margin (white-edged fins of chars)
         margin = smoothstep(0.82, 0.92, v) if spec["kind"] != "pelvic_front" else 0
@@ -890,7 +915,7 @@ def eye_tilt():
 def eye_centre():
     """Where the right eye sits: in its socket, set into the head along the surface's normal (model space)."""
     lat, tilt = _eye_surface()
-    depth = 0.36 * EYE_R
+    depth = 0.24 * EYE_R
     return model(np.array(EYE[0]), np.array(EYE[1] + depth * math.sin(tilt)), np.array(lat - depth * math.cos(tilt)))
 
 
