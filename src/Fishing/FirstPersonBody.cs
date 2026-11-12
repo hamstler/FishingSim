@@ -31,6 +31,7 @@ public partial class FirstPersonBody : Node3D
     private Vector3 _lastFishGrip;
     private ArmIK? _ik;
     private Node3D? _model;
+    private MeshInstance3D? _torso;
     private Transform3D _modelRest;
 
     /// <summary>
@@ -108,6 +109,8 @@ public partial class FirstPersonBody : Node3D
         {
             var mi = (MeshInstance3D)node;
             mi.Visible = mi.Name == "Arms";
+            if (mi.Name == "Body")
+                _torso = mi;
             mi.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
             mi.VisibilityRangeEnd = 0f;
             // The arms are always right in front of the eyes: never culled by their rest-pose bounds.
@@ -221,10 +224,14 @@ public partial class FirstPersonBody : Node3D
         var ik = _ik!;
         if (_model != null)
         {
-            if (ToolBodyFrame?.Invoke() is Transform3D frame)
-                _model.GlobalTransform = frame;
+            // With a tool the shirt shows too: looking down at the work the arms come out of a body, not from nowhere.
+            var frame = ToolBodyFrame?.Invoke();
+            if (frame is Transform3D bodyFrame)
+                _model.GlobalTransform = bodyFrame;
             else
                 _model.Transform = _modelRest;
+            if (_torso != null)
+                _torso.Visible = frame != null;
         }
         if (ToolPose?.Invoke() is { } tool)
         {

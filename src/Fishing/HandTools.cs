@@ -33,11 +33,11 @@ public partial class HandTools : Node3D
     {
         new(0.00f, new(0.015f, 0.03f, -0.98f), new(0.12f, 0.82f, 0.55f), 0f),
         new(0.18f, new(0.22f, 0.35f, -1.25f), new(-0.1f, 0.9f, 0.8f), 0f),
-        new(0.36f, new(0.35f, g - 0.12f, -1.0f), new(-0.3f, 0.85f, 0.45f), 0f),
-        new(0.50f, new(0.35f, g - 0.2f, -1.0f), new(-0.3f, 0.85f, 0.45f), 0f),
-        new(0.64f, new(0.35f, g - 0.1f, -0.98f), new(-0.3f, 0.7f, 0.75f), 0f),
-        new(0.80f, new(0.3f, g + 0.65f, -1.05f), new(-0.25f, 0.3f, 0.92f), 0f),
-        new(0.90f, new(0.7f, g + 0.85f, -0.85f), new(-0.6f, 0.15f, 0.8f), 1.9f),
+        new(0.36f, new(0.3f, g - 0.12f, -1.2f), new(-0.3f, 0.85f, 0.45f), 0f),
+        new(0.50f, new(0.3f, g - 0.2f, -1.2f), new(-0.3f, 0.85f, 0.45f), 0f),
+        new(0.64f, new(0.3f, g - 0.1f, -1.18f), new(-0.3f, 0.75f, 0.68f), 0f),
+        new(0.80f, new(0.3f, g + 0.6f, -1.25f), new(-0.25f, 0.35f, 0.9f), 0f),
+        new(0.90f, new(0.7f, g + 0.8f, -1.0f), new(-0.6f, 0.15f, 0.8f), 1.9f),
         new(1.00f, new(0.015f, 0.03f, -0.98f), new(0.12f, 0.82f, 0.55f), 0f),
     };
 
@@ -52,11 +52,11 @@ public partial class HandTools : Node3D
     };
 
     private const float DigSeconds = 2.1f, SweepSeconds = 1.35f;
-    private const float DigPitch = -0.88f, SweepPitch = -0.15f;
+    private const float DigPitch = -0.62f, SweepPitch = -0.15f;
 
     /// <summary>How far the body bends over the work (forward, down) while digging, and where the head goes meanwhile
     /// (a little down and back, so the eyes see the blade in the ground beyond the hands).</summary>
-    private static readonly Vector3 DigLean = new(0f, -0.25f, -0.15f), DigHead = new(0f, -0.15f, 0.05f);
+    private static readonly Vector3 DigLean = new(0f, -0.3f, -0.28f), DigHead = new(0f, -0.3f, -0.28f);
 
     private Player _player = null!;
     private FishingRod _rod = null!;
@@ -213,7 +213,9 @@ public partial class HandTools : Node3D
                 _rod.Notify("Z pomostu nie dokopiesz się do ziemi.", 2f);
                 return false;
             }
-            var at = feet + Forward.Normalized() * 0.85f;
+            var ahead = _player.GlobalTransform.Basis * new Vector3(0.3f, 0f, -1.2f);
+            ahead.Y = 0f;
+            var at = feet + ahead;
             var ground = _lake.GroundKindAt(at.X, at.Z);
             if (ground == GroundKind.Water)
             {
