@@ -36,6 +36,15 @@ public partial class Menu : Control
         Input.MouseMode = Input.MouseModeEnum.Visible;
         GetTree().Paused = false;
         UserStore.EnsureDefault();
+        // The painted world textures (4096 px) take a minute or two to paint on the very first start: begin while the
+        // angler logs in and picks a map. Later starts only read them from the disk cache.
+        if (!Renderer.IsHeadless)
+            Task.Run(() =>
+            {
+                World.Props.GroundTextures.Prewarm();
+                World.Props.Textures.Prewarm();
+                ProceduralTextures.PrewarmFoliage();
+            });
         foreach (var path in LakeBed.LocationPaths)
             _locations.Add(GD.Load<LocationData>(path));
         BuildBackground();

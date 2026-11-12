@@ -49,14 +49,14 @@ public static class ProceduralTextures
             return (NoiseTexture2D)t;
         var tex = new NoiseTexture2D
         {
-            Width = 256,
-            Height = 256,
+            Width = 1024,
+            Height = 1024,
             Seamless = true,
             GenerateMipmaps = true,
             Noise = new FastNoiseLite
             {
                 Seed = 11,
-                Frequency = 0.04f,
+                Frequency = 0.01f,
                 NoiseType = FastNoiseLite.NoiseTypeEnum.Cellular,
                 CellularReturnType = FastNoiseLite.CellularReturnTypeEnum.Distance2Sub,
                 FractalType = FastNoiseLite.FractalTypeEnum.None,
@@ -81,21 +81,55 @@ public static class ProceduralTextures
         string key = needles ? "needles" : "leaves";
         if (Cache.TryGetValue(key, out var t))
             return t;
-        const int cell = 512;
-        int size = needles ? cell : cell * 2;
+        var tex = Painted(ClusterName(needles), () => PaintCluster(needles));
+        Cache[key] = tex;
+        return tex;
+    }
+
+    /// <summary>Leaf pictures are painted at four times the size of the original 512-pixel designs.</summary>
+    private const float LK = 4f;
+
+    /// <summary>Bump when a leaf, needle or fern design changes.</summary>
+    private const int LeafVersion = 2;
+
+    /// <summary>
+    /// An alpha-tested picture (leaves, needles, fern): from the compressed disk cache, or painted, its mipmaps keeping
+    /// the leaves' coverage, and stored. Without a screen (tests) a plain stand-in.
+    /// </summary>
+    private static Texture2D Painted(string name, Func<Image> paint)
+    {
+        if (Renderer.IsHeadless)
+            return ImageTexture.CreateFromImage(Image.CreateEmpty(4, 4, false, Image.Format.Rgba8));
+        return ImageTexture.CreateFromImage(Picture(name, paint));
+    }
+
+    private static Image Picture(string name, Func<Image> paint) =>
+        TextureStore.Get(name, LeafVersion, BlockCompress.Kind.ColourAlpha, paint, prepare: i => PreserveAlphaCoverage(i, 0.5f)).Image;
+
+    /// <summary>Paints the leaf, needle and fern pictures into the disk cache (no textures: safe on a worker thread).</summary>
+    public static void PrewarmFoliage()
+    {
+        foreach (bool needles in new[] { false, true })
+            Picture(ClusterName(needles), () => PaintCluster(needles));
+        const int w = (int)(256 * LK), h = (int)(1024 * LK);
+        Picture($"fern_{w}x{h}", () => PaintFern(w, h));
+    }
+
+    private const int LeafCell = (int)(512 * LK);
+
+    private static string ClusterName(bool needles) => needles ? $"needles_{LeafCell}" : $"leaves_{LeafCell * 2}";
+
+    private static Image PaintCluster(bool needles)
+    {
+        int size = needles ? LeafCell : LeafCell * 2;
         var canvas = new LeafCanvas(size);
         var rng = new Random(needles ? 21 : 12);
         if (needles)
-            PaintNeedleSpray(canvas, cell / 2f, cell / 2f, cell, rng);
+            PaintNeedleSpray(canvas, LeafCell / 2f, LeafCell / 2f, LeafCell, rng);
         else
             for (int k = 0; k < 4; k++)
-                PaintLeafSpray(canvas, (k % 2) * cell + cell / 2f, (k / 2) * cell + cell / 2f, cell, k, rng);
-        var img = canvas.Image(needles ? new Color(0.6f, 0.78f, 0.66f) : new Color(0.72f, 0.86f, 0.6f));
-        img.GenerateMipmaps();
-        PreserveAlphaCoverage(img, 0.5f);
-        var tex = ImageTexture.CreateFromImage(img);
-        Cache[key] = tex;
-        return tex;
+                PaintLeafSpray(canvas, (k % 2) * LeafCell + LeafCell / 2f, (k / 2) * LeafCell + LeafCell / 2f, LeafCell, k, rng);
+        return canvas.Image(needles ? new Color(0.6f, 0.78f, 0.66f) : new Color(0.72f, 0.86f, 0.6f));
     }
 
     /// <summary>RGBA in floats, painted with "over" blending and anti-aliased coverage.</summary>
@@ -207,7 +241,7 @@ public static class ProceduralTextures
                 float side = across / MathF.Max(hw, 0.5f);           // -1..1 across the leaf
                 var k = col * (across > 0f ? 1.06f : 0.9f);          // folded along the midrib: one half catches more light
                 k = k.Lerp(dark, MathF.Pow(MathF.Abs(side), 3f) * 0.35f + (1f - t) * 0.12f);
-                if (MathF.Abs(across) < 0.9f && t < 0.92f)
+                if (MathF.Abs(across) < 0.9f * LK && t < 0.92f)
                     k = k.Lerp(new Color(0.86f, 0.92f, 0.7f), 0.45f);  // midrib
                 else
                 {
@@ -230,21 +264,28 @@ public static class ProceduralTextures
         const string key = "fern";
         if (Cache.TryGetValue(key, out var t))
             return t;
-        const int w = 256, h = 1024;
+        const int w = (int)(256 * LK), h = (int)(1024 * LK);
+        var tex = Painted($"fern_{w}x{h}", () => PaintFern(w, h));
+        Cache[key] = tex;
+        return tex;
+    }
+
+    private static Image PaintFern(int w, int h)
+    {
         var c = new LeafCanvas(w, h);
         var rng = new Random(33);
         var stalk = new Color(0.7f, 0.78f, 0.48f);
-        c.Line(new Vector2(w / 2f, 0f), new Vector2(w / 2f, h - 6f), 5f, 1.5f, stalk * 0.85f, stalk);
+        c.Line(new Vector2(w / 2f, 0f), new Vector2(w / 2f, h - 6f * LK), 5f * LK, 1.5f * LK, stalk * 0.85f, stalk);
         int side = 1;
-        for (float y = 70f; y < h - 30f; y += 21f)
+        for (float y = 70f * LK; y < h - 30f * LK; y += 21f * LK)
         {
             float along = y / h;
             float len = (w * 0.47f) * MathF.Pow(MathF.Sin(MathF.PI * MathF.Min(along * 1.25f + 0.12f, 1f)), 0.7f) * (1f - 0.75f * along * along);
-            if (len < 6f)
+            if (len < 6f * LK)
                 continue;
             foreach (int sgn in new[] { side, -side })
             {
-                var root = new Vector2(w / 2f + sgn * 2f, y + (sgn == side ? 0f : 10f));
+                var root = new Vector2(w / 2f + sgn * 2f * LK, y + (sgn == side ? 0f : 10f * LK));
                 // Pinnae point outwards and towards the tip.
                 float ang = MathF.Atan2(0.55f, sgn * 1f);
                 var dir = new Vector2(MathF.Cos(ang), MathF.Sin(ang));
@@ -252,12 +293,12 @@ public static class ProceduralTextures
                     dir = new Vector2(-MathF.Abs(dir.X), dir.Y);
                 var col = new Color(0.62f, 0.82f, 0.48f).Lerp(new Color(0.8f, 0.92f, 0.55f), along) * Rf(rng, 0.85f, 1f);
                 var n = new Vector2(-dir.Y, dir.X);
-                int lobes = Math.Max(3, (int)(len / 9f));
+                int lobes = Math.Max(3, (int)(len / (9f * LK)));
                 for (int k = 0; k < lobes; k++)
                 {
                     float s = (k + 0.5f) / lobes;
                     var p = root + dir * len * s;
-                    float lw = 9f * (1f - 0.75f * s) + 2f;
+                    float lw = (9f * (1f - 0.75f * s) + 2f) * LK;
                     foreach (int ls in new[] { -1, 1 })
                     {
                         var lc = p + n * ls * lw * 0.5f;
@@ -274,16 +315,11 @@ public static class ProceduralTextures
                             }
                     }
                 }
-                c.Line(root, root + dir * len, 2.2f, 0.8f, stalk * 0.9f, stalk);
+                c.Line(root, root + dir * len, 2.2f * LK, 0.8f * LK, stalk * 0.9f, stalk);
             }
             side = -side;
         }
-        var img = c.Image(new Color(0.66f, 0.84f, 0.5f));
-        img.GenerateMipmaps();
-        PreserveAlphaCoverage(img, 0.5f);
-        var tex = ImageTexture.CreateFromImage(img);
-        Cache[key] = tex;
-        return tex;
+        return c.Image(new Color(0.66f, 0.84f, 0.5f));
     }
 
     private static void PaintLeafSpray(LeafCanvas c, float cx, float cy, int cell, int kind, Random rng)
@@ -310,7 +346,7 @@ public static class ProceduralTextures
             float twigLen = reach - len * (kind == LeafWillow ? 0.7f : 0.9f);
             var dir = new Vector2(MathF.Cos(a), MathF.Sin(a));
             var end = start + dir * twigLen;
-            c.Line(start, end, 3.2f, 1.2f, twig, twig * 1.1f);
+            c.Line(start, end, 3.2f * LK, 1.2f * LK, twig, twig * 1.1f);
             for (int k = 0; k < perTwig; k++)
             {
                 float s = (k + 0.6f) / perTwig;
@@ -344,18 +380,18 @@ public static class ProceduralTextures
             var d = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
             var end = start + d * length;
             c.Line(start, end, width, width * 0.4f, bark, bark);
-            for (float s = 3f; s < length; s += 2.3f)
+            for (float s = 3f * LK; s < length; s += 2.3f * LK)
             {
                 float t = s / length;
                 var p = start + d * s;
                 var col = old.Lerp(young, MathF.Max(t - 0.7f, 0f) / 0.3f) * Rf(rng, 0.78f, 1f);
-                float nl = Rf(rng, 11f, 17f) * (1f - 0.3f * t);
+                float nl = Rf(rng, 11f, 17f) * LK * (1f - 0.3f * t);
                 foreach (float side in new[] { -1f, 1f })
                 {
                     float na = angle + side * Rf(rng, 0.6f, 1.0f);
                     var tip = p + new Vector2(MathF.Cos(na), MathF.Sin(na)) * nl;
                     if (tip.DistanceTo(new Vector2(cx, cy)) < reach)
-                        c.Line(p, tip, 1.8f, 0.8f, col * 0.85f, col);
+                        c.Line(p, tip, 1.8f * LK, 0.8f * LK, col * 0.85f, col);
                 }
                 if (depth > 0 && rng.NextDouble() < 0.07)
                     Twig(p, angle + (rng.NextDouble() < 0.5 ? -1f : 1f) * Rf(rng, 0.5f, 0.8f), (length - s) * Rf(rng, 0.4f, 0.6f), width * 0.6f, depth - 1);
@@ -364,8 +400,8 @@ public static class ProceduralTextures
         for (int i = 0; i < 11; i++)
         {
             float a = i * Mathf.Tau / 11f + Rf(rng, -0.2f, 0.2f);
-            var start = new Vector2(cx, cy) + new Vector2(MathF.Cos(a), MathF.Sin(a)) * Rf(rng, 0f, 18f);
-            Twig(start, a, reach - 22f, 3.5f, 1);
+            var start = new Vector2(cx, cy) + new Vector2(MathF.Cos(a), MathF.Sin(a)) * Rf(rng, 0f, 18f) * LK;
+            Twig(start, a, reach - 22f * LK, 3.5f * LK, 1);
         }
     }
 

@@ -6,13 +6,13 @@ namespace FishingSim.World.Props;
 
 /// <summary>
 /// High-resolution textures for the medieval village (boards, plaster, thatch, fieldstone): each tile is
-/// <see cref="Size"/>² pixels covering 2 m (512 px per metre, sharp at QHD), read with trilinear anisotropic filtering.
+/// <see cref="Size"/>² pixels covering 2 m (2048 px per metre), block compressed, read with trilinear anisotropic filtering.
 /// They are painted from byte arrays on worker threads with a tiling value noise of their own, and kept in a disk
 /// cache (user://texcache) so later launches load them instead of painting them again.
 /// </summary>
 public static class Textures
 {
-    public const int Size = 1024;
+    public const int Size = 4096;
 
     /// <summary>Scale of the original 256-pixel designs: every distance in pixels is multiplied by this.</summary>
     private const float S = Size / 256f;
@@ -21,7 +21,7 @@ public static class Textures
     public const float TriplanarScale = 0.5f;
 
     /// <summary>Bump when a texture design changes, so stale cached images are repainted.</summary>
-    private const int CacheVersion = 2;
+    private const int CacheVersion = 3;
 
     private static ImageTexture? _planks, _shingles, _planksPainted, _stone, _plaster;
 
@@ -48,31 +48,28 @@ public static class Textures
         }
     }
 
-    private static string CachePath(string name) => $"user://texcache/{name}_{Size}_v{CacheVersion}.png";
-
-    /// <summary>Loads a cached texture, or paints it and stores it in the cache.</summary>
+    /// <summary>
+    /// A texture from the disk cache (block compressed, Graphics/TextureStore), or painted and stored there. Without a
+    /// screen (tests) a plain stand-in: nothing is drawn.
+    /// </summary>
     private static ImageTexture Cached(string name, Func<Canvas> paint)
     {
-        string path = CachePath(name);
-        Image? img = null;
-        if (FileAccess.FileExists(path))
-        {
-            img = Godot.Image.LoadFromFile(path);
-            if (img != null && (img.GetWidth() != Size || img.GetHeight() != Size))
-                img = null;
-            img?.Convert(Godot.Image.Format.Rgb8);
-        }
-        if (img == null)
-        {
-            img = paint().Image();
-            if (!OS.HasEnvironment("FISHSIM_NO_CACHE"))
-            {
-                DirAccess.MakeDirRecursiveAbsolute("user://texcache");
-                img.SavePng(path);
-            }
-        }
-        img.GenerateMipmaps();
-        return ImageTexture.CreateFromImage(img);
+        if (Graphics.Renderer.IsHeadless)
+            return ImageTexture.CreateFromImage(Godot.Image.CreateEmpty(4, 4, false, Godot.Image.Format.Rgb8));
+        return ImageTexture.CreateFromImage(Picture(name, paint));
+    }
+
+    private static Godot.Image Picture(string name, Func<Canvas> paint) =>
+        Graphics.TextureStore.Get($"{name}_{Size}", CacheVersion, Graphics.BlockCompress.Kind.Colour, () => paint().Image()).Image;
+
+    /// <summary>Paints every design into the disk cache (no textures are made: safe on a worker thread).</summary>
+    public static void Prewarm()
+    {
+        foreach (var (name, paint) in new (string, Func<Canvas>)[]
+                 {
+                     ("planks", PaintPlanks), ("planks_painted", PaintPlanksPainted), ("plaster", PaintPlaster), ("thatch", PaintThatch), ("stone", PaintStone),
+                 })
+            Picture(name, paint);
     }
 
     // ------------------------------------------------------------------ tiling value noise (thread-safe)
@@ -154,7 +151,9 @@ public static class Textures
     }
 
     /// <summary>The same boards in light grey, so a material colour can stain them.</summary>
-    public static ImageTexture PlanksPainted() => _planksPainted ??= Cached("planks_painted", () =>
+    public static ImageTexture PlanksPainted() => _planksPainted ??= Cached("planks_painted", PaintPlanksPainted);
+
+    private static Canvas PaintPlanksPainted()
     {
         var src = PaintPlanks();
         var c = new Canvas();
@@ -167,10 +166,12 @@ public static class Textures
             }
         });
         return c;
-    });
+    }
 
     /// <summary>Lime plaster for the timber-framed walls: off-white, mottled, with a few hairline cracks.</summary>
-    public static ImageTexture Plaster() => _plaster ??= Cached("plaster", () =>
+    public static ImageTexture Plaster() => _plaster ??= Cached("plaster", PaintPlaster);
+
+    private static Canvas PaintPlaster()
     {
         var c = new Canvas();
         Rows(y =>
@@ -195,10 +196,12 @@ public static class Textures
             }
         }
         return c;
-    });
+    }
 
     /// <summary>Thatch: layered rows of straw, each made of individual stalks with shadow under the row above.</summary>
-    public static ImageTexture Shingles() => _shingles ??= Cached("thatch", () =>
+    public static ImageTexture Shingles() => _shingles ??= Cached("thatch", PaintThatch);
+
+    private static Canvas PaintThatch()
     {
         var c = new Canvas();
         const int rows = 8;
@@ -220,10 +223,12 @@ public static class Textures
             }
         });
         return c;
-    });
+    }
 
     /// <summary>Rough fieldstones with dark mortar: rows of irregular, rounded stones with lit tops.</summary>
-    public static ImageTexture Stone() => _stone ??= Cached("stone", () =>
+    public static ImageTexture Stone() => _stone ??= Cached("stone", PaintStone);
+
+    private static Canvas PaintStone()
     {
         var c = new Canvas();
         Rows(y =>
@@ -265,5 +270,5 @@ public static class Textures
             }
         }
         return c;
-    });
+    }
 }

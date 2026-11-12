@@ -34,7 +34,7 @@ void fragment() {
 	vec3 tilt = vec3(qy.r * 2.0 - 1.0, 0.0, qy.g * 2.0 - 1.0) * tw.y
 		+ vec3(0.0, qx.g * 2.0 - 1.0, qx.r * 2.0 - 1.0) * tw.x
 		+ vec3(qz.r * 2.0 - 1.0, qz.g * 2.0 - 1.0, 0.0) * tw.z;
-	float rough = qy.a * tw.y + qx.a * tw.x + qz.a * tw.z;
+	float rough = 0.75;
 	vec3 col = a.rgb * srgb_to_linear(COLOR.rgb) / rock_mean;
 	// Moss on the tops, ragged at its edge, thicker in the hollows of the stone.
 	float nz = texture(noise_tex, wpos.xz * 0.35 + wpos.y * 0.21).r;

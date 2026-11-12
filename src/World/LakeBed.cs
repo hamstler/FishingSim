@@ -443,6 +443,7 @@ public partial class LakeBed : Node3D
         tints[Props.GroundTextures.Rock] = Vector3.One;
         tints[Props.GroundTextures.Snow] = Vector3.One;
         material.SetShaderParameter("layer_tint", tints);
+        material.SetShaderParameter("layer_rough", Props.GroundTextures.Roughness);
         material.SetShaderParameter("snow_line", loc.SnowLine);
         material.SetShaderParameter("rock_line", loc.RockLine);
         material.SetShaderParameter("dark_grass_tint", Towards(Calm(loc.DarkGrassColor), Props.GroundTextures.Grass, 1f));

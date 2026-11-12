@@ -8,10 +8,11 @@ shader_type spatial;
 render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
 
 uniform sampler2DArray ground_albedo : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
-uniform sampler2DArray ground_normal : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2DArray ground_normal : filter_linear_mipmap_anisotropic, repeat_enable;     // RG: tilt along x, z (BC5)
 uniform sampler2D noise_tex : repeat_enable, filter_linear_mipmap;
 uniform sampler2D caustics_tex : repeat_enable, filter_linear_mipmap;
 uniform vec3 layer_tint[7];
+uniform float layer_rough[7];
 uniform vec3 dark_grass_tint = vec3(1.0);
 uniform float tile = 2.0;
 uniform float bump = 1.0;
@@ -124,14 +125,14 @@ void fragment() {
 				vec4 q = textureGrad(ground_normal, vec3(uvB, L), dBx, dBy);
 				// The second reading is turned: turn its tilt back into the world.
 				vec2 tb = turn(q.rg * 2.0 - 1.0, -0.83) * 0.5 + 0.5;
-				nm += vec4(tb, q.ba) * mixB;
+				nm += vec4(tb, 0.0, 0.0) * mixB;
 			}
 			t3 = vec3(nm.r * 2.0 - 1.0, 0.0, nm.g * 2.0 - 1.0);
 		}
 		vec3 tint = i == 0 ? grass_tint : layer_tint[i];
 		base += alb[i].rgb * tint * b;
 		tilt += t3 * b;
-		rough += nm.a * b;
+		rough += layer_rough[i] * b;
 		total += b;
 	}
 	base /= total;

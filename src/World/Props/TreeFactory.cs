@@ -142,6 +142,7 @@ public static class TreeFactory
         cached.SetShaderParameter("bark_albedo", albedo);
         cached.SetShaderParameter("bark_normal", normal);
         cached.SetShaderParameter("bark_mean", new Vector3(mean.R, mean.G, mean.B));
+        cached.SetShaderParameter("roughness", birch ? 0.7f : 0.9f);
         return cached;
     }
 
