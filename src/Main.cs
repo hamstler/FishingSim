@@ -35,6 +35,10 @@ public partial class Main : Node3D
     public InteractionManager Interactions { get; private set; } = null!;
     public FishPopulation Fish { get; private set; } = null!;
     public GearCatalog Gear => _gear;
+    public HandTools Tools { get; private set; } = null!;
+    public CookingPanel Cooking { get; private set; } = null!;
+    public InsectSwarms Swarms { get; private set; } = null!;
+    public DigMarks DigMarks { get; private set; } = null!;
 
     public override void _Ready()
     {
@@ -89,6 +93,20 @@ public partial class Main : Node3D
         Player.Body.RaiseSource = () => Rod.Lifting && Rod.State is RodState.Nibble or RodState.Bite or RodState.Fight or RodState.Close or RodState.Waiting ? 1f : 0f;
         Player.Body.ReelingSource = () => Rod.Reeling && Rod.State is RodState.Waiting or RodState.Fight or RodState.Nibble or RodState.Bite;
 
+        // Camp life: the shovel and the insect net (Q), the holes they leave, the mayflies over the shore at dusk.
+        Swarms = new InsectSwarms();
+        AddChild(Swarms);
+        Swarms.Setup(_lake, _world);
+        var marks = new DigMarks();
+        AddChild(marks);
+        marks.Setup(_lake);
+        DigMarks = marks;
+        Tools = new HandTools();
+        Player.AddChild(Tools);
+        Tools.Setup(Player, Rod, _gear, _profile, _lake, _world, Swarms, marks);
+        Player.Body.ToolPose = Tools.HandPose;
+        Player.Body.ToolBodyFrame = Tools.BodyFrame;
+
         var grass = new Graphics.GrassField();
         grass.Setup(_lake, Player);
         AddChild(grass);
@@ -114,7 +132,7 @@ public partial class Main : Node3D
         AddChild(Interactions);
         Interactions.Setup(Player, Scenery, Rod);
 
-        var hud = new Hud();
+        var hud = new Hud { Tools = Tools };
         hud.Setup(Rod, Tournaments, Interactions, Player, Scenery);
         AddChild(hud);
 
@@ -134,7 +152,16 @@ public partial class Main : Node3D
         pause.Setup(Rod, Tournaments, Save, shop, gameUi, results);
         AddChild(pause);
 
-        Interactions.Activated += spot => OnInteract(spot, shop, gameUi);
+        Cooking = new CookingPanel();
+        Cooking.Setup(Rod, _gear, species);
+        AddChild(Cooking);
+        _world.HoursAdvanced += hours =>
+        {
+            foreach (var fire in World.Props.Campfire.All)
+                fire.PassTime(hours);
+        };
+
+        Interactions.Activated += spot => OnInteract(spot, shop, gameUi, Cooking);
 
         // The mood of the map (water colour, mist) follows the location; a new map also means a new start on the pier.
         ApplyMood();
@@ -180,6 +207,8 @@ public partial class Main : Node3D
             _lantern = null;
         }
         _lake.WadeLimit = _gear.Accessory(AccessoryKind.Waders)?.Power ?? LakeBed.WadeDepth;
+        foreach (var fire in Scenery.Campfires)
+            fire.ShowPot(_gear.Has(AccessoryKind.CookingPot));
         if (Rod.State == RodState.Idle)
             Rod.ApplyTackle();     // reel grease and the like change the tackle's numbers
         var glasses = _gear.Accessory(AccessoryKind.PolarizedGlasses);
@@ -199,10 +228,11 @@ public partial class Main : Node3D
             ApplyGearEffects();
     }
 
-    private static void OnInteract(Interactable spot, Shop shop, GameUI gameUi)
+    private static void OnInteract(Interactable spot, Shop shop, GameUI gameUi, CookingPanel cooking)
     {
         switch (spot.Kind)
         {
+            case InteractKind.Campfire when spot.Target is World.Props.Campfire fire: cooking.Open(fire); break;
             case InteractKind.Tackle: shop.OpenFor(ShopKind.Tackle); break;
             case InteractKind.Bait: shop.OpenFor(ShopKind.Bait); break;
             case InteractKind.FishBuyer: shop.OpenFor(ShopKind.FishBuyer); break;

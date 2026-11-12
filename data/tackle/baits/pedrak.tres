@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Pędrak"
+Kind = 0
+AffinityAs = "worm"
+AffinityScale = 1.1
+Reusable = false
+StartCount = 0
+PackSize = 6
+Price = 16
+RequiredLevel = 1
+Description = "Tłusta larwa chrabąszcza wykopana spod korzeni w lesie: klenie, karpie i liny ją lubią."

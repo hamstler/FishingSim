@@ -26,7 +26,7 @@ public sealed class TackleLoadout
         "worm", "corn", "bread", "boilie", "livebait", "maggot", "insect",
         "rosowka", "ochotka", "chrabaszcz", "martwa_rybka", "ciasto", "groch", "kasza", "konopie", "kulka_czosnkowa",
         "kulka_plywajaca", "blystka_obrotowa", "blystka_mosiezna", "rybka_kora", "rybka_drewniana", "piorko_olowiane",
-        "skorka_wegorza", "mucha_kogut", "mucha_zajac", "blystka_srebrna");
+        "skorka_wegorza", "mucha_kogut", "mucha_zajac", "blystka_srebrna", "jetka", "pedrak");
     private static readonly string[] LeaderPaths = Paths("leaders",
         TackleSlotExtensions.NoLeader, "przypon_wlosie", "przypon_jelito", "przypon_mosiezny", "przypon_stalowy",
         "przypon_jedwab_drut");

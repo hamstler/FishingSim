@@ -405,6 +405,30 @@ public partial class LakeBed : Node3D
     }
 
     /// <summary>
+    /// The ground under a point for digging and insects: water, rock above the rock line, a trodden path, a sandy beach
+    /// at the water's edge, the damp bank just above it (best for worms), the forest floor, else the meadow.
+    /// </summary>
+    public Core.Camp.GroundKind GroundKindAt(float x, float z)
+    {
+        var loc = Location;
+        float h = HeightAt(loc, x, z);
+        if (h < 0.03f)
+            return Core.Camp.GroundKind.Water;
+        if (h > loc.RockLine)
+            return Core.Camp.GroundKind.Rock;
+        var g = GroundAt(loc, x, z, h);
+        if (g.Y > 0.5f)
+            return Core.Camp.GroundKind.Path;
+        if (g.X > 0.7f && h < 0.7f)
+            return Core.Camp.GroundKind.Sand;
+        if (h < 1.3f)
+            return Core.Camp.GroundKind.Mud;
+        if (g.Z > 0.5f)
+            return Core.Camp.GroundKind.Forest;
+        return Core.Camp.GroundKind.Meadow;
+    }
+
+    /// <summary>
     /// How much of the painted grounds lies at a point (terrain.gdshader): sand, dirt path, forest floor, lake bed; the
     /// meadow is the rest, rock and snow come from slope and height in the shader.
     /// </summary>

@@ -62,6 +62,14 @@ public sealed class Profile
     public Dictionary<string, int> BaitCounts { get; set; } = new();
     public Dictionary<string, string> Equipped { get; set; } = new();
 
+    /// <summary>The last meal's lasting effect and the game hours it has left (none when null or run out).</summary>
+    public Core.Camp.MealBuff? Meal { get; set; }
+
+    public float MealHoursLeft { get; set; }
+
+    /// <summary>The meal working right now, or null.</summary>
+    public Core.Camp.MealBuff? ActiveMeal => Meal != null && MealHoursLeft > 0f ? Meal : null;
+
     /// <summary>Keepnets, landing nets and accessories.</summary>
     public GearInventory Gear { get; set; } = new();
 
@@ -81,6 +89,8 @@ public sealed class Profile
 
     public void Reset()
     {
+        Meal = null;
+        MealHoursLeft = 0f;
         Money = StartMoney;
         Xp = 0;
         Level = 1;
@@ -131,6 +141,12 @@ public sealed class Profile
         if (hours <= 0f)
             return;
         Market.AdvanceHours(hours);
+        if (MealHoursLeft > 0f)
+        {
+            MealHoursLeft = MathF.Max(0f, MealHoursLeft - hours);
+            if (MealHoursLeft <= 0f)
+                Changed?.Invoke();
+        }
         if (KeepnetLimit is not KeepnetSpec spec || Keepnet.Count == 0)
             return;
         float fill = spec.MaxKg > 0f ? KeepnetWeight / spec.MaxKg : 1f;
@@ -181,6 +197,9 @@ public sealed class Profile
     {
         string name = species.SpeciesName;
         int xpGain = Progression.FishXp(species, weight);
+        // A well-fed angler learns more from every fish.
+        if (ActiveMeal is { } meal)
+            xpGain = (int)MathF.Round(xpGain * (1f + meal.XpBonus));
         int value = Progression.FishValue(species, weight);
         bool released = toKeepnet && !KeepnetFits(weight);
         if (toKeepnet && !released)
@@ -340,6 +359,40 @@ public sealed class Profile
         Keepnet.Add(new CatchRecord(species.SpeciesName, weight, Progression.FishValue(species, weight), 1f, weight < species.LegalWeight));
         Changed?.Invoke();
         return null;
+    }
+
+    /// <summary>Adds bait the angler dug up or caught (no shop needed).</summary>
+    public void AddBait(IReadOnlyDictionary<string, int> baits)
+    {
+        if (baits.Count == 0)
+            return;
+        foreach (var (id, n) in baits)
+            BaitCounts[id] = BaitCounts.GetValueOrDefault(id) + n;
+        Changed?.Invoke();
+    }
+
+    /// <summary>The keepnet as cooking ingredients.</summary>
+    public List<Core.Camp.Cooking.Ingredient> Ingredients() =>
+        Keepnet.Select((f, i) => new Core.Camp.Cooking.Ingredient(i, f.Weight, f.Value, f.Undersized)).ToList();
+
+    /// <summary>
+    /// Cooks a dish from the keepnet and eats it: the fish it takes leave the keepnet, the meal's buff starts (a new
+    /// meal replaces the old one). Returns the fish used, or null with <paramref name="error"/> when it cannot be made.
+    /// </summary>
+    public List<CatchRecord>? Cook(Core.Camp.Recipe recipe, bool hasPot, out string? error)
+    {
+        var ingredients = Ingredients();
+        error = Core.Camp.Cooking.Missing(recipe, ingredients, hasPot);
+        if (error != null)
+            return null;
+        var picked = Core.Camp.Cooking.Pick(recipe, ingredients)!;
+        var used = picked.Select(i => Keepnet[i]).ToList();
+        foreach (int i in picked.OrderByDescending(i => i))
+            Keepnet.RemoveAt(i);
+        Meal = recipe.Buff;
+        MealHoursLeft = recipe.Buff.Hours;
+        Changed?.Invoke();
+        return used;
     }
 
     /// <summary>Puts a landed fish back into the water (a little XP for sportsmanship).</summary>

@@ -30,6 +30,17 @@ public partial class FirstPersonBody : Node3D
     private float _leftOnReel, _raise, _crank, _leftOnFish;
     private Vector3 _lastFishGrip;
     private ArmIK? _ik;
+    private Node3D? _model;
+    private Transform3D _modelRest;
+
+    /// <summary>
+    /// With a tool in the hands the body stands in the player's frame (not the camera's: looking down at the work does
+    /// not swing the shoulders back); this gives the model's world transform then (null with the rod).
+    /// </summary>
+    public Func<Transform3D?>? ToolBodyFrame { get; set; }
+
+    /// <summary>The model's transform relative to the eyes (the camera), to place it in another frame.</summary>
+    public Transform3D ModelFromEyes => _modelRest;
     private BodyAction _action;
 
     public override void _Process(double delta)
@@ -51,6 +62,12 @@ public partial class FirstPersonBody : Node3D
 
     /// <summary>0..1 how far the rod should be raised (right mouse button); set by Main from the rod.</summary>
     public Func<float>? RaiseSource { get; set; }
+
+    /// <summary>Where one hand should be (world space): wrist, the way the fingers and the palm point, grip, elbow hint.</summary>
+    public readonly record struct HandTarget(Vector3 Wrist, Vector3 Fingers, Vector3 Palm, float Grip, Vector3 Pole);
+
+    /// <summary>A tool in the hands (shovel, insect net): both hands go where it says instead of the rod.</summary>
+    public Func<(HandTarget Right, HandTarget Left)?>? ToolPose { get; set; }
 
     /// <summary>A fish to hold in the left hand, or null (unused since the catch panel shows the landed fish).</summary>
     public Func<Node3D?>? HeldFishSource { get; set; }
@@ -100,6 +117,8 @@ public partial class FirstPersonBody : Node3D
         // A little forward of standing straight: leaning over the rod, the hands reach the handle with the elbows bent.
         body.Position = new Vector3(Eyes.X, -Eyes.Y, Eyes.Z - Lean);
         AddChild(body);
+        _model = body;
+        _modelRest = body.Transform;
         _ik = new ArmIK();
         skeleton.AddChild(_ik);
         return true;
@@ -200,6 +219,25 @@ public partial class FirstPersonBody : Node3D
     private void ApplyArms(BodyAction action, float dt)
     {
         var ik = _ik!;
+        if (_model != null)
+        {
+            if (ToolBodyFrame?.Invoke() is Transform3D frame)
+                _model.GlobalTransform = frame;
+            else
+                _model.Transform = _modelRest;
+        }
+        if (ToolPose?.Invoke() is { } tool)
+        {
+            foreach (var (arm, t) in new[] { (ik.Right, tool.Right), (ik.Left, tool.Left) })
+            {
+                arm.Wrist = t.Wrist;
+                arm.Fingers = t.Fingers;
+                arm.Palm = t.Palm;
+                arm.Grip = t.Grip;
+                arm.Pole = t.Pole;
+            }
+            return;
+        }
         var rigBasis = _rig.GlobalTransform.Basis.Orthonormalized();
         var palm = (rigBasis * GripPalm).Normalized();
         var fingers = (rigBasis * GripFingers).Normalized();

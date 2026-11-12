@@ -153,8 +153,11 @@ public sealed class VillageSuite : ITestSuite
             stats[loc.DisplayName] = new Dictionary<string, int>(scenery.Stats);
             int functional = loc.BuildingSpecs().Count(s => s.IsFunctional);
             int sights = loc.Landmarks.Count(l => !l.StartsWith("platforms"));
-            t.Check(scenery.Interactables.Count == functional && scenery.Markers.Count == functional + sights,
-                $"{loc.DisplayName}: {functional} doors with a prompt, map markers for them and {sights} landmarks");
+            int doors = scenery.Interactables.Count(x => x.Kind != InteractKind.Campfire);
+            int fires = scenery.Campfires.Count;
+            t.Check(doors == functional && fires == 2 && scenery.Interactables.Count == functional + fires
+                    && scenery.Markers.Count == functional + sights + fires,
+                $"{loc.DisplayName}: {functional} doors with a prompt, {fires} campfires (camp and hearth), map markers for them and {sights} landmarks");
             t.Check(loc.Landmarks.Length > 0 && scenery.Stats.Where(kv => kv.Key.StartsWith("landmark_")).Sum(kv => kv.Value) == loc.Landmarks.Length,
                 $"{loc.DisplayName}: its own landmarks are built ({string.Join(", ", loc.Landmarks.Select(l => l.Split(',')[0]))})");
             t.Check(scenery.Stats.Where(kv => kv.Key.StartsWith("building_")).Sum(kv => kv.Value) == loc.Buildings.Length, $"{loc.DisplayName}: every building was built");
@@ -278,7 +281,8 @@ public sealed class VillageSuite : ITestSuite
         lake.SetLocation(2);
         await t.NextFrame();
         t.Check(lake.LocationIndex == 2 && player.GlobalPosition.DistanceTo(Player.SpawnPoint) < 0.5f && rod.State == RodState.Idle, "a new map puts the player back on the pier");
-        t.Check(main.Scenery.Interactables.Count == lake.Location.BuildingSpecs().Count(s => s.IsFunctional), "the new map's doors replace the old ones");
+        t.Check(main.Scenery.Interactables.Count(x => x.Kind != InteractKind.Campfire) == lake.Location.BuildingSpecs().Count(s => s.IsFunctional)
+                && main.Scenery.Campfires.Count == 2, "the new map's doors and campfires replace the old ones");
 
         t.Section("night");
         var building = main.Scenery.GetChildren().OfType<Building>().First(b => b.Spec.IsFunctional);

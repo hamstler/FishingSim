@@ -39,6 +39,20 @@ public partial class Player : CharacterBody3D
     public LakeBed? Bed { get; set; }
 
     public Camera3D Camera { get; private set; } = null!;
+
+    /// <summary>The pitch the mouse asks for (radians); the camera follows it unless work bends the head down.</summary>
+    private float _lookPitch, _appliedPitch;
+
+    /// <summary>Where the eyes go while the hands work (digging, sweeping the net), and how much (0..1).</summary>
+    public float WorkPitch { get; set; }
+
+    public float WorkBlend { get; set; }
+
+    /// <summary>Where the head goes while the hands work (bending over the shovel), scaled by WorkBlend.</summary>
+    public Vector3 WorkOffset { get; set; }
+
+    /// <summary>True while a tool is being used: the angler stands still.</summary>
+    public bool Busy { get; set; }
     public RodRig Rig { get; private set; } = null!;
     public Node3D RodTip => Rig.Tip;
 
@@ -71,6 +85,7 @@ public partial class Player : CharacterBody3D
         Velocity = Vector3.Zero;
         Rotation = Vector3.Zero;
         Camera.Rotation = Vector3.Zero;
+        _lookPitch = _appliedPitch = 0f;
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -78,8 +93,9 @@ public partial class Player : CharacterBody3D
         if (@event is InputEventMouseMotion motion && Input.MouseMode == Input.MouseModeEnum.Captured)
         {
             RotateY(-motion.Relative.X * MouseSensitivity);
-            float pitch = Math.Clamp(Camera.Rotation.X - motion.Relative.Y * MouseSensitivity, -1.4f, 1.4f);
-            Camera.Rotation = new Vector3(pitch, 0f, Camera.Rotation.Z);
+            _lookPitch = Math.Clamp(_lookPitch - motion.Relative.Y * MouseSensitivity, -1.4f, 1.4f);
+            _appliedPitch = Mathf.Lerp(_lookPitch, WorkPitch, WorkBlend);
+            Camera.Rotation = new Vector3(_appliedPitch, 0f, Camera.Rotation.Z);
         }
     }
 
@@ -87,10 +103,13 @@ public partial class Player : CharacterBody3D
     {
         using var perfScope = Graphics.Perf.Scope("player");
         var dir = Vector2.Zero;
-        if (Input.IsKeyPressed(Key.W)) dir.Y -= 1f;
-        if (Input.IsKeyPressed(Key.S)) dir.Y += 1f;
-        if (Input.IsKeyPressed(Key.A)) dir.X -= 1f;
-        if (Input.IsKeyPressed(Key.D)) dir.X += 1f;
+        if (!Busy)
+        {
+            if (Input.IsKeyPressed(Key.W)) dir.Y -= 1f;
+            if (Input.IsKeyPressed(Key.S)) dir.Y += 1f;
+            if (Input.IsKeyPressed(Key.A)) dir.X -= 1f;
+            if (Input.IsKeyPressed(Key.D)) dir.X += 1f;
+        }
         var move = (GlobalTransform.Basis * new Vector3(dir.X, 0f, dir.Y)).Normalized();
         var v = Velocity;
         float speed = Input.IsKeyPressed(Key.Shift) ? SprintSpeed : WalkSpeed;
@@ -146,8 +165,12 @@ public partial class Player : CharacterBody3D
         float speed = new Vector2(Velocity.X, Velocity.Z).Length();
         var action = ActionSource?.Invoke() ?? BodyAction.None;
         var pose = Motion.Update(dt, speed, IsOnFloor() || Bed == null, action);
-        Camera.Position = new Vector3(pose.HeadBobX, EyeHeight + pose.HeadBobY + pose.Breath, 0f);
-        Camera.Rotation = new Vector3(Camera.Rotation.X, 0f, pose.HeadRoll);
+        Camera.Position = new Vector3(pose.HeadBobX, EyeHeight + pose.HeadBobY + pose.Breath, 0f) + WorkOffset * WorkBlend;
+        // Someone else (a tool, a test) turned the camera: that is where the angler looks now.
+        if (MathF.Abs(Camera.Rotation.X - _appliedPitch) > 1e-4f)
+            _lookPitch = Camera.Rotation.X;
+        _appliedPitch = Mathf.Lerp(_lookPitch, WorkPitch, WorkBlend);
+        Camera.Rotation = new Vector3(_appliedPitch, 0f, pose.HeadRoll);
         Body.Apply(pose, action, dt);
     }
 }

@@ -58,23 +58,62 @@ public static class People
     /// the Quaternius villagers (CharacterAsset) dressed and busy as the role says, or the primitive figure without a
     /// screen.
     /// </summary>
-    public static Npc Create(Role role, int variant)
+    public static Npc Create(Role role, int variant) => Create(role, variant, null);
+
+    /// <summary>
+    /// A villager busy with something: <paramref name="idle"/> replaces the role's own (chopping wood, sitting by the
+    /// fire...), <paramref name="gestures"/> its occasional gestures, and <paramref name="inHand"/> is held in the right
+    /// fist (an axe, a bucket: built along +Y from the grip, the business end towards +X).
+    /// </summary>
+    public static Npc Create(Role role, int variant, string? idle, string[]? gestures = null, Node3D? inHand = null)
     {
         var look = LookFor(role, variant);
         var npc = new Npc { Name = role.ToString() };
-        var (appearance, idle, gestures) = Dress(role, variant, look);
+        var (appearance, defaultIdle, defaultGestures) = Dress(role, variant, look);
+        idle ??= defaultIdle;
+        gestures ??= defaultGestures;
         if (CharacterAsset.Create(appearance, idle) is { } model)
         {
             model.Scale = Vector3.One * (look.Height / CharacterAsset.HeightOf(appearance.Model));
             npc.AddChild(model);
-            npc.Rig(model, Greets(role), idle, gestures);
+            npc.Rig(model, Greets(role) && !idle.StartsWith("Sitting"), idle, gestures);
+            if (inHand != null && CharacterAsset.SkeletonOf(model) is { } skeleton)
+                Hold(skeleton, inHand);
         }
         else
+        {
+            inHand?.QueueFree();
             Build(npc, look, role);
+        }
         var body = new StaticBody3D { CollisionLayer = 1, Position = new Vector3(0f, look.Height * 0.5f, 0f) };
         body.AddChild(new CollisionShape3D { Shape = new CapsuleShape3D { Radius = 0.3f, Height = look.Height } });
         npc.AddChild(body);
         return npc;
+    }
+
+    /// <summary>
+    /// Puts a thing in the right fist: the handle across the palm (towards the index finger), the business end the way
+    /// the fingers point, worked out from the hand's rest pose (the packs' T-pose, palm down).
+    /// </summary>
+    private static void Hold(Skeleton3D sk, Node3D item)
+    {
+        int hand = sk.FindBone("hand_r"), mid = sk.FindBone("middle_01_r"), index = sk.FindBone("index_01_r"), pinky = sk.FindBone("pinky_01_r");
+        if (hand < 0 || mid < 0 || index < 0 || pinky < 0)
+        {
+            item.QueueFree();
+            return;
+        }
+        var rest = sk.GetBoneGlobalRest(hand);
+        var inv = rest.Basis.Inverse();
+        var fingers = (inv * (sk.GetBoneGlobalRest(mid).Origin - rest.Origin)).Normalized();
+        var across = (inv * (sk.GetBoneGlobalRest(index).Origin - sk.GetBoneGlobalRest(pinky).Origin)).Normalized();
+        var palm = (inv * Vector3.Down).Normalized();
+        across = (across - fingers * across.Dot(fingers)).Normalized();
+        var z = fingers.Cross(across).Normalized();
+        item.Transform = new Transform3D(new Basis(fingers, across, z), fingers * 0.075f + palm * 0.03f - across * 0.08f);
+        var at = new BoneAttachment3D { BoneName = "hand_r" };
+        sk.AddChild(at);
+        at.AddChild(item);
     }
 
     /// <summary>Shopkeepers and traders nod when the angler walks up to them.</summary>

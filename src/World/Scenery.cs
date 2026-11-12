@@ -237,6 +237,8 @@ public partial class Scenery : Node3D
 
         var loc = _lake.Location;
         BuildVillage(loc);
+        BuildCampfires(loc);
+        BuildEverydayLife(loc);
         BuildLandmarks(loc);
         var rng = new RandomNumberGenerator { Seed = 42 };
         ScatterTrees(loc, rng);
@@ -282,6 +284,242 @@ public partial class Scenery : Node3D
             Interactables.Add(spot);
             Markers.Add(new MapMarker(spec.Position, building.Title, MarkerColor(spec.Kind)));
         }
+    }
+
+    // ------------------------------------------------------------------ campfires
+    /// <summary>The campfires on this map: the angler's camp by the pier and the village hearth.</summary>
+    public List<Props.Campfire> Campfires { get; } = new();
+
+    /// <summary>Where the angler's camp stands (for tests and screenshots).</summary>
+    public Vector3 CampPosition { get; private set; }
+
+    /// <summary>
+    /// The angler's camp on the grass beside the pier (a fire ring with a tripod, two logs to sit on, a stack of wood, a
+    /// shovel stuck in the ground, a bucket and a crate) and a cooking hearth on the village square with logs around it.
+    /// Both are interactable: light the fire, cook fish from the keepnet.
+    /// </summary>
+    private void BuildCampfires(LocationData loc)
+    {
+        Campfires.Clear();
+        var layout = _lake.Layout;
+        bool Free(float x, float z, float pad, float path) =>
+            layout.PadDistance(x, z) > pad && layout.PathDistance(x, z) > path && _lake.IsWalkable(x, z);
+        // The camp: the nearest flat grass to the pier's foot, clear of paths and buildings.
+        Vector2? camp = null;
+        for (float r = 7f; r < 40f && camp == null; r += 1.5f)
+            for (float a = 0f; a < Mathf.Tau && camp == null; a += 0.25f)
+            {
+                float x = MathF.Cos(a) * r, z = 9f + MathF.Sin(a) * r * 0.6f;
+                float h = _lake.HeightAt(loc, x, z);
+                if (h < 0.9f || h > 4f || !Free(x, z, 5f, 3f))
+                    continue;
+                float slope = MathF.Abs(_lake.HeightAt(loc, x + 1.5f, z) - _lake.HeightAt(loc, x - 1.5f, z))
+                              + MathF.Abs(_lake.HeightAt(loc, x, z + 1.5f) - _lake.HeightAt(loc, x, z - 1.5f));
+                if (slope < 0.6f)
+                    camp = new Vector2(x, z);
+            }
+        if (camp is Vector2 c)
+            AddCampfire(loc, c, "Twoje obozowisko", true);
+        // The village hearth: on the square, a few metres off its middle, clear of the buildings.
+        var plaza = loc.PlazaCenter;
+        bool placed = false;
+        for (float r = 5f; r < 24f && !placed; r += 1.5f)
+            for (float a = 0.5f; a < Mathf.Tau + 0.5f && !placed; a += 0.35f)
+            {
+                var p = plaza + new Vector2(MathF.Cos(a), MathF.Sin(a)) * r;
+                float h = _lake.HeightAt(loc, p.X, p.Y);
+                if (layout.PadDistance(p.X, p.Y) > 3.5f && _lake.IsWalkable(p.X, p.Y) && h > 0.6f
+                    && new Vector2(p.X - (camp?.X ?? 1e4f), p.Y - (camp?.Y ?? 1e4f)).Length() > 12f)
+                {
+                    AddCampfire(loc, p, "Palenisko w wiosce", false);
+                    placed = true;
+                }
+            }
+    }
+
+    private void AddCampfire(LocationData loc, Vector2 at, string title, bool playerCamp)
+    {
+        float h = _lake.HeightAt(loc, at.X, at.Y);
+        var root = new Node3D { Position = new Vector3(at.X, h, at.Y), Name = playerCamp ? "Camp" : "Hearth" };
+        var fire = new Props.Campfire { Title = title, PlayerCamp = playerCamp };
+        root.AddChild(fire);
+        // Logs to sit on round the fire, facing it; at the village hearth two villagers sit on them and talk.
+        for (int i = 0; i < (playerCamp ? 2 : 3); i++)
+        {
+            float a = (playerCamp ? 0.6f + i * 2.2f : 0.4f + i * 2.1f);
+            var log = Props.CampProps.SeatLog(1.3f, i + (playerCamp ? 0 : 5), playerCamp ? 0.17f : 0.21f);
+            log.Position = new Vector3(MathF.Cos(a) * 1.7f, 0f, MathF.Sin(a) * 1.7f);
+            log.Rotation = new Vector3(0f, -a + Mathf.Pi / 2f, 0f);
+            root.AddChild(log);
+            if (!playerCamp && i < 2)
+            {
+                var sitter = Props.People.Create(i == 0 ? Props.Role.Elder : Props.Role.Woman, 40 + i,
+                    i == 0 ? "Sitting_Idle_Loop" : "Sitting_Talking_Loop", Array.Empty<string>());
+                // Facing the fire, seated on the log.
+                sitter.Position = new Vector3(MathF.Cos(a) * 1.78f, 0f, MathF.Sin(a) * 1.78f);
+                sitter.Rotation = new Vector3(0f, MathF.Atan2(-MathF.Cos(a), -MathF.Sin(a)), 0f);
+                root.AddChild(sitter);
+                Count("villager_sitting");
+            }
+        }
+        if (playerCamp)
+        {
+            // A stack of split wood, a shovel left stuck in the ground, a bucket and a crate.
+            for (int i = 0; i < 6; i++)
+            {
+                var piece = Props.CampProps.SeatLog(0.6f, i + 20);
+                piece.Scale = new Vector3(1f, 0.45f, 0.45f);
+                piece.Position = new Vector3(-2.4f + (i % 3) * 0.02f, 0.02f + (i / 3) * 0.14f, 1.1f + (i % 3) * 0.16f);
+                piece.Rotation = new Vector3(0f, 0.2f, 0f);
+                root.AddChild(piece);
+            }
+            var shovel = Props.CampProps.Shovel(out _);
+            shovel.Position = new Vector3(2.3f, -0.12f, 0.9f);
+            shovel.RotationDegrees = new Vector3(-12f, 30f, 8f);
+            root.AddChild(shovel);
+            if (Props.PropAsset.Create("wooden_bucket_01", height: 0.32f) is { } bucket)
+            {
+                bucket.Position = new Vector3(2.1f, 0f, -0.6f);
+                root.AddChild(bucket);
+            }
+            if (Props.PropAsset.Create("wooden_crate_01", height: 0.45f) is { } crate)
+            {
+                crate.Position = new Vector3(-2.2f, 0f, -0.9f);
+                crate.RotationDegrees = new Vector3(0f, 20f, 0f);
+                root.AddChild(crate);
+            }
+            CampPosition = root.Position;
+        }
+        AddChild(root);
+        Track(root);
+        Campfires.Add(fire);
+        var spot = new Interactable { Kind = InteractKind.Campfire, Title = title, Radius = 3.2f, Position = root.Position, Target = fire };
+        AddChild(spot);
+        Track(spot);
+        Interactables.Add(spot);
+        Markers.Add(new MapMarker(at, title, new Color(1f, 0.5f, 0.2f)));
+    }
+
+    // ------------------------------------------------------------------ everyday life
+    /// <summary>
+    /// Life round the houses: behind or beside each home one of a washing line (a woman hanging linen), a chopping
+    /// block with a woodcutter at a felled trunk, a rack of tools, a fishing net drying on poles (fishing and timber
+    /// villages) or a gardener watering with a bucket (farms); and rowboats pulled up on the shore by the pier.
+    /// </summary>
+    private void BuildEverydayLife(LocationData loc)
+    {
+        var layout = _lake.Layout;
+        int n = 0;
+        foreach (var building in _buildings)
+        {
+            if (!building.Spec.IsDwelling)
+                continue;
+            int kind = n++ % 4;
+            float r = building.Spec.PadRadius;
+            // Behind the house or to its side, where no path runs.
+            Vector3? at = null;
+            float yaw = building.Rotation.Y;
+            foreach (var local in new[] { new Vector3(0f, 0f, -r * 0.85f), new Vector3(r * 0.85f, 0f, -1f), new Vector3(-r * 0.85f, 0f, -1f) })
+            {
+                var p = building.Transform * local;
+                if (layout.PathDistance(p.X, p.Z) > 2f && _lake.IsWalkable(p.X, p.Z) && _lake.HeightAt(loc, p.X, p.Z) > 0.6f)
+                {
+                    at = new Vector3(p.X, _lake.HeightAt(loc, p.X, p.Z), p.Z);
+                    break;
+                }
+            }
+            if (at is not Vector3 spot)
+                continue;
+            var root = new Node3D { Position = spot, Rotation = new Vector3(0f, yaw, 0f) };
+            switch (kind)
+            {
+                case 0:
+                    root.AddChild(Props.Everyday.LaundryLine(n));
+                    var washer = Props.People.Create(Props.Role.Woman, n * 3 + 1, "Idle_Loop", new[] { "PickUp_Table", "Interact" });
+                    washer.Position = new Vector3(0.4f, 0f, 0.9f);
+                    washer.RotationDegrees = new Vector3(0f, 180f, 0f);
+                    root.AddChild(washer);
+                    Count("villager_washing");
+                    break;
+                case 1:
+                    var block = Props.Everyday.ChoppingBlock(n);
+                    block.Position = new Vector3(-1.4f, 0f, 0f);
+                    root.AddChild(block);
+                    // A felled trunk standing up to be split; the woodcutter swings at it.
+                    var trunk = new MeshInstance3D
+                    {
+                        Mesh = new CylinderMesh { TopRadius = 0.2f, BottomRadius = 0.24f, Height = 1.5f, RadialSegments = 12 },
+                        Position = new Vector3(0.9f, 0.75f, 0f), MaterialOverride = Props.TreeFactory.BarkMaterial("pine"),
+                    };
+                    root.AddChild(trunk);
+                    var cutter = Props.People.Create(Props.Role.Hunter, n * 5 + 2, "TreeChopping_Loop", Array.Empty<string>(), Props.Everyday.Axe());
+                    cutter.Position = new Vector3(0.9f, 0f, 1.05f);
+                    cutter.RotationDegrees = new Vector3(0f, 180f, 0f);
+                    root.AddChild(cutter);
+                    Count("villager_woodcutter");
+                    break;
+                case 2:
+                    // A rack of tools: a beam on two posts, the tools leaning against it.
+                    foreach (float x in new[] { -0.8f, 0.8f })
+                        root.AddChild(new MeshInstance3D
+                        {
+                            Mesh = new CylinderMesh { TopRadius = 0.04f, BottomRadius = 0.045f, Height = 1.2f, RadialSegments = 8 },
+                            Position = new Vector3(x, 0.6f, 0f), MaterialOverride = Props.CampProps.DarkWood,
+                        });
+                    root.AddChild(new MeshInstance3D
+                    {
+                        Mesh = new CylinderMesh { TopRadius = 0.035f, BottomRadius = 0.035f, Height = 1.8f, RadialSegments = 8 },
+                        Position = new Vector3(0f, 1.15f, 0f), RotationDegrees = new Vector3(0f, 0f, 90f), MaterialOverride = Props.CampProps.DarkWood,
+                    });
+                    var tools = Props.Everyday.LeaningTools(n);
+                    tools.Position = new Vector3(0f, 0f, -0.42f);
+                    root.AddChild(tools);
+                    break;
+                default:
+                    if (loc.VillageStyle == "farm")
+                    {
+                        Node3D? bucket = Props.PropAsset.Create("wooden_bucket_01", height: 0.28f);
+                        var gardener = Props.People.Create(Props.Role.Farmer, n * 7 + 3, "Farm_Watering", new[] { "Idle_Loop" }, bucket);
+                        root.AddChild(gardener);
+                        Count("villager_gardener");
+                    }
+                    else
+                    {
+                        root.AddChild(Props.Everyday.NetRack(n));
+                        Count("net_rack");
+                    }
+                    break;
+            }
+            AddChild(root);
+            Track(root);
+            Count("everyday_" + kind);
+        }
+        // Rowboats pulled up on the beach either side of the pier, bows towards the water.
+        int boats = 0;
+        foreach (float side in new[] { -1f, 1f })
+            for (float x = 7f; x < 40f && boats < (side < 0 ? 1 : 2); x += 2f)
+            {
+                float bx = side * x;
+                for (float z = -2f; z < 14f; z += 1f)
+                {
+                    float h = _lake.HeightAt(loc, bx, z);
+                    if (h < 0.08f || h > 0.45f || layout.PathDistance(bx, z) < 3f)
+                        continue;
+                    // The bow points down the slope, towards the water.
+                    float dx = _lake.HeightAt(loc, bx + 1f, z) - _lake.HeightAt(loc, bx - 1f, z);
+                    float dz = _lake.HeightAt(loc, bx, z + 1f) - _lake.HeightAt(loc, bx, z - 1f);
+                    float boatYaw = MathF.Atan2(-dx, -dz);
+                    var boat = Props.Everyday.Rowboat(boats + (int)loc.RimHeight);
+                    boat.Position = new Vector3(bx, h - 0.03f, z);
+                    boat.Rotation = new Vector3(0.04f, boatYaw, 0.06f * side);
+                    AddChild(boat);
+                    Track(boat);
+                    boats++;
+                    Count("rowboat");
+                    x = 1000f;
+                    break;
+                }
+            }
     }
 
     // ------------------------------------------------------------------ landmarks

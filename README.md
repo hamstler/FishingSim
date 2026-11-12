@@ -38,6 +38,19 @@ gdy podchodzisz, a głowy odwracają się za wędkarzem. W widoku z pierwszej os
 (rękawy koszuli, dłonie z palcami): kości ramion ustawia IK, więc prawa dłoń obejmuje rękojeść wędki, a lewa kręci
 korbką kołowrotka.
 
+**Życie obozowe:** pod Q masz w ręku wędkę, łopatę albo siatkę na owady. Łopatą kopiesz w wilgotnej ziemi (kamera
+pochyla się nad robotą, ostrze wchodzi w ziemię, grudka z wijącymi się robakami ląduje obok, zostaje dołek): najwięcej
+robaków jest na wilgotnym brzegu i łące, w lesie trafiają się pędraki, rosówki wychodzą nocą i po deszczu, a w tym
+samym miejscu drugi raz nic nie znajdziesz. Siatką machasz nad wodą o zmierzchu, gdzie tańczą roje jętek (widać je nad
+brzegiem), w dzień po łące za konikami polnymi, a o zmroku przy drzewach za chrabąszczami. Przy pomoście stoi twoje
+obozowisko (krąg kamieni, trójnóg, kłody, drewno, wbita łopata, wiadro), a na placu każdej wioski palenisko. Rozpalasz
+ogień (płomienie, iskry, dym, migoczące światło, trzask) i gotujesz rybę z siatki: rybę z rożna albo zupę rybną w
+garnku. Posiłek daje premię na kilka godzin gry (więcej XP, szybsze brania), widoczną na HUD.
+
+**Codzienne życie wiosek:** przy domach schnie pranie na sznurach, drwal rąbie drewno przy pieńku z siekierą, stoją
+stojaki z widłami, grabiami i łopatą, na żerdziach suszą się sieci z pływakami, na wsiach ogrodnik podlewa grządki, a
+przy palenisku siedzą i rozmawiają mieszkańcy. Na brzegu obok pomostu leżą wyciągnięte łodzie z wiosłami.
+
 **Panel połowu:** po wyjęciu ryby świat przygasa, a na rzeźbionej karcie złowiona ryba obraca się powoli wokół własnej
 osi w świetle studyjnego reflektora (wjeżdża z lekkim obrotem i porusza płetwami). Pod nią waga, długość, cena w skupie,
 doświadczenie i rekord, stan siatki, ostrzeżenie o wymiarze ochronnym albo pełnej siatce oraz wybór: do siatki (E) albo
@@ -128,6 +141,9 @@ repozytorium, więc lepiej przebudowywać tylko zmienione gatunki. Opis całego 
 | Spacja | kasarek (podbierak): wyjmuje rybę przy brzegu. Trzeba go kupić; bez kasarka Spacja nic nie robi |
 | Kółko myszy | hamulec (wartość w procentach w prawym dolnym rogu) |
 | E / R (zaraz po złowieniu) | ryba do siatki / do wody (+3 XP) |
+| Q (Shift+Q wstecz) | narzędzie w ręku: wędka, łopata, siatka na owady (łopatę i siatkę kupisz w kramie) |
+| LPM z łopatą / siatką | kopanie (robaki, rosówki, pędraki) / zamach siatką (jętki, koniki polne, chrabąszcze) |
+| E przy ognisku | panel ogniska: rozpalenie i gotowanie ryb z siatki |
 | 1-6 (Shift = wstecz) | wędka, kołowrotek, żyłka, hak, przynęta, przypon (tylko przed rzutem) |
 | I / M / J / T | ekwipunek, mapa, dziennik, turnieje |
 | E | wejście do kramu, gildii, na targ lub na postój wozów (przy drzwiach budynku) |

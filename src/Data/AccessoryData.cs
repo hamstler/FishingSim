@@ -21,6 +21,12 @@ public enum AccessoryKind
     HookHone,
     /// <summary>Smalec do kołowrotka: the reel winds faster (Power = extra share of speed).</summary>
     ReelGrease,
+    /// <summary>Łopata: a hand tool (Q) to dig for worms, night crawlers and grubs (Core/Camp/Digging).</summary>
+    Shovel,
+    /// <summary>Siatka na owady: a hand tool (Q) to catch mayflies, grasshoppers and chafers (Core/Camp/Sweeping).</summary>
+    InsectNet,
+    /// <summary>Garnek: cook fish soup over a campfire (Core/Camp/Cooking).</summary>
+    CookingPot,
 }
 
 /// <summary>Any other accessory. Owning one is enough for it to work (they are not equipped in a slot).</summary>

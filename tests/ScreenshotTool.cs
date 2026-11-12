@@ -460,6 +460,124 @@ public partial class ScreenshotTool : Node
             for (int i = 0; i < 30; i++)
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         }
+        else if (mode == 25)
+        {
+            // Camp tools: arg 0 = digging with the shovel on the damp bank near the pier, 1 = the insect net through a
+            // mayfly swarm (use an evening hour). FISHSIM_SHOT_WAIT = seconds into the action (default 0.85).
+            main.Rod.Profile.Money += 1000;
+            foreach (var id in new[] { "lopata", "siatka_na_owady", "garnek" })
+                main.Gear.Buy(GearSlot.Accessory, GD.Load<TackleItem>($"res://data/tackle/accessories/{id}.tres"));
+            var lake = main.Rod.Lake;
+            Vector3 stand = Vector3.Zero, look = Vector3.Forward;
+            if (arg == 1 && main.Swarms.Spots.Count > 0)
+            {
+                var spot = main.Swarms.Spots[0];
+                // Stand on the bank, the swarm in front: step away from the water.
+                var away = Vector3.Zero;
+                foreach (var d in new[] { Vector3.Right, Vector3.Left, Vector3.Forward, Vector3.Back })
+                    away += d * lake.HeightAt(spot.X + d.X * 3f, spot.Z + d.Z * 3f);
+                away = away.LengthSquared() > 1e-6f ? away.Normalized() : Vector3.Back;
+                stand = spot + away * 1.6f;
+                look = spot - stand;
+            }
+            else
+            {
+                for (float r = 6f; r < 80f && stand == Vector3.Zero; r += 1.5f)
+                    for (float ang = 0f; ang < Mathf.Tau; ang += 0.2f)
+                    {
+                        float x = MathF.Cos(ang) * r, z = MathF.Sin(ang) * r - 6f;
+                        var ahead = new Vector3(x, 0, z) + new Vector3(MathF.Cos(ang), 0, MathF.Sin(ang)) * 0.85f;
+                        if (lake.GroundKindAt(x, z) == FishingSim.Core.Camp.GroundKind.Mud && lake.GroundKindAt(ahead.X, ahead.Z) == FishingSim.Core.Camp.GroundKind.Mud)
+                        {
+                            stand = new Vector3(x, 0, z);
+                            look = new Vector3(MathF.Cos(ang), 0, MathF.Sin(ang));
+                            break;
+                        }
+                    }
+            }
+            main.Player.GlobalPosition = new Vector3(stand.X, lake.HeightAt(stand.X, stand.Z) + 0.3f, stand.Z);
+            main.Player.Rotation = new Vector3(0f, MathF.Atan2(-look.X, -look.Z), 0f);
+            for (int i = 0; i < 20; i++)
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            main.Tools.Select(arg == 1 ? FishingSim.Fishing.HandTool.Net : FishingSim.Fishing.HandTool.Shovel);
+            for (int i = 0; i < 10; i++)
+                await NextFrame();
+            // FISHSIM_TOOL_AT = the point of the action (0..1) to stop at, so slow frames do not run past it.
+            if (float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_TOOL_AT"), System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out float freeze))
+                main.Tools.FreezeAt = freeze;
+            if (System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_IDLE") != "1")
+                main.Tools.Use();
+            double at = double.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_WAIT"), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out double w) ? w : 0.85;
+            await ToSignal(GetTree().CreateTimer(at), SceneTreeTimer.SignalName.Timeout);
+            GD.Print($"tools: {main.Tools.Current} at {stand} ground {lake.GroundKindAt(stand.X, stand.Z)} haul {main.Tools.LastHaul?.Message}");
+        }
+        else if (mode == 26)
+        {
+            // The angler's camp: arg 0 = the fire lit, fish roasting on the spit; 1 = soup in the pot; 2 = the cooking
+            // panel open; 3 = the village hearth, lit.
+            main.Rod.Profile.Money += 1000;
+            main.Gear.Buy(GearSlot.Accessory, GD.Load<TackleItem>("res://data/tackle/accessories/garnek.tres"));
+            var carp = GD.Load<FishSpecies>("res://data/fish/karp.tres");
+            var roach = GD.Load<FishSpecies>("res://data/fish/ploc.tres");
+            main.Rod.Profile.Keep(roach, 0.35f);
+            main.Rod.Profile.Keep(roach, 0.42f);
+            main.Rod.Profile.Keep(carp, 2.1f);
+            var fire = main.Scenery.Campfires[arg == 3 ? main.Scenery.Campfires.Count - 1 : 0];
+            var at = fire.GetParent<Node3D>().GlobalPosition;
+            var lake = main.Rod.Lake;
+            var from = at + new Vector3(2.6f, 0f, 2.6f);
+            main.Player.GlobalPosition = new Vector3(from.X, lake.HeightAt(from.X, from.Z) + 0.3f, from.Z);
+            var d = at - from;
+            main.Player.Rotation = new Vector3(0f, MathF.Atan2(-d.X, -d.Z), 0f);
+            main.Player.Camera.Rotation = new Vector3(-0.32f, 0f, 0f);
+            for (int i = 0; i < 20; i++)
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            fire.Light();
+            if (arg is 0 or 1)
+            {
+                main.Cooking.Open(fire);
+                main.Cooking.Cook(FishingSim.Core.Camp.Cooking.All[arg]);
+            }
+            else if (arg == 2)
+                main.Cooking.Open(fire);
+            await ToSignal(GetTree().CreateTimer(3.0), SceneTreeTimer.SignalName.Timeout);
+            GD.Print($"camp at {at}: lit {fire.Lit} cooking {fire.Cooking?.Name} fires {main.Scenery.Campfires.Count}");
+        }
+        else if (mode == 27)
+        {
+            // Everyday life: arg 0 = woodcutter, 1 = washing line, 2 = village hearth, 3 = rowboat, 4 = net rack, 5 = tool rack.
+            string[] names = { "ChoppingBlock", "Laundry", "Hearth", "Rowboat", "NetRack", "Tools" };
+            var target = main.Scenery.FindChild(names[Math.Clamp(arg, 0, names.Length - 1)], true, false) as Node3D;
+            if (target != null)
+            {
+                var at = target.GlobalPosition;
+                var lake = main.Rod.Lake;
+                float dist = arg == 2 ? 5.5f : 4.2f;
+                Vector3 best = at + new Vector3(dist, 0, 0);
+                // A spot to stand: on walkable ground, preferring the one with the clearest ground between.
+                for (float ang = 0f; ang < Mathf.Tau; ang += 0.4f)
+                {
+                    var p = at + new Vector3(MathF.Cos(ang) * dist, 0f, MathF.Sin(ang) * dist);
+                    if (lake.IsWalkable(p.X, p.Z) && lake.HeightAt(p.X, p.Z) > 0.3f)
+                    {
+                        best = p;
+                        if (ang > 1.5f)
+                            break;
+                    }
+                }
+                main.Player.GlobalPosition = new Vector3(best.X, lake.HeightAt(best.X, best.Z) + 0.3f, best.Z);
+                var d = at - best;
+                main.Player.Rotation = new Vector3(0f, MathF.Atan2(-d.X, -d.Z), 0f);
+                main.Player.Camera.Rotation = new Vector3(-0.18f, 0f, 0f);
+                if (arg == 2 && main.Scenery.Campfires.Count > 1)
+                    main.Scenery.Campfires[^1].Light();
+            }
+            GD.Print($"everyday {arg}: {(target != null ? target.GlobalPosition.ToString() : "none")}");
+            for (int i = 0; i < 40; i++)
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
         else if (mode is 10 or 11)
         {
             var spot = main.Scenery.Interactables.First(i => i.Kind is InteractKind.Tackle or InteractKind.General);

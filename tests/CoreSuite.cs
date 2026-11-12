@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using FishingSim.Core;
 using FishingSim.Data;
 using Godot;
+using FishingSim.Core.Camp;
+using FishingSim.Progress;
 
 namespace FishingSim.Tests;
 
@@ -30,6 +32,8 @@ public sealed class CoreSuite : ITestSuite
         t.Check(Progression.FishValue(roach, 0.8f) == 10, "0.8 kg roach sells for 10 zł");
         t.Check(Progression.FishValue(carp, 5f) == 125, "5 kg carp sells for 125 zł");
         t.Check(Progression.FishXp(carp, 14f) > Progression.FishXp(roach, 0.4f) * 5, "a big carp is worth far more XP than a small roach");
+
+        CampLife(t, roach, carp);
 
         t.Section("data resources load with their C# types");
         t.Check(roach.SpeciesName == "Płoć" && carp.PricePerKg == 25f, "species .tres values arrive in the C# properties");
@@ -217,5 +221,69 @@ public sealed class CoreSuite : ITestSuite
         for (int i = 0; i < 600; i++)
             model.Step(1f / 60f, 0.5f, true);
         return $"{model.LineOut:0.0000}/{model.Tension:0.0000}/{model.Stamina:0.0000}";
+    }
+
+    /// <summary>Digging, the insect net, cooking and meals (Core/Camp).</summary>
+    private static void CampLife(TestContext t, FishSpecies roach, FishSpecies carp)
+    {
+        t.Section("camp life: digging, insects, cooking");
+        var rng = new FishingSim.Core.SystemRng(7);
+        int Total(GroundKind g, float hour, Weather w, string id)
+        {
+            int n = 0;
+            for (int i = 0; i < 300; i++)
+                n += Digging.Dig(g, hour, w, false, rng).Baits.GetValueOrDefault(id);
+            return n;
+        }
+        t.Check(Digging.Dig(GroundKind.Path, 12f, Weather.Clear, false, rng).Total == 0
+                && Digging.Dig(GroundKind.Rock, 12f, Weather.Clear, false, rng).Total == 0,
+            "a trodden path or rock gives no bait");
+        t.Check(Enumerable.Range(0, 50).All(_ => Digging.Dig(GroundKind.Mud, 2f, Weather.Rain, true, rng).Total == 0),
+            "a spot already dug gives nothing again");
+        int mud = Total(GroundKind.Mud, 12f, Weather.Clear, Digging.Worm), sand = Total(GroundKind.Sand, 12f, Weather.Clear, Digging.Worm);
+        int dry = Total(GroundKind.Meadow, 12f, Weather.Clear, Digging.Worm), wet = Total(GroundKind.Meadow, 12f, Weather.Rain, Digging.Worm);
+        t.Check(mud > sand * 4 && wet > dry, $"worms: a damp bank beats sand ({mud} vs {sand}), rain brings them up ({wet} vs {dry})");
+        t.Check(Total(GroundKind.Meadow, 12f, Weather.Clear, Digging.NightCrawler) == 0 && Total(GroundKind.Meadow, 23f, Weather.Rain, Digging.NightCrawler) > 50,
+            "night crawlers only at night or after rain");
+        t.Check(Total(GroundKind.Forest, 12f, Weather.Clear, Digging.Grub) > 60 && Total(GroundKind.Meadow, 12f, Weather.Clear, Digging.Grub) == 0,
+            "grubs come from the forest floor");
+
+        t.Check(Sweeping.MayflyActivity(12f, Weather.Clear) == 0f && Sweeping.MayflyActivity(19f, Weather.Clear) > 0.9f
+                && Sweeping.MayflyActivity(19f, Weather.Rain) == 0f, "mayflies dance over the water at dusk, not at noon or in rain");
+        int flies = 0, hoppers = 0;
+        for (int i = 0; i < 200; i++)
+        {
+            flies += Sweeping.Sweep(new SweepContext(GroundKind.Sand, true, false, 19f, Weather.Clear, 1f), rng).Baits.GetValueOrDefault(Sweeping.Mayfly);
+            hoppers += Sweeping.Sweep(new SweepContext(GroundKind.Meadow, false, false, 13f, Weather.Clear, 0f), rng).Baits.GetValueOrDefault(Sweeping.Grasshopper);
+        }
+        t.Check(flies > 300 && hoppers > 100, $"a swarm fills the net with mayflies ({flies}), a warm meadow gives grasshoppers ({hoppers})");
+        t.Check(Sweeping.Sweep(new SweepContext(GroundKind.Meadow, true, true, 19f, Weather.Rain, 1f), rng).Total == 0, "rain grounds every insect");
+        foreach (var id in new[] { "jetka", "pedrak", Digging.NightCrawler, Sweeping.Grasshopper, Sweeping.Beetle })
+            t.Check(GD.Load<BaitData>($"res://data/tackle/baits/{id}.tres") != null, $"bait {id} exists");
+
+        var fish = new List<Cooking.Ingredient>
+        {
+            new(0, 2.4f, 60, false), new(1, 0.3f, 4, false), new(2, 0.08f, 1, false), new(3, 0.5f, 6, true),
+        };
+        t.Check(Cooking.Pick(Cooking.Roast, fish) is [3], "a roast takes the cheapest fish big enough to eat, undersized first");
+        t.Check(Cooking.Missing(Cooking.Soup, fish, hasPot: false) != null && Cooking.Pick(Cooking.Soup, fish) is { Count: >= 2 } soup
+                && !soup.Contains(0), "soup needs the pot and two or more fish, sparing the valuable one");
+        t.Check(Cooking.Missing(Cooking.Roast, new List<Cooking.Ingredient>(), true) != null, "nothing to cook from an empty keepnet");
+
+        var p = new Profile();
+        p.Keepnet.Add(new CatchRecord("Płoć", 0.3f, 4));
+        p.Keepnet.Add(new CatchRecord("Karp", 3f, 75));
+        int xpPlain = p.AddCatch(roach, 0.4f, toKeepnet: false).Xp;
+        var used = p.Cook(Cooking.Roast, hasPot: false, out var error);
+        t.Check(error == null && used is { Count: 1 } && used[0].Species == "Płoć" && p.Keepnet.Count == 1 && p.ActiveMeal?.Name == "Syty",
+            "cooking takes the roach from the keepnet and the meal starts");
+        int xpFed = p.AddCatch(roach, 0.4f, toKeepnet: false).Xp;
+        t.Check(xpFed > xpPlain, $"a fed angler gains more XP ({xpFed} vs {xpPlain})");
+        var json = ProfileSerializer.ToJson(p).ToJsonString();
+        t.Check(ProfileSerializer.FromJson(json).ActiveMeal?.Name == "Syty", "the meal survives a save");
+        p.PassTime(Cooking.Roast.Buff.Hours + 0.1f);
+        t.Check(p.ActiveMeal == null, "the meal wears off after its hours");
+        p.AddBait(new Dictionary<string, int> { ["jetka"] = 3 });
+        t.Check(p.BaitCounts.GetValueOrDefault("jetka") == 3, "gathered bait goes into the bait box");
     }
 }

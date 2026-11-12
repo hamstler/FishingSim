@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AccessoryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/AccessoryData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Łopata z jesionowym trzonkiem"
+Kind = 8
+Power = 1.0
+Description = "Kop w wilgotnej ziemi: robaki na łące i przy brzegu, pędraki w lesie, rosówki nocą i po deszczu. Q zmienia narzędzie w ręku."
+Price = 40
+RequiredLevel = 1

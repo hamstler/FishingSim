@@ -287,8 +287,13 @@ public partial class FishingRod : Node3D
     public float Attraction() => BiteModel.Attraction(_species, MakeBiteContext(CurrentDepth()));
 
     // ------------------------------------------------------------------ input
+    /// <summary>True while another tool is in the hands (shovel, insect net): the rod is put away, it does nothing.</summary>
+    public bool Holstered { get; set; }
+
     public override void _UnhandledInput(InputEvent @event)
     {
+        if (Holstered)
+            return;
         if (InputBlocked)
         {
             if (AllowHookKey && @event is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Right })
@@ -404,7 +409,7 @@ public partial class FishingRod : Node3D
         if (_bobber == null)
             return;
         float dt = (float)delta;
-        bool captured = !InputBlocked && Input.MouseMode == Input.MouseModeEnum.Captured;
+        bool captured = !InputBlocked && !Holstered && Input.MouseMode == Input.MouseModeEnum.Captured;
         Reeling = ReelOverride || (captured && Input.IsMouseButtonPressed(MouseButton.Left));
         Lifting = LiftOverride || (captured && Input.IsMouseButtonPressed(MouseButton.Right));
         BannerTime = MathF.Max(BannerTime - dt, 0f);
@@ -464,6 +469,9 @@ public partial class FishingRod : Node3D
         State = s;
         _stateTime = 0f;
     }
+
+    /// <summary>Shows a line in the banner (camp tools, cooking).</summary>
+    public void Notify(string text, float seconds = 3f) => ShowBanner(text, seconds);
 
     private void ShowBanner(string text, float seconds = 3f)
     {
@@ -565,7 +573,8 @@ public partial class FishingRod : Node3D
     private void NewBiteTimer() =>
         _biteTimer = DevInstantBite
             ? 0.5f
-            : BiteModel.WaitSeconds(_rng, BiteWaitMin, BiteWaitMax, _lineVisibility, Attraction());
+            : BiteModel.WaitSeconds(_rng, BiteWaitMin, BiteWaitMax, _lineVisibility, Attraction())
+              / (1f + (Profile.ActiveMeal?.BiteBonus ?? 0f));   // a well-fed angler waits a little less
 
     private void TickWaiting(float dt)
     {

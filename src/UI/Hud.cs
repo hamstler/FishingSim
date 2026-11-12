@@ -23,6 +23,54 @@ public partial class Hud : CanvasLayer
     private FishingRod _rod = null!;
     private TournamentManager _tournaments = null!;
     private InteractionManager _interactions = null!;
+    private HBoxContainer _toolbar = null!;
+    private Label _meal = null!;
+    private string _toolbarKey = "";
+
+    /// <summary>The angler's tools (set by Main), shown as a little bar when more than the rod is owned.</summary>
+    public HandTools? Tools { get; set; }
+
+    private void UpdateToolbar()
+    {
+        if (Tools == null)
+            return;
+        var list = Tools.Available();
+        string key = string.Join(",", list) + "|" + Tools.Current;
+        if (key != _toolbarKey)
+        {
+            _toolbarKey = key;
+            foreach (var c in _toolbar.GetChildren())
+                c.QueueFree();
+            foreach (var tool in list)
+            {
+                bool on = tool == Tools.Current;
+                var slot = new PanelContainer { CustomMinimumSize = new Vector2(52, 52), TooltipText = HandTools.NameOf(tool) };
+                slot.AddThemeStyleboxOverride("panel", UiArt.Nine(UiArt.InsetTexture, 4, 3));
+                slot.Modulate = on ? Colors.White : new Color(1f, 1f, 1f, 0.55f);
+                slot.AddChild(new TextureRect
+                {
+                    Texture = IconOf(tool), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                    StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered, CustomMinimumSize = new Vector2(44, 44),
+                });
+                if (on)
+                    slot.AddThemeStyleboxOverride("panel", UITheme.Box(new Color(0.3f, 0.22f, 0.1f, 0.85f), UITheme.Accent, 4, 2, 3));
+                _toolbar.AddChild(slot);
+            }
+            var hint = new Label { Text = "Q", SizeFlagsVertical = Control.SizeFlags.ShrinkCenter };
+            hint.AddThemeFontSizeOverride("font_size", 14);
+            hint.AddThemeColorOverride("font_color", new Color(Ink, 0.8f));
+            _toolbar.AddChild(hint);
+        }
+        _toolbar.Visible = list.Count > 1 && !_helpOpen;
+    }
+
+    private Texture2D IconOf(HandTool tool) => tool switch
+    {
+        HandTool.Shovel => Graphics.Icons.For(GD.Load<Data.AccessoryData>("res://data/tackle/accessories/lopata.tres")),
+        HandTool.Net => Graphics.Icons.For(GD.Load<Data.AccessoryData>("res://data/tackle/accessories/siatka_na_owady.tres")),
+        _ => Graphics.Icons.For(_rod.Loadout.Rod),
+    };
+
     private Label _status = null!, _purse = null!, _tackle = null!, _time = null!, _banner = null!, _prompt = null!, _tournament = null!;
     private Label _help = null!, _hint = null!, _dev = null!, _drag = null!;
     private ProgressBar _power = null!;
@@ -117,6 +165,14 @@ public partial class Hud : CanvasLayer
 
         _banner = Text(26, Ink, HorizontalAlignment.Center);
         Anchor(_banner, 0.5f, 0f, -420, 90, 420, 220);
+
+        // The tools in hand (Q): rod, shovel, insect net; and the meal's buff under them.
+        _toolbar = new HBoxContainer { Visible = false };
+        _toolbar.AddThemeConstantOverride("separation", 6);
+        Anchor(_toolbar, 0f, 1f, 16, -168, 300, -112);
+        AddChild(_toolbar);
+        _meal = Text(14, new Color(1f, 0.86f, 0.55f));
+        Anchor(_meal, 0f, 1f, 16, -196, 520, -170);
 
         _prompt = Text(19, Gold, HorizontalAlignment.Center);
         Anchor(_prompt, 0.5f, 1f, -400, -170, 400, -140);
@@ -249,6 +305,12 @@ public partial class Hud : CanvasLayer
         SetText(_time, $"{rod.World.TimeText}  ·  {rod.World.Weather.DisplayName()}\n{rod.Lake.Location.DisplayName}");
         if (_minimap == null)
             Fade(_time, details, dt);
+
+        UpdateToolbar();
+        SetText(_meal, pr.ActiveMeal is { } meal
+            ? $"{meal.Name}: +{meal.XpBonus * 100f:0}% XP, szybsze brania ({pr.MealHoursLeft:0.0} h)"
+            : "");
+        Fade(_meal, pr.ActiveMeal != null, dt);
 
         var spot = _interactions.Current;
         if (spot != null)

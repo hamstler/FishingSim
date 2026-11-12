@@ -94,6 +94,13 @@ public static class ProfileSerializer
             },
             ["location_idx"] = p.LocationIdx,
             ["hour"] = p.Hour,
+            ["meal"] = p.ActiveMeal is { } meal
+                ? new JsonObject
+                {
+                    ["name"] = meal.Name, ["hours"] = meal.Hours, ["xp_bonus"] = meal.XpBonus, ["bite_bonus"] = meal.BiteBonus,
+                    ["left"] = p.MealHoursLeft,
+                }
+                : null,
         };
     }
 
@@ -195,6 +202,11 @@ public static class ProfileSerializer
         {
             foreach (var (k, v) in eq)
                 if (v != null) p.Equipped[k] = v.GetValue<string>();
+        }
+        if (d["meal"] is JsonObject m && Str(m["name"]) is string mealName)
+        {
+            p.Meal = new Core.Camp.MealBuff(mealName, Float(m["hours"], 1f), Float(m["xp_bonus"], 0f), Float(m["bite_bonus"], 0f));
+            p.MealHoursLeft = Float(m["left"], 0f);
         }
         // Saves from before keepnets/landing nets keep the starter gear that Reset() gave them.
         if (d["gear"] is JsonObject gear)

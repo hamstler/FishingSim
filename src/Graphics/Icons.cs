@@ -210,6 +210,7 @@ public static class Icons
     }
 
     private static Color C(float r, float g, float b) => new(r, g, b);
+    private static Color C(float r, float g, float b, float a) => new(r, g, b, a);
 
     private static ImageTexture Cached(string key, Func<Canvas, Canvas> draw)
     {
@@ -348,6 +349,25 @@ public static class Icons
                 foreach (var (x, y) in new[] { (20, 24), (40, 22), (30, 40), (46, 42) })
                     for (int k = 0; k < 4; k++)
                         c.Disc(x + k * 3, y + k, 3.2f, 3.6f, C(0.96f, 0.92f, 0.8f), C(0.85f, 0.8f, 0.66f));
+                break;
+            case "jetka":                                // mayfly: slim body, upright wings, three long tails
+                c.Line(18, 40, 44, 30, 3.5f, C(0.78f, 0.7f, 0.5f));
+                c.Disc(46, 29, 4, 3.5f, C(0.6f, 0.5f, 0.32f));
+                c.Line(18, 40, 4, 44, 1f, C(0.55f, 0.48f, 0.34f));
+                c.Line(18, 40, 6, 50, 1f, C(0.55f, 0.48f, 0.34f));
+                c.Line(18, 40, 10, 56, 1f, C(0.55f, 0.48f, 0.34f));
+                c.Disc(34, 18, 7, 14, C(0.82f, 0.86f, 0.88f, 0.85f), C(0.62f, 0.68f, 0.7f, 0.85f));
+                c.Disc(27, 24, 5, 9, C(0.78f, 0.82f, 0.85f, 0.8f));
+                break;
+            case "pedrak":                               // chafer grub curled into a C, brown head, little legs
+                for (int i = 0; i < 26; i++)
+                {
+                    float a = 0.6f + i / 25f * 4.4f;
+                    c.Disc(32 + MathF.Cos(a) * 14, 34 + MathF.Sin(a) * 13, 7.5f - i * 0.12f, 7.5f - i * 0.12f, C(0.95f, 0.92f, 0.82f), C(0.82f, 0.78f, 0.66f));
+                }
+                c.Disc(42, 23, 6, 5.5f, C(0.62f, 0.4f, 0.18f), C(0.48f, 0.3f, 0.12f));
+                foreach (var (x, y) in new[] { (36, 26), (33, 29), (31, 33) })
+                    c.Line(x, y, x - 5, y + 2, 1.5f, C(0.55f, 0.36f, 0.16f));
                 break;
             case "insect":
                 c.Disc(30, 34, 15, 6, C(0.45f, 0.65f, 0.2f), C(0.32f, 0.5f, 0.15f));
@@ -603,6 +623,29 @@ public static class Icons
                 c.Disc(32, 40, 18, 16, C(0.62f, 0.38f, 0.22f), C(0.48f, 0.28f, 0.16f));
                 c.Disc(32, 26, 14, 4, C(0.96f, 0.93f, 0.82f));
                 c.Rect(18, 22, 46, 24, C(0.5f, 0.3f, 0.17f));
+                break;
+            case AccessoryKind.Shovel:             // ash handle with a D grip, iron blade
+                c.Line(20, 8, 38, 40, 4f, C(0.62f, 0.44f, 0.26f));
+                c.Ring(18, 8, 5, 2.5f, C(0.5f, 0.34f, 0.2f));
+                c.Disc(42, 47, 10, 12, C(0.55f, 0.56f, 0.6f), C(0.4f, 0.41f, 0.45f));
+                c.Line(35, 38, 48, 58, 2f, C(0.75f, 0.76f, 0.8f));
+                c.Disc(45, 54, 6, 4, C(0.42f, 0.3f, 0.18f));
+                break;
+            case AccessoryKind.InsectNet:          // pole, ring and a cone of fine net
+                c.Line(6, 58, 30, 30, 3.5f, C(0.62f, 0.44f, 0.26f));
+                c.Disc(42, 20, 15, 14, C(0.9f, 0.92f, 0.88f, 0.55f), C(0.75f, 0.78f, 0.74f, 0.55f));
+                for (int k = -2; k <= 2; k++)
+                    c.Line(42 + k * 5, 8, 42 + k * 3, 32, 0.8f, C(0.6f, 0.62f, 0.6f, 0.7f));
+                c.Ring(42, 20, 14, 2f, C(0.45f, 0.45f, 0.48f));
+                break;
+            case AccessoryKind.CookingPot:         // black iron pot with a bail handle and steam
+                c.Disc(32, 42, 20, 14, C(0.22f, 0.22f, 0.24f), C(0.12f, 0.12f, 0.14f));
+                c.Rect(12, 30, 52, 34, C(0.3f, 0.3f, 0.33f));
+                c.Ring(32, 30, 18, 1.5f, C(0.35f, 0.35f, 0.38f));
+                c.Line(16, 30, 32, 14, 1.5f, C(0.35f, 0.35f, 0.38f));
+                c.Line(48, 30, 32, 14, 1.5f, C(0.35f, 0.35f, 0.38f));
+                c.Disc(26, 20, 4, 6, C(0.92f, 0.94f, 0.96f, 0.5f));
+                c.Disc(36, 14, 4, 6, C(0.92f, 0.94f, 0.96f, 0.4f));
                 break;
             default:                                // wooden bucket
                 c.Rect(16, 22, 48, 56, C(0.6f, 0.4f, 0.22f));
