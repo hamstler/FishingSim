@@ -984,8 +984,9 @@ def write_textures(work, w=2048, h=1024):
     os.makedirs(work, exist_ok=True)
     x, y, s, ds, side = unwrap_coords(w, h)
     c, height = skin(x, y, s, side)
-    Image.fromarray((np.clip(c, 0, 1) * 255).astype(np.uint8), "RGB").save(os.path.join(work, "body_albedo.jpg"),
-                                                                          quality=92 if w > 2048 else 86)
+    # Lossless here: the glb build encodes every picture once, to WebP (a JPEG in between lost detail twice).
+    Image.fromarray((np.clip(c, 0, 1) * 255).astype(np.uint8), "RGB").save(os.path.join(work, "body_albedo.png"),
+                                                                          compress_level=1)
     k = 0.00062
     dx = (X1 - X0) / w
     gx = (np.roll(height, -1, axis=1) - np.roll(height, 1, axis=1)) * 0.5 / dx
@@ -993,7 +994,7 @@ def write_textures(work, w=2048, h=1024):
     n = np.dstack([-gx * k, gy * k, np.ones_like(height)])
     n /= np.linalg.norm(n, axis=2, keepdims=True)
     Image.fromarray(((n * 0.5 + 0.5) * 255).astype(np.uint8), "RGB") \
-        .save(os.path.join(work, "body_normal.jpg"), quality=90)
+        .save(os.path.join(work, "body_normal.png"), compress_level=1)
     for name, spec in FINS.items():
         paint_fin(name, spec).save(os.path.join(work, name + ".png"))
     paint_eye(256 if w <= 2048 else 512).save(os.path.join(work, "iris.png"))

@@ -168,8 +168,8 @@ def dome(radius, offset, polar_max=72.0, segments=48, rings=14):
 def build(work):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     tex = {name: bpy.data.images.load(os.path.join(work, name + ".png")) for name in P.FINS}
-    albedo = bpy.data.images.load(os.path.join(work, "body_albedo.jpg"))
-    normal = bpy.data.images.load(os.path.join(work, "body_normal.jpg"))
+    albedo = bpy.data.images.load(os.path.join(work, "body_albedo.png"))
+    normal = bpy.data.images.load(os.path.join(work, "body_normal.png"))
     normal.colorspace_settings.name = "Non-Color"
     iris = bpy.data.images.load(os.path.join(work, "iris.png"))
     objects = []
@@ -276,7 +276,7 @@ def export(objects, out):
         ob.select_set(ob in objects)
     bpy.ops.export_scene.gltf(filepath=out, export_format="GLB", use_selection=True, export_apply=True,
                               export_tangents=True, export_yup=True, export_image_format="WEBP",
-                              export_image_quality=92, export_image_webp_fallback=False,
+                              export_image_quality=85, export_image_webp_fallback=False,
                               export_materials="EXPORT", export_cameras=False, export_lights=False)
 
 
