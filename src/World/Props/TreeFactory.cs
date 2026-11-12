@@ -16,6 +16,35 @@ public static class TreeFactory
 {
     private static readonly Dictionary<string, PlantMeshes> Cache = new();
 
+    // While the far versions of the crowns are built: fewer, larger cards with the same silhouette.
+    private static float _cardDensity = 1f, _cardScale = 1f;
+    private static int _trunkSides = 12, _trunkRings = 8;
+    private static readonly Dictionary<string, PlantMeshes> FarCache = new();
+
+    /// <summary>
+    /// The same plant for far away (drawn beyond the near range, see Scenery.AddTrees): a quarter of the leaf cards at
+    /// twice the size, and a six-sided trunk.
+    /// </summary>
+    public static PlantMeshes GetFar(string kind)
+    {
+        if (FarCache.TryGetValue(kind, out var cached))
+            return cached;
+        var near = Get(kind);
+        Cache.Remove(kind);
+        (_cardDensity, _cardScale, _trunkSides, _trunkRings) = (0.22f, 1.9f, 6, 2);
+        try
+        {
+            var far = Get(kind);
+            FarCache[kind] = far;
+            return far;
+        }
+        finally
+        {
+            (_cardDensity, _cardScale, _trunkSides, _trunkRings) = (1f, 1f, 12, 8);
+            Cache[kind] = near;
+        }
+    }
+
     public static PlantMeshes Get(string kind)
     {
         if (Cache.TryGetValue(kind, out var cached))
@@ -41,7 +70,7 @@ public static class TreeFactory
     /// </summary>
     private static ArrayMesh Trunk(float top, float bottom, float height)
     {
-        const int sides = 12, rings = 8;
+        int sides = _trunkSides, rings = _trunkRings;
         var st = new SurfaceTool();
         st.Begin(Mesh.PrimitiveType.Triangles);
         float girth = Mathf.Tau * bottom;
@@ -239,13 +268,13 @@ public static class TreeFactory
         centre /= puffs.Length;
         foreach (var p in puffs)
         {
-            int count = Math.Max(6, (int)(p.Radius * p.Radius * density));
+            int count = Math.Max(4, (int)(p.Radius * p.Radius * density * _cardDensity));
             for (int i = 0; i < count; i++)
             {
                 var dir = RandomUnit(rng);
                 float r = p.Radius * (0.45f + 0.55f * MathF.Sqrt(rng.Randf()));
                 var pos = p.Centre + new Vector3(dir.X * r, dir.Y * r * p.Squash * 0.5f, dir.Z * r);
-                float size = cardSize * rng.RandfRange(0.75f, 1.25f);
+                float size = cardSize * _cardScale * rng.RandfRange(0.75f, 1.25f);
                 var normal = (pos - centre * 0.6f).Normalized().Lerp(Vector3.Up, 0.25f).Normalized();
                 float shade = 0.5f + 0.5f * Math.Clamp(r / p.Radius, 0f, 1f) * (0.75f + 0.25f * Math.Clamp(dir.Y + 0.5f, 0f, 1f));
                 Card(st, pos, RandomUnit(rng), size, normal, new Color(shade, shade, shade), rng.Randf() * Mathf.Tau, leaf);
@@ -265,7 +294,7 @@ public static class TreeFactory
             top = MathF.Max(top, l.Y + l.Height * 0.5f);
         foreach (var (y, radius, height) in layers)
         {
-            int count = (int)(radius * radius * 26f) + 10;
+            int count = (int)((radius * radius * 26f + 10) * _cardDensity) + 3;
             for (int i = 0; i < count; i++)
             {
                 float a = rng.Randf() * Mathf.Tau;
@@ -277,7 +306,7 @@ public static class TreeFactory
                 var along = (outward - Vector3.Up * 0.35f).Normalized();
                 var side = Vector3.Up.Cross(along).Normalized();
                 var plane = along.Cross(side).Normalized();
-                float size = MathF.Max(radius * 0.75f, 0.45f) * rng.RandfRange(0.8f, 1.2f);
+                float size = MathF.Max(radius * 0.75f, 0.45f) * _cardScale * rng.RandfRange(0.8f, 1.2f);
                 float shade = 0.45f + 0.55f * (ring / MathF.Max(radius, 0.01f)) * (0.7f + 0.3f * (pos.Y / MathF.Max(top, 0.01f)));
                 var normal = (outward + Vector3.Up * 0.5f).Normalized();
                 Card(st, pos + along * size * 0.35f, plane, size, normal, new Color(shade, shade, shade), rng.RandfRange(-0.3f, 0.3f));

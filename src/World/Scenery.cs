@@ -54,6 +54,12 @@ public partial class Scenery : Node3D
         foreach (var (node, range) in _ranged)
             if (IsInstanceValid(node))
                 node.VisibilityRangeEnd = range * GraphicsQuality.FoliageRange;
+        foreach (var (near, far) in _treeLods)
+            if (IsInstanceValid(near) && IsInstanceValid(far))
+            {
+                near.VisibilityRangeEnd = TreeNearRange * GraphicsQuality.FoliageRange;
+                far.VisibilityRangeBegin = TreeNearRange * GraphicsQuality.FoliageRange;
+            }
     }
 
     private float _time;
@@ -210,6 +216,7 @@ public partial class Scenery : Node3D
             n.QueueFree();
         _dynamic.Clear();
         _ranged.Clear();
+        _treeLods.Clear();
         _buildings.Clear();
         Interactables.Clear();
         Markers.Clear();
@@ -418,20 +425,48 @@ public partial class Scenery : Node3D
         var trunkColors = kinds.ToDictionary(k => k, _ => new List<Color>());
         var crowns = kinds.ToDictionary(k => k, _ => new List<Transform3D>());
         var crownColors = kinds.ToDictionary(k => k, _ => new List<Color>());
-
-        float threshold = -0.08f + (1f - loc.TreeDensity) * 0.5f;
-        int cap = (int)(1150 * Math.Min(loc.TreeDensity, 1.2f));
-        int placed = 0;
         _treeSpots.Clear();
-        for (int i = 0; i < 14000 && placed < cap; i++)
+
+        void Plant(string kind, float x, float z, float h, float s, float yaw, float tint, bool understorey)
         {
-            float x = rng.RandfRange(-165f, 165f);
-            float z = rng.RandfRange(-195f, 68f);
+            var meshes = TreeFactory.Get(kind);
+            var basis = new Basis(Vector3.Up, yaw).Scaled(new Vector3(s, s, s));
+            var pos = new Vector3(x, h - 0.1f, z);
+            trunks[kind].Add(new Transform3D(basis, pos + new Vector3(0, meshes.TrunkLift * s, 0)));
+            trunkColors[kind].Add(Tint(meshes.TrunkColor, tint * 0.5f));
+            crowns[kind].Add(new Transform3D(basis, pos + new Vector3(0, meshes.CrownLift * s, 0)));
+            crownColors[kind].Add(Tint(CrownColor(kind), tint));
+            if (understorey)
+                _treeSpots.Add((x, z, kind));
+            Count("tree_" + kind);
+        }
+
+        string Choose(float[] weights, float pick)
+        {
+            float total = weights.Sum();
+            float roll = pick * total;
+            for (int k = 0; k < kinds.Length; k++)
+            {
+                roll -= weights[k];
+                if (roll <= 0f)
+                    return kinds[k];
+            }
+            return kinds[0];
+        }
+
+        // The woods inside the map, where the map's forest noise says so.
+        float threshold = -0.08f + (1f - loc.TreeDensity) * 0.5f;
+        int cap = (int)(1550 * Math.Min(loc.TreeDensity, 1.2f));
+        int placed = 0;
+        for (int i = 0; i < 20000 && placed < cap; i++)
+        {
+            float x = rng.RandfRange(LakeBed.XMin, LakeBed.XMax);
+            float z = rng.RandfRange(LakeBed.ZMin, LakeBed.ZMax);
             float s = rng.RandfRange(0.7f, 1.7f);
             float tint = rng.RandfRange(-0.05f, 0.05f);
             float pick = rng.Randf();
             float yaw = rng.Randf() * Mathf.Tau;
-            if (_lake.ForestDensity(x, z) < threshold)
+            if (_lake.ForestDensity(x, z) < threshold || _lake.PlayDistance(x, z) > -34f)
                 continue;
             float h = _lake.HeightAt(loc, x, z);
             if (h < 1.2f || !Clear(loc, x, z))
@@ -439,7 +474,6 @@ public partial class Scenery : Node3D
             float inside = _lake.InsideMetres(loc, x, z);
 
             // Weighted choice of the kind, nudged by where the tree stands.
-            float total = 0f;
             var weights = new float[kinds.Length];
             for (int k = 0; k < kinds.Length; k++)
             {
@@ -453,39 +487,110 @@ public partial class Scenery : Node3D
                 else if (kinds[k] == "spruce")
                     w *= h > 5f ? 1.4f : 1f;
                 weights[k] = w;
-                total += w;
             }
-            if (total <= 0f)
+            if (weights.Sum() <= 0f)
                 continue;
-            float roll = pick * total;
-            int chosen = 0;
-            for (int k = 0; k < kinds.Length; k++)
-            {
-                roll -= weights[k];
-                if (roll <= 0f)
-                {
-                    chosen = k;
-                    break;
-                }
-            }
-            string kind = kinds[chosen];
-            var meshes = TreeFactory.Get(kind);
-            var basis = new Basis(Vector3.Up, yaw).Scaled(new Vector3(s, s, s));
-            var pos = new Vector3(x, h - 0.1f, z);
-            trunks[kind].Add(new Transform3D(basis, pos + new Vector3(0, meshes.TrunkLift * s, 0)));
-            trunkColors[kind].Add(Tint(meshes.TrunkColor, tint * 0.5f));
-            crowns[kind].Add(new Transform3D(basis, pos + new Vector3(0, meshes.CrownLift * s, 0)));
-            crownColors[kind].Add(Tint(CrownColor(kind), tint));
+            Plant(Choose(weights, pick), x, z, h, s, yaw, tint, true);
             placed++;
-            _treeSpots.Add((x, z, kind));
-            Count("tree_" + kind);
         }
+
+        // The forest at the edge of the map: dense at the foot of the mountains, where the angler is stopped (so the
+        // edge is a thicket, not an invisible wall), then thinning up the slopes to the tree line.
+        float treeLine = MathF.Min(loc.SnowLine - 3f, loc.RimHeight * 0.75f);
+        var rimWeights = new float[kinds.Length];
+        for (int k = 0; k < kinds.Length; k++)
+            rimWeights[k] = kinds[k] switch
+            {
+                "spruce" => loc.TreeShare("spruce") + 0.35f,
+                "pine" => loc.TreeShare("pine") + 0.2f,
+                "birch" => loc.TreeShare("birch") + 0.1f,
+                "oak" => loc.TreeShare("oak") * 0.6f + 0.04f,
+                _ => 0f,
+            };
+        const float cell = 3.4f;
+        int rim = 0;
+        for (float gz = LakeBed.ZMin - 140f; gz <= LakeBed.ZMax + 140f; gz += cell)
+            for (float gx = LakeBed.XMin - 140f; gx <= LakeBed.XMax + 140f; gx += cell)
+            {
+                float x = gx + rng.Randf() * cell, z = gz + rng.Randf() * cell;
+                float s = rng.RandfRange(0.9f, 2f), yaw = rng.Randf() * Mathf.Tau, tint = rng.RandfRange(-0.06f, 0.05f), pick = rng.Randf();
+                float keep = rng.Randf();
+                float d = _lake.PlayDistance(x, z);
+                if (d < -34f || d > 140f || (d > 2f && keep > 0.3f) || (d < -20f && keep > 0.6f))
+                    continue;
+                float h = _lake.HeightAt(loc, x, z);
+                if (h < 1.2f || h > treeLine - keep * 8f || _lake.InsideMetres(loc, x, z) > -3f || (d < 0f && !Clear(loc, x, z)))
+                    continue;
+                float slope = MathF.Abs(_lake.HeightAt(loc, x + 1.5f, z) - h) + MathF.Abs(_lake.HeightAt(loc, x, z + 1.5f) - h);
+                if (slope > 1.4f)
+                    continue;
+                Plant(Choose(rimWeights, pick), x, z, h, s, yaw, tint, d < 0f && keep < 0.25f);
+                rim++;
+            }
+        Count("rim_tree", rim);
+
         foreach (var kind in kinds)
         {
             var meshes = TreeFactory.Get(kind);
+            var far = TreeFactory.GetFar(kind);
             if (meshes.Trunk != null)
-                AddMultiMesh(meshes.Trunk, trunks[kind], trunkColors[kind], TreeFactory.BarkMaterial(kind == "birch"));
-            AddMultiMesh(meshes.Crown, crowns[kind], crownColors[kind], TreeFactory.FoliageMaterial(meshes.Needles));
+                AddTrees(meshes.Trunk, far.Trunk!, trunks[kind], trunkColors[kind], TreeFactory.BarkMaterial(kind == "birch"));
+            AddTrees(meshes.Crown, far.Crown, crowns[kind], crownColors[kind], TreeFactory.FoliageMaterial(meshes.Needles));
+        }
+    }
+
+    /// <summary>Distance (m) up to which trees are drawn in full; beyond it their far versions (fewer, larger leaf cards).</summary>
+    private const float TreeNearRange = 130f;
+
+    private readonly List<(GeometryInstance3D Near, GeometryInstance3D Far)> _treeLods = new();
+
+    /// <summary>
+    /// Trees in 64 m cells, each cell twice: the full tree near the angler and the far version beyond
+    /// <see cref="TreeNearRange"/> (shortened by the quality setting), so thousands of trees can fill the horizon.
+    /// </summary>
+    private void AddTrees(Mesh near, Mesh far, List<Transform3D> transforms, List<Color> colors, Material material)
+    {
+        const float cell = 64f;
+        var groups = new Dictionary<(int, int), List<int>>();
+        for (int i = 0; i < transforms.Count; i++)
+        {
+            var o = transforms[i].Origin;
+            var key = ((int)MathF.Floor(o.X / cell), (int)MathF.Floor(o.Z / cell));
+            if (!groups.TryGetValue(key, out var list))
+                groups[key] = list = new List<int>();
+            list.Add(i);
+        }
+        foreach (var ((cx, cz), ids) in groups)
+        {
+            var centre = new Vector3((cx + 0.5f) * cell, 0f, (cz + 0.5f) * cell);
+            MultiMesh Make(Mesh mesh)
+            {
+                var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true, Mesh = mesh, InstanceCount = ids.Count };
+                for (int k = 0; k < ids.Count; k++)
+                {
+                    var t = transforms[ids[k]];
+                    mm.SetInstanceTransform(k, new Transform3D(t.Basis, t.Origin - centre));
+                    mm.SetInstanceColor(k, colors[ids[k]]);
+                }
+                return mm;
+            }
+            float range = TreeNearRange * GraphicsQuality.FoliageRange;
+            var nearInst = new MultiMeshInstance3D
+            {
+                Multimesh = Make(near), MaterialOverride = material, Position = centre,
+                VisibilityRangeEnd = range, VisibilityRangeEndMargin = 12f,
+            };
+            var farInst = new MultiMeshInstance3D
+            {
+                Multimesh = Make(far), MaterialOverride = material, Position = centre,
+                VisibilityRangeBegin = range, VisibilityRangeBeginMargin = 12f,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            };
+            AddChild(nearInst);
+            AddChild(farInst);
+            Track(nearInst);
+            Track(farInst);
+            _treeLods.Add((nearInst, farInst));
         }
     }
 
@@ -499,16 +604,23 @@ public partial class Scenery : Node3D
         {
             new(0.97f, 0.97f, 0.92f), new(0.98f, 0.85f, 0.2f), new(0.92f, 0.4f, 0.6f), new(0.6f, 0.4f, 0.85f), new(0.9f, 0.25f, 0.2f),
         };
-        int maxBushes = (int)(600 * loc.BushDensity), maxFlowers = (int)(2600 * loc.FlowerDensity), maxTufts = (int)(5200 * Math.Max(loc.BushDensity, 0.7f));
-        for (int i = 0; i < 60000 && (bushes.Count < maxBushes || flowers.Count < maxFlowers || tufts.Count < maxTufts); i++)
+        int maxBushes = (int)(900 * loc.BushDensity), maxFlowers = (int)(3400 * loc.FlowerDensity), maxTufts = (int)(7000 * Math.Max(loc.BushDensity, 0.7f));
+        float highest = MathF.Min(loc.SnowLine - 2f, 40f);
+        for (int i = 0; i < 90000 && (bushes.Count < maxBushes || flowers.Count < maxFlowers || tufts.Count < maxTufts); i++)
         {
-            float x = rng.RandfRange(-150f, 150f);
-            float z = rng.RandfRange(-190f, 64f);
+            float x = rng.RandfRange(LakeBed.XMin, LakeBed.XMax);
+            float z = rng.RandfRange(LakeBed.ZMin, LakeBed.ZMax);
             float kindRoll = rng.Randf();
             float s = rng.RandfRange(0.7f, 1.4f);
             float yaw = rng.Randf() * Mathf.Tau;
+            float edge = _lake.PlayDistance(x, z);
+            if (edge > 3f)
+                continue;
+            // Thick undergrowth in the forest at the map's edge.
+            if (edge > -30f)
+                kindRoll *= 0.4f;
             float h = _lake.HeightAt(loc, x, z);
-            if (h < 1.0f || h > 14f || !Clear(loc, x, z, 1.5f, 1.6f))
+            if (h < 1.0f || h > highest || !Clear(loc, x, z, 1.5f, 1.6f))
                 continue;
             float patch = _lake.Noise(x * 3f + 40f, z * 3f - 70f);   // flowers and grass grow in patches
             if (kindRoll < 0.12f && bushes.Count < maxBushes)
@@ -776,8 +888,10 @@ public partial class Scenery : Node3D
         float size = loc.RockDensity > 1.5f ? 1.7f : 1f;
         for (int tries = 0; rocks.Count < maxRocks && tries < 30000; tries++)
         {
-            float x = rng.RandfRange(-160f, 160f);
-            float z = rng.RandfRange(-195f, 64f);
+            float x = rng.RandfRange(LakeBed.XMin, LakeBed.XMax);
+            float z = rng.RandfRange(LakeBed.ZMin, LakeBed.ZMax);
+            if (_lake.PlayDistance(x, z) > 0f)
+                continue;
             if (MathF.Abs(x) < 6f && z > -6f && z < 12f)
                 continue;
             float inside = _lake.InsideMetres(loc, x, z);
@@ -794,6 +908,28 @@ public partial class Scenery : Node3D
             float gr = rng.RandfRange(0.38f, 0.55f);
             colors.Add(new Color(gr, gr * 0.98f, gr * 0.93f));
         }
+        // Big boulders and scree on the mountains around the map.
+        int mountain = 0;
+        for (int tries = 0; mountain < 60 + 50 * loc.RockDensity && tries < 20000; tries++)
+        {
+            float x = rng.RandfRange(LakeBed.XMin - 110f, LakeBed.XMax + 110f);
+            float z = rng.RandfRange(LakeBed.ZMin - 110f, LakeBed.ZMax + 110f);
+            float d = _lake.PlayDistance(x, z);
+            if (d < -6f || d > 100f)
+                continue;
+            float h = _lake.HeightAt(loc, x, z);
+            // Below the snow, in groups (scree under the crags), not sprinkled evenly.
+            if (h < 3f || h > loc.SnowLine - 3f || _lake.Noise(x * 2.5f + 11f, z * 2.5f) < 0.05f)
+                continue;
+            float sz = rng.RandfRange(1.2f, 3.6f) * (0.8f + 0.4f * loc.RockDensity);
+            var scale = new Vector3(rng.RandfRange(0.8f, 1.3f), rng.RandfRange(0.45f, 0.8f), rng.RandfRange(0.8f, 1.2f)) * sz;
+            rocks.Add(new Transform3D(new Basis(Vector3.Up, rng.Randf() * Mathf.Tau).Scaled(scale), new Vector3(x, h - sz * 0.15f, z)));
+            float gr = rng.RandfRange(0.4f, 0.56f);
+            colors.Add(new Color(gr, gr * 0.98f, gr * 0.94f));
+            mountain++;
+        }
+        Count("mountain_rock", mountain);
+
         // Three boulder shapes, each rock one of them.
         for (int v = 0; v < 3; v++)
         {

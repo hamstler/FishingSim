@@ -66,6 +66,14 @@ public partial class LocationData : Resource
     /// <summary>Multiplier for how tall the surrounding hills are.</summary>
     [Export] public float HillScale { get; set; } = 1f;
 
+    /// <summary>Height (m) of the mountains that close the map in (they rise behind a dense forest at the map's edge).</summary>
+    [Export] public float RimHeight { get; set; } = 60f;
+
+    /// <summary>Height (m) above which the mountains are snowy, and above which bare rock shows through.</summary>
+    [Export] public float SnowLine { get; set; } = 26f;
+
+    [Export] public float RockLine { get; set; } = 10.5f;
+
     // --- look: vegetation ---
     /// <summary>Overall amount of trees (1 = the default forest).</summary>
     [Export] public float TreeDensity { get; set; } = 1f;

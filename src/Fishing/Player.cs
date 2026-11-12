@@ -15,9 +15,10 @@ public partial class Player : CharacterBody3D
     private const float SprintSpeed = 5.8f;
     private const float MouseSensitivity = 0.0025f;
     private const float Gravity = 9.8f;
-    private const float BoundsX = 160f;
-    private const float BoundsZMin = -190f;
-    private const float BoundsZMax = 66f;
+    // A last safety net: the real edge is LakeBed.PlayDistance (the forest at the foot of the mountains, see IsWalkable).
+    private const float BoundsX = World.LakeBed.XMax;
+    private const float BoundsZMin = World.LakeBed.ZMin;
+    private const float BoundsZMax = World.LakeBed.ZMax;
 
     /// <summary>Where the player starts on every map: the end of the pier.</summary>
     public static readonly Vector3 SpawnPoint = new(0f, 1.1f, -3f);

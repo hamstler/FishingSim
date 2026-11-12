@@ -68,6 +68,28 @@ public sealed class WorldSuite : ITestSuite
                         forest++;
                 }
             t.Check(worst <= 1.001f, $"{name}: the grounds never add up to more than the whole ({worst:0.000})");
+
+            // Relief: hills on the land, mountains closing the map in, a stop for the angler at the forest's edge.
+            float top = 0f, topX = 0f, topZ = 0f;
+            for (float x = -150f; x <= 150f; x += 4f)
+                for (float z = -180f; z <= 70f; z += 4f)
+                {
+                    if (bed.PlayDistance(x, z) > -45f || bed.InsideMetres(loc, x, z) > -25f)
+                        continue;
+                    float hh = bed.HeightAt(loc, x, z) - bed.RimAt(loc, x, z);
+                    if (bed.HillsAt(loc, x, z) > 0.5f && hh > top)
+                        (top, topX, topZ) = (hh, x, z);
+                }
+            t.Check(top > 4f, $"{name}: hills rise on the land (highest {top:0.0} m at {topX:0},{topZ:0})");
+            t.Check(MathF.Abs(bed.HeightAt(loc, loc.PlazaCenter.X, loc.PlazaCenter.Y) - bed.HeightAt(loc, loc.PlazaCenter.X + 8f, loc.PlazaCenter.Y)) < 0.6f,
+                $"{name}: the village square stays level");
+            float rimTop = 0f;
+            for (float a = 0f; a < MathF.Tau; a += 0.2f)
+                rimTop = MathF.Max(rimTop, bed.HeightAt(loc, MathF.Cos(a) * 380f, -60f + MathF.Sin(a) * 330f));
+            t.Check(rimTop > loc.RimHeight * 0.6f, $"{name}: mountains close the map in ({rimTop:0} m)");
+            t.Check(!bed.IsWalkable(LakeBed.XMax + 5f, -60f) && !bed.IsWalkable(0f, LakeBed.ZMax + 5f) && bed.IsWalkable(0f, 30f),
+                $"{name}: the angler is stopped at the edge of the map, not in the village");
+            t.Check(bed.PlayDistance(0f, 30f) < -40f && bed.PlayDistance(0f, -4f) < -40f, $"{name}: the pier and the village lie well inside the map");
             t.Check(forest > 20, $"{name}: there is forest floor under the woods ({forest} samples)");
         }
         t.Check(bed.AbundanceOf("Karp") == locations[bed.LocationIndex].AbundanceOf("Karp"), "abundance follows the selected location");

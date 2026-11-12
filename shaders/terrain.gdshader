@@ -18,6 +18,8 @@ uniform float bump = 1.0;
 uniform float time = 0.0;
 uniform float daylight = 1.0;
 uniform float water_level = 0.0;
+uniform float snow_line = 26.0;
+uniform float rock_line = 10.5;
 
 varying vec3 wpos;
 varying vec3 wnormal;
@@ -50,8 +52,9 @@ void fragment() {
 	g += vec4(wander, mid - 0.5 + (finer - 0.5) * 0.5, wander, wander) * g * (1.0 - g) * 4.5;
 	g = clamp(g, 0.0, 1.0);
 	float rock = max(smoothstep(0.30, 0.50, slope + (mid - 0.5) * 0.3),
-		smoothstep(10.5, 16.0, wpos.y + (mid - 0.5) * 8.0) * smoothstep(0.35, 0.65, fine * 0.7 + mid * 0.5));
-	float snow = smoothstep(25.0, 31.0, wpos.y + (mid - 0.5) * 6.0) * (1.0 - smoothstep(0.5, 0.75, slope));
+		smoothstep(rock_line, rock_line + 5.5, wpos.y + (mid - 0.5) * 8.0) * smoothstep(0.35, 0.65, fine * 0.7 + mid * 0.5));
+	// Snow lies on the gentler ground; steep faces stay bare rock.
+	float snow = smoothstep(snow_line - 1.0, snow_line + 5.0, wpos.y + (mid - 0.5) * 6.0) * (1.0 - smoothstep(0.3, 0.5, slope + (fine - 0.5) * 0.2));
 	float w[7];
 	w[0] = max(1.0 - g.x - g.y - g.z - g.w, 0.0);
 	w[1] = g.z;
