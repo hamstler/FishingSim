@@ -244,8 +244,8 @@ public static partial class Everyday
                 }
         st.GenerateNormals();
         st.GenerateTangents();
-        var paint = new[] { new Color(0.55f, 0.32f, 0.2f), new Color(0.32f, 0.42f, 0.5f), new Color(0.48f, 0.45f, 0.36f) }[seed % 3];
-        var hull = BuildingFactory.Photo("weathered_brown_planks", paint * 1.4f, 0.85f, triplanar: false)
+        var paint = new[] { new Color(0.62f, 0.4f, 0.26f), new Color(0.45f, 0.55f, 0.62f), new Color(0.6f, 0.56f, 0.45f) }[seed % 3];
+        var hull = BuildingFactory.Photo("weathered_brown_planks", paint * 1.75f, 0.85f, triplanar: false)
                    ?? BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = paint, Roughness = 0.85f });
         hull.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
         root.AddChild(new MeshInstance3D { Mesh = st.Commit(), MaterialOverride = hull });
