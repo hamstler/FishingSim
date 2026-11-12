@@ -9,3 +9,5 @@ StartCount = 15
 Price = 8
 PackSize = 15
 RequiredLevel = 1
+Kind = 0
+Description = "Białe larwy: płocie, krąpie, ukleje."

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ReelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/ReelData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Bęben sumowy"
+DragMax = 14.0
+ReelSpeed = 2.6
+LineCapacity = 220.0
+Price = 980
+RequiredLevel = 6
+Description = "Ogromny bęben z mocnym hamulcem: dla sumów i jesiotrów."

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Kasza jęczmienna"
+Kind = 1
+AffinityAs = "corn"
+AffinityScale = 0.95
+Reusable = false
+StartCount = 30
+PackSize = 15
+Price = 8
+RequiredLevel = 1
+Description = "Tania przynęta na drobnicę."

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ReelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/ReelData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Szpula z lipy"
+DragMax = 1.5
+ReelSpeed = 1.6
+LineCapacity = 50.0
+Price = 20
+RequiredLevel = 1
+Description = "Najtańsza szpula z lipowego drewna."

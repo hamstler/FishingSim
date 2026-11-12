@@ -12,6 +12,9 @@ public abstract partial class TackleItem : Resource
 
     [Export] public int RequiredLevel { get; set; } = 1;
 
+    /// <summary>A sentence or two for the shop card.</summary>
+    [Export(PropertyHint.MultilineText)] public string Description { get; set; } = "";
+
     /// <summary>Stable id: the resource file name without extension (e.g. "teleskop").</summary>
     public string ItemId => System.IO.Path.GetFileNameWithoutExtension(ResourcePath);
 }

@@ -234,7 +234,8 @@ public partial class Hud : CanvasLayer
         Fade(_purse, _purseFlash > 0f || details, dt);
 
         var lo = rod.Loadout;
-        string tackle = $"{lo.Rod.DisplayName}, {lo.Reel.DisplayName}\n{lo.Line.DisplayName}, {lo.Hook.DisplayName}\n{lo.Bait.DisplayName} ×{lo.BaitCount}";
+        string leader = lo.Leader.ItemId == Progress.TackleSlotExtensions.NoLeader ? "" : $", {lo.Leader.DisplayName}";
+        string tackle = $"{lo.Rod.DisplayName}, {lo.Reel.DisplayName}\n{lo.Line.DisplayName}{leader}, {lo.Hook.DisplayName}\n{lo.Bait.DisplayName} ×{lo.BaitCount}";
         if (tackle != _lastTackle)
         {
             if (_lastTackle != "")

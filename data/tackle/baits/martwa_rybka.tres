@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Martwa rybka"
+Kind = 0
+AffinityAs = "livebait"
+AffinityScale = 0.7
+Reusable = false
+StartCount = 10
+PackSize = 5
+Price = 20
+RequiredLevel = 2
+Description = "Tańsza od żywca, sumy i węgorze biorą ją chętnie."

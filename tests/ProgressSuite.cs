@@ -149,6 +149,40 @@ public sealed class ProgressSuite : ITestSuite
         t.Check(old.Hour == 7f && old.Records["Karp"] == 4.5f, "floats written as 7.0 parse");
         t.Check(old.Owned["rod"].Contains("teleskop") && old.BaitCounts["worm"] == 14 && old.BaitCounts.Count == 1, "owned gear and bait stock parse");
         t.Check(old.Journal.Count == 1 && old.Journal[0].Location == null && old.Journal[0].Hour == "12:00", "journal entries without optional fields parse");
+        t.Check(old.Owns(TackleSlot.Leader, TackleSlotExtensions.NoLeader) && new TackleLoadout().Leader != null,
+            "an old save without leaders still has \"no leader\"");
+
+        t.Section("lures, leaders and lines");
+        var tackle = new TackleLoadout();
+        t.Check(tackle.Items(TackleSlot.Rod).Count >= 10 && tackle.Items(TackleSlot.Reel).Count >= 7 && tackle.Items(TackleSlot.Line).Count >= 9
+                && tackle.Items(TackleSlot.Leader).Count >= 6 && tackle.Items(TackleSlot.Bait).Count >= 26,
+            "the shops stock many rods, reels, lines, leaders and baits");
+        t.Check(tackle.Items(TackleSlot.Bait).OfType<BaitData>().Count(b => b.Kind == BaitKind.Lure && b.Reusable) >= 8,
+            "there are lures, and they are not used up");
+        t.Check(tackle.Items(TackleSlot.Line).OfType<LineData>().Count(l => l.Kind == LineKind.Braid) >= 4,
+            "braided lines are their own kind");
+        var esox = GD.Load<FishSpecies>("res://data/fish/szczupak.tres");
+        var eel = GD.Load<FishSpecies>("res://data/fish/wegorz.tres");
+        var grayling = GD.Load<FishSpecies>("res://data/fish/lipien.tres");
+        t.Check(esox.AffinityFor("blystka_mosiezna") > 1.5f && esox.AffinityFor("blystka_srebrna") > esox.AffinityFor("blystka_mosiezna"),
+            "a pike goes for a brass spoon, more so for the silver one (family x scale)");
+        t.Check(eel.AffinityFor("blystka_mosiezna") == 0f && grayling.AffinityFor("mucha_kogut") > grayling.AffinityFor("blystka_obrotowa"),
+            "an eel ignores lures; a grayling prefers a fly to a spinner");
+        t.Check(esox.AffinityFor("rosowka") > esox.AffinityFor("worm") * 1.1f, "a better bait of a family scores above the plain one");
+        t.Check(esox.BiteOff > 0f && GD.Load<FishSpecies>("res://data/fish/karp.tres").BiteOff == 0f, "a pike has teeth, a carp has none");
+        var lp = new Profile();
+        var ll = new TackleLoadout();
+        ll.Attach(lp);
+        t.Check(ll.Leader.ItemId == TackleSlotExtensions.NoLeader && lp.Owns(TackleSlot.Leader, TackleSlotExtensions.NoLeader)
+                && !lp.Destroy(TackleSlot.Leader, TackleSlotExtensions.NoLeader), "everyone fishes without a leader at first, and cannot lose it");
+        lp.Level = 5; lp.Money = 1000;
+        t.Check(lp.Buy(TackleSlot.Leader, "przypon_stalowy", 90, 3) == null && lp.Owns(TackleSlot.Leader, "przypon_stalowy"), "a wire leader can be bought");
+        lp.BaitCounts["blystka_mosiezna"] = 2;
+        ll.Index[(int)TackleSlot.Bait] = ll.Items(TackleSlot.Bait).ToList().FindIndex(i => i.ItemId == "blystka_mosiezna");
+        ll.UseBait();
+        t.Check(ll.LureOn && ll.BaitCount == 2, "a bite does not use a lure up");
+        ll.LoseLure();
+        t.Check(ll.BaitCount == 1, "a lure is lost with the hook");
         return Task.CompletedTask;
     }
 }

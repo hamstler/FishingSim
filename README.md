@@ -10,6 +10,8 @@ Wolna gra na licencji **GNU GPL 3.0 lub nowszej**: możesz ją kopiować, zmieni
 
 **Hol:** ryba ma prawdziwą pozycję, kierunek i prędkość: płynie najwyżej z prędkością zrywu wynikającą z długości ciała (płoć ok. 1 m/s, duży karp czy szczupak 3 m/s), skręca z ograniczoną szybkością i kołysze się na napiętej lince jak wahadło, zamiast przeskakiwać. Linkę zabiera tylko wtedy, gdy przeciąga hamulec, a wędkarz zyskuje linkę powoli, póki ryba ciągnie. Walka zaczyna się od pierwszego odjazdu zaraz po zacięciu, wędka szarpie przy każdym zrywie, a zmęczenie zależy od tego, jak mocno ryba walczy z hamulcem. Płoć to ok. pół minuty, karp 12 kg ok. 2 minuty na sprzęcie karpiowym (na teleskopie wyciąga całą linkę). Startowy zestaw jest słaby (kij 2,4 kg, hamulec 2 kg).
 
+**Sprzęt:** 10 wędek (spławikowe, spinningowe, gruntowe, karpiowe i sumowe), 7 kołowrotków, żyłki z włosia, jelita i jedwabiu oraz plecionki z lnu, konopi i jedwabiu, 6 przyponów, 7 haczyków, 26 przynęt i akcesoria. Żyłka rozciąga się i tłumi zrywy ryby, plecionka jest mocniejsza i pewniej zacina, ale zrywy idą prosto w wędkę. Przypon to część linki: cienki z włosia czy jelita jest mało widoczny (szybsze brania), ale słabszy, a drut chroni przed zębami: szczupak, sum i sandacze potrafią przegryźć linkę bez drucianego przyponu. Przynęty sztuczne (błystki, rybki, przynęty miękkie, muchy) nie zużywają się, giną tylko z haczykiem przy zerwaniu i biorą tylko wtedy, gdy się je zwija (LPM), szybciej na wędce spinningowej. Każdy gatunek ma swoje upodobania (szczupak: błystki wahadłowe i rybki, sandacz: przynęty miękkie, lipień i pstrąg: muchy). Wodery pozwalają wejść głębiej do wody, osełka poprawia zacięcie, a smalec przyspiesza kołowrotek.
+
 **Zniszczony sprzęt:** złamana wędka znika z ekwipunku i z ręki, przy zerwanej żyłce przepada haczyk, a gdy ryba wyciągnie całą linkę, przepada żyłka. Bez kompletnego zestawu nie da się zarzucić. W kramie wędkarskim można odebrać darmowy zestaw, ale tylko wtedy, gdy brakujących części nie da się kupić za pieniądze z sakiewki.
 
 **Modele ryb:** każdy gatunek ma własną budowę (`src/Fishing/FishBody.cs`): wysokość i szerokość ciała, garb, płaski brzuch, długość pyska, szeroka lub płaska głowa, trzon ogonowy, kształt ogona (od zaokrąglonego po głęboko wcięty i rekinowy u jesiotrów), rodzaj płetwy grzbietowej (miękka, kolczasta, żagiel lipienia, długa karpia, ciągła węgorza, kolce ciernika), płetwa tłuszczowa, wąsy i oko dopasowane do głowy.
@@ -103,7 +105,7 @@ repozytorium, więc lepiej przebudowywać tylko zmienione gatunki. Opis całego 
 | Spacja | kasarek (podbierak): wyjmuje rybę przy brzegu. Trzeba go kupić; bez kasarka Spacja nic nie robi |
 | Kółko myszy | hamulec (wartość w procentach w prawym dolnym rogu) |
 | E / R (zaraz po złowieniu) | ryba do siatki / do wody (+3 XP) |
-| 1-5 (Shift = wstecz) | wędka, kołowrotek, żyłka, hak, przynęta (tylko przed rzutem) |
+| 1-6 (Shift = wstecz) | wędka, kołowrotek, żyłka, hak, przynęta, przypon (tylko przed rzutem) |
 | I / M / J / T | ekwipunek, mapa, dziennik, turnieje |
 | E | wejście do kramu, gildii, na targ lub na postój wozów (przy drzwiach budynku) |
 | Shift | bieg |

@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="HookData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/HookData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Kuty haczyk #3"
+Size = 3.0
+Price = 6
+RequiredLevel = 1
+Description = "Średni haczyk na większość ryb."

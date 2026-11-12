@@ -1,10 +1,14 @@
 namespace FishingSim.Progress;
 
-public enum TackleSlot { Rod, Reel, Line, Hook, Bait }
+/// <summary>The pieces of the rig. The leader is optional ("Bez przyponu" is always owned).</summary>
+public enum TackleSlot { Rod, Reel, Line, Hook, Bait, Leader }
 
 public static class TackleSlotExtensions
 {
-    public const int Count = 5;
+    public const int Count = 6;
+
+    /// <summary>The leader every angler has: no leader at all.</summary>
+    public const string NoLeader = "brak";
 
     /// <summary>Key used in save files.</summary>
     public static string Key(this TackleSlot slot) => slot switch
@@ -13,6 +17,7 @@ public static class TackleSlotExtensions
         TackleSlot.Reel => "reel",
         TackleSlot.Line => "line",
         TackleSlot.Hook => "hook",
+        TackleSlot.Leader => "leader",
         _ => "bait",
     };
 
@@ -23,6 +28,7 @@ public static class TackleSlotExtensions
         TackleSlot.Reel => "kołowrotka",
         TackleSlot.Line => "linki",
         TackleSlot.Hook => "haczyka",
+        TackleSlot.Leader => "przyponu",
         _ => "przynęty",
     };
 
@@ -32,6 +38,7 @@ public static class TackleSlotExtensions
         TackleSlot.Reel => "Kołowrotek",
         TackleSlot.Line => "Linka",
         TackleSlot.Hook => "Haczyk",
+        TackleSlot.Leader => "Przypon",
         _ => "Przynęta",
     };
 }

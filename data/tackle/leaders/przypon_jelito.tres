@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="LeaderData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/LeaderData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Przypon z jelita"
+Strength = 5.0
+Visibility = 0.65
+BiteProof = 0.0
+Price = 25
+RequiredLevel = 2
+Description = "Cienki i przezroczysty: brania przychodzą szybciej."

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Mucha z piór koguta"
+Kind = 3
+AffinityAs = "fly"
+AffinityScale = 1.0
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 20
+RequiredLevel = 2
+Description = "Lekka mucha na powierzchnię: pstrągi, lipienie i klenie."

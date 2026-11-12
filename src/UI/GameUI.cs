@@ -250,8 +250,12 @@ public partial class GameUI : CanvasLayer
     {
         RodData r => $"Rzut x{r.CastMult:0.00} | wytrzymałość wędki {r.MaxLoad:0} kg | amortyzacja {Mathf.RoundToInt(r.ShockAbsorb * 200f)}%",
         ReelData r => $"Hamulec do {r.DragMax:0} kg | zwijanie {r.ReelSpeed:0.0} m/s | szpula {r.LineCapacity:0} m",
-        LineData l => $"Wytrzymałość {l.Strength:0} kg | widoczność x{l.Visibility:0.00} (wyżej = wolniejsze brania)",
+        LineData l => $"{(l.Kind == LineKind.Braid ? "Plecionka" : "Żyłka")} {l.Strength:0} kg | widoczność x{l.Visibility:0.00} | "
+            + (l.Kind == LineKind.Braid ? "bez rozciągliwości: pewne zacięcie, zrywy idą w wędkę" : "rozciąga się i tłumi zrywy"),
         HookData h => $"Rozmiar #{Mathf.RoundToInt(h.Size)} | większy hak = większe ryby, ale gorzej bierze drobnica",
+        LeaderData d when d.ItemId == TackleSlotExtensions.NoLeader => "Linka idzie prosto do haczyka (szczupak może ją przegryźć)",
+        LeaderData d => $"Wytrzymałość {d.Strength:0} kg | widoczność x{d.Visibility:0.00} | odporność na zęby {d.BiteProof * 100f:0}%",
+        BaitData { Kind: BaitKind.Lure } b => $"Przynęta sztuczna, masz {_profile.BaitCounts.GetValueOrDefault(b.ItemId)} szt. Bierze tylko podczas zwijania (LPM).",
         _ => $"Zapas: {_profile.BaitCounts.GetValueOrDefault(item.ItemId)} szt.",
     };
 
@@ -267,7 +271,8 @@ public partial class GameUI : CanvasLayer
             _slotPrev[s].Disabled = !idle;
             _slotNext[s].Disabled = !idle;
         }
-        string weak = _rod.LineStrength <= _rod.RodMaxLoad ? "linka" : "wędka";
+        string weak = _rod.LineStrength > _rod.RodMaxLoad ? "wędka"
+            : _loadout.Leader.Strength < _loadout.Line.Strength ? "przypon" : "linka";
         _summary.Text = $"Najsłabsze ogniwo: {weak}, limit {_rod.EffectiveLimit:0.0} kg. Maks. hamulec {_rod.DragMax:0.0} kg. "
             + $"Zasięg rzutu do ok. {_rod.EstimateCastRange():0} m."
             + (idle ? "" : "\nSprzęt można zmieniać tylko między rzutami.");

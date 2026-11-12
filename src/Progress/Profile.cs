@@ -98,11 +98,13 @@ public sealed class Profile
             ["reel"] = new() { "mlynek1000" },
             ["line"] = new() { "zylka025" },
             ["hook"] = new() { "hak5" },
+            ["leader"] = new() { TackleSlotExtensions.NoLeader },
         };
         BaitCounts = new() { ["worm"] = 20, ["bread"] = 10 };
         Equipped = new()
         {
             ["rod"] = "junior", ["reel"] = "mlynek1000", ["line"] = "zylka025", ["hook"] = "hak5", ["bait"] = "worm",
+            ["leader"] = TackleSlotExtensions.NoLeader,
         };
         Gear = new GearInventory();
         Market = new FishMarket();
@@ -111,7 +113,9 @@ public sealed class Profile
     // ------------------------------------------------------------------ economy
     public int XpToNext => Progression.XpForLevel(Level + 1);
 
-    public bool Owns(TackleSlot slot, string id) => Owned.TryGetValue(slot.Key(), out var ids) && ids.Contains(id);
+    public bool Owns(TackleSlot slot, string id) =>
+        (slot == TackleSlot.Leader && id == TackleSlotExtensions.NoLeader)
+        || (Owned.TryGetValue(slot.Key(), out var ids) && ids.Contains(id));
 
     public int KeepnetValue => Keepnet.Sum(f => f.Value);
 
@@ -249,6 +253,8 @@ public sealed class Profile
             return $"Wymagany poziom {requiredLevel}";
         if (slot != TackleSlot.Bait && Owns(slot, id))
             return "Już to masz";
+        if (slot != TackleSlot.Bait && !Owned.ContainsKey(slot.Key()))
+            Owned[slot.Key()] = new();
         if (Money < price)
             return "Za mało pieniędzy";
         Money -= price;
@@ -278,10 +284,11 @@ public sealed class Profile
     /// </summary>
     public bool Destroy(TackleSlot slot, string id)
     {
-        if (slot == TackleSlot.Bait || !Owned.TryGetValue(slot.Key(), out var ids) || !ids.Remove(id))
+        if (slot == TackleSlot.Bait || (slot == TackleSlot.Leader && id == TackleSlotExtensions.NoLeader)
+            || !Owned.TryGetValue(slot.Key(), out var ids) || !ids.Remove(id))
             return false;
         if (Equipped.GetValueOrDefault(slot.Key()) == id)
-            Equipped[slot.Key()] = ids.Count > 0 ? ids[0] : "";
+            Equipped[slot.Key()] = slot == TackleSlot.Leader ? TackleSlotExtensions.NoLeader : ids.Count > 0 ? ids[0] : "";
         Changed?.Invoke();
         return true;
     }

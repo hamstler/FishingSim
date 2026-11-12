@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="LineData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/LineData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Plecionka smołowana na sumy"
+Kind = 1
+Strength = 26.0
+Visibility = 1.35
+Stretch = 0.02
+Price = 700
+RequiredLevel = 6
+Description = "Smołowana plecionka na sumy: najmocniejsza, ale widoczna z daleka."

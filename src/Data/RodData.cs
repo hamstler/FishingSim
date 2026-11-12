@@ -2,9 +2,14 @@ using Godot;
 
 namespace FishingSim.Data;
 
+/// <summary>What a rod is made for (shop categories; a spinning rod also brings lure bites on faster).</summary>
+public enum RodKind { Float, Spinning, Bottom, Carp }
+
 [GlobalClass]
 public partial class RodData : TackleItem
 {
+    [Export] public RodKind Kind { get; set; } = RodKind.Float;
+
     /// <summary>Multiplies cast speed (range).</summary>
     [Export] public float CastMult { get; set; } = 1f;
 

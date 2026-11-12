@@ -23,6 +23,9 @@ public partial class LakeBed : Node3D
     /// <summary>Largest water depth (m) a player may wade into.</summary>
     public const float WadeDepth = 0.5f;
 
+    /// <summary>How deep the angler may wade here and now (deeper with waders).</summary>
+    public float WadeLimit { get; set; } = WadeDepth;
+
     public static readonly string[] LocationPaths =
     {
         "res://data/locations/jezioro.tres",
@@ -209,7 +212,7 @@ public partial class LakeBed : Node3D
     {
         if (OnPier(x, z))
             return true;
-        return DepthAt(x, z) <= WadeDepth;
+        return DepthAt(x, z) <= WadeLimit;
     }
 
     public static bool OnPier(float x, float z) => MathF.Abs(x) <= 1.6f && z >= -4.2f && z <= 6.2f;

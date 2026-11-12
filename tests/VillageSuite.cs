@@ -239,7 +239,7 @@ public sealed class VillageSuite : ITestSuite
         int total = shop.Tabs.GetTabCount();
         foreach (var (kind, shown) in new[]
         {
-            (InteractKind.Tackle, 7), (InteractKind.Bait, 1), (InteractKind.FishBuyer, 2), (InteractKind.Market, 2), (InteractKind.General, 10),
+            (InteractKind.Tackle, 8), (InteractKind.Bait, 1), (InteractKind.FishBuyer, 2), (InteractKind.Market, 2), (InteractKind.General, 11),
             (InteractKind.BusStop, 1),
         })
         {

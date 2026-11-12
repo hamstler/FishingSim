@@ -9,3 +9,5 @@ StartCount = 20
 Price = 12
 PackSize = 10
 RequiredLevel = 1
+Kind = 1
+Description = "Gotowana pszenica: płocie, leszcze, karpie."

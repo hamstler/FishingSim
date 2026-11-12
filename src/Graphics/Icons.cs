@@ -113,6 +113,7 @@ public static class Icons
         LineData l => Line(l),
         HookData h => Hook(h),
         BaitData b => Bait(b.ItemId),
+        LeaderData d => Leader(d),
         KeepnetData k => Keepnet(k),
         LandingNetData n => LandingNet(n),
         AccessoryData a => Accessory(a),
@@ -121,25 +122,50 @@ public static class Icons
 
     private static ImageTexture Rod(RodData r) => Cached("rod:" + r.ItemId, c =>
     {
-        // Blank colour from the wood: hazel (light), ash (pale yellow), oak (dark).
-        var wood = r.ItemId switch { "junior" => C(0.78f, 0.58f, 0.32f), "karpiowka" => C(0.45f, 0.29f, 0.16f), _ => C(0.86f, 0.74f, 0.46f) };
+        // Blank colour from the wood: hazel, ash, oak, willow, yew, hornbeam, reed, horn-tipped oak, laminated woods.
+        var wood = r.ItemId switch
+        {
+            "junior" => C(0.78f, 0.58f, 0.32f), "karpiowka" => C(0.45f, 0.29f, 0.16f), "wierzbowa_splawikowa" => C(0.82f, 0.78f, 0.5f),
+            "cisowy_spinning" => C(0.66f, 0.32f, 0.2f), "grabowy_gruntowy" => C(0.72f, 0.68f, 0.6f), "trzcinowa_odleglosciowa" => C(0.9f, 0.8f, 0.48f),
+            "jesionowy_spinning" => C(0.8f, 0.66f, 0.4f), "sumowy_kij" => C(0.32f, 0.2f, 0.12f), "wedka_mistrza" => C(0.6f, 0.38f, 0.2f),
+            _ => C(0.86f, 0.74f, 0.46f),
+        };
         var shade = wood.Darkened(0.3f);
-        c.Line(10, 56, 58, 6, 3.2f, shade);
-        c.Line(9, 55, 57, 5, 2.2f, wood);
+        // Spinning rods are short and stiff, float rods long.
+        float tipX = r.Kind == RodKind.Spinning ? 50 : 58, tipY = r.Kind == RodKind.Spinning ? 14 : 6;
+        float thick = r.MaxLoad > 10f ? 1.4f : 1f;
+        c.Line(10, 56, tipX, tipY, 3.2f * thick, shade);
+        c.Line(9, 55, tipX - 1, tipY - 1, 2.2f * thick, wood);
+        if (r.ItemId == "trzcinowa_odleglosciowa")           // the reed's nodes
+            foreach (float t in new[] { 0.2f, 0.4f, 0.6f, 0.8f })
+                c.Disc(10 + (tipX - 10) * t, 56 - (56 - tipY) * t, 2f, 2f, wood.Darkened(0.35f));
+        if (r.ItemId == "wedka_mistrza")                     // light and dark woods glued in bands
+            foreach (float t in new[] { 0.3f, 0.5f, 0.7f })
+                c.Line(10 + (tipX - 10) * t, 56 - (56 - tipY) * t, 10 + (tipX - 10) * (t + 0.08f), 56 - (56 - tipY) * (t + 0.08f), 2.2f, C(0.9f, 0.8f, 0.55f));
+        if (r.ItemId == "sumowy_kij")                        // horn tip
+            c.Line(10 + (tipX - 10) * 0.85f, 56 - (56 - tipY) * 0.85f, tipX - 1, tipY - 1, 2.6f, C(0.92f, 0.88f, 0.78f));
         c.Line(6, 60, 20, 45, 5f, C(0.36f, 0.22f, 0.13f));                      // leather grip
         c.Line(6, 59, 19, 45, 3f, C(0.5f, 0.32f, 0.18f));
         foreach (float t in new[] { 0.35f, 0.55f, 0.72f, 0.86f })
-            c.Disc(10 + 48 * t + 1.5f, 56 - 50 * t + 1.5f, 1.4f, 1.4f, C(0.75f, 0.6f, 0.3f));   // brass guides
+            c.Disc(10 + (tipX - 10) * t + 1.5f, 56 - (56 - tipY) * t + 1.5f, 1.4f, 1.4f, C(0.75f, 0.6f, 0.3f));   // brass guides
         c.Disc(23, 41, 2.2f, 2.2f, C(0.85f, 0.8f, 0.6f));                                   // twine wrap
         return c;
     });
 
     private static ImageTexture Reel(ReelData r) => Cached("reel:" + r.ItemId, c =>
     {
-        var body = r.ItemId switch { "mlynek1000" => C(0.55f, 0.36f, 0.2f), "mlynek3000" => C(0.5f, 0.52f, 0.56f), _ => C(0.85f, 0.66f, 0.25f) };
+        var body = r.ItemId switch
+        {
+            "mlynek1000" => C(0.55f, 0.36f, 0.2f), "mlynek3000" => C(0.5f, 0.52f, 0.56f), "szpula_lipowa" => C(0.86f, 0.74f, 0.52f),
+            "orzechowy_lekki" => C(0.42f, 0.27f, 0.16f), "mosiezny_hamulec" => C(0.8f, 0.62f, 0.28f), "beben_sumowy" => C(0.3f, 0.3f, 0.33f),
+            _ => C(0.85f, 0.66f, 0.25f),
+        };
+        float rr = 14f + 5f * Math.Clamp(r.LineCapacity / 220f, 0f, 1f);
         c.Rect(28, 8, 34, 20, C(0.32f, 0.22f, 0.14f));                                   // foot
-        c.Disc(30, 36, 18, 18, body, body.Darkened(0.3f));
-        c.Disc(30, 36, 11, 11, C(0.85f, 0.78f, 0.6f), C(0.7f, 0.62f, 0.45f));          // line on the spool
+        c.Disc(30, 36, rr, rr, body, body.Darkened(0.3f));
+        c.Disc(30, 36, rr * 0.6f, rr * 0.6f, C(0.85f, 0.78f, 0.6f), C(0.7f, 0.62f, 0.45f));          // line on the spool
+        if (r.ItemId == "mosiezny_hamulec" || r.ItemId == "freerunner")
+            c.Ring(30, 36, rr - 1.5f, 1.5f, C(1f, 0.86f, 0.5f));                        // brass rim
         c.Disc(30, 36, 4, 4, body.Darkened(0.4f));
         c.Line(30, 36, 50, 50, 3f, body.Darkened(0.2f));                                // handle arm
         c.Disc(52, 52, 4.5f, 4.5f, C(0.3f, 0.2f, 0.12f), C(0.2f, 0.13f, 0.08f));       // knob
@@ -148,11 +174,27 @@ public static class Icons
 
     private static ImageTexture Line(LineData l) => Cached("line:" + l.ItemId, c =>
     {
-        var thread = l.ItemId == "plecionka030" ? C(0.82f, 0.74f, 0.55f) : l.ItemId == "zylka016" ? C(0.93f, 0.9f, 0.84f) : C(0.86f, 0.82f, 0.72f);
+        var thread = l.ItemId switch
+        {
+            "plecionka030" => C(0.82f, 0.74f, 0.55f), "zylka016" => C(0.93f, 0.9f, 0.84f), "jelito_cienkie" or "jelito_mocne" => C(0.88f, 0.7f, 0.42f),
+            "jedwab_skrecany" or "plecionka_jedwabna" => C(0.97f, 0.95f, 0.9f), "plecionka_konopna" => C(0.6f, 0.58f, 0.4f),
+            "plecionka_smolowana" => C(0.18f, 0.16f, 0.14f), _ => C(0.86f, 0.82f, 0.72f),
+        };
         c.Rect(14, 14, 50, 50, C(0.45f, 0.3f, 0.18f));                                  // spool flanges
         c.Rect(18, 18, 46, 46, thread);
-        for (int y = 20; y < 46; y += 3)
-            c.Line(18, y, 46, y + 1, 1f, thread.Darkened(0.18f));                      // windings
+        if (l.Kind == LineKind.Braid)
+        {
+            for (int k = -28; k < 28; k += 4)                                          // the braid's weave
+            {
+                c.Line(18 + MathF.Max(k, 0), 18 - MathF.Min(k, 0), 46 - MathF.Max(-k, 0), 46 + MathF.Min(-k, 0) - 0.01f, 1f, thread.Darkened(0.22f));
+                c.Line(46 - MathF.Max(k, 0), 18 - MathF.Min(k, 0), 18 + MathF.Max(-k, 0), 46 + MathF.Min(-k, 0) - 0.01f, 1f, thread.Lightened(0.15f));
+            }
+        }
+        else
+        {
+            for (int y = 20; y < 46; y += 3)
+                c.Line(18, y, 46, y + 1, 1f, thread.Darkened(0.18f));                  // windings
+        }
         c.Disc(32, 32, 4, 4, C(0.3f, 0.2f, 0.12f));
         c.Line(46, 40, 58, 56, 1f, thread);                                             // loose end
         return c;
@@ -212,6 +254,123 @@ public static class Icons
                 c.Disc(26, 36, 13, 13, C(0.85f, 0.55f, 0.25f), C(0.65f, 0.38f, 0.16f));
                 c.Disc(44, 26, 9, 9, C(0.9f, 0.7f, 0.35f), C(0.7f, 0.5f, 0.2f));
                 break;
+            case "rosowka":
+                for (int i = 0; i < 46; i++)
+                {
+                    float t = i / 45f;
+                    c.Disc(8 + t * 48, 32 + MathF.Sin(t * 7f) * 11, 5.2f, 5.2f, C(0.62f, 0.3f, 0.32f), C(0.48f, 0.2f, 0.24f));
+                }
+                break;
+            case "ochotka":
+                foreach (var (x, y, a) in new[] { (18, 24, 0.4f), (36, 20, -0.3f), (28, 40, 0.1f), (46, 40, 0.6f), (16, 46, -0.5f) })
+                    for (int k = 0; k < 8; k++)
+                        c.Disc(x + k * 1.6f, y + k * a * 1.6f, 1.8f, 1.8f, C(0.82f, 0.12f, 0.12f), C(0.6f, 0.06f, 0.08f));
+                break;
+            case "chrabaszcz":
+                c.Disc(32, 36, 14, 17, C(0.46f, 0.26f, 0.14f), C(0.32f, 0.17f, 0.09f));
+                c.Line(32, 20, 32, 52, 1f, C(0.2f, 0.1f, 0.05f));
+                c.Disc(32, 17, 7, 5, C(0.15f, 0.12f, 0.1f));
+                foreach (int side in new[] { -1, 1 })
+                    for (int k = 0; k < 3; k++)
+                        c.Line(32 + side * 12, 30 + k * 8, 32 + side * 22, 26 + k * 10, 1.5f, C(0.15f, 0.12f, 0.1f));
+                break;
+            case "martwa_rybka":
+                c.Disc(30, 32, 20, 8, C(0.62f, 0.64f, 0.6f), C(0.45f, 0.47f, 0.44f));
+                c.Line(48, 32, 58, 24, 3f, C(0.5f, 0.52f, 0.5f));
+                c.Line(48, 32, 58, 40, 3f, C(0.5f, 0.52f, 0.5f));
+                c.Line(14, 28, 18, 32, 1f, C(0.05f, 0.05f, 0.05f));
+                c.Line(18, 28, 14, 32, 1f, C(0.05f, 0.05f, 0.05f));
+                break;
+            case "ciasto":
+                c.Disc(32, 34, 18, 16, C(0.95f, 0.86f, 0.66f), C(0.82f, 0.72f, 0.5f));
+                c.Disc(26, 28, 5, 4, C(1f, 0.95f, 0.8f));
+                break;
+            case "groch":
+                foreach (var (x, y) in new[] { (22, 24), (38, 22), (46, 36), (30, 38), (18, 42), (36, 50) })
+                    c.Disc(x, y, 7, 7, C(0.55f, 0.7f, 0.3f), C(0.4f, 0.55f, 0.2f));
+                break;
+            case "kasza" or "konopie":
+            {
+                // A small heap of grains, scattered at random in a round pile.
+                bool hemp = id == "konopie";
+                var rng = new Random(hemp ? 7 : 3);
+                for (int k = 0; k < (hemp ? 22 : 34); k++)
+                {
+                    float a = (float)rng.NextDouble() * MathF.Tau, d = MathF.Sqrt((float)rng.NextDouble()) * 20f;
+                    float gx = 32 + MathF.Cos(a) * d * 1.1f, gy = 36 + MathF.Sin(a) * d * 0.75f;
+                    if (hemp)
+                        c.Disc(gx, gy, 3.6f, 3f, C(0.4f, 0.34f, 0.24f), C(0.26f, 0.21f, 0.15f));
+                    else
+                        c.Disc(gx, gy, 3f, 2.2f, C(0.92f, 0.86f, 0.68f), C(0.76f, 0.68f, 0.5f));
+                }
+                break;
+            }
+            case "kulka_czosnkowa":
+                c.Disc(26, 36, 13, 13, C(0.95f, 0.93f, 0.85f), C(0.78f, 0.76f, 0.68f));
+                c.Disc(44, 26, 9, 9, C(0.92f, 0.9f, 0.8f), C(0.75f, 0.73f, 0.64f));
+                break;
+            case "kulka_plywajaca":
+                c.Disc(32, 36, 15, 15, C(0.92f, 0.6f, 0.25f), C(0.72f, 0.42f, 0.16f));
+                c.Rect(26, 16, 38, 22, C(0.7f, 0.55f, 0.35f));                         // the cork in it
+                break;
+            case "blystka_obrotowa":
+                c.Line(10, 32, 54, 32, 1.5f, C(0.55f, 0.56f, 0.6f));                    // wire shaft
+                c.Disc(30, 26, 9, 5, C(0.9f, 0.82f, 0.5f), C(0.7f, 0.6f, 0.3f));          // the spinning blade
+                c.Disc(42, 32, 4, 4, C(0.8f, 0.2f, 0.15f));                              // bead body
+                c.Line(54, 32, 58, 40, 1.5f, C(0.55f, 0.56f, 0.6f));                     // treble hook
+                c.Line(54, 32, 58, 24, 1.5f, C(0.55f, 0.56f, 0.6f));
+                c.Ring(8, 32, 3, 1.2f, C(0.55f, 0.56f, 0.6f));
+                break;
+            case "blystka_mosiezna" or "blystka_srebrna":
+                var metal = id == "blystka_srebrna" ? C(0.86f, 0.88f, 0.92f) : C(0.86f, 0.68f, 0.3f);
+                for (int i = 0; i < 30; i++)
+                {
+                    float t = i / 29f;
+                    c.Disc(14 + t * 34, 22 + t * 16, 3f + 7f * MathF.Sin(MathF.PI * MathF.Pow(t, 0.7f)), 3f + 6f * MathF.Sin(MathF.PI * MathF.Pow(t, 0.7f)), metal, metal.Darkened(0.3f));
+                }
+                c.Line(22, 26, 40, 34, 1f, metal.Lightened(0.4f));                      // shine
+                c.Ring(11, 20, 3, 1.2f, C(0.55f, 0.56f, 0.6f));
+                c.Line(50, 40, 56, 50, 1.5f, C(0.55f, 0.56f, 0.6f));
+                break;
+            case "rybka_kora" or "rybka_drewniana":
+                bool painted = id == "rybka_drewniana";
+                c.Disc(32, 32, 20, 8, painted ? C(0.9f, 0.85f, 0.6f) : C(0.55f, 0.38f, 0.24f), painted ? C(0.35f, 0.5f, 0.3f) : C(0.42f, 0.28f, 0.17f));
+                if (painted)
+                    c.Disc(16, 31, 6, 6, C(0.85f, 0.2f, 0.15f));                         // red head
+                c.Line(12, 34, 5, 40, 2.5f, C(0.85f, 0.85f, 0.8f));                     // diving lip
+                c.Disc(16, 29, 1.8f, 1.8f, C(0.05f, 0.05f, 0.05f));
+                c.Line(28, 40, 26, 48, 1.5f, C(0.55f, 0.56f, 0.6f));                    // belly and tail trebles
+                c.Line(52, 32, 58, 38, 1.5f, C(0.55f, 0.56f, 0.6f));
+                break;
+            case "piorko_olowiane":
+                c.Disc(16, 34, 8, 8, C(0.55f, 0.56f, 0.6f), C(0.38f, 0.39f, 0.43f));     // lead head
+                c.Disc(13, 32, 1.6f, 1.6f, C(0.9f, 0.85f, 0.2f));
+                for (int k = 0; k < 7; k++)
+                    c.Line(22, 34, 56, 24 + k * 3, 2f, k % 2 == 0 ? C(0.95f, 0.95f, 0.9f) : C(0.8f, 0.3f, 0.25f));
+                break;
+            case "skorka_wegorza":
+                for (int i = 0; i < 40; i++)
+                {
+                    float t = i / 39f;
+                    float w = t < 0.6f ? 6f : 6f * (1f - (t - 0.6f) / 0.4f) + 1f;
+                    c.Disc(12 + t * 36 + MathF.Max(t - 0.6f, 0f) * 10f, 32 + MathF.Sin(MathF.Max(t - 0.5f, 0f) * 12f) * 6f, w, w, C(0.3f, 0.32f, 0.2f), C(0.2f, 0.22f, 0.13f));
+                }
+                c.Disc(12, 32, 6, 6, C(0.55f, 0.56f, 0.6f));
+                break;
+            case "mucha_kogut" or "mucha_zajac":
+                bool nymph = id == "mucha_zajac";
+                c.Line(20, 36, 46, 36, 3f, nymph ? C(0.55f, 0.45f, 0.32f) : C(0.25f, 0.2f, 0.15f));   // body on the hook shank
+                if (nymph)
+                    for (int k = 0; k < 6; k++)
+                        c.Line(22 + k * 4, 36, 20 + k * 4, 42, 1f, C(0.7f, 0.6f, 0.45f));
+                else
+                {
+                    c.Disc(24, 24, 10, 6, C(0.75f, 0.45f, 0.2f), C(0.6f, 0.32f, 0.12f));   // hackle feathers
+                    c.Disc(36, 22, 8, 5, C(0.85f, 0.6f, 0.3f));
+                }
+                c.Line(46, 36, 50, 46, 1.5f, C(0.55f, 0.56f, 0.6f));
+                c.Line(50, 46, 44, 48, 1.5f, C(0.55f, 0.56f, 0.6f));
+                break;
             default:   // livebait: a small silvery fish
                 c.Disc(30, 32, 20, 8, C(0.75f, 0.8f, 0.82f), C(0.55f, 0.6f, 0.62f));
                 c.Line(48, 32, 58, 24, 3f, C(0.6f, 0.65f, 0.7f));
@@ -219,6 +378,36 @@ public static class Icons
                 c.Disc(16, 30, 2, 2, C(0.05f, 0.05f, 0.05f));
                 break;
         }
+        return c;
+    });
+
+    private static ImageTexture Leader(LeaderData d) => Cached("leader:" + d.ItemId, c =>
+    {
+        if (d.ItemId == "brak")
+        {
+            c.Ring(32, 32, 20, 3, C(0.7f, 0.25f, 0.2f));
+            c.Line(18, 46, 46, 18, 3f, C(0.7f, 0.25f, 0.2f));
+            return c;
+        }
+        var strand = d.ItemId switch
+        {
+            "przypon_wlosie" => C(0.92f, 0.9f, 0.84f), "przypon_jelito" => C(0.88f, 0.7f, 0.42f), "przypon_mosiezny" => C(0.88f, 0.7f, 0.3f),
+            "przypon_stalowy" => C(0.5f, 0.52f, 0.56f), _ => C(0.95f, 0.93f, 0.86f),
+        };
+        // A loop at the top, the strand in a gentle S, a swivel, the hook at the bottom.
+        c.Ring(32, 10, 5, 1.6f, strand);
+        for (int i = 0; i < 30; i++)
+        {
+            float t = i / 29f;
+            c.Disc(32 + MathF.Sin(t * 5f) * 6f, 15 + t * 30, d.BiteProof > 0f ? 1.4f : 1f, d.BiteProof > 0f ? 1.4f : 1f, strand);
+        }
+        if (d.ItemId == "przypon_jedwab_drut")
+            for (int i = 0; i < 30; i += 3)
+                c.Disc(32 + MathF.Sin(i / 29f * 5f) * 6f, 15 + i, 1.2f, 1.2f, C(0.6f, 0.6f, 0.62f));
+        c.Disc(32, 47, 3, 4, C(0.55f, 0.56f, 0.6f));                                     // swivel
+        c.Line(32, 50, 32, 58, 2f, C(0.62f, 0.64f, 0.68f));
+        c.Line(32, 58, 26, 56, 2f, C(0.62f, 0.64f, 0.68f));
+        c.Line(26, 56, 26, 52, 2f, C(0.62f, 0.64f, 0.68f));
         return c;
     });
 
@@ -279,6 +468,26 @@ public static class Icons
                 c.Line(18, 22, 10, 58, 3.5f, C(0.45f, 0.3f, 0.17f));
                 c.Line(46, 22, 54, 58, 3.5f, C(0.45f, 0.3f, 0.17f));
                 c.Line(32, 24, 32, 60, 3.5f, C(0.4f, 0.26f, 0.15f));
+                break;
+            case AccessoryKind.Waders:             // greased leather waders
+                c.Rect(18, 8, 46, 14, C(0.35f, 0.24f, 0.14f));
+                c.Rect(18, 14, 30, 50, C(0.45f, 0.32f, 0.19f));
+                c.Rect(34, 14, 46, 50, C(0.45f, 0.32f, 0.19f));
+                c.Rect(14, 50, 30, 58, C(0.25f, 0.17f, 0.1f));
+                c.Rect(34, 50, 50, 58, C(0.25f, 0.17f, 0.1f));
+                c.Line(22, 8, 20, 2, 2f, C(0.3f, 0.2f, 0.12f));
+                c.Line(42, 8, 44, 2, 2f, C(0.3f, 0.2f, 0.12f));
+                break;
+            case AccessoryKind.HookHone:           // whetstone with a hook
+                c.Rect(10, 30, 54, 44, C(0.55f, 0.55f, 0.58f));
+                c.Rect(10, 30, 54, 33, C(0.68f, 0.68f, 0.7f));
+                c.Line(30, 14, 30, 26, 2.5f, C(0.62f, 0.64f, 0.68f));
+                c.Line(30, 26, 24, 24, 2.5f, C(0.62f, 0.64f, 0.68f));
+                break;
+            case AccessoryKind.ReelGrease:         // a clay pot of goose fat
+                c.Disc(32, 40, 18, 16, C(0.62f, 0.38f, 0.22f), C(0.48f, 0.28f, 0.16f));
+                c.Disc(32, 26, 14, 4, C(0.96f, 0.93f, 0.82f));
+                c.Rect(18, 22, 46, 24, C(0.5f, 0.3f, 0.17f));
                 break;
             default:                                // wooden bucket
                 c.Rect(16, 22, 48, 56, C(0.6f, 0.4f, 0.22f));
@@ -356,6 +565,7 @@ public static class Icons
         "rod" => Rod(new RodData()),
         "reel" => Reel(new ReelData()),
         "line" => Line(new LineData()),
+        "leader" => Leader(new LeaderData { BiteProof = 1f }),
         "hook" => Hook(new HookData { Size = 6 }),
         "bait" => Bait("worm"),
         "keepnet" => Keepnet(new KeepnetData()),

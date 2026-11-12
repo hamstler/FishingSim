@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="LineData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/LineData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Skręcana linka jedwabna"
+Kind = 0
+Strength = 9.0
+Visibility = 0.85
+Stretch = 0.35
+Price = 260
+RequiredLevel = 4
+Description = "Skręcany jedwab: mocny, cienki i mało widoczny."

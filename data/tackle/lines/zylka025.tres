@@ -9,3 +9,6 @@ Strength = 5.0
 Visibility = 1.0
 Price = 15
 RequiredLevel = 1
+Kind = 0
+Stretch = 0.55
+Description = "Zwykła linka z końskiego włosia. Rozciąga się i tłumi zrywy ryby."

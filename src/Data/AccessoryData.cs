@@ -15,6 +15,12 @@ public enum AccessoryKind
     Chair,
     /// <summary>Wiadro na przynęty: keeps live bait alive longer (planned).</summary>
     BaitBucket,
+    /// <summary>Wodery: wade deeper (Power = how deep, in metres).</summary>
+    Waders,
+    /// <summary>Osełka: sharper hooks set better (Power = extra share of strikes that hold).</summary>
+    HookHone,
+    /// <summary>Smalec do kołowrotka: the reel winds faster (Power = extra share of speed).</summary>
+    ReelGrease,
 }
 
 /// <summary>Any other accessory. Owning one is enough for it to work (they are not equipped in a slot).</summary>
@@ -26,5 +32,4 @@ public partial class AccessoryData : TackleItem
     /// <summary>Strength of the effect; meaning depends on <see cref="Kind"/> (e.g. extra visibility in metres).</summary>
     [Export] public float Power { get; set; } = 1f;
 
-    [Export(PropertyHint.MultilineText)] public string Description { get; set; } = "";
 }

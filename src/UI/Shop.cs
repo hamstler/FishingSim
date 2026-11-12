@@ -23,7 +23,7 @@ public partial class Shop : CanvasLayer
 {
     private static readonly (string Key, string Title)[] TabDefinitions =
     {
-        ("rod", "Wędki"), ("reel", "Kołowrotki"), ("line", "Linki"), ("hook", "Haczyki"),
+        ("rod", "Wędki"), ("reel", "Kołowrotki"), ("line", "Linki"), ("leader", "Przypony"), ("hook", "Haczyki"),
         ("keepnet", "Siatki"), ("landingnet", "Kasarki"), ("accessory", "Akcesoria"),
         ("bait", "Przynęty"), ("fish", "Ryby"), ("market", "Targ"), ("records", "Rekordy"), ("travel", "Łowiska"),
     };
@@ -168,7 +168,7 @@ public partial class Shop : CanvasLayer
         _profile.Changed += Refresh;
     }
 
-    private static bool IsGridTab(string key) => key is "rod" or "reel" or "line" or "hook" or "keepnet" or "landingnet" or "accessory" or "bait" or "records";
+    private static bool IsGridTab(string key) => key is "rod" or "reel" or "line" or "leader" or "hook" or "keepnet" or "landingnet" or "accessory" or "bait" or "records";
 
     private Texture2D TabIcon(string key) => key switch
     {
@@ -240,12 +240,12 @@ public partial class Shop : CanvasLayer
 
     private static readonly Dictionary<ShopKind, (string Title, string[] Tabs)> Kinds = new()
     {
-        [ShopKind.Tackle] = ("Kram wędkarski", new[] { "rod", "reel", "line", "hook", "keepnet", "landingnet", "accessory" }),
+        [ShopKind.Tackle] = ("Kram wędkarski", new[] { "rod", "reel", "line", "leader", "hook", "keepnet", "landingnet", "accessory" }),
         [ShopKind.Bait] = ("Kram z przynętami", new[] { "bait" }),
         [ShopKind.FishBuyer] = ("Skup ryb", new[] { "fish", "records" }),
         [ShopKind.Market] = ("Targ rybny", new[] { "market", "records" }),
         [ShopKind.General] = ("Kram wędkarski i przynęty",
-            new[] { "rod", "reel", "line", "hook", "keepnet", "landingnet", "accessory", "bait", "fish", "records" }),
+            new[] { "rod", "reel", "line", "leader", "hook", "keepnet", "landingnet", "accessory", "bait", "fish", "records" }),
         [ShopKind.Travel] = ("Postój wozów: dokąd jedziesz?", new[] { "travel" }),
     };
 
@@ -493,20 +493,28 @@ public partial class Shop : CanvasLayer
             case RodData r:
                 var cr = current as RodData;
                 yield return ("Zasięg rzutu", r.CastMult / 1.4f, cr?.CastMult / 1.4f ?? -1f, $"x{r.CastMult:0.00}");
-                yield return ("Wytrzymałość", r.MaxLoad / 15f, cr?.MaxLoad / 15f ?? -1f, $"{r.MaxLoad:0} kg");
+                yield return ("Wytrzymałość", r.MaxLoad / 18f, cr?.MaxLoad / 18f ?? -1f, $"{r.MaxLoad:0} kg");
                 yield return ("Amortyzacja zrywów", r.ShockAbsorb / 0.5f, cr?.ShockAbsorb / 0.5f ?? -1f, $"{r.ShockAbsorb * 200f:0}%");
                 yield return ("Akcja (szczytowa → paraboliczna)", r.Action, cr?.Action ?? -1f, r.Action < 0.34f ? "szczytowa" : r.Action < 0.67f ? "średnia" : "paraboliczna");
                 break;
             case ReelData r:
                 var ce = current as ReelData;
-                yield return ("Siła hamulca", r.DragMax / 12f, ce?.DragMax / 12f ?? -1f, $"{r.DragMax:0} kg");
+                yield return ("Siła hamulca", r.DragMax / 14f, ce?.DragMax / 14f ?? -1f, $"{r.DragMax:0} kg");
                 yield return ("Szybkość zwijania", r.ReelSpeed / 4f, ce?.ReelSpeed / 4f ?? -1f, $"{r.ReelSpeed:0.0} m/s");
-                yield return ("Pojemność szpuli", r.LineCapacity / 200f, ce?.LineCapacity / 200f ?? -1f, $"{r.LineCapacity:0} m");
+                yield return ("Pojemność szpuli", r.LineCapacity / 220f, ce?.LineCapacity / 220f ?? -1f, $"{r.LineCapacity:0} m");
                 break;
             case LineData l:
                 var cl = current as LineData;
-                yield return ("Wytrzymałość", l.Strength / 15f, cl?.Strength / 15f ?? -1f, $"{l.Strength:0} kg");
+                yield return ("Wytrzymałość", l.Strength / 26f, cl?.Strength / 26f ?? -1f, $"{l.Strength:0} kg");
                 yield return ("Niewidoczność w wodzie", 1f / MathF.Max(l.Visibility, 0.5f) * 0.6f, cl != null ? 1f / MathF.Max(cl.Visibility, 0.5f) * 0.6f : -1f, $"x{l.Visibility:0.00}");
+                yield return ("Rozciągliwość (tłumi zrywy)", l.Stretch / 0.6f, cl != null ? cl.Stretch / 0.6f : -1f, l.Kind == LineKind.Braid ? "plecionka" : $"{l.Stretch * 100f:0}%");
+                break;
+            case LeaderData d:
+                var cd = current as LeaderData;
+                bool none = d.ItemId == TackleSlotExtensions.NoLeader;
+                yield return ("Wytrzymałość", none ? 1f : d.Strength / 16f, cd == null ? -1f : cd.ItemId == TackleSlotExtensions.NoLeader ? 1f : cd.Strength / 16f, none ? "jak linka" : $"{d.Strength:0} kg");
+                yield return ("Niewidoczność w wodzie", none ? 0.6f : 1f / MathF.Max(d.Visibility, 0.5f) * 0.6f, cd == null ? -1f : cd.Visibility <= 0f ? 0.6f : 1f / MathF.Max(cd.Visibility, 0.5f) * 0.6f, none ? "jak linka" : $"x{d.Visibility:0.00}");
+                yield return ("Odporność na zęby", d.BiteProof, cd?.BiteProof ?? -1f, $"{d.BiteProof * 100f:0}%");
                 break;
             case HookData h:
                 var ch = current as HookData;
@@ -523,13 +531,17 @@ public partial class Shop : CanvasLayer
                 yield return ("Największa ryba", n.MaxWeight / 25f, cn?.MaxWeight / 25f ?? -1f, $"{n.MaxWeight:0.#} kg");
                 yield return ("Długość rączki", n.Reach / 3.5f, cn?.Reach / 3.5f ?? -1f, $"{n.Reach:0.#} m");
                 break;
+            case BaitData { Reusable: true }:
+                break;
             case BaitData b:
                 yield return ("W paczce", b.PackSize / 20f, -1f, $"{b.PackSize} szt.");
                 break;
         }
     }
 
-    private static string Describe(TackleItem item) => item switch
+    private static string Describe(TackleItem item) => item.Description != "" && item is not AccessoryData
+        ? item.Description + (item is BaitData { Kind: BaitKind.Lure } ? "\nPrzynęta sztuczna: nie zużywa się, bierze tylko podczas zwijania (LPM)." : "")
+        : item switch
     {
         RodData => "Wędka decyduje o zasięgu rzutu i o tym, ile ryba może pociągnąć, zanim kij pęknie.",
         ReelData => "Kołowrotek: hamulec oddaje linkę uciekającej rybie, szpula mieści zapas linki.",
@@ -556,7 +568,8 @@ public partial class Shop : CanvasLayer
         {
             int pack = ((BaitData)item).PackSize;
             state = $"Masz: {_profile.BaitCounts.GetValueOrDefault(item.ItemId)} szt.";
-            button = locked ? $"Wymaga poziomu {item.RequiredLevel}" : $"Kup paczkę ({pack} szt.) za {Lore.Money(item.Price)}";
+            button = locked ? $"Wymaga poziomu {item.RequiredLevel}"
+                : pack == 1 ? $"Kup za {Lore.Money(item.Price)}" : $"Kup paczkę ({pack} szt.) za {Lore.Money(item.Price)}";
             enabled = !locked && _profile.Money >= item.Price;
             action = () => Buy(slot, index);
         }

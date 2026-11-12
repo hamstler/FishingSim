@@ -180,6 +180,25 @@ public sealed class GameSuite : ITestSuite
         loadout.Index[(int)TackleSlot.Rod] = 0;
         rod.ApplyTackle();
 
+        t.Section("leaders and lures in the game");
+        float lineOnly = rod.LineStrength;
+        int hair = loadout.Items(TackleSlot.Leader).ToList().FindIndex(i => i.ItemId == "przypon_wlosie");
+        loadout.Index[(int)TackleSlot.Leader] = hair;
+        rod.ApplyTackle();
+        t.Check(MathF.Abs(rod.LineStrength - MathF.Min(lineOnly, loadout.Leader.Strength)) < 0.001f && rod.LineStrength < lineOnly,
+            $"a thin leader is the weakest link ({lineOnly:0.0} -> {rod.LineStrength:0.0} kg)");
+        loadout.Index[(int)TackleSlot.Leader] = 0;
+        rod.ApplyTackle();
+        t.Check(MathF.Abs(rod.LineStrength - lineOnly) < 0.001f, "without a leader the line holds as before");
+        var gearCatalog = rod.Gear!;
+        var waders = gearCatalog.Items(GearSlot.Accessory).First(i => i.ItemId == "wodery");
+        int cash = profile.Money;
+        profile.Money = 1000;
+        profile.Level = Math.Max(profile.Level, waders.RequiredLevel);
+        t.Check(gearCatalog.Buy(GearSlot.Accessory, waders) == null && rod.Lake.WadeLimit > LakeBed.WadeDepth,
+            $"waders let the angler wade deeper ({rod.Lake.WadeLimit:0.0} m)");
+        profile.Money = cash;
+
         t.Section("fishing loop end to end");
         rod.DevInstantBite = true;
         rod.DevSpeciesIndex = 0;

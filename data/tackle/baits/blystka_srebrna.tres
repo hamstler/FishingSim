@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Srebrna błystka mistrza"
+Kind = 3
+AffinityAs = "spoon"
+AffinityScale = 1.3
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 160
+RequiredLevel = 5
+Description = "Kuta ze srebra: błyszczy nawet w mętnej wodzie."

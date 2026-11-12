@@ -180,6 +180,9 @@ public partial class Main : Node3D
             _lantern.QueueFree();
             _lantern = null;
         }
+        _lake.WadeLimit = _gear.Accessory(AccessoryKind.Waders)?.Power ?? LakeBed.WadeDepth;
+        if (Rod.State == RodState.Idle)
+            Rod.ApplyTackle();     // reel grease and the like change the tackle's numbers
         var glasses = _gear.Accessory(AccessoryKind.PolarizedGlasses);
         float clarity = _lake.Location.WaterClarity;
         Fish.VisibleRange = FishPopulation.BaseVisibleRange + (glasses?.Power ?? 0f);
