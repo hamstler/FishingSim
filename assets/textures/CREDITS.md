@@ -26,3 +26,15 @@ Wszystkie na licencji CC0 1.0 (domena publiczna): wolno ich używać w każdym c
 | weathered_brown_planks | Weathered Brown Planks | Dimitrios Savva, Rico Cilliers | CC0 1.0 (public domain) | https://polyhaven.com/a/weathered_brown_planks |
 | white_planks_clean | White Planks Clean | Rob Tuytel | CC0 1.0 (public domain) | https://polyhaven.com/a/white_planks_clean |
 | wooden_rough_planks | Wooden Rough Planks | Rob Tuytel | CC0 1.0 (public domain) | https://polyhaven.com/a/wooden_rough_planks |
+
+## Modele z Poly Haven (assets/models)
+
+| id | nazwa | autorzy | licencja | źródło |
+|---|---|---|---|---|
+| stone_fire_pit | Stone Fire Pit | Sebastian Platen | CC0 1.0 (public domain) | https://polyhaven.com/a/stone_fire_pit |
+| tree_stump_01 | Tree Stump 01 | Rob Tuytel | CC0 1.0 (public domain) | https://polyhaven.com/a/tree_stump_01 |
+| wicker_basket_01 | Wicker Basket 01 | Kuutti Siitonen | CC0 1.0 (public domain) | https://polyhaven.com/a/wicker_basket_01 |
+| wine_barrel_01 | Wine Barrel 01 | James Ray Cock | CC0 1.0 (public domain) | https://polyhaven.com/a/wine_barrel_01 |
+| wooden_bucket_01 | Wooden Bucket 01 | James Ray Cock | CC0 1.0 (public domain) | https://polyhaven.com/a/wooden_bucket_01 |
+| wooden_crate_01 | Wooden Crate 01 | James Ray Cock | CC0 1.0 (public domain) | https://polyhaven.com/a/wooden_crate_01 |
+| wooden_lantern_01 | Wooden Lantern 01 | James Ray Cock | CC0 1.0 (public domain) | https://polyhaven.com/a/wooden_lantern_01 |

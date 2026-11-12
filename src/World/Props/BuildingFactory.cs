@@ -142,7 +142,7 @@ public static partial class BuildingFactory
     private static StandardMaterial3D LogWall(Color tint) => Photo("weathered_brown_planks", Nudge(tint) * 1.45f, 0.88f) ?? Textured(Textures.Logs(), tint, 0.9f);
 
     /// <summary>Board-and-batten in paint of the given colour (falu red, ochre, white...).</summary>
-    private static StandardMaterial3D BoardWall(Color paint) => Photo("white_planks_clean", paint, 0.75f) ?? Textured(Textures.Boards(), paint, 0.8f);
+    private static StandardMaterial3D BoardWall(Color paint) => Photo("white_planks_clean", paint * 1.45f, 0.75f) ?? Textured(Textures.Boards(), paint, 0.8f);
 
     private static StandardMaterial3D ShingleRoof(Color tint)
     {
@@ -164,7 +164,7 @@ public static partial class BuildingFactory
         var (albedo, normal) = GroundTextures.LayerTextures(GroundTextures.Grass);
         var m = Pixel(new StandardMaterial3D
         {
-            AlbedoTexture = albedo, AlbedoColor = new Color(0.62f, 0.86f, 0.52f), Uv1Triplanar = true,
+            AlbedoTexture = albedo, AlbedoColor = new Color(0.5f, 0.66f, 0.42f), Uv1Triplanar = true,
             Uv1Scale = Vector3.One / GroundTextures.TileMetres, Roughness = 0.9f, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
             NormalEnabled = true, NormalTexture = normal,
         });
@@ -174,7 +174,7 @@ public static partial class BuildingFactory
     /// <summary>Woven canvas in a colour (tents, awnings, clothes).</summary>
     public static StandardMaterial3D Cloth(Color colour, bool twoSided = true)
     {
-        var m = Photo("rough_linen", colour, 0.95f, scale: 0.5f) ?? Textured(Textures.Cloth(), colour, 0.95f, 2f);
+        var m = Photo("rough_linen", colour * 1.5f, 0.95f, scale: 0.5f) ?? Textured(Textures.Cloth(), colour, 0.95f, 2f);
         if (twoSided)
             m.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
         return m;
@@ -207,7 +207,7 @@ public static partial class BuildingFactory
     }
 
     private static StandardMaterial3D Painted(Color color) =>
-        Photo("white_planks_clean", color, 0.7f) ?? Textured(Textures.PlanksPainted(), color, 0.85f);
+        Photo("white_planks_clean", color * 1.45f, 0.7f) ?? Textured(Textures.PlanksPainted(), color, 0.85f);
 
     /// <summary>Lime plaster between the timbers; the house colour only tints it lightly.</summary>
     private static StandardMaterial3D Plaster(Color tint) =>
@@ -507,6 +507,15 @@ public static partial class BuildingFactory
     // ------------------------------------------------------------------ shop dressing
     private static void Barrel(Node3D parent, Vector3 pos)
     {
+        // The Poly Haven wine barrel when it is there (CC0), standing at its own size.
+        if (PropAsset.Create("wine_barrel_01", 0.95f) is { } model)
+        {
+            model.Position = pos;
+            model.RotationDegrees = new Vector3(0f, (pos.X * 37f + pos.Z * 53f) % 360f, 0f);
+            parent.AddChild(model);
+            Collider(parent, new Vector3(0.8f, 0.95f, 0.8f), pos + new Vector3(0, 0.475f, 0));
+            return;
+        }
         var wood = Wood(new Color(0.7f, 0.5f, 0.35f));
         Cyl(parent, 0.4f, 0.4f, 0.95f, pos + new Vector3(0, 0.475f, 0), wood, 12);
         foreach (float y in new[] { 0.2f, 0.75f })
@@ -516,6 +525,19 @@ public static partial class BuildingFactory
 
     private static void Crates(Node3D parent, Vector3 pos, int count)
     {
+        if (PropAsset.Create("wooden_crate_01", 0f, 1.15f) is { } first)
+        {
+            // Crates side by side, the third on top, each turned a little.
+            for (int i = 0; i < count; i++)
+            {
+                var crate = i == 0 ? first : PropAsset.Create("wooden_crate_01", 0f, 1.15f)!;
+                crate.Position = pos + (i == 2 ? new Vector3(0.45f, 0.41f, 0.05f) : new Vector3(i * 0.98f, 0f, i * 0.12f));
+                crate.RotationDegrees = new Vector3(0f, 8f * i - 6f, 0f);
+                parent.AddChild(crate);
+            }
+            Collider(parent, new Vector3(count * 1.0f, 0.9f, 0.6f), pos + new Vector3(count * 0.45f, 0.45f, 0));
+            return;
+        }
         var wood = Wood(new Color(0.8f, 0.62f, 0.42f));
         for (int i = 0; i < count; i++)
         {
@@ -716,6 +738,14 @@ public static partial class BuildingFactory
         Box(b, new Vector3(0.22f, 3.4f, 0.22f), new Vector3(0, 1.7f, 0), wood);
         Box(b, new Vector3(0.9f, 0.1f, 0.1f), new Vector3(0.38f, 3.3f, 0), iron);
         Box(b, new Vector3(0.05f, 0.25f, 0.05f), new Vector3(0.75f, 3.15f, 0), iron);
+        if (PropAsset.Create("wooden_lantern_01", 0.55f) is { } lantern)
+        {
+            // The Poly Haven lantern (CC0) on the arm, a flame inside that lights up after dark.
+            lantern.Position = new Vector3(0.75f, 2.5f, 0f);
+            b.AddChild(lantern);
+            Box(b, new Vector3(0.1f, 0.14f, 0.1f), new Vector3(0.75f, 2.72f, 0), Glass(b));
+            return;
+        }
         Box(b, new Vector3(0.34f, 0.42f, 0.34f), new Vector3(0.75f, 2.82f, 0), Glass(b));
         Box(b, new Vector3(0.42f, 0.08f, 0.42f), new Vector3(0.75f, 3.06f, 0), iron);
         Box(b, new Vector3(0.38f, 0.06f, 0.38f), new Vector3(0.75f, 2.58f, 0), iron);

@@ -245,7 +245,13 @@ public static partial class BuildingFactory
     private static void Campfire(Building b, Vector3 at)
     {
         var stone = Stone(new Color(0.75f, 0.74f, 0.72f));
-        for (int i = 0; i < 9; i++)
+        var pit = PropAsset.Create("stone_fire_pit", 0f, 0.8f);
+        if (pit != null)
+        {
+            pit.Position = at;
+            b.AddChild(pit);
+        }
+        for (int i = 0; i < (pit != null ? 0 : 9); i++)
         {
             float a = i * Mathf.Tau / 9f;
             var s = new MeshInstance3D
@@ -365,7 +371,14 @@ public static partial class BuildingFactory
         {
             float x = -width / 2f + 0.4f + i * (width - 0.8f) / 3f;
             var p = at + new Vector3(x, 0.95f, (i % 2) * 0.12f - 0.05f);
-            Cyl(b, 0.24f, 0.2f, 0.18f, p + new Vector3(0f, 0.09f, 0f), basket, 12);
+            if (PropAsset.Create("wicker_basket_01", 0f, 1.25f) is { } wicker)
+            {
+                wicker.Position = p;
+                wicker.RotationDegrees = new Vector3(0f, i * 47f, 0f);
+                b.AddChild(wicker);
+            }
+            else
+                Cyl(b, 0.24f, 0.2f, 0.18f, p + new Vector3(0f, 0.09f, 0f), basket, 12);
             Color fill = kind switch
             {
                 0 => new Color(0.62f, 0.68f, 0.72f),                          // fish
@@ -394,8 +407,17 @@ public static partial class BuildingFactory
         var iron = Flat(new Color(0.14f, 0.13f, 0.12f), 0.5f, 0.6f);
         var glow = Pixel(new StandardMaterial3D { AlbedoColor = new Color(0.9f, 0.8f, 0.55f), EmissionEnabled = false, Emission = new Color(1f, 0.75f, 0.4f) });
         b.AddGlow(glow);
-        Box(b, new Vector3(0.18f, 0.24f, 0.18f), at, glow);
-        Box(b, new Vector3(0.22f, 0.04f, 0.22f), at + new Vector3(0f, 0.14f, 0f), iron);
+        if (PropAsset.Create("wooden_lantern_01", 0.4f) is { } lantern)
+        {
+            lantern.Position = at - new Vector3(0f, 0.3f, 0f);
+            b.AddChild(lantern);
+            Box(b, new Vector3(0.08f, 0.12f, 0.08f), at - new Vector3(0f, 0.15f, 0f), glow);      // the flame inside
+        }
+        else
+        {
+            Box(b, new Vector3(0.18f, 0.24f, 0.18f), at, glow);
+            Box(b, new Vector3(0.22f, 0.04f, 0.22f), at + new Vector3(0f, 0.14f, 0f), iron);
+        }
         var light = new OmniLight3D { LightColor = new Color(1f, 0.78f, 0.45f), OmniRange = 6f, LightEnergy = 0f, Position = at };
         b.AddChild(light);
         b.AddLight(light);
@@ -415,7 +437,13 @@ public static partial class BuildingFactory
         Cyl(b, 0.07f, 0.07f, 1.7f, new Vector3(0f, 1.65f, 0f), wood, 8).RotationDegrees = new Vector3(0f, 0f, 90f);
         Box(b, new Vector3(0.05f, 0.35f, 0.05f), new Vector3(0.9f, 1.5f, 0.1f), wood);
         Cyl(b, 0.006f, 0.006f, 0.55f, new Vector3(0f, 1.36f, 0f), Flat(new Color(0.7f, 0.66f, 0.52f)), 4);
-        Cyl(b, 0.13f, 0.11f, 0.22f, new Vector3(0f, 1.0f, 0f), wood, 10);
+        if (PropAsset.Create("wooden_bucket_01", 0.32f) is { } bucket)
+        {
+            bucket.Position = new Vector3(0f, 0.9f, 0f);
+            b.AddChild(bucket);
+        }
+        else
+            Cyl(b, 0.13f, 0.11f, 0.22f, new Vector3(0f, 1.0f, 0f), wood, 10);
         Collider(b, new Vector3(1.8f, 1f, 1.8f), new Vector3(0f, 0.5f, 0f));
     }
 
@@ -440,7 +468,13 @@ public static partial class BuildingFactory
             Box(holder, new Vector3(0.1f, 1.2f, 0.1f), new Vector3(sx, 0.6f, 0f), bark);
         Box(holder, new Vector3(2.7f, 0.06f, 1.2f), new Vector3(0f, 1.05f, 0f), Wood(new Color(0.5f, 0.42f, 0.34f)), new Vector3(8f, 0f, 0f));
         Collider(holder, new Vector3(2.4f, 1f, 1f), new Vector3(0f, 0.5f, 0f));
-        Cyl(holder, 0.28f, 0.3f, 0.5f, new Vector3(1.9f, 0.25f, 0.8f), bark, 12);
+        if (PropAsset.Create("tree_stump_01", 0f, 0.42f) is { } stump)
+        {
+            stump.Position = new Vector3(1.9f, 0f, 0.8f);
+            holder.AddChild(stump);
+        }
+        else
+            Cyl(holder, 0.28f, 0.3f, 0.5f, new Vector3(1.9f, 0.25f, 0.8f), bark, 12);
         Box(holder, new Vector3(0.04f, 0.6f, 0.04f), new Vector3(1.9f, 0.72f, 0.8f), Wood(new Color(0.7f, 0.56f, 0.38f)), new Vector3(0f, 0f, 25f));
         Box(holder, new Vector3(0.06f, 0.14f, 0.18f), new Vector3(2.03f, 0.98f, 0.8f), Flat(new Color(0.35f, 0.35f, 0.38f), 0.4f, 0.7f));
     }

@@ -1,0 +1,14 @@
+{
+ "id": "wine_barrel_01",
+ "name": "Wine Barrel 01",
+ "authors": [
+  "James Ray Cock"
+ ],
+ "size_m": [
+  0.742,
+  0.756,
+  0.871
+ ],
+ "licence": "CC0 1.0 (public domain)",
+ "source": "https://polyhaven.com/a/wine_barrel_01"
+}
