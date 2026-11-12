@@ -84,12 +84,12 @@ public static class Sweeping
 {
     public const string Mayfly = "jetka", Grasshopper = "insect", Beetle = "chrabaszcz";
 
-    /// <summary>The mayflies' hours: from five in the afternoon until it is dark.</summary>
+    /// <summary>The mayflies' hours: the evening before dark (the game's day ends at six, dusk lasts till about eight).</summary>
     public static float MayflyActivity(float hour, Weather weather)
     {
         if (weather == Weather.Rain)
             return 0f;
-        float rise = Smooth(16f, 18f, hour), fall = 1f - Smooth(20.5f, 22f, hour);
+        float rise = Smooth(15.5f, 17f, hour), fall = 1f - Smooth(19.5f, 20.5f, hour);
         return rise * fall * (weather == Weather.Cloudy ? 0.8f : 1f);
     }
 
@@ -111,7 +111,7 @@ public static class Sweeping
         if (c.NearTrees && dusk && rng.NextFloat() < 0.4f)
             baits[Beetle] = 1;
         string empty = c.NearWater && MayflyActivity(c.Hour, c.Weather) <= 0f
-            ? "Pusto. Jętki tańczą nad wodą wieczorem."
+            ? "Pusto. Jętki tańczą nad wodą o zmierzchu (ok. 17-20)."
             : "Siatka pusta.";
         return new Haul(baits, baits.Count == 0 ? empty : "Złapano: " + Digging.Describe(baits));
     }

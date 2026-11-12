@@ -15,8 +15,8 @@ namespace FishingSim.World;
 /// </summary>
 public partial class InsectSwarms : Node3D
 {
-    private const int PerSwarm = 70;
-    private const float Reach = 3.6f;
+    private const int PerSwarm = 45;
+    private const float Reach = 2.6f;
 
     private sealed class Swarm
     {
@@ -82,13 +82,13 @@ public partial class InsectSwarms : Node3D
         if (Renderer.IsHeadless)
             return;
         _material ??= new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/mayfly.gdshader") };
-        var quad = new QuadMesh { Size = new Vector2(0.045f, 0.045f) };
+        var quad = new QuadMesh { Size = new Vector2(0.03f, 0.03f) };
         foreach (var s in _swarms)
         {
             var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = quad, InstanceCount = PerSwarm };
             for (int i = 0; i < PerSwarm; i++)
                 mm.SetInstanceTransform(i, Transform3D.Identity);
-            mm.CustomAabb = new Aabb(new Vector3(-2.5f, 0f, -2.5f), new Vector3(5f, 3.5f, 5f));
+            mm.CustomAabb = new Aabb(new Vector3(-1.2f, 0f, -1.2f), new Vector3(2.4f, 2.6f, 2.4f));
             s.View = new MultiMeshInstance3D
             {
                 Multimesh = mm, MaterialOverride = _material, Position = s.Position, Visible = false,
@@ -112,7 +112,7 @@ public partial class InsectSwarms : Node3D
                 s.View.SetInstanceShaderParameter("fade", Activity * (0.25f + 0.75f * s.Fullness));
             }
         }
-        _material?.SetShaderParameter("light", Math.Clamp(_world.Daylight * 1.4f, 0.15f, 1f));
+        _material?.SetShaderParameter("light", Math.Clamp(_world.Daylight * 1.4f, 0f, 1f));
     }
 
     /// <summary>How thick the swarm is at a point (0..1): the evening's activity, the swarm's fullness, the distance.</summary>

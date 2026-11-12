@@ -19,9 +19,9 @@ void vertex() {
 	float cyc = fract(TIME * speed + hash(id + 7.7));
 	// The dance: up fast with beating wings, down slowly with the wings held still.
 	float h = cyc < 0.28 ? smoothstep(0.0, 1.0, cyc / 0.28) : 1.0 - smoothstep(0.0, 1.0, (cyc - 0.28) / 0.72);
-	float r = 0.4 + 1.5 * hash(id + 1.3);
+	float r = 0.15 + 0.85 * hash(id + 1.3);
 	float a = TIME * (0.12 + 0.2 * hash(id + 5.0)) + ph;
-	vec3 off = vec3(cos(a) * r, 0.6 + h * (0.9 + 0.8 * hash(id + 9.0)), sin(a) * r * 0.7);
+	vec3 off = vec3(cos(a) * r, 0.8 + h * (0.7 + 0.7 * hash(id + 9.0)), sin(a) * r * 0.7);
 	v_flap = cyc < 0.28 ? abs(sin(TIME * 55.0 + ph)) : 0.85;
 	vec4 origin = MODEL_MATRIX[3] + vec4(off, 0.0);
 	// Hidden insects (fewer at the start and end of the evening) fold away.
@@ -40,5 +40,5 @@ void fragment() {
 	float a = max(body, max(wing * 0.7, tails * 0.8));
 	if (a < 0.35) discard;
 	vec3 c = mix(tint * 0.85, vec3(1.0, 0.97, 0.9), wing * (1.0 - body));
-	ALBEDO = c * (0.35 + 0.75 * light);
+	ALBEDO = c * (0.08 + 0.92 * light);
 }
