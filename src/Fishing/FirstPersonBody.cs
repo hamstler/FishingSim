@@ -10,9 +10,9 @@ namespace FishingSim.Fishing;
 /// World/Props/CharacterAsset), the rest of the body hidden, its skeleton set so the eyes are at the camera. ArmIK
 /// bends shoulder, elbow and wrist each frame so the right hand grips the rod handle (palm on the right of the blank,
 /// fingers round under it with the reel foot between them, thumb along the top) and the left hand turns the reel
-/// handle while reeling, holds the landed fish from below, otherwise hangs at the side. Without a screen (tests) the
-/// old built hands stand in. The rod is raised when the player holds the right mouse button (strike, pumping,
-/// lifting the fish out).
+/// handle while reeling, otherwise hangs at the side (a landed fish is shown on the catch panel, not held up).
+/// Without a screen (tests) the old built hands stand in. The rod is raised when the player holds the right mouse
+/// button (strike, pumping, lifting the fish out).
 /// </summary>
 public partial class FirstPersonBody : Node3D
 {
@@ -52,7 +52,7 @@ public partial class FirstPersonBody : Node3D
     /// <summary>0..1 how far the rod should be raised (right mouse button); set by Main from the rod.</summary>
     public Func<float>? RaiseSource { get; set; }
 
-    /// <summary>The landed fish to hold in the left hand (camera child), or null.</summary>
+    /// <summary>A fish to hold in the left hand, or null (unused since the catch panel shows the landed fish).</summary>
     public Func<Node3D?>? HeldFishSource { get; set; }
 
     /// <summary>True while the reel handle should turn (set by Main from the rod).</summary>

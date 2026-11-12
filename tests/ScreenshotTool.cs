@@ -356,6 +356,10 @@ public partial class ScreenshotTool : Node
                 for (int i = 0; i < 600 && !(rod.HeldFishModel?.HasDetailedSkin ?? true); i++)
                     await NextFrame();
                 frames = 3;
+                // FISHSIM_SHOT_WAIT=seconds: let the catch panel's fish turn a while first.
+                if (double.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_WAIT"), System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out double wait))
+                    await ToSignal(GetTree().CreateTimer(wait), SceneTreeTimer.SignalName.Timeout);
             }
         }
         else if (mode == 15)

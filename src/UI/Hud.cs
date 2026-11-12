@@ -129,10 +129,9 @@ public partial class Hud : CanvasLayer
         _gauge = new TensionGauge { Rod = _rod };
         Anchor(_gauge, 0.5f, 1f, -GaugeHalfWidth, GaugeTop, GaugeHalfWidth, GaugeTop + GaugeHeight);
         AddChild(_gauge);
-        // After a landing: keep it or let it go (above the status line, the fish is held up in the left hand).
+        // After a landing: the catch on its stage, keep it or let it go (over everything, the world dimmed).
         _catchPanel = new CatchPanel();
         _catchPanel.Setup(_rod);
-        Anchor(_catchPanel, 0.5f, 1f, -320, -300, 320, -130);
         AddChild(_catchPanel);
         _power = new ProgressBar { ShowPercentage = false, Theme = UITheme.Make() };
         Anchor(_power, 0.5f, 1f, -160, -80, 160, -72);
@@ -217,7 +216,8 @@ public partial class Hud : CanvasLayer
 
         SetText(_drag, $"Hamulec {Mathf.RoundToInt(rod.DragSetting * 100f)}%");
         SetText(_banner, rod.BannerTime > 0f ? rod.BannerText : _banner.Text);
-        Fade(_banner, rod.BannerTime > 0f, dt);
+        // While the catch panel is open it says it all.
+        Fade(_banner, rod.BannerTime > 0f && !_catchPanel.Visible, dt);
 
         // Purse and keepnet: flash when they change.
         var pr = rod.Profile;

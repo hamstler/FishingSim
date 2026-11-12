@@ -1016,20 +1016,15 @@ public partial class FishingRod : Node3D
     private void ShowHeldFish(FishSpecies species, float weight)
     {
         ClearHeldFish();
-        // Held up side-on above the catch panel, like a photo of the catch, at its real size: a bigger, heavier fish
-        // fills more of the view (only a giant is held further off so it still fits).
+        // The detailed model at its real size; the catch panel puts it on its stage and turns it slowly. Until then
+        // (or without a panel, in tests) it waits hidden by the camera, where its skin is painted in the background.
         var model = FishModel.Create(species, weight, detailed: true);
-        float fit = MathF.Min(1f, 1.15f / model.Length);
-        float shown = model.Length * fit, distance = Math.Clamp(0.42f + 0.32f * shown, 0.42f, 0.8f);
-        model.Scale = new Vector3(fit, fit, fit);
-        model.Wiggle = 0.25f;
-        model.Position = new Vector3(0.02f, 0.1f * distance / 0.6f, -distance);
-        model.RotationDegrees = new Vector3(-4f, -80f, 6f);
+        model.Visible = false;
         _camera.AddChild(model);
         _heldFish = model;
     }
 
-    /// <summary>A fish has just been landed and is held up: the catch panel asks where it goes.</summary>
+    /// <summary>A fish has just been landed: the catch panel shows it and asks where it goes.</summary>
     public bool AwaitingDecision { get; private set; }
 
     /// <summary>What the last landing earned (XP, record, value) for the catch panel.</summary>
@@ -1075,7 +1070,7 @@ public partial class FishingRod : Node3D
         ClearHeldFish();
     }
 
-    /// <summary>The landed fish shown in front of the camera (held in the left hand), or null.</summary>
+    /// <summary>The landed fish (on the catch panel's stage), or null.</summary>
     public Node3D? HeldFish => _heldFish;
 
     /// <summary>The held fish's model (to check its detailed skin).</summary>
