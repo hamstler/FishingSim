@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using FishingSim.Core;
 using FishingSim.Core.Gear;
@@ -215,6 +216,9 @@ public partial class FishingRod : Node3D
         _lineVisibility = line.Visibility;
         // Rated power: the rod's own limit; it reads as fully bent near that load.
         _bendModel = new Core.Physics.RodBendModel(RodRig.Joints * RodRig.SegmentLength, rod.MaxLoad, rod.Action);
+        // A snapped rod is gone: nothing left in the hand until a new one is bought or handed out.
+        if (_rig != null)
+            _rig.Visible = Loadout.Profile == null || Loadout.Profile.Owns(TackleSlot.Rod, rod.ItemId);
     }
 
     private Core.Physics.RodBendModel? _bendModel;
@@ -297,13 +301,7 @@ public partial class FishingRod : Node3D
             switch (mb.ButtonIndex)
             {
                 case MouseButton.Left when mb.Pressed && State == RodState.Idle:
-                    if (Loadout.BaitCount <= 0)
-                    {
-                        ShowBanner("Brak przynęty! Zmień przynętę (klawisz 5)");
-                        return;
-                    }
-                    CastPower = 0f;
-                    SetState(RodState.Charging);
+                    TryStartCharge();
                     break;
                 case MouseButton.Left when !mb.Pressed && State == RodState.Charging:
                     Cast();
@@ -332,8 +330,11 @@ public partial class FishingRod : Node3D
             case Key.Space:
                 TryNet();
                 break;
-            case Key.R when State == RodState.Landed && _releasable && CurrentSpecies != null:
+            case Key.R when State == RodState.Landed && AwaitingDecision:
                 ReleaseCatch();
+                break;
+            case Key.E when State == RodState.Landed && AwaitingDecision:
+                KeepCatch();
                 break;
             case Key.F2:
                 DevInstantBite = !DevInstantBite;
@@ -479,6 +480,12 @@ public partial class FishingRod : Node3D
 
     public void ResetToIdle()
     {
+        // Walking away from an undecided catch puts it back into the water.
+        if (AwaitingDecision)
+        {
+            AwaitingDecision = false;
+            Profile.Release();
+        }
         LoseBiter();
         ClearHeldFish();
         _bobber.Stow();
@@ -497,6 +504,27 @@ public partial class FishingRod : Node3D
         float speed = Mathf.Lerp(_castMin, _castMax, CastPower);
         _bobber.Launch(_rodTip.GlobalPosition, aim * speed);
         SetState(RodState.Flying);
+    }
+
+    /// <summary>LMB in the idle state: starts charging a cast, unless the kit or the bait is missing (then says why).</summary>
+    public bool TryStartCharge()
+    {
+        if (State != RodState.Idle)
+            return false;
+        if (!Loadout.Ready)
+        {
+            var missing = string.Join(", ", Profile.MissingKit().Select(m => m.MissingName()));
+            ShowBanner($"Brak sprzętu: {missing}. Kram wędkarski: kup nowy, a bez pieniędzy odbierz darmowy zestaw.", 4f);
+            return false;
+        }
+        if (Loadout.BaitCount <= 0)
+        {
+            ShowBanner("Brak przynęty! Zmień przynętę (klawisz 5)");
+            return false;
+        }
+        CastPower = 0f;
+        SetState(RodState.Charging);
+        return true;
     }
 
     /// <summary>Starts a cast with the given power without input (tests, tools).</summary>
@@ -605,7 +633,10 @@ public partial class FishingRod : Node3D
             SoundCue?.Invoke(Core.Audio.OneShot.Bell, 1f);
         _pulseTimer = 0f;
         if (CurrentSpecies != null)
+        {
             Graphics.FishSkin.Prewarm(CurrentSpecies);     // paint the close-up skin while the float twitches
+            FishAsset.Prefetch(CurrentSpecies);            // and decode the species' model pictures
+        }
         SetState(RodState.Nibble);
     }
 
@@ -690,6 +721,7 @@ public partial class FishingRod : Node3D
         _fishNode.Visible = true;
         _fishDepth = 0.3f;
         _jump = 0f;
+        _fishYaw = _fight.Heading;
         SetState(RodState.Fight);
     }
 
@@ -701,21 +733,24 @@ public partial class FishingRod : Node3D
         switch (outcome)
         {
             case FightOutcome.LineBroke:
-                BreakLine(RodMaxLoad < LineStrength ? "Wędka się złamała!" : "Linka pękła!");
+                if (RodMaxLoad < LineStrength)
+                    BreakLine("Wędka się złamała!", TackleSlot.Rod);
+                else
+                    BreakLine("Linka pękła! Haczyk został w rybie.", TackleSlot.Hook);
                 return;
             case FightOutcome.SpooledOut:
-                BreakLine("Ryba wyciągnęła całą linkę!");
+                BreakLine("Ryba wyciągnęła całą linkę! Żyłka przepadła.", TackleSlot.Line);
                 return;
             case FightOutcome.Landed:
                 EnterClose();
                 return;
         }
 
-        // Fish position and visuals.
-        float angle = _fight.FishAngle;
-        var dir = new Vector3(MathF.Sin(angle), 0f, MathF.Cos(angle));
-        var pos = Origin() + dir * _fight.LineOut;
+        // Fish position and visuals: where the fight model has it, facing the way it swims.
+        var pos = Origin() + new Vector3(_fight.Position.X, 0f, _fight.Position.Y);
         _bobber.Hold(new Vector3(pos.X, _waterY - 0.02f, pos.Z));
+        if (_fight.BurstStarted)
+            Twitch(0.6f + 1.2f * Math.Clamp(_fight.PeakPull / MathF.Max(EffectiveLimit, 0.1f), 0f, 1f));   // the rod kicks with every surge
         // A fresh fish bores deep and only comes up as it tires; runs take it down, rests let it rise.
         float floor = MathF.Min(CurrentDepth() * 0.75f, 2.4f);
         float wantDepth = Mathf.Lerp(0.2f, floor, MathF.Pow(_fight.Stamina, 0.7f)) * (_fight.Running ? 1f : 0.7f);
@@ -747,15 +782,18 @@ public partial class FishingRod : Node3D
         {
             SoundCue?.Invoke(Core.Audio.OneShot.SmallSplash, 0.6f);   // a tired fish thrashes at the surface
         }
-        float shake = _fight.Bursting ? MathF.Sin(_stateTime * 17f) * 0.45f : 0f;
-        float sway = MathF.Sin(_stateTime * (_fight.Running ? 3.1f : 1.7f)) * (_fight.Running ? 0.35f : 0.18f);
+        // The body follows its heading smoothly; head shakes during surges, a slight tail-beat sway otherwise.
+        _fishYaw = Mathf.LerpAngle(_fishYaw, _fight.Heading, Math.Clamp(6f * dt, 0f, 1f));
+        float shake = _fight.Bursting ? MathF.Sin(_stateTime * 17f) * 0.3f : 0f;
+        float sway = MathF.Sin(_stateTime * (4f + 6f * _fight.Speed)) * 0.06f;
         _fishNode.GlobalPosition = new Vector3(pos.X, fishY, pos.Z);
-        _fishNode.Rotation = new Vector3(pitch, angle + sway + shake, _fight.Bursting ? shake * 0.6f : 0f);
+        _fishNode.Rotation = new Vector3(pitch, _fishYaw + sway + shake, _fight.Bursting ? shake * 0.5f : 0f);
         if (_fishModel != null)
-            _fishModel.Wiggle = (_fight.Bursting ? 2.6f : _fight.Running ? 1.7f : 0.8f) * (0.4f + 0.6f * _fight.Stamina);
+            _fishModel.Wiggle = Math.Clamp(0.5f + _fight.Speed * 1.2f, 0.5f, 2.8f) * (0.4f + 0.6f * _fight.Stamina);
     }
 
     private float _fishDepth = 0.3f;
+    private float _fishYaw;
     private float _jump;
 
     // ------------------------------------------------------------------ fish at the surface: lift or net
@@ -786,7 +824,10 @@ public partial class FishingRod : Node3D
         _liftStress = ratio > 1f ? _liftStress + (ratio - 1f) * 3f * dt : MathF.Max(_liftStress - 0.5f * dt, 0f);
         if (!DevUnbreakable && (_liftStress >= 1f || ratio > 1.6f))
         {
-            BreakLine(RodMaxLoad < LineStrength ? "Wędka pękła pod ciężarem ryby!" : "Linka pękła przy podnoszeniu! Użyj kasarka.");
+            if (RodMaxLoad < LineStrength)
+                BreakLine("Wędka pękła pod ciężarem ryby!", TackleSlot.Rod);
+            else
+                BreakLine("Linka pękła przy podnoszeniu! Użyj kasarka.", TackleSlot.Hook);
             return;
         }
 
@@ -877,8 +918,10 @@ public partial class FishingRod : Node3D
         var context = new CatchContext(
             Lake.Location.DisplayName, Loadout.Bait.DisplayName, Loadout.Hook.DisplayName,
             MathF.Round(CurrentDepth() * 10f) / 10f, World.TimeText);
-        var result = Profile.AddCatch(species, CurrentWeight, context);
-        _releasable = !result.Released;
+        // Counts, journal, records and XP now; the keepnet only when the angler chooses (catch panel: E / R).
+        var result = Profile.AddCatch(species, CurrentWeight, context, toKeepnet: false);
+        LastCatch = result;
+        AwaitingDecision = true;
         if (_biter != null)
             Population?.Catch(_biter);
         _biter = null;
@@ -887,10 +930,6 @@ public partial class FishingRod : Node3D
             text += "\nNowy rekord gatunku!";
         if (result.LevelUp)
             text += $"\nAwans na poziom {Profile.Level}!";
-        if (result.Released)
-            text += "\nSiatka pełna: ryba wypuszczona. Sprzedaj ryby albo kup większą siatkę.";
-        else if (CurrentWeight < species.LegalWeight)
-            text += $"\nNiewymiarowa (poniżej {species.LegalWeight:0.00} kg)! Wypuść ją (R), bo strażnik ukarze.";
         ShowBanner(text, 4.5f);
         _lineOutOutsideFight = 0f;
         _fight = null;
@@ -902,8 +941,26 @@ public partial class FishingRod : Node3D
         FishLanded?.Invoke(species, CurrentWeight);
     }
 
-    private void BreakLine(string text)
+    /// <summary>Breaks the tackle as if a fish had done it (tools and tests).</summary>
+    public void ForceBreak(TackleSlot slot) =>
+        BreakLine(slot == TackleSlot.Rod ? "Wędka się złamała!" : "Linka pękła!", slot);
+
+    /// <summary>
+    /// Ends the fight with a loss. <paramref name="destroyed"/> is the piece of tackle lost for good: a snapped rod, the
+    /// hook left in the fish, or the whole line pulled off the spool. It leaves the inventory.
+    /// </summary>
+    private void BreakLine(string text, TackleSlot? destroyed = null)
     {
+        if (destroyed is TackleSlot slot && !DevUnbreakable)
+        {
+            var lost = Loadout.Selected(slot);
+            if (Profile.Destroy(slot, lost.ItemId))
+            {
+                Loadout.Resync();
+                ApplyTackle();
+                text += Loadout.Ready ? $" Stracono: {lost.DisplayName}." : $" Stracono: {lost.DisplayName}. Kup nowy w kramie wędkarskim.";
+            }
+        }
         ShowBanner(text, 3.5f);
         SoundCue?.Invoke(Core.Audio.OneShot.LineSnap, 1f);
         LoseBiter(_fishNode.Visible ? _fishNode.GlobalPosition : null);
@@ -916,37 +973,74 @@ public partial class FishingRod : Node3D
 
     private void TickResult()
     {
-        if (_stateTime > ResultSeconds)
+        // A landed fish waits in the hand for the angler's choice; after it the rod is ready again shortly.
+        if (State == RodState.Landed && AwaitingDecision)
+            return;
+        float since = State == RodState.Landed ? _stateTime - _decidedAt : _stateTime;
+        if (since > (State == RodState.Landed ? 1f : ResultSeconds))
             ResetToIdle();
     }
 
     private void ShowHeldFish(FishSpecies species, float weight)
     {
         ClearHeldFish();
+        // Held up side-on above the catch panel, like a photo of the catch, at its real size: a bigger, heavier fish
+        // fills more of the view (only a giant is held further off so it still fits).
         var model = FishModel.Create(species, weight, detailed: true);
-        float fit = MathF.Min(1f, 0.55f / model.Length);
+        float fit = MathF.Min(1f, 1.15f / model.Length);
+        float shown = model.Length * fit, distance = Math.Clamp(0.42f + 0.32f * shown, 0.42f, 0.8f);
         model.Scale = new Vector3(fit, fit, fit);
         model.Wiggle = 0.25f;
-        model.Position = new Vector3(-0.1f, -0.26f, -0.62f);
-        model.RotationDegrees = new Vector3(-6f, -75f, 10f);
+        model.Position = new Vector3(0.02f, 0.1f * distance / 0.6f, -distance);
+        model.RotationDegrees = new Vector3(-4f, -80f, 6f);
         _camera.AddChild(model);
         _heldFish = model;
     }
 
-    private bool _releasable;
+    /// <summary>A fish has just been landed and is held up: the catch panel asks where it goes.</summary>
+    public bool AwaitingDecision { get; private set; }
 
-    /// <summary>True right after a kept catch: R puts it back into the water.</summary>
-    public bool CanRelease => State == RodState.Landed && _releasable;
+    /// <summary>What the last landing earned (XP, record, value) for the catch panel.</summary>
+    public CatchResult LastCatch { get; private set; }
 
-    /// <summary>Puts the fish just caught back into the water (R right after landing).</summary>
+    /// <summary>Kept for compatibility: the landed fish may still go back into the water.</summary>
+    public bool CanRelease => State == RodState.Landed && AwaitingDecision;
+
+    private float _decidedAt = -1f;
+
+    /// <summary>The catch panel's "Do siatki": the fish goes into the keepnet (if it fits).</summary>
+    public bool KeepCatch()
+    {
+        if (!AwaitingDecision || CurrentSpecies == null)
+            return false;
+        string? error = Profile.Keep(CurrentSpecies, CurrentWeight);
+        if (error != null)
+        {
+            ShowBanner(error, 3f);
+            return false;
+        }
+        Decided();
+        SoundCue?.Invoke(Core.Audio.OneShot.SmallSplash, 0.5f);
+        ShowBanner($"Do siatki: {CurrentSpecies.SpeciesName} {CurrentWeight:0.00} kg", 2f);
+        return true;
+    }
+
+    /// <summary>The catch panel's "Do wody": the fish swims away (a little XP).</summary>
     public void ReleaseCatch()
     {
-        if (!CanRelease || CurrentSpecies == null || !Profile.ReleaseLast(CurrentSpecies.SpeciesName, CurrentWeight))
+        if (!AwaitingDecision || CurrentSpecies == null)
             return;
-        _releasable = false;
-        ClearHeldFish();
+        Profile.Release();
+        Decided();
         SoundCue?.Invoke(Core.Audio.OneShot.SmallSplash, 0.8f);
         ShowBanner($"Wypuszczono: {CurrentSpecies.SpeciesName} {CurrentWeight:0.00} kg (+{Profile.ReleaseXp} XP)", 2.5f);
+    }
+
+    private void Decided()
+    {
+        AwaitingDecision = false;
+        _decidedAt = _stateTime;
+        ClearHeldFish();
     }
 
     /// <summary>The landed fish shown in front of the camera (held in the left hand), or null.</summary>

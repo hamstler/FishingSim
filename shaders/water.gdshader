@@ -20,7 +20,7 @@ uniform vec3 shallow_color : source_color = vec3(0.04, 0.26, 0.26);
 uniform vec3 deep_color : source_color = vec3(0.01, 0.07, 0.11);
 /// Metres of water you can see into (per map).
 uniform float clarity = 2.6;
-uniform sampler2D foam_noise : repeat_enable, filter_nearest_mipmap;
+uniform sampler2D foam_noise : repeat_enable, filter_linear_mipmap;
 
 varying vec3 wpos;
 

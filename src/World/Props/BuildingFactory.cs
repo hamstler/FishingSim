@@ -103,10 +103,13 @@ public static partial class BuildingFactory
     }
 
     // ------------------------------------------------------------------ materials
-    /// <summary>Pixel-art look: nearest-filtered textures, banded (toon) light, no shiny highlights.</summary>
+    /// <summary>
+    /// The village's material finish: high-resolution textures read with trilinear anisotropic filtering (sharp at
+    /// QHD, no shimmer at a distance), soft banded light, no shiny highlights. (The name is historical.)
+    /// </summary>
     public static StandardMaterial3D Pixel(StandardMaterial3D m, bool shiny = false)
     {
-        m.TextureFilter = BaseMaterial3D.TextureFilterEnum.NearestWithMipmaps;
+        m.TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic;
         m.DiffuseMode = BaseMaterial3D.DiffuseModeEnum.Toon;
         m.SpecularMode = shiny ? BaseMaterial3D.SpecularModeEnum.Toon : BaseMaterial3D.SpecularModeEnum.Disabled;
         return m;
@@ -207,7 +210,7 @@ public static partial class BuildingFactory
             OutlineModulate = new Color(0.05f, 0.04f, 0.03f),
             DoubleSided = false,
             AlphaCut = Label3D.AlphaCutMode.Discard,
-            TextureFilter = BaseMaterial3D.TextureFilterEnum.Nearest,
+            TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
         });
     }
 

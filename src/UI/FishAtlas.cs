@@ -27,6 +27,7 @@ public partial class FishAtlas : Control
     private SubViewport _viewport = null!;
     private Node3D _turntable = null!;
     private FishModel? _model;
+    private FishSpecies? _pendingModel;
     private Profile? _profile;
     private float _spin, _time;
     private bool _dragging;
@@ -235,14 +236,16 @@ public partial class FishAtlas : Control
         foreach (var b in _list.GetChildren().OfType<Button>())
             b.SetPressedNoSignal(b.TooltipText == sp.LatinName && b.Text.StartsWith(sp.SpeciesName));
 
+        // The model's 4K pictures are decoded on a worker thread; the turntable shows the fish once they are ready
+        // (see _Process), and the species either side of it in the list are decoded meanwhile.
         _model?.QueueFree();
-        float typical = sp.MinWeight + (sp.MaxWeight - sp.MinWeight) * 0.35f;
-        _model = FishModel.Create(sp, typical, detailed: true);
-        _model.Wiggle = 0.35f;
-        float scale = 1.0f / MathF.Max(_model.Length, 0.01f);
-        _model.Scale = new Vector3(scale, scale, scale);
-        _model.RotationDegrees = new Vector3(0, 90, 0);
-        _turntable.AddChild(_model);
+        _model = null;
+        _pendingModel = sp;
+        Fishing.FishAsset.Prefetch(sp);
+        int at = _listed.IndexOf(sp);
+        foreach (int k in new[] { at - 1, at + 1 })
+            if (at >= 0 && k >= 0 && k < _listed.Count)
+                Fishing.FishAsset.Prefetch(_listed[k]);
 
         _name.Text = sp.SpeciesName;
         _latin.Text = sp.LatinName;
@@ -252,7 +255,8 @@ public partial class FishAtlas : Control
             $"Waga: {Weight(sp.MinWeight)} - {Weight(sp.MaxWeight)}   ·   trofeum od {Weight(sp.TrophyThreshold)}   ·   wymiar ochronny {Weight(sp.LegalWeight)}\n"
             + $"Skup: {sp.PricePerKg:0} gr/kg   ·   siła w holu: {Stars(sp.PullFactor, 0.4f, 1.7f)}   ·   waleczność: {Stars(sp.Aggression, 0.3f, 0.9f)}\n"
             + $"{GameUI.SpeciesTips(sp)}\n"
-            + $"Łowiska: {(homes.Count > 0 ? string.Join(", ", homes) : "-")}";
+            + $"Łowiska: {(homes.Count > 0 ? string.Join(", ", homes) : "-")}"
+            + (Fishing.FishReference.For(sp) is { } reference ? $"\n{reference.Credit}" : "");
         if (_profile != null)
         {
             int n = _profile.CatchCounts.GetValueOrDefault(sp.SpeciesName);
@@ -278,6 +282,17 @@ public partial class FishAtlas : Control
     {
         if (!Visible || _turntable == null)
             return;
+        if (_pendingModel is { } sp && Fishing.FishAsset.IsReady(sp))
+        {
+            _pendingModel = null;
+            float typical = sp.MinWeight + (sp.MaxWeight - sp.MinWeight) * 0.35f;
+            _model = FishModel.Create(sp, typical, detailed: true);
+            _model.Wiggle = 0.35f;
+            float scale = 1.0f / MathF.Max(_model.Length, 0.01f);
+            _model.Scale = new Vector3(scale, scale, scale);
+            _model.RotationDegrees = new Vector3(0, 90, 0);
+            _turntable.AddChild(_model);
+        }
         // Mostly side-on (that is how anglers look at a fish), swaying gently; drag with the mouse to turn it.
         _time += (float)delta;
         _turntable.Rotation = new Vector3(0f, _spin + MathF.Sin(_time * 0.6f) * 0.45f, 0f);

@@ -38,12 +38,155 @@ public sealed class GearSuite : ITestSuite
 
         t.Section("66 freshwater species");
         var catalogue = SpeciesCatalog.Paths.Select(p => GD.Load<FishSpecies>(p)).ToList();
+        // FISHSIM_DUMP_FISH=<file>: writes every species' build, skin style, iris and mouth as JSON for the model tools
+        // (tools/fish_model).
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_DUMP_FISH") is { Length: > 0 } dumpPath)
+        {
+            var dump = new System.Text.Json.Nodes.JsonObject();
+            foreach (var sp in catalogue)
+            {
+                var b = FishingSim.Fishing.FishBody.Of(sp);
+                var st = FishingSim.Graphics.FishSkin.StyleOf(sp);
+                var irisColour = FishingSim.Fishing.FishBody.IrisOf(sp);
+                var node = new System.Text.Json.Nodes.JsonObject();
+                foreach (var prop in b.GetType().GetProperties())
+                {
+                    var v = prop.GetValue(b);
+                    node[prop.Name] = v switch
+                    {
+                        float f => f, int i => i, bool bo => bo, _ => v?.ToString(),
+                    };
+                }
+                node["Name"] = sp.SpeciesName;
+                node["Latin"] = sp.LatinName;
+                node["Pattern"] = st.Pattern.ToString();
+                node["Scale"] = st.Scale;
+                node["Silver"] = st.Silver;
+                node["Count"] = st.Count;
+                node["Iris"] = new System.Text.Json.Nodes.JsonArray(irisColour.R, irisColour.G, irisColour.B);
+                node["Mouth"] = FishingSim.Fishing.FishBody.MouthOf(sp);
+                node["Back"] = new System.Text.Json.Nodes.JsonArray(sp.BackColor.R, sp.BackColor.G, sp.BackColor.B);
+                node["Belly"] = new System.Text.Json.Nodes.JsonArray(sp.BellyColor.R, sp.BellyColor.G, sp.BellyColor.B);
+                node["FinColor"] = new System.Text.Json.Nodes.JsonArray(sp.FinColor.R, sp.FinColor.G, sp.FinColor.B);
+                node["BodyDepth"] = sp.BodyDepth;
+                node["DorsalPos"] = sp.DorsalPos;
+                dump[sp.ResourcePath.GetFile().GetBaseName()] = node;
+            }
+            System.IO.File.WriteAllText(dumpPath, dump.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+        }
         var maps = FishingSim.World.LakeBed.LocationPaths.Select(p => GD.Load<LocationData>(p)).ToList();
         string[] baits = { "worm", "corn", "bread", "boilie", "livebait", "maggot", "insect" };
         t.Check(catalogue.Count >= 66 && catalogue.All(s => s != null) && catalogue.Select(s => s.SpeciesName).Distinct().Count() == catalogue.Count,
             $"{catalogue.Count} species load, all with unique names");
         var undescribed = catalogue.Where(s => s.LatinName == "" || s.Description.Length < 40).Select(s => s.SpeciesName).ToList();
         t.Check(undescribed.Count == 0, $"every species has a Latin name and an atlas description {string.Join(", ", undescribed)}");
+        // Fish models: every species has its own build and eyes in proportion to the head.
+        var oversizedEyes = new List<string>();
+        var builds = new Dictionary<string, (float H, float W)>();
+        foreach (var sp in catalogue)
+        {
+            foreach (bool detailed in new[] { false, true })
+            {
+                var m = FishingSim.Fishing.FishModel.Create(sp, sp.MinWeight, detailed);
+                if (m.EyeDiameter > 0.62f * m.HeadHeightAtEye || m.EyeDiameter > 0.12f * m.Length)
+                    oversizedEyes.Add($"{sp.SpeciesName} {m.EyeDiameter * 1000f:0.0} mm / head {m.HeadHeightAtEye * 1000f:0.0} mm");
+                if (!detailed)
+                    builds[sp.SpeciesName] = (m.MaxHeight / m.Length, m.MaxWidth / m.MaxHeight);
+                m.Free();
+            }
+        }
+        t.Check(oversizedEyes.Count == 0, $"no fish has eyes bigger than its head allows {string.Join(", ", oversizedEyes.Take(5))}");
+        t.Check(catalogue.Count(FishingSim.Fishing.FishBody.HasOwnShape) == catalogue.Count, "every species has a body shape of its own");
+        t.Check(builds["Leszcz"].H > builds["Szczupak"].H * 1.8f && builds["Węgorz"].W > builds["Leszcz"].W * 2.5f
+                && builds["Karaś złocisty"].H > builds["Płoć"].H * 1.2f && builds["Sum"].W > builds["Karp"].W,
+            $"bodies differ: a bream is deep and flat, a pike long, an eel round (H/L bream {builds["Leszcz"].H:0.00}, pike {builds["Szczupak"].H:0.00}; W/H eel {builds["Węgorz"].W:0.00}, bream {builds["Leszcz"].W:0.00}; H/L crucian {builds["Karaś złocisty"].H:0.00}, roach {builds["Płoć"].H:0.00}; W/H wels {builds["Sum"].W:0.00}, carp {builds["Karp"].W:0.00})");
+        // Close-up detail: painted fins with rays and a translucent membrane, the iris, a swimming shader.
+        var perch = catalogue.First(sp => sp.SpeciesName == "Okoń");
+        var spiny = FishingSim.Graphics.FinPainter.Paint(perch, FishingSim.Graphics.FinKind.SpinyDorsal, 256, 128);
+        int clear = 0, translucent = 0, dark = 0;
+        for (int y = 0; y < 128; y += 2)
+            for (int x = 0; x < 256; x += 2)
+            {
+                var px = spiny.GetPixel(x, y);
+                if (px.A < 0.05f) clear++;
+                else if (px.A < 0.9f) translucent++;
+                if (px.A > 0.3f && px.R + px.G + px.B < 0.4f) dark++;
+            }
+        t.Check(clear > 100 && translucent > 1000 && dark > 50,
+            $"a perch's spiny dorsal has a ragged edge, a see-through membrane and its black spot ({clear} clear, {translucent} translucent, {dark} dark samples)");
+        var iris = FishingSim.Graphics.EyePainter.For(FishingSim.Fishing.FishBody.IrisOf(catalogue.First(sp => sp.SpeciesName == "Płoć"))).GetImage();
+        var pupil = iris.GetPixel(128, 128);
+        var irisRing = iris.GetPixel(128 + 85, 128);
+        t.Check(pupil.R < 0.05f && irisRing.R > irisRing.B * 2f, "a roach's eye: black pupil in a red iris");
+        var close = FishingSim.Fishing.FishModel.Create(perch, 0.5f, detailed: true);
+        int shaded = close.FindChildren("*", nameof(MeshInstance3D), true, false).OfType<MeshInstance3D>().Count(m => m.MaterialOverride is ShaderMaterial);
+        t.Check(shaded >= 6, $"a close-up perch swims with its body and {shaded - 1} fins bending together (shader materials)");
+        close.Free();
+
+        // Measured species: the painted model follows the side view of a real fish (FishReference) and is credited.
+        var measured = catalogue.Where(FishingSim.Fishing.FishReference.Has).ToList();
+        t.Check(measured.Count == catalogue.Count, $"{measured.Count} species are lofted to their reference outline");
+        if (measured.Count > 0)
+        {
+            var off = new List<string>();
+            foreach (var msp in measured)
+            {
+                var r = FishingSim.Fishing.FishReference.For(msp)!;
+                float axis = r.Axis, deepest = 0f;
+                for (int i = 0; i <= 60; i++)
+                {
+                    var (top, bottom) = r.EdgesAt(i / 60f, axis);
+                    deepest = MathF.Max(deepest, top + bottom);
+                }
+                float mid = MathF.Sqrt(msp.MinWeight * msp.MaxWeight);
+                var mm = FishingSim.Fishing.FishModel.Create(msp, mid, false);
+                float want = deepest * FishingSim.Fishing.FishModel.Proportions(FishingSim.Fishing.FishModel.Growth(msp, mid)).Depth;
+                if (MathF.Abs(mm.MaxHeight / mm.Length - want) > want * 0.08f || r.Credit == "")
+                    off.Add($"{msp.SpeciesName} {mm.MaxHeight / mm.Length:0.000} vs {want:0.000}");
+                mm.Free();
+            }
+            t.Check(off.Count == 0, $"their depth matches the reference, and the reference is credited {string.Join(", ", off)}");
+        }
+        // Hand-built models (tools/fish_model): the close-up perch is the model made from photos of real perch.
+        var perchAsset = FishingSim.Fishing.FishAsset.For(perch);
+        t.Check(perchAsset != null && perchAsset.Fins.Count == 6 && perchAsset.Eyes.Count == 2 && perchAsset.BodyNormal != null,
+            $"the perch has its own model (built in Blender): body with a normal map, {perchAsset?.Fins.Count ?? 0} fins, {perchAsset?.Eyes.Count ?? 0} eyes under corneas");
+        if (perchAsset != null)
+        {
+            var pm = FishingSim.Fishing.FishModel.Create(perch, 0.4f, detailed: true);
+            int parts = pm.FindChildren("*", nameof(MeshInstance3D), true, false).Count;
+            t.Check(parts == 9 + perchAsset.Corneas.Count && perchAsset.Corneas.Count == 2 && pm.MaxHeight / pm.Length > 0.22f && pm.MaxHeight / pm.Length < 0.32f && pm.EyeDiameter < 0.62f * pm.HeadHeightAtEye,
+                $"a close-up perch is built from it ({parts} parts, H/L {pm.MaxHeight / pm.Length:0.00}, eye {pm.EyeDiameter * 1000f:0} mm in a {pm.HeadHeightAtEye * 1000f:0} mm head)");
+            pm.Free();
+        }
+        // Every species has its own model built in Blender, with an eye on each side under a cornea and its fins; the
+        // close-up fish is built from it and keeps its eyes inside the head.
+        var noModel = new List<string>();
+        foreach (var msp in catalogue)
+        {
+            var a = FishingSim.Fishing.FishAsset.For(msp);
+            if (a == null || a.Eyes.Count != 2 || a.Fins.Count < 4 || a.BodyAlbedo == null)
+            {
+                noModel.Add(msp.SpeciesName);
+                continue;
+            }
+            var cm = FishingSim.Fishing.FishModel.Create(msp, MathF.Sqrt(msp.MinWeight * msp.MaxWeight), detailed: true);
+            if (cm.EyeDiameter <= 0f || cm.EyeDiameter > 0.62f * cm.HeadHeightAtEye)
+                noModel.Add($"{msp.SpeciesName} (eye {cm.EyeDiameter * 1000f:0} mm, head {cm.HeadHeightAtEye * 1000f:0} mm)");
+            cm.Free();
+        }
+        t.Check(noModel.Count == 0, $"every species has its own model with eyes and fins {string.Join(", ", noModel.Take(6))}");
+        // Growth: a heavy fish is deeper and thicker for its length than a young one, which has bigger eyes.
+        var growCarp = catalogue.First(sp => sp.SpeciesName == "Karp");
+        var young = FishingSim.Fishing.FishModel.Create(growCarp, growCarp.MinWeight, false);
+        var grown = FishingSim.Fishing.FishModel.Create(growCarp, growCarp.MaxWeight, false);
+        t.Check(grown.Length > young.Length * 1.5f && grown.MaxHeight / grown.Length > young.MaxHeight / young.Length * 1.12f
+                && grown.MaxWidth / grown.Length > young.MaxWidth / young.Length * 1.2f
+                && young.EyeDiameter / young.Length > grown.EyeDiameter / grown.Length * 1.1f,
+            $"a carp grows with its weight: {young.Length:0.00} m slim young fish, {grown.Length:0.00} m deep, thick old one (H/L {young.MaxHeight / young.Length:0.000} -> {grown.MaxHeight / grown.Length:0.000})");
+        young.Free();
+        grown.Free();
+
         var homeless = catalogue.Where(s => maps.All(m => m.AbundanceOf(s.SpeciesName) <= 0f)).Select(s => s.SpeciesName).ToList();
         t.Check(homeless.Count == 0, $"every species lives on at least one map {string.Join(", ", homeless)}");
         var picky = catalogue.Where(s => baits.All(b => s.AffinityFor(b) <= 0f)).Select(s => s.SpeciesName).ToList();
@@ -412,15 +555,16 @@ public sealed class GearSuite : ITestSuite
         t.Check(main.Rod.Gear != null && main.Rod.Profile.KeepnetLimit != null, "the rod knows the landing net and the keepnet limits the profile");
         t.Check(main.Player.Body != null && main.Player.Camera.Current, "first-person body and camera are in place");
 
-        // Releasing a catch with R.
+        // Releasing a catch with R (the catch panel's "Do wody").
         var prof = main.Rod.Profile;
+        int netBefore = prof.Keepnet.Count;
         main.Rod.ForceLand(Species("ploc"), 0.2f);
-        int netBefore = prof.Keepnet.Count, xpBefore = prof.Xp;
+        int xpBefore = prof.Xp;
         main.Rod._UnhandledInput(new InputEventKey { Keycode = Godot.Key.R, Pressed = true });
-        t.Check(prof.Keepnet.Count == netBefore - 1 && prof.Xp == xpBefore + Profile.ReleaseXp && main.Rod.HeldFish == null,
-            "R right after landing puts the fish back (out of the keepnet, a little XP)");
-        main.Rod._UnhandledInput(new InputEventKey { Keycode = Godot.Key.R, Pressed = true });
-        t.Check(prof.Keepnet.Count == netBefore - 1, "a fish can only be released once");
+        t.Check(prof.Keepnet.Count == netBefore && prof.Xp == xpBefore + Profile.ReleaseXp && main.Rod.HeldFish == null && !main.Rod.AwaitingDecision,
+            "R after landing puts the fish back into the water (never in the keepnet, a little XP)");
+        main.Rod._UnhandledInput(new InputEventKey { Keycode = Godot.Key.E, Pressed = true });
+        t.Check(prof.Keepnet.Count == netBefore, "once decided, the fish cannot be kept as well");
         main.Rod.ResetToIdle();
 
         var market = main.Scenery.Interactables.FirstOrDefault(s => s.Kind == InteractKind.Market);

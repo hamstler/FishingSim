@@ -79,6 +79,7 @@ public partial class FishPopulation : Node3D
         _views.Clear();
         _model.Clear();
         int school = 0;
+        Graphics.FishSkin.PrewarmLight(_species.Where(sp => _bed.AbundanceOf(sp.SpeciesName) > 0f));
         float totalAbundance = _species.Sum(sp => MathF.Max(_bed.AbundanceOf(sp.SpeciesName), 0f));
         foreach (var sp in _species)
         {
@@ -106,6 +107,7 @@ public partial class FishPopulation : Node3D
                     var view = FishModel.Create(sp, weight);
                     view.Scale = Vector3.One * ViewScale;
                     view.Visible = false;
+                    view.SetUnderwater(Tint, 0.5f);
                     AddChild(view);
                     _views[agent.Id] = view;
                 }
@@ -168,6 +170,7 @@ public partial class FishPopulation : Node3D
         var view = FishModel.Create(sp, weight);
         view.Scale = Vector3.One * ViewScale;
         view.Visible = false;
+        view.SetUnderwater(Tint, 0.5f);          // prepare its see-through materials now, not when it first swims into view
         AddChild(view);
         _views[fresh.Id] = view;
     }

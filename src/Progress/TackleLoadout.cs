@@ -82,12 +82,43 @@ public sealed class TackleLoadout
         }
     }
 
+    /// <summary>Re-reads the equipped items from the profile (after gear was destroyed or handed out).</summary>
+    public void Resync()
+    {
+        if (Profile != null)
+            Attach(Profile);
+    }
+
+    /// <summary>Rod, reel, line and hook in use are all owned: the angler can fish.</summary>
+    public bool Ready =>
+        Profile == null || new[] { TackleSlot.Rod, TackleSlot.Reel, TackleSlot.Line, TackleSlot.Hook }
+            .All(s => Profile.Owns(s, Selected(s).ItemId));
+
+    /// <summary>The cheapest item of each missing kind the angler may buy at their level (the cost of fishing again).</summary>
+    public int CostOfMissing()
+    {
+        if (Profile == null)
+            return 0;
+        int total = 0;
+        foreach (var slot in Profile.MissingKit())
+        {
+            var buyable = Items(slot).Where(i => i.RequiredLevel <= Profile.Level).Select(i => i.Price).ToList();
+            total += buyable.Count > 0 ? buyable.Min() : 0;
+        }
+        return total;
+    }
+
     public void SyncToProfile()
     {
         if (Profile == null)
             return;
         for (int s = 0; s < TackleSlotExtensions.Count; s++)
+        {
+            // Never mark a destroyed (no longer owned) item as equipped again.
+            if ((TackleSlot)s != TackleSlot.Bait && !Profile.Owns((TackleSlot)s, _items[s][Index[s]].ItemId))
+                continue;
             Profile.Equipped[((TackleSlot)s).Key()] = _items[s][Index[s]].ItemId;
+        }
     }
 
     public bool IsOwned(TackleSlot slot, int i)

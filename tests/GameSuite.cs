@@ -124,8 +124,8 @@ public sealed class GameSuite : ITestSuite
         t.Check(minimap != null && minimap.AnchorLeft == 1f && minimap.OffsetTop > 0f && minimap.OffsetTop < 40f,
             "the minimap and clock sit in the top-right corner");
         var mc = new Vector2(10f, -20f);
-        t.Check(Minimap.ToMap(mc, mc) == new Vector2(Minimap.Size / 2f, Minimap.Size / 2f)
-                && MathF.Abs(Minimap.ToMap(mc + new Vector2(Minimap.ViewMetres / 2f, 0f), mc).X - Minimap.Size) < 0.01f,
+        t.Check(Minimap.ToMap(mc, mc) == new Vector2(Minimap.MapSize / 2f, Minimap.MapSize / 2f)
+                && MathF.Abs(Minimap.ToMap(mc + new Vector2(Minimap.ViewMetres / 2f, 0f), mc).X - Minimap.MapSize) < 0.01f,
             $"the minimap is centred on the angler and shows {Minimap.ViewMetres:0} m across");
 
         t.Section("pause menu");
@@ -217,8 +217,20 @@ public sealed class GameSuite : ITestSuite
         rod.LiftOverride = false;
         rod.ReelOverride = false;
         t.Check(rod.State == RodState.Landed && profile.TotalCatches == fishBefore + 1, "the fish is landed and added to the profile");
-        t.Check(profile.Journal.Count > 0 && profile.Journal[^1].Location == "Zatoka Szuwarowa" && profile.Journal[^1].Bait != null, "the journal notes where and on what it was caught");
         t.Check(rod.BannerText.Contains("XP"), "the banner reports the XP gained");
+        var hud = main.GetChildren().OfType<Hud>().First();
+        int netBeforeChoice = profile.Keepnet.Count;
+        await t.NextFrame();
+        t.Check(rod.AwaitingDecision && hud.CatchPanel.Visible && profile.Keepnet.Count == netBeforeChoice,
+            "a panel asks where the fish goes; it is not in the keepnet yet");
+        await t.Seconds(1.5);
+        t.Check(rod.State == RodState.Landed && rod.AwaitingDecision, "the fish waits in the hand until the angler decides");
+        hud.CatchPanel.KeepButton.EmitSignal(BaseButton.SignalName.Pressed);
+        await t.NextFrame();
+        await t.NextFrame();
+        t.Check(!rod.AwaitingDecision && profile.Keepnet.Count == netBeforeChoice + 1 && !hud.CatchPanel.Visible,
+            $"\"Do siatki\" puts it into the keepnet and closes the panel (awaiting {rod.AwaitingDecision}, net {profile.Keepnet.Count}/{netBeforeChoice}, visible {hud.CatchPanel.Visible}, banner {rod.BannerText})");
+        t.Check(profile.Journal.Count > 0 && profile.Journal[^1].Location == "Zatoka Szuwarowa" && profile.Journal[^1].Bait != null, "the journal notes where and on what it was caught");
         t.Check(baitBefore >= 0 && rod.Tension == 0f, "tension is cleared after the fight");
         rod.ResetToIdle();
 
@@ -226,7 +238,9 @@ public sealed class GameSuite : ITestSuite
         var carp = GD.Load<FishSpecies>("res://data/fish/karp.tres");
         int money0 = profile.Money;
         rod.ForceLand(carp, 5f);
-        t.Check(rod.BannerText.Contains("rekord") && profile.Keepnet.Count >= 1, "a record fish is announced");
+        t.Check(rod.BannerText.Contains("rekord"), "a record fish is announced");
+        rod._UnhandledInput(Key(Godot.Key.E));
+        t.Check(profile.Keepnet.Count >= 1 && !rod.AwaitingDecision, "E puts the landed fish into the keepnet");
         rod.ResetToIdle();
         shop.Toggle();
         t.Check(shop.Visible && rod.InputBlocked, "B opens the shop and blocks fishing input");
@@ -235,6 +249,27 @@ public sealed class GameSuite : ITestSuite
         t.Check(profile.Money == money0 + value && profile.Keepnet.Count == 0, "selling in the shop pays out");
         shop.Toggle();
         t.Check(!shop.Visible && !rod.InputBlocked, "closing the shop re-enables input");
+
+        t.Section("broken gear and the free kit");
+        rod.DevUnbreakable = false;
+        string inHand = loadout.Rod.ItemId;
+        profile.Owned["rod"].RemoveAll(id => id != inHand);        // the only rod the angler has
+        rod.ForceBreak(TackleSlot.Rod);
+        t.Check(profile.Owned["rod"].Count == 0 && !loadout.Ready && !main.Player.Rig.Visible,
+            "a snapped rod disappears from the inventory and from the hand");
+        rod.ResetToIdle();
+        t.Check(!rod.TryStartCharge() && rod.State == RodState.Idle && rod.BannerText.Contains("wędki"), "without a rod there is no cast, and the banner says why");
+        profile.Money = 500;
+        shop.OpenFor(ShopKind.Tackle);
+        t.Check(shop.FreeKitButton.Visible && shop.FreeKitButton.Disabled, "with money the free kit is shown but cannot be taken");
+        shop.Close();
+        profile.Money = 5;
+        shop.OpenFor(ShopKind.Tackle);
+        t.Check(shop.FreeKitButton.Visible && !shop.FreeKitButton.Disabled, "a broke angler may take the free kit");
+        shop.FreeKitButton.EmitSignal(BaseButton.SignalName.Pressed);
+        t.Check(profile.Owns(TackleSlot.Rod, "junior") && loadout.Ready && main.Player.Rig.Visible && !shop.FreeKitButton.Visible,
+            "the free kit puts a rod back in the hand");
+        shop.Close();
 
         main.QueueFree();
         await t.NextFrame();

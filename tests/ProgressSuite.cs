@@ -78,6 +78,36 @@ public sealed class ProgressSuite : ITestSuite
         lo.Refill();
         t.Check(lo.BaitCount > 0, "dev refill restocks the equipped bait");
 
+        t.Section("broken gear and the free kit");
+        var bp = new Profile();
+        var bl = new TackleLoadout();
+        bl.Attach(bp);
+        t.Check(bp.HasKit && bl.Ready, "a new angler has a complete kit");
+        t.Check(bp.Destroy(TackleSlot.Rod, "junior") && !bp.Owns(TackleSlot.Rod, "junior") && bp.Equipped["rod"] == "",
+            "a snapped rod leaves the inventory and is no longer equipped");
+        bl.Resync();
+        t.Check(!bp.HasKit && !bl.Ready && bp.MissingKit().SequenceEqual(new[] { TackleSlot.Rod }), "without a rod the kit is incomplete");
+        int cost = bl.CostOfMissing();
+        t.Check(cost == 40, $"a replacement rod costs {cost} gr (the cheapest one at level 1)");
+        bp.Money = 60;
+        t.Check(!bp.CanClaimFreeKit(cost) && bp.ClaimFreeKit(cost) != null && !bp.HasKit, "with money for a new rod the free kit is refused");
+        bp.Money = 25;
+        t.Check(bp.CanClaimFreeKit(cost) && bp.ClaimFreeKit(cost) == null && bp.HasKit && bp.Equipped["rod"] == "junior" && bp.Money == 25,
+            "a broke angler gets the starter rod for free");
+        bl.Resync();
+        t.Check(bl.Ready && bl.Rod.ItemId == "junior", "the loadout picks the handed-out rod up");
+        t.Check(bp.ClaimFreeKit(0) != null, "no second free kit while the kit is complete");
+        bp.Owned["rod"].Add("teleskop");
+        bp.Equipped["rod"] = "teleskop";
+        bp.Destroy(TackleSlot.Rod, "teleskop");
+        t.Check(bp.Equipped["rod"] == "junior" && bp.HasKit, "losing one of two rods falls back to the other");
+        bp.Destroy(TackleSlot.Hook, "hak5");
+        bp.BaitCounts.Clear();
+        bp.Money = 0;
+        bl.Resync();
+        bp.ClaimFreeKit(bl.CostOfMissing());
+        t.Check(bp.Owns(TackleSlot.Hook, "hak5") && bp.BaitCounts["worm"] == Profile.StarterWorms, "the free kit adds the missing hook and some worms");
+
         t.Section("journal");
         var j = new Profile();
         j.AddCatch(carp, 3.3f, new CatchContext("Staw", "Kulka", "Hak #8", 2.2f, "06:30"));

@@ -37,7 +37,12 @@ public partial class ScreenshotTool : Node
         float px = hasPos ? float.Parse(Arg(9, "0"), System.Globalization.CultureInfo.InvariantCulture) : 0f;
         float pz = hasPos ? float.Parse(Arg(10, "0"), System.Globalization.CultureInfo.InvariantCulture) : 0f;
 
-        GetWindow().Size = new Vector2I(1280, 720);
+        // FISHSIM_SHOT_SIZE=WxH renders a bigger shot (e.g. 2560x1440 to check the fish at QHD).
+        var size = new Vector2I(1280, 720);
+        var asked = System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_SIZE")?.Split('x');
+        if (asked is { Length: 2 } && int.TryParse(asked[0], out int shotW) && int.TryParse(asked[1], out int shotH))
+            size = new Vector2I(shotW, shotH);
+        GetWindow().Size = size;
         UserStore.Path = "/tmp/fishsim_shot_users.json";
         await NextFrame();
 
@@ -58,6 +63,91 @@ public partial class ScreenshotTool : Node
             return;
         }
 
+        if (mode == 22)
+        {
+            // Studio close-up of one detailed fish (arg = catalogue index): the whole fish, then the head up close.
+            var root3d = new Node3D();
+            GetTree().Root.AddChild(root3d);
+            var env = new Godot.Environment
+            {
+                BackgroundMode = Godot.Environment.BGMode.Color, BackgroundColor = new Color(0.12f, 0.16f, 0.18f),
+                AmbientLightSource = Godot.Environment.AmbientSource.Color, AmbientLightColor = new Color(0.55f, 0.62f, 0.7f), AmbientLightEnergy = 0.55f,
+                TonemapMode = Godot.Environment.ToneMapper.Aces, SsaoEnabled = true, GlowEnabled = true,
+            };
+            root3d.AddChild(new WorldEnvironment { Environment = env });
+            root3d.AddChild(new DirectionalLight3D { RotationDegrees = new Vector3(-40, 35, 0), LightEnergy = 1.6f, ShadowEnabled = true });
+            root3d.AddChild(new DirectionalLight3D { RotationDegrees = new Vector3(-15, -150, 0), LightEnergy = 0.7f, LightColor = new Color(0.65f, 0.8f, 1f) });
+            var sp = GD.Load<FishSpecies>(FishingSim.Data.SpeciesCatalog.Paths[Math.Clamp(arg, 0, FishingSim.Data.SpeciesCatalog.Paths.Length - 1)]);
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var fish = FishModel.Create(sp, sp.MinWeight + (sp.MaxWeight - sp.MinWeight) * 0.5f, detailed: true);
+            if (System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_DEBUG") == "1")
+                GD.Print($"close-up model built in {watch.ElapsedMilliseconds} ms");
+            float sc = 1f / fish.Length;
+            fish.Scale = new Vector3(sc, sc, sc);
+            fish.RotationDegrees = new Vector3(0, 90, 0);
+            fish.Wiggle = 0.5f;
+            root3d.AddChild(fish);
+            var cam = new Camera3D { Fov = 30f, Current = true, Position = new Vector3(0.02f, 0.05f, 2.1f), RotationDegrees = new Vector3(-2, 0, 0) };
+            root3d.AddChild(cam);
+            for (int i = 0; i < 900 && !fish.HasDetailedSkin; i++)
+                await NextFrame();
+            for (int i = 0; i < 10; i++)
+                await NextFrame();
+            GetViewport().GetTexture().GetImage().SavePng(output);
+            // The head, three-quarter view from the front.
+            cam.Position = new Vector3(0.62f, 0.06f, 0.42f);
+            cam.LookAt(new Vector3(0.36f, 0.0f, 0f));
+            fish.Wiggle = 0f;
+            for (int i = 0; i < 6; i++)
+                await NextFrame();
+            GetViewport().GetTexture().GetImage().SavePng(output.Replace(".png", "_head.png"));
+            GD.Print($"saved {output} (detailed skin {fish.HasDetailedSkin})");
+            if (System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_DEBUG") == "1")
+                foreach (var n in fish.FindChildren("*", "MeshInstance3D", true, false))
+                    if (n is MeshInstance3D mi)
+                        GD.Print($"  {mi.Name} pos {mi.Position} scale {mi.Scale} aabb {mi.GetAabb()} mat {mi.MaterialOverride?.GetType().Name}");
+            GetTree().Quit();
+            return;
+        }
+        if (mode == 21)
+        {
+            // Side views of 20 species (page = arg) in a small studio: body shapes, fins and eyes at a glance.
+            var root3d = new Node3D();
+            GetTree().Root.AddChild(root3d);
+            var env = new Godot.Environment
+            {
+                BackgroundMode = Godot.Environment.BGMode.Color, BackgroundColor = new Color(0.16f, 0.2f, 0.23f),
+                AmbientLightSource = Godot.Environment.AmbientSource.Color, AmbientLightColor = new Color(0.6f, 0.65f, 0.7f), AmbientLightEnergy = 0.7f,
+                TonemapMode = Godot.Environment.ToneMapper.Aces,
+            };
+            root3d.AddChild(new WorldEnvironment { Environment = env });
+            root3d.AddChild(new DirectionalLight3D { RotationDegrees = new Vector3(-35, 20, 0), LightEnergy = 1.5f });
+            var paths = FishingSim.Data.SpeciesCatalog.Paths.Skip(arg * 20).Take(20).ToList();
+            for (int i = 0; i < paths.Count; i++)
+            {
+                var sp = GD.Load<FishSpecies>(paths[i]);
+                var fish = FishModel.Create(sp, sp.MinWeight + (sp.MaxWeight - sp.MinWeight) * 0.5f);
+                fish.Wiggle = 0f;
+                float sc = 1f / fish.Length;
+                fish.Scale = new Vector3(sc, sc, sc);
+                fish.RotationDegrees = new Vector3(0, 90, 0);
+                fish.Position = new Vector3((i % 4) * 1.25f, -(i / 4) * 0.62f, 0);
+                root3d.AddChild(fish);
+                var label = new Label3D { Text = sp.SpeciesName, FontSize = 40, PixelSize = 0.0022f, Position = fish.Position + new Vector3(0, -0.24f, 0.3f) };
+                root3d.AddChild(label);
+            }
+            root3d.AddChild(new Camera3D
+            {
+                Projection = Camera3D.ProjectionType.Orthogonal, Size = 3.3f, Current = true,
+                Position = new Vector3(1.9f, -1.2f, 5f),
+            });
+            for (int i = 0; i < 12; i++)
+                await NextFrame();
+            GetViewport().GetTexture().GetImage().SavePng(output);
+            GD.Print($"saved {output}");
+            GetTree().Quit();
+            return;
+        }
         if (mode == 20)
         {
             // Detailed skins of a few species (1024×512 each), stacked: check scales, spots and bars up close.
@@ -200,7 +290,10 @@ public partial class ScreenshotTool : Node
             if (mode == 2)
             {
                 var carp = GD.Load<FishSpecies>("res://data/fish/karp.tres");
-                rod.ForceLand(GD.Load<FishSpecies>($"res://data/fish/{(arg > 0 ? FishingSim.Data.SpeciesCatalog.Paths[arg].GetFile().GetBaseName() : "karp")}.tres"), arg > 0 ? 1.2f : 4.7f);
+                // FISHSIM_SHOT_WEIGHT sets the landed fish's weight (to compare a small and a big one).
+                float landed = float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_WEIGHT"), System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out float wanted) ? wanted : arg > 0 ? 1.2f : 4.7f;
+                rod.ForceLand(GD.Load<FishSpecies>($"res://data/fish/{(arg > 0 ? FishingSim.Data.SpeciesCatalog.Paths[arg].GetFile().GetBaseName() : "karp")}.tres"), landed);
                 // Wait for the detailed skin painted in the background.
                 for (int i = 0; i < 600 && !(rod.HeldFishModel?.HasDetailedSkin ?? true); i++)
                     await NextFrame();

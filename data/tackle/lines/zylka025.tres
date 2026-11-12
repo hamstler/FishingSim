@@ -7,5 +7,5 @@ script = ExtResource("1")
 DisplayName = "Linka z końskiego włosia"
 Strength = 5.0
 Visibility = 1.0
-Price = 0
+Price = 15
 RequiredLevel = 1

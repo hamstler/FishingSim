@@ -3,7 +3,7 @@ shader_type spatial;
 // (backlight), self-shadowing from the vertex colour (inner cards are darker) and wind sway / leaf flutter.
 render_mode cull_disabled, diffuse_toon, specular_disabled;
 
-uniform sampler2D leaf_tex : source_color, filter_nearest_mipmap, repeat_disable;
+uniform sampler2D leaf_tex : source_color, filter_linear_mipmap, repeat_disable;
 uniform float wind = 0.3;
 uniform float time = 0.0;
 uniform vec3 translucency : source_color = vec3(0.55, 0.65, 0.25);

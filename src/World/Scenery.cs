@@ -144,7 +144,7 @@ public partial class Scenery : Node3D
             EmissionEnabled = true,
             Emission = new Color(1f, 0.72f, 0.32f),
             EmissionEnergyMultiplier = 0.6f,
-            TextureFilter = BaseMaterial3D.TextureFilterEnum.Nearest,
+            TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
         };
         var bulbs = new List<Transform3D>();
         foreach (var (a, b) in new[] { (tops[0], tops[1]), (tops[1], tops[2]), (tops[0], tops[3]) })
