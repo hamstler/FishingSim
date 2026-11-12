@@ -96,13 +96,35 @@ public partial class LakeBed : Node3D
         var layout = new MapLayout();
         layout.Specs.AddRange(loc.BuildingSpecs());
         var plaza = loc.PlazaCenter;
-        layout.Pads.Add(new Pad(plaza, 6f, MathF.Max(NaturalHeight(loc, plaza.X, plaza.Y), 1.25f)));
+        layout.PlazaHeight = MathF.Max(NaturalHeight(loc, plaza.X, plaza.Y), 1.25f);
+        layout.Pads.Add(new Pad(plaza, 6f, layout.PlazaHeight));
         foreach (var spec in layout.Specs.Where(s => s.PadRadius > 0f))
-            layout.Pads.Add(new Pad(spec.Position, spec.PadRadius, MathF.Max(NaturalHeight(loc, spec.Position.X, spec.Position.Y), 1.25f)));
+        {
+            var p = spec.Position;
+            float ground = VillageGround(loc, p.X, p.Y, NaturalHeight(loc, p.X, p.Y), layout.PlazaHeight);
+            layout.Pads.Add(new Pad(p, spec.PadRadius, MathF.Max(ground, 1.25f)));
+        }
 
         layout.Paths.Add(new PathSegment(MapLayout.PierRoot, plaza));
-        foreach (var spec in layout.Specs.Where(s => s.IsFunctional || s.Kind is BuildingKind.House))
-            layout.Paths.Add(new PathSegment(plaza, spec.DoorPoint(plaza)));
+        // Streets, then a short path from every door to the nearest street (or straight to the square without streets).
+        var streets = new List<PathSegment>();
+        foreach (var entry in loc.Streets)
+            if (LocationData.Numbers(entry) is { Length: >= 4 } n)
+                streets.Add(new PathSegment(new Vector2(n[0], n[1]), new Vector2(n[2], n[3])));
+        layout.Paths.AddRange(streets);
+        foreach (var spec in layout.Specs.Where(s => s.IsFunctional || s.IsDwelling))
+        {
+            var door = spec.DoorPoint(plaza);
+            var to = plaza;
+            float best = door.DistanceTo(plaza);
+            foreach (var street in streets)
+            {
+                var q = street.Closest(door);
+                if (door.DistanceTo(q) < best)
+                    (best, to) = (door.DistanceTo(q), q);
+            }
+            layout.Paths.Add(new PathSegment(to, door));
+        }
         _layouts[loc] = layout;
         return layout;
     }
@@ -310,8 +332,10 @@ public partial class LakeBed : Node3D
         float h = NaturalHeight(loc, x, z);
         if (h < 0f)
             return h;
+        var layout = LayoutFor(loc);
+        h = VillageGround(loc, x, z, h, layout.PlazaHeight);
         var p = new Vector2(x, z);
-        foreach (var pad in LayoutFor(loc).Pads)
+        foreach (var pad in layout.Pads)
         {
             float d = p.DistanceTo(pad.Center);
             float t = 1f - Smooth(pad.Radius * 0.75f, pad.Radius * 1.6f, d);
@@ -319,6 +343,19 @@ public partial class LakeBed : Node3D
                 h = Mathf.Lerp(h, pad.Height, t);
         }
         return h;
+    }
+
+    /// <summary>
+    /// The village lies on one gentle level: within ~30 m of the square the ground eases to the square's height
+    /// (fading out towards the open land and towards the beach), so houses do not stand on mounds or in pits.
+    /// </summary>
+    private float VillageGround(LocationData loc, float x, float z, float h, float plazaHeight)
+    {
+        float d = new Vector2(x, z).DistanceTo(loc.PlazaCenter);
+        if (d > 70f)
+            return h;
+        float w = (1f - Smooth(30f, 68f, d)) * Smooth(5f, 14f, -InsideMetres(loc, x, z));
+        return h + (plazaHeight - h) * w;
     }
 
     /// <summary>True where the player may stand: on land, in the shallows, or on the pier.</summary>

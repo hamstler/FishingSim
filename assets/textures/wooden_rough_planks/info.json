@@ -1,0 +1,14 @@
+{
+ "id": "wooden_rough_planks",
+ "name": "Wooden Rough Planks",
+ "authors": [
+  "Rob Tuytel"
+ ],
+ "metres": [
+  2.0,
+  2.0
+ ],
+ "licence": "CC0 1.0 (public domain)",
+ "source": "https://polyhaven.com/a/wooden_rough_planks",
+ "grey": false
+}

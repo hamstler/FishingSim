@@ -98,7 +98,6 @@ public static class TreeFactory
 
     // ------------------------------------------------------------------ materials
     private static ShaderMaterial? _leafMaterial, _needleMaterial, _grassMaterial;
-    private static ShaderMaterial? _barkMaterial;
     private static ShaderMaterial? _rockMaterial;
 
     /// <summary>Leaf-card material (shaders/foliage.gdshader); wind and time are set by <see cref="SetWind"/>.</summary>
@@ -124,26 +123,28 @@ public static class TreeFactory
         return _grassMaterial;
     }
 
-    private static ShaderMaterial? _birchBark;
+    private static readonly Dictionary<string, ShaderMaterial> BarkMaterials = new();
 
     /// <summary>
-    /// Bark (shaders/bark.gdshader): furrowed plates with lichen, or white birch bark with lenticels and black patches;
-    /// the instance colour tints it.
+    /// Bark (shaders/bark.gdshader) for a kind of tree: photographed pine bark on the conifers, broadleaf bark on oaks
+    /// and willows (Poly Haven, CC0), the painted white bark with lenticels on birches; the instance colour tints it.
     /// </summary>
-    public static ShaderMaterial BarkMaterial(bool birch = false)
+    public static ShaderMaterial BarkMaterial(string kind = "oak")
     {
-        ref var cached = ref birch ? ref _birchBark : ref _barkMaterial;
-        if (cached != null)
+        string group = kind switch { "birch" => "birch", "spruce" or "pine" => "pine_bark", _ => "bark_brown_02" };
+        if (BarkMaterials.TryGetValue(group, out var cached))
             return cached;
-        cached = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/bark.gdshader") };
+        var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/bark.gdshader") };
+        BarkMaterials[group] = m;
         if (Renderer.IsHeadless)
-            return cached;      // nothing is drawn without a screen: skip painting the bark
-        var (albedo, normal, mean) = GroundTextures.Bark(birch);
-        cached.SetShaderParameter("bark_albedo", albedo);
-        cached.SetShaderParameter("bark_normal", normal);
-        cached.SetShaderParameter("bark_mean", new Vector3(mean.R, mean.G, mean.B));
-        cached.SetShaderParameter("roughness", birch ? 0.7f : 0.9f);
-        return cached;
+            return m;
+        var photo = group == "birch" ? null : GroundTextures.PhotoBarkOf(group);
+        var (albedo, normal, mean) = photo ?? GroundTextures.Bark(group == "birch");
+        m.SetShaderParameter("bark_albedo", albedo);
+        m.SetShaderParameter("bark_normal", normal);
+        m.SetShaderParameter("bark_mean", new Vector3(mean.R, mean.G, mean.B));
+        m.SetShaderParameter("roughness", group == "birch" ? 0.7f : 0.9f);
+        return m;
     }
 
     /// <summary>

@@ -1,0 +1,14 @@
+{
+ "id": "snow_02",
+ "name": "Snow 02",
+ "authors": [
+  "Rob Tuytel"
+ ],
+ "metres": [
+  2.0,
+  2.0
+ ],
+ "licence": "CC0 1.0 (public domain)",
+ "source": "https://polyhaven.com/a/snow_02",
+ "grey": false
+}

@@ -24,6 +24,11 @@ Wolna gra na licencji **GNU GPL 3.0 lub nowszej**: możesz ją kopiować, zmieni
 
 **Malowana przyroda:** ziemia składa się z siedmiu ręcznie „malowanych” w kodzie warstw (łąka ze źdźbłami i koniczyną, leśna ściółka z liśćmi, igłami, gałązkami i mchem, piasek ze zmarszczkami i kamyczkami, ubita ścieżka ze żwirem, kamieniste dno, skała z porostami, śnieg), które łączą się według wysokości: trawa wrasta w piasek, kamyki wystają z mułu. Głazy mają tę samą skałę z mchem na wierzchu, pnie korę z bruzdami (brzozy białą z ciemnymi plamami), korony liście kształtu dębu, brzozy, wierzby i leszczyny, a paprocie, kwiaty i chmury mają własne kształty i cieniowanie.
 
+**Budynki i tekstury ze zdjęć:** ściany, dachy, drewno, tkaniny, kora i grunt mają fotograficzne materiały PBR (kolor
+i mapa wypukłości) z Poly Haven na licencji CC0 (do użytku komercyjnego). Gra sama je dekoduje i kompresuje. Wszystkie
+bryły budynków mają zaokrąglone krawędzie, chaty są z prawdziwych bali z krzyżującymi się końcami na narożnikach, a dachy
+mają grubość i okap.
+
 **Tekstury 4K:** tekstury świata (ziemia, kora, budynki, liście) mają 4096 px na kafel 2 m. Gra maluje je sama przy pierwszym uruchomieniu (zaczyna już w menu; na 4 rdzeniach trwa to ok. 2 minut), kompresuje własnym kompresorem blokowym (BC1/BC3/BC5, więc mieszczą się w pamięci karty także w wyeksportowanej grze) i zapisuje w `user://texcache` (ok. 250 MB). Kolejne uruchomienia tylko je wczytują. Okno startuje zmaksymalizowane, a świat renderuje się w natywnej rozdzielczości.
 
 **Interfejs:** rzeźbione dębowe ramy z mosiężnymi ćwiekami, przyciski z desek, pergaminowe karty i złocone paski, wszystko malowane w kodzie. W kramie boczny pasek kategorii z dużymi obrazkami, podkategorie (np. wędki spławikowe, spinningowe, gruntowe, karpiowe; przynęty naturalne, roślinne, karpiowe, sztuczne), wyszukiwarka, sortowanie i filtr „Dostępne”; karty mają wstążkę jakości (zwykły, dobry, wyborny, mistrzowski), pieczęć posiadanego i gwiazdkę używanego przedmiotu, kłódkę na zablokowanych, rosną pod kursorem, a zakup kończy się deszczem monet i brzękiem. Obrazki przedmiotów są gładkie (128 px), z cieniem.
@@ -222,5 +227,8 @@ Zmian, których nie rozpowszechniasz (np. własna wersja do grania w domu), nie 
   gatunku są w [`assets/fish/CREDITS.md`](assets/fish/CREDITS.md).
 - **Barwy i kształty części gatunków** zmierzono na zdjęciach z Wikimedia Commons na wolnych licencjach. Same zdjęcia
   nie są częścią projektu; autorzy i licencje są w `assets/fish/CREDITS.md` i w atlasie ryb w grze.
-- Dźwięki są syntezowane w kodzie, tekstury malowane w kodzie, a czcionka to wbudowana czcionka Godota: projekt nie
-  zawiera plików graficznych ani dźwiękowych innych autorów.
+- **Tekstury fotograficzne** (drewno, bale, strzecha, dachówka, gont, tynk, kamień, len, juta, kora, trawa, ściółka,
+  piasek, ścieżka, otoczaki, skała, śnieg) pochodzą z [Poly Haven](https://polyhaven.com) i są na licencji **CC0 1.0**
+  (domena publiczna): wolno ich używać w każdym celu, także komercyjnym, bez opłat i bez obowiązku podawania autora.
+  Lista z autorami jest w [`assets/textures/CREDITS.md`](assets/textures/CREDITS.md); pobiera je `tools/assets/polyhaven.py`.
+- Dźwięki są syntezowane w kodzie, pozostałe tekstury malowane w kodzie, a czcionka to wbudowana czcionka Godota.

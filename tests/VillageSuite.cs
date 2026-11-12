@@ -61,7 +61,7 @@ public sealed class VillageSuite : ITestSuite
 
             bool onLand = layout.Specs.All(s => bed.InsideMetres(loc, s.Position.X, s.Position.Y) < -2f);
             t.Check(onLand, "every building stands on land");
-            bool inBounds = layout.Specs.All(s => s.Position.X is > -150f and < 150f && s.Position.Y is > 0f and < 66f);
+            bool inBounds = layout.Specs.All(s => bed.PlayDistance(s.Position.X, s.Position.Y) < -25f && s.Position.Y > 0f);
             t.Check(inBounds, "every building is inside the walkable area");
 
             float worstPad = 0f;

@@ -11,6 +11,7 @@ public enum BuildingKind
     Tackle, Bait, FishBuyer, Market, General, Office, BusStop,
     // scenery
     House, Barn, Windmill, Boathouse, Haystack, Lamp, Bench, Boat, Crates, Signpost, Fence,
+    Cabin, RedHouse, StoneHouse, Smokehouse, Tent, MarketTent, Stall, Well, Woodpile, DryingRack, Cart, Villager,
 }
 
 /// <summary>A building or prop placed on a map, parsed from the "kind,x,z[,yaw]" strings in <see cref="LocationData.Buildings"/>.</summary>
@@ -30,13 +31,23 @@ public sealed record BuildingSpec(BuildingKind Kind, Vector2 Position, float? Ya
 
     public bool IsFunctional => Kind <= BuildingKind.BusStop;
 
+    /// <summary>Somebody lives here: the house gets a path to its door.</summary>
+    public bool IsDwelling => Kind is BuildingKind.House or BuildingKind.Cabin or BuildingKind.RedHouse or BuildingKind.StoneHouse
+        or BuildingKind.Smokehouse or BuildingKind.Boathouse;
+
     /// <summary>Radius of the flat pad (m) the terrain is levelled to; 0 for small props.</summary>
     public float PadRadius => Kind switch
     {
         BuildingKind.Tackle or BuildingKind.General or BuildingKind.Office => 9f,
         BuildingKind.Bait or BuildingKind.FishBuyer => 7f,
         BuildingKind.Market => 8f,
-        BuildingKind.House or BuildingKind.Boathouse => 8f,
+        BuildingKind.House or BuildingKind.Boathouse or BuildingKind.RedHouse => 8f,
+        BuildingKind.Cabin or BuildingKind.StoneHouse => 7f,
+        BuildingKind.Smokehouse => 4.5f,
+        BuildingKind.MarketTent => 4f,
+        BuildingKind.Tent => 3.5f,
+        BuildingKind.Stall => 3f,
+        BuildingKind.Well => 2.5f,
         BuildingKind.Barn => 10f,
         BuildingKind.Windmill => 6f,
         BuildingKind.BusStop => 4f,
@@ -56,7 +67,11 @@ public sealed record BuildingSpec(BuildingKind Kind, Vector2 Position, float? Ya
     public Vector2 DoorPoint(Vector2 plaza)
     {
         float yaw = FacingYaw(plaza);
-        float reach = Kind switch { BuildingKind.BusStop => 2.4f, BuildingKind.Windmill => 4f, _ => 5.2f };
+        float reach = Kind switch
+        {
+            BuildingKind.BusStop => 2.4f, BuildingKind.Windmill => 4f, BuildingKind.Smokehouse => 3.6f, BuildingKind.Tent => 3f,
+            BuildingKind.MarketTent or BuildingKind.Stall => 3.4f, _ => 5.2f,
+        };
         return Position + new Vector2(MathF.Sin(yaw), MathF.Cos(yaw)) * reach;
     }
 }

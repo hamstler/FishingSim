@@ -1,0 +1,14 @@
+{
+ "id": "white_planks_clean",
+ "name": "White Planks Clean",
+ "authors": [
+  "Rob Tuytel"
+ ],
+ "metres": [
+  1.8000000715255737,
+  1.8000000715255737
+ ],
+ "licence": "CC0 1.0 (public domain)",
+ "source": "https://polyhaven.com/a/white_planks_clean",
+ "grey": true
+}

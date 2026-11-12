@@ -1,0 +1,14 @@
+{
+ "id": "rock_face_04",
+ "name": "Rock Face 04",
+ "authors": [
+  "Dimitrios Savva"
+ ],
+ "metres": [
+  2.0,
+  2.0
+ ],
+ "licence": "CC0 1.0 (public domain)",
+ "source": "https://polyhaven.com/a/rock_face_04",
+ "grey": false
+}

@@ -1,0 +1,15 @@
+{
+ "id": "stone_wall",
+ "name": "Stone Wall",
+ "authors": [
+  "Dario Barresi",
+  "Charlotte Baglioni"
+ ],
+ "metres": [
+  2.0,
+  2.0
+ ],
+ "licence": "CC0 1.0 (public domain)",
+ "source": "https://polyhaven.com/a/stone_wall",
+ "grey": false
+}

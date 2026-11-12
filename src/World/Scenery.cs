@@ -86,13 +86,25 @@ public partial class Scenery : Node3D
     // ------------------------------------------------------------------ pier
     private void BuildPier()
     {
+        var deck = Graphics.PhotoTextures.Get("brown_planks_09");
         var wood = BuildingFactory.Pixel(new StandardMaterial3D
         {
-            AlbedoTexture = Textures.Planks(),
+            AlbedoTexture = deck?.Albedo ?? Textures.Planks(),
             Uv1Triplanar = true,
             Uv1Scale = Vector3.One * Textures.TriplanarScale,
             Roughness = 0.9f,
         });
+        if (deck != null)
+        {
+            wood.Uv1Scale = Vector3.One / deck.Metres;
+            wood.NormalEnabled = true;
+            wood.NormalTexture = deck.Normal;
+        }
+        else if (Textures.NormalFor(Textures.Planks()) is { } planksNormal)
+        {
+            wood.NormalEnabled = true;
+            wood.NormalTexture = planksNormal;
+        }
         var dark = BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = new Color(0.22f, 0.15f, 0.09f), Roughness = 0.95f });
 
         var body = new StaticBody3D { CollisionLayer = 1, Position = new Vector3(0, 0.95f, 1) };
@@ -243,6 +255,7 @@ public partial class Scenery : Node3D
     private void BuildVillage(LocationData loc)
     {
         var layout = _lake.Layout;
+        BuildingFactory.Style = loc.VillageStyle;
         int variant = 0;
         foreach (var spec in layout.Specs)
         {
@@ -534,7 +547,7 @@ public partial class Scenery : Node3D
             var meshes = TreeFactory.Get(kind);
             var far = TreeFactory.GetFar(kind);
             if (meshes.Trunk != null)
-                AddTrees(meshes.Trunk, far.Trunk!, trunks[kind], trunkColors[kind], TreeFactory.BarkMaterial(kind == "birch"));
+                AddTrees(meshes.Trunk, far.Trunk!, trunks[kind], trunkColors[kind], TreeFactory.BarkMaterial(kind));
             AddTrees(meshes.Crown, far.Crown, crowns[kind], crownColors[kind], TreeFactory.FoliageMaterial(meshes.Needles));
         }
     }

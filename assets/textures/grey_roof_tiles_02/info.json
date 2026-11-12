@@ -1,0 +1,14 @@
+{
+ "id": "grey_roof_tiles_02",
+ "name": "Grey Roof Tiles 02",
+ "authors": [
+  "Rob Tuytel"
+ ],
+ "metres": [
+  1.5,
+  1.5
+ ],
+ "licence": "CC0 1.0 (public domain)",
+ "source": "https://polyhaven.com/a/grey_roof_tiles_02",
+ "grey": false
+}

@@ -66,6 +66,15 @@ public partial class LocationData : Resource
     /// <summary>Multiplier for how tall the surrounding hills are.</summary>
     [Export] public float HillScale { get; set; } = 1f;
 
+    /// <summary>
+    /// How the village is built: "timber" (half-timbered plaster, thatch), "farm" (painted board houses, clay tiles),
+    /// "fishing" (weathered boards, wooden shingles), "mountain" (log cabins with turf roofs). See BuildingFactory.Style.
+    /// </summary>
+    [Export] public string VillageStyle { get; set; } = "timber";
+
+    /// <summary>Main streets of the village ("x1,z1,x2,z2"): every door gets a short path to the nearest street.</summary>
+    [Export] public string[] Streets { get; set; } = System.Array.Empty<string>();
+
     /// <summary>Height (m) of the mountains that close the map in (they rise behind a dense forest at the map's edge).</summary>
     [Export] public float RimHeight { get; set; } = 60f;
 

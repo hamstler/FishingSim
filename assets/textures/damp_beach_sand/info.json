@@ -1,0 +1,14 @@
+{
+ "id": "damp_beach_sand",
+ "name": "Damp Beach Sand",
+ "authors": [
+  "Dimitrios Savva"
+ ],
+ "metres": [
+  2.0,
+  2.0
+ ],
+ "licence": "CC0 1.0 (public domain)",
+ "source": "https://polyhaven.com/a/damp_beach_sand",
+ "grey": false
+}

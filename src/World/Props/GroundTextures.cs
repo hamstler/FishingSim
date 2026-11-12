@@ -29,6 +29,17 @@ public static class GroundTextures
     public const int Grass = 0, Forest = 1, Sand = 2, Path = 3, Bed = 4, Rock = 5, Snow = 6, Count = 7;
     private static readonly string[] Names = { "grass", "forest", "sand", "path", "bed", "rock", "snow" };
 
+    /// <summary>
+    /// The photographed grounds used instead of the painted ones when they are all present (assets/textures, CC0):
+    /// meadow, forest floor, beach sand, rocky trail, river pebbles, rock face, snow; each a 2 m tile.
+    /// </summary>
+    private static readonly string[] Photos = { "leafy_grass", "forrest_ground_01", "damp_beach_sand", "rocky_trail", "dry_river_pebbles", "rock_face_04", "snow_02" };
+
+    public const int PhotoSize = 2048;
+    private const int PhotoVersion = 1;
+
+    private static bool UsePhotos => Array.TrueForAll(Photos, Graphics.PhotoTextures.Has);
+
     /// <summary>Roughness of each ground (the texture keeps only colour, height and the surface's tilt).</summary>
     public static readonly float[] Roughness = { 0.8f, 0.85f, 0.9f, 0.88f, 0.55f, 0.75f, 0.5f };
 
@@ -68,8 +79,16 @@ public static class GroundTextures
     {
         for (int i = 0; i < Count; i++)
             LoadLayer(i);
-        Bark(false, texturesToo: false);
         Bark(true, texturesToo: false);
+        foreach (var id in new[] { "pine_bark", "bark_brown_02" })
+            if (Graphics.PhotoTextures.Has(id))
+            {
+                Graphics.TextureStore.Get($"bark_photo_{id}_a", PhotoVersion, Graphics.BlockCompress.Kind.ColourAlpha, () => Graphics.PhotoTextures.AlbedoWithHeight(id, PhotoSize));
+                Graphics.TextureStore.Get($"bark_photo_{id}_n", PhotoVersion, Graphics.BlockCompress.Kind.TwoChannel, () => Graphics.PhotoTextures.GroundNormal(id, PhotoSize),
+                    normalMap: true);
+            }
+            else
+                Bark(false, texturesToo: false);
     }
 
     private static readonly (Image Albedo, Image Normal, Color Mean)?[] Layers = new (Image, Image, Color)?[Count];
@@ -82,6 +101,18 @@ public static class GroundTextures
         {
             if (Layers[layer] is { } done)
                 return done;
+            if (UsePhotos)
+            {
+                // Photographed grounds (Poly Haven, CC0): colour with the height map in alpha, normals turned to the
+                // painter's convention, all at PhotoSize.
+                string id = Photos[layer];
+                var (pa, pmean) = Graphics.TextureStore.Get($"ground_{Names[layer]}_photo_a_{PhotoSize}", PhotoVersion, Graphics.BlockCompress.Kind.ColourAlpha,
+                    () => Graphics.PhotoTextures.AlbedoWithHeight(id, PhotoSize));
+                var (pn, _) = Graphics.TextureStore.Get($"ground_{Names[layer]}_photo_n_{PhotoSize}", PhotoVersion, Graphics.BlockCompress.Kind.TwoChannel,
+                    () => Graphics.PhotoTextures.GroundNormal(id, PhotoSize), normalMap: true);
+                Layers[layer] = (pa, pn, pmean);
+                return (pa, pn, pmean);
+            }
             (Image A, Image N)? painted = null;
             (Image A, Image N) Paint() => painted ??= (layer switch
             {
@@ -123,6 +154,30 @@ public static class GroundTextures
     }
 
     public static float Lin(float c) => Graphics.TextureStore.Lin(c);
+
+    private static readonly System.Collections.Generic.Dictionary<int, (Texture2D, Texture2D)> LayerTex = new();
+
+    /// <summary>
+    /// One ground as ordinary textures (albedo with height in alpha, normal map with the ground painter's convention:
+    /// green points down the picture), for other materials: a turf roof wears the meadow.
+    /// </summary>
+    public static (Texture2D Albedo, Texture2D Normal) LayerTextures(int layer)
+    {
+        lock (LayerTex)
+        {
+            if (LayerTex.TryGetValue(layer, out var cached))
+                return cached;
+            if (Graphics.Renderer.IsHeadless)
+            {
+                var plain = ImageTexture.CreateFromImage(Image.CreateEmpty(4, 4, false, Image.Format.Rgba8));
+                return LayerTex[layer] = (plain, plain);
+            }
+            var (a, n, _) = LoadLayer(layer);
+            var result = ((Texture2D)ImageTexture.CreateFromImage(a), (Texture2D)ImageTexture.CreateFromImage(n));
+            LayerTex[layer] = result;
+            return result;
+        }
+    }
 
     // ------------------------------------------------------------------ the canvas
     /// <summary>
@@ -387,6 +442,30 @@ public static class GroundTextures
     /// albedo (height in alpha, BC3), the normal map (RG tilt, BC5) and the albedo's linear average.
     /// </summary>
     public static (Texture2D Albedo, Texture2D Normal, Color Mean) Bark(bool birch) => Bark(birch, true)!.Value;
+
+    private static readonly System.Collections.Generic.Dictionary<string, (Texture2D, Texture2D, Color)> PhotoBark = new();
+
+    /// <summary>
+    /// Photographed bark (Poly Haven, CC0) for the conifers and the broadleaf trees, as the bark shader reads it:
+    /// colour with its height in alpha, normals in the painter's convention. Null when the set is missing.
+    /// </summary>
+    public static (Texture2D Albedo, Texture2D Normal, Color Mean)? PhotoBarkOf(string id)
+    {
+        lock (PhotoBark)
+        {
+            if (PhotoBark.TryGetValue(id, out var cached))
+                return cached;
+            if (!Graphics.PhotoTextures.Has(id) || Graphics.Renderer.IsHeadless)
+                return null;
+            var (a, mean) = Graphics.TextureStore.Get($"bark_photo_{id}_a", PhotoVersion, Graphics.BlockCompress.Kind.ColourAlpha,
+                () => Graphics.PhotoTextures.AlbedoWithHeight(id, PhotoSize));
+            var (n, _) = Graphics.TextureStore.Get($"bark_photo_{id}_n", PhotoVersion, Graphics.BlockCompress.Kind.TwoChannel,
+                () => Graphics.PhotoTextures.GroundNormal(id, PhotoSize), normalMap: true);
+            var result = ((Texture2D)ImageTexture.CreateFromImage(a), (Texture2D)ImageTexture.CreateFromImage(n), mean);
+            PhotoBark[id] = result;
+            return result;
+        }
+    }
 
     private static (Texture2D Albedo, Texture2D Normal, Color Mean)? Bark(bool birch, bool texturesToo)
     {

@@ -18,7 +18,7 @@ void fragment() {
 	vec4 n = texture(bark_normal, UV);
 	vec3 tint = srgb_to_linear(COLOR.rgb);
 	ALBEDO = clamp(tint * a.rgb / bark_mean, 0.0, 1.0);
-	NORMAL_MAP = vec3(n.r, n.g, 1.0);
+	NORMAL_MAP = vec3(n.r, 1.0 - n.g, 1.0);     // the ground painter's green points down the picture; Godot's up
 	NORMAL_MAP_DEPTH = relief;
 	AO = mix(0.5, 1.0, a.a);      // the bark's height: deep furrows get less light
 	AO_LIGHT_AFFECT = 0.2;
