@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using FishingSim.Data;
+using FishingSim.Graphics;
 using FishingSim.World.Props;
 
 namespace FishingSim.World;
@@ -34,6 +35,7 @@ public partial class Scenery : Node3D
         _world = world;
         BuildPier();
         lake.Rebuilt += Rebuild;
+        GraphicsQuality.Changed += ApplyFoliageRange;
         Rebuild();
     }
 
@@ -41,6 +43,17 @@ public partial class Scenery : Node3D
     {
         if (_lake != null)
             _lake.Rebuilt -= Rebuild;
+        GraphicsQuality.Changed -= ApplyFoliageRange;
+    }
+
+    // Scattered plants with their full drawing range, shortened by the quality setting.
+    private readonly List<(GeometryInstance3D Node, float Range)> _ranged = new();
+
+    private void ApplyFoliageRange()
+    {
+        foreach (var (node, range) in _ranged)
+            if (IsInstanceValid(node))
+                node.VisibilityRangeEnd = range * GraphicsQuality.FoliageRange;
     }
 
     private float _time;
@@ -196,6 +209,7 @@ public partial class Scenery : Node3D
         foreach (var n in _dynamic)
             n.QueueFree();
         _dynamic.Clear();
+        _ranged.Clear();
         _buildings.Clear();
         Interactables.Clear();
         Markers.Clear();
@@ -209,6 +223,8 @@ public partial class Scenery : Node3D
         ScatterTrees(loc, rng);
         ScatterGroundCover(loc, rng);
         ScatterReeds(loc, rng);
+        ScatterShoreline(loc, rng);
+        ScatterWaterPlants(loc, rng);
         ScatterRocks(loc, rng);
     }
 
@@ -331,6 +347,47 @@ public partial class Scenery : Node3D
         Track(inst);
     }
 
+    /// <summary>
+    /// Small plants in square cells, each its own instance with a visibility range: dense around the angler, nothing
+    /// drawn far away where they would not be seen anyway.
+    /// </summary>
+    private void AddMultiMeshChunked(Mesh mesh, List<Transform3D> transforms, List<Color> colors, Material? material, float range,
+        float cell = 36f, bool shadows = true)
+    {
+        var groups = new Dictionary<(int, int), List<int>>();
+        for (int i = 0; i < transforms.Count; i++)
+        {
+            var o = transforms[i].Origin;
+            var key = ((int)MathF.Floor(o.X / cell), (int)MathF.Floor(o.Z / cell));
+            if (!groups.TryGetValue(key, out var list))
+                groups[key] = list = new List<int>();
+            list.Add(i);
+        }
+        foreach (var ((cx, cz), ids) in groups)
+        {
+            var centre = new Vector3((cx + 0.5f) * cell, 0f, (cz + 0.5f) * cell);
+            var mm = new MultiMesh
+            {
+                TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true, Mesh = mesh, InstanceCount = ids.Count,
+            };
+            for (int k = 0; k < ids.Count; k++)
+            {
+                var t = transforms[ids[k]];
+                mm.SetInstanceTransform(k, new Transform3D(t.Basis, t.Origin - centre));
+                mm.SetInstanceColor(k, colors[ids[k]]);
+            }
+            var inst = new MultiMeshInstance3D
+            {
+                Multimesh = mm, MaterialOverride = material ?? VertexColorMaterial(), Position = centre,
+                VisibilityRangeEnd = range * GraphicsQuality.FoliageRange, VisibilityRangeEndMargin = cell * 0.25f,
+                CastShadow = shadows ? GeometryInstance3D.ShadowCastingSetting.On : GeometryInstance3D.ShadowCastingSetting.Off,
+            };
+            AddChild(inst);
+            Track(inst);
+            _ranged.Add((inst, range));
+        }
+    }
+
     private static StandardMaterial3D VertexColorMaterial() => BuildingFactory.Pixel(new StandardMaterial3D
     {
         VertexColorUseAsAlbedo = true,
@@ -352,6 +409,8 @@ public partial class Scenery : Node3D
         _ => new Color(0.2f, 0.4f, 0.12f),
     };
 
+    private readonly List<(float X, float Z, string Kind)> _treeSpots = new();
+
     private void ScatterTrees(LocationData loc, RandomNumberGenerator rng)
     {
         string[] kinds = { "spruce", "oak", "birch", "pine", "willow" };
@@ -360,10 +419,11 @@ public partial class Scenery : Node3D
         var crowns = kinds.ToDictionary(k => k, _ => new List<Transform3D>());
         var crownColors = kinds.ToDictionary(k => k, _ => new List<Color>());
 
-        float threshold = -0.05f + (1f - loc.TreeDensity) * 0.5f;
-        int cap = (int)(550 * Math.Min(loc.TreeDensity, 1.2f));
+        float threshold = -0.08f + (1f - loc.TreeDensity) * 0.5f;
+        int cap = (int)(1150 * Math.Min(loc.TreeDensity, 1.2f));
         int placed = 0;
-        for (int i = 0; i < 4000 && placed < cap; i++)
+        _treeSpots.Clear();
+        for (int i = 0; i < 14000 && placed < cap; i++)
         {
             float x = rng.RandfRange(-165f, 165f);
             float z = rng.RandfRange(-195f, 68f);
@@ -417,6 +477,7 @@ public partial class Scenery : Node3D
             crowns[kind].Add(new Transform3D(basis, pos + new Vector3(0, meshes.CrownLift * s, 0)));
             crownColors[kind].Add(Tint(CrownColor(kind), tint));
             placed++;
+            _treeSpots.Add((x, z, kind));
             Count("tree_" + kind);
         }
         foreach (var kind in kinds)
@@ -428,7 +489,7 @@ public partial class Scenery : Node3D
         }
     }
 
-    // ------------------------------------------------------------------ bushes, flowers, grass
+    // ------------------------------------------------------------------ bushes, flowers, grass, the understorey
     private void ScatterGroundCover(LocationData loc, RandomNumberGenerator rng)
     {
         var bushes = new List<Transform3D>(); var bushColors = new List<Color>();
@@ -438,8 +499,8 @@ public partial class Scenery : Node3D
         {
             new(0.97f, 0.97f, 0.92f), new(0.98f, 0.85f, 0.2f), new(0.92f, 0.4f, 0.6f), new(0.6f, 0.4f, 0.85f), new(0.9f, 0.25f, 0.2f),
         };
-        int maxBushes = (int)(260 * loc.BushDensity), maxFlowers = (int)(1500 * loc.FlowerDensity), maxTufts = (int)(1100 * loc.BushDensity);
-        for (int i = 0; i < 14000 && (bushes.Count < maxBushes || flowers.Count < maxFlowers || tufts.Count < maxTufts); i++)
+        int maxBushes = (int)(600 * loc.BushDensity), maxFlowers = (int)(2600 * loc.FlowerDensity), maxTufts = (int)(5200 * Math.Max(loc.BushDensity, 0.7f));
+        for (int i = 0; i < 60000 && (bushes.Count < maxBushes || flowers.Count < maxFlowers || tufts.Count < maxTufts); i++)
         {
             float x = rng.RandfRange(-150f, 150f);
             float z = rng.RandfRange(-190f, 64f);
@@ -450,28 +511,67 @@ public partial class Scenery : Node3D
             if (h < 1.0f || h > 14f || !Clear(loc, x, z, 1.5f, 1.6f))
                 continue;
             float patch = _lake.Noise(x * 3f + 40f, z * 3f - 70f);   // flowers and grass grow in patches
-            if (kindRoll < 0.2f && bushes.Count < maxBushes)
+            if (kindRoll < 0.12f && bushes.Count < maxBushes)
             {
                 bushes.Add(new Transform3D(new Basis(Vector3.Up, yaw).Scaled(new Vector3(s, s, s)), new Vector3(x, h, z)));
                 bushColors.Add(Tint(CrownColor("bush"), rng.RandfRange(-0.05f, 0.05f)));
             }
-            else if (kindRoll < 0.5f && patch > 0.05f && flowers.Count < maxFlowers)
+            else if (kindRoll < 0.4f && patch > 0.0f && flowers.Count < maxFlowers)
             {
                 flowers.Add(new Transform3D(Basis.Identity.Scaled(new Vector3(s, s, s) * 0.8f), new Vector3(x, h + 0.14f, z)));
                 flowerColors.Add(palette[rng.RandiRange(0, palette.Length - 1)]);
             }
-            else if (tufts.Count < maxTufts)
+            else if (tufts.Count < maxTufts && patch > -0.35f)
             {
                 tufts.Add(new Transform3D(new Basis(Vector3.Up, yaw).Scaled(new Vector3(s, s * 1.2f, s)), new Vector3(x, h - 0.05f, z)));
                 tuftColors.Add(Tint(loc.GrassColor.Lerp(new Color(0.5f, 0.65f, 0.25f), 0.35f), rng.RandfRange(-0.06f, 0.06f)));
             }
         }
-        AddMultiMesh(TreeFactory.Get("bush").Crown, bushes, bushColors, TreeFactory.FoliageMaterial(false));
-        AddMultiMesh(TreeFactory.Blossom(), flowers, flowerColors);
-        AddMultiMesh(TreeFactory.Tuft(), tufts, tuftColors, TreeFactory.GrassMaterial());
+
+        // The forest floor: hazel shrubs and ferns in the shade of the trees.
+        var hazels = new List<Transform3D>(); var hazelColors = new List<Color>();
+        var ferns = new List<Transform3D>(); var fernColors = new List<Color>();
+        foreach (var (tx, tz, kind) in _treeSpots)
+        {
+            if (kind == "willow")
+                continue;
+            if (rng.Randf() < 0.35f * loc.BushDensity)
+            {
+                float a = rng.Randf() * Mathf.Tau, d = rng.RandfRange(2.2f, 4.5f);
+                float x = tx + MathF.Cos(a) * d, z = tz + MathF.Sin(a) * d;
+                float h = _lake.HeightAt(loc, x, z);
+                if (h > 1.1f && Clear(loc, x, z, 1.5f, 1.6f))
+                {
+                    float sc = rng.RandfRange(0.8f, 1.5f);
+                    hazels.Add(new Transform3D(new Basis(Vector3.Up, rng.Randf() * Mathf.Tau).Scaled(new Vector3(sc, sc * rng.RandfRange(0.9f, 1.3f), sc)),
+                        new Vector3(x, h + 0.7f * sc - 0.15f, z)));
+                    hazelColors.Add(Tint(new Color(0.26f, 0.42f, 0.13f), rng.RandfRange(-0.05f, 0.05f)));
+                }
+            }
+            int nf = kind is "pine" ? 1 : rng.RandiRange(1, 4);
+            for (int k = 0; k < nf; k++)
+            {
+                float a = rng.Randf() * Mathf.Tau, d = rng.RandfRange(0.8f, 3.5f);
+                float x = tx + MathF.Cos(a) * d, z = tz + MathF.Sin(a) * d;
+                float h = _lake.HeightAt(loc, x, z);
+                if (h < 1.1f || !Clear(loc, x, z, 1.5f, 1.6f))
+                    continue;
+                float sc = rng.RandfRange(0.7f, 1.3f);
+                ferns.Add(new Transform3D(new Basis(Vector3.Up, rng.Randf() * Mathf.Tau).Scaled(new Vector3(sc, sc, sc)), new Vector3(x, h - 0.03f, z)));
+                fernColors.Add(Tint(new Color(0.28f, 0.48f, 0.15f), rng.RandfRange(-0.06f, 0.04f)));
+            }
+        }
+
+        AddMultiMeshChunked(TreeFactory.Get("bush").Crown, bushes, bushColors, TreeFactory.FoliageMaterial(false), 220f);
+        AddMultiMeshChunked(TreeFactory.Get("hazel").Crown, hazels, hazelColors, TreeFactory.FoliageMaterial(false), 220f);
+        AddMultiMeshChunked(TreeFactory.Blossom(), flowers, flowerColors, null, 80f, shadows: false);
+        AddMultiMeshChunked(TreeFactory.Tuft(), tufts, tuftColors, TreeFactory.GrassMaterial(), 90f, shadows: false);
+        AddMultiMeshChunked(TreeFactory.Fern(), ferns, fernColors, TreeFactory.GrassMaterial(), 90f, shadows: false);
         Count("bush", bushes.Count);
+        Count("hazel", hazels.Count);
         Count("flower", flowers.Count);
         Count("tuft", tufts.Count);
+        Count("fern", ferns.Count);
     }
 
     // ------------------------------------------------------------------ reeds and rocks
@@ -479,7 +579,7 @@ public partial class Scenery : Node3D
     {
         List<Transform3D> reeds = new(), heads = new();
         List<Color> colors = new(), headColors = new();
-        int maxReeds = (int)(1800 * loc.ReedDensity);
+        int maxReeds = (int)(4200 * Math.Min(loc.ReedDensity, 2f));
         // Shorelines to sample: the main lake, its bays (x, z, rx, rz) and the islands (sampled just outside them).
         var shores = new List<(float X, float Z, float Rx, float Rz, bool Island)> { (0f, loc.OutlineCz, loc.OutlineRx, loc.OutlineRz, false) };
         foreach (var entry in loc.Lobes)
@@ -503,10 +603,10 @@ public partial class Scenery : Node3D
                 continue;
             if (_lake.ForestDensity(x * 1.7f, z * 1.7f) < 0f)
                 continue;
-            for (int k = 0; k < 3; k++)
+            for (int k = 0; k < 5; k++)
             {
-                float rx = x + rng.RandfRange(-0.5f, 0.5f);
-                float rz = z + rng.RandfRange(-0.5f, 0.5f);
+                float rx = x + rng.RandfRange(-0.8f, 0.8f);
+                float rz = z + rng.RandfRange(-0.8f, 0.8f);
                 float hh = rng.RandfRange(0.9f, 1.5f);
                 var euler = new Vector3(rng.RandfRange(-0.12f, 0.12f), rng.Randf() * Mathf.Tau, rng.RandfRange(-0.12f, 0.12f));
                 var b = Basis.FromEuler(euler).Scaled(new Vector3(1, hh, 1));
@@ -521,9 +621,151 @@ public partial class Scenery : Node3D
                 }
             }
         }
-        AddMultiMesh(TreeFactory.Reed(), reeds, colors);
-        AddMultiMesh(TreeFactory.Cattail(), heads, headColors);
+        AddMultiMeshChunked(TreeFactory.Reed(), reeds, colors, null, 260f, 48f, shadows: false);    // shadows of stalks this thin are barely seen
+        AddMultiMeshChunked(TreeFactory.Cattail(), heads, headColors, null, 200f, 48f, shadows: false);
         Count("reed", reeds.Count);
+    }
+
+    /// <summary>Points along the shorelines (the lake, its bays, its islands), with their outlines.</summary>
+    private List<(float X, float Z, float Rx, float Rz, bool Island)> Shores(LocationData loc)
+    {
+        var shores = new List<(float X, float Z, float Rx, float Rz, bool Island)> { (0f, loc.OutlineCz, loc.OutlineRx, loc.OutlineRz, false) };
+        foreach (var entry in loc.Lobes)
+            if (LocationData.Numbers(entry) is { Length: >= 4 } l)
+                shores.Add((l[0], l[1], l[2], l[3], false));
+        foreach (var entry in loc.Islands)
+            if (LocationData.Numbers(entry) is { Length: >= 3 } i)
+                shores.Add((i[0], i[1], i[2], i[2], true));
+        return shores;
+    }
+
+    /// <summary>Near the pier the water is kept open (the angler casts from there).</summary>
+    private static bool NearPier(float x, float z) => MathF.Abs(x) < 12f && z > -18f;
+
+    // ------------------------------------------------------------------ the water's edge: rushes and yellow irises
+    private void ScatterShoreline(LocationData loc, RandomNumberGenerator rng)
+    {
+        var rushes = new List<Transform3D>(); var rushColors = new List<Color>();
+        var irises = new List<Transform3D>(); var irisColors = new List<Color>();
+        var irisFlowers = new List<Transform3D>(); var irisFlowerColors = new List<Color>();
+        var shores = Shores(loc);
+        int maxRushes = (int)(1400 * Math.Clamp(loc.ReedDensity, 0.3f, 2f)), maxIrises = (int)(320 * Math.Max(loc.ReedDensity, 0.2f));
+        for (int tries = 0; (rushes.Count < maxRushes || irises.Count < maxIrises) && tries < 60000; tries++)
+        {
+            var shore = shores.Count == 1 || rng.Randf() < 0.6f ? shores[0] : shores[rng.RandiRange(1, shores.Count - 1)];
+            float angle = rng.Randf() * Mathf.Tau;
+            float shrink = shore.Island ? rng.RandfRange(0.95f, 1.25f) : rng.RandfRange(0.93f, 1.08f);
+            float x = shore.X + shore.Rx * shrink * MathF.Cos(angle);
+            float z = shore.Z + shore.Rz * shrink * MathF.Sin(angle);
+            if (NearPier(x, z))
+                continue;
+            float inside = _lake.InsideMetres(loc, x, z);
+            float depth = _lake.DepthAt(loc, x, z);
+            if (inside > 0f && depth > 0f && depth < 0.35f && rushes.Count < maxRushes)
+            {
+                // Rushes stand in the first hand's breadth of water.
+                float sc = rng.RandfRange(0.7f, 1.3f);
+                rushes.Add(new Transform3D(new Basis(Vector3.Up, rng.Randf() * Mathf.Tau).Scaled(new Vector3(sc, sc * rng.RandfRange(0.9f, 1.4f), sc)),
+                    new Vector3(x, -depth, z)));
+                rushColors.Add(Tint(new Color(0.22f, 0.34f, 0.13f), rng.RandfRange(-0.04f, 0.04f)));
+            }
+            else if (inside > -2.5f && inside < 0.4f && irises.Count < maxIrises && _lake.Noise(x * 2f - 30f, z * 2f + 11f) > 0.1f
+                     && Clear(loc, x, z, 1.5f, 1.6f))
+            {
+                // Yellow flag irises on the wet bank, in clumps.
+                float h = MathF.Max(_lake.HeightAt(loc, x, z), -depth);
+                float sc = rng.RandfRange(0.8f, 1.2f);
+                var b = new Basis(Vector3.Up, rng.Randf() * Mathf.Tau).Scaled(new Vector3(sc, sc, sc));
+                irises.Add(new Transform3D(b, new Vector3(x, h - 0.02f, z)));
+                irisColors.Add(Tint(new Color(0.3f, 0.45f, 0.18f), rng.RandfRange(-0.04f, 0.04f)));
+                if (rng.Randf() < 0.7f)
+                {
+                    irisFlowers.Add(new Transform3D(Basis.Identity.Scaled(new Vector3(0.7f, 0.9f, 0.7f)), new Vector3(x + 0.05f, h + 0.68f * sc, z)));
+                    irisFlowerColors.Add(new Color(0.98f, 0.84f, 0.15f));
+                }
+            }
+        }
+        AddMultiMeshChunked(TreeFactory.Rush(), rushes, rushColors, TreeFactory.GrassMaterial(), 140f, 48f, shadows: false);
+        AddMultiMeshChunked(TreeFactory.IrisLeaves(), irises, irisColors, TreeFactory.GrassMaterial(), 120f, 48f, shadows: false);
+        AddMultiMeshChunked(TreeFactory.Blossom(), irisFlowers, irisFlowerColors, null, 120f, 48f, shadows: false);
+        Count("rush", rushes.Count);
+        Count("iris", irises.Count);
+    }
+
+    // ------------------------------------------------------------------ on the water: lilies and pondweed
+    private void ScatterWaterPlants(LocationData loc, RandomNumberGenerator rng)
+    {
+        var pads = new List<Transform3D>(); var padColors = new List<Color>();
+        var whites = new List<Transform3D>(); var whiteColors = new List<Color>();
+        var yellows = new List<Transform3D>(); var yellowColors = new List<Color>();
+        var weeds = new List<Transform3D>(); var weedColors = new List<Color>();
+        var shores = Shores(loc);
+        int patches = (int)MathF.Round(30 * loc.LilyDensity), weedPatches = (int)MathF.Round(22 * loc.LilyDensity);
+        int made = 0, madeWeeds = 0;
+        for (int tries = 0; (made < patches || madeWeeds < weedPatches) && tries < 20000; tries++)
+        {
+            bool weed = made >= patches || (madeWeeds < weedPatches && rng.Randf() < 0.4f);
+            var shore = shores.Count == 1 || rng.Randf() < 0.45f ? shores[0] : shores[rng.RandiRange(1, shores.Count - 1)];
+            float angle = rng.Randf() * Mathf.Tau;
+            float shrink = shore.Island ? rng.RandfRange(1.1f, 1.8f) : rng.RandfRange(0.72f, 0.97f);
+            float cx = shore.X + shore.Rx * shrink * MathF.Cos(angle);
+            float cz = shore.Z + shore.Rz * shrink * MathF.Sin(angle);
+            if (NearPier(cx, cz))
+                continue;
+            float depth = _lake.DepthAt(loc, cx, cz);
+            if (weed ? depth < 0.9f || depth > 3.2f : depth < 0.4f || depth > 2.2f)
+                continue;
+            if (weed)
+                madeWeeds++;
+            else
+                made++;
+            // A patch: leaves crowd its middle and thin out to its edge.
+            float radius = rng.RandfRange(1.6f, weed ? 3.5f : 5f);
+            int count = (int)(radius * radius * rng.RandfRange(weed ? 0.9f : 2.2f, weed ? 1.6f : 3.6f));
+            bool yellowPatch = !weed && rng.Randf() < 0.3f;
+            for (int k = 0; k < count; k++)
+            {
+                float a = rng.Randf() * Mathf.Tau, d = radius * MathF.Sqrt(rng.Randf());
+                float x = cx + MathF.Cos(a) * d, z = cz + MathF.Sin(a) * d;
+                float dd = _lake.DepthAt(loc, x, z);
+                if (dd < 0.25f || dd > 3.4f || NearPier(x, z))
+                    continue;
+                var basis = new Basis(Vector3.Up, rng.Randf() * Mathf.Tau);
+                if (weed)
+                {
+                    float sc = rng.RandfRange(0.8f, 1.3f);
+                    weeds.Add(new Transform3D(basis.Scaled(new Vector3(sc, 1f, sc)), new Vector3(x, 0.002f, z)));
+                    weedColors.Add(Tint(Colors.White, rng.RandfRange(-0.12f, 0.02f)));
+                    continue;
+                }
+                float r = rng.RandfRange(0.15f, yellowPatch ? 0.26f : 0.34f);
+                pads.Add(new Transform3D(basis.Scaled(new Vector3(r, 1f, r)), new Vector3(x, 0.004f * (k % 4), z)));
+                padColors.Add(Tint(Colors.White, rng.RandfRange(-0.2f, 0.0f)));
+                if (rng.Randf() < (yellowPatch ? 0.12f : 0.14f))
+                {
+                    var fb = new Basis(Vector3.Up, rng.Randf() * Mathf.Tau).Scaled(Vector3.One * rng.RandfRange(0.85f, 1.25f));
+                    var at = new Vector3(x + rng.RandfRange(-0.05f, 0.05f), 0.018f, z + rng.RandfRange(-0.05f, 0.05f));
+                    if (yellowPatch)
+                    {
+                        yellows.Add(new Transform3D(fb, at + Vector3.Up * 0.03f));
+                        yellowColors.Add(Colors.White);
+                    }
+                    else
+                    {
+                        whites.Add(new Transform3D(fb, at));
+                        whiteColors.Add(rng.Randf() < 0.25f ? new Color(1f, 0.82f, 0.88f) : Colors.White);
+                    }
+                }
+            }
+        }
+        var floating = TreeFactory.FloatingMaterial();
+        AddMultiMeshChunked(TreeFactory.LilyPad(), pads, padColors, floating, 160f, 48f, shadows: false);
+        AddMultiMeshChunked(TreeFactory.Pondweed(), weeds, weedColors, floating, 120f, 48f, shadows: false);
+        AddMultiMeshChunked(TreeFactory.LilyFlower(), whites, whiteColors, floating, 160f, 48f, shadows: false);
+        AddMultiMeshChunked(TreeFactory.YellowLily(), yellows, yellowColors, floating, 160f, 48f, shadows: false);
+        Count("lily", pads.Count);
+        Count("lily_flower", whites.Count + yellows.Count);
+        Count("pondweed", weeds.Count);
     }
 
     private void ScatterRocks(LocationData loc, RandomNumberGenerator rng)

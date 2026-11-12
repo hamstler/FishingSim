@@ -31,6 +31,7 @@ TreeDensity = 0.45
 TreeMix = {"oak": 1.0, "birch": 0.4, "spruce": 0.1}
 BushDensity = 1.2
 FlowerDensity = 2.5
+LilyDensity = 1.4
 ReedDensity = 1.5
 RockDensity = 0.3
 PlazaCenter = Vector2(0, 22)

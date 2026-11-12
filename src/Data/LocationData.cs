@@ -77,6 +77,9 @@ public partial class LocationData : Resource
     [Export] public float ReedDensity { get; set; } = 1f;
     [Export] public float RockDensity { get; set; } = 1f;
 
+    /// <summary>Water lilies and pondweed on the shallows (warm, still water: many; a cold mountain lake: few).</summary>
+    [Export] public float LilyDensity { get; set; } = 1f;
+
     // --- village ---
     /// <summary>Where the paths meet; buildings face this point.</summary>
     [Export] public Vector2 PlazaCenter { get; set; } = new(0, 28);

@@ -38,3 +38,11 @@ cloud_drift={
 "type": "float",
 "value": 0.0
 }
+water_time={
+"type": "float",
+"value": 0.0
+}
+water_amp={
+"type": "float",
+"value": 0.03
+}

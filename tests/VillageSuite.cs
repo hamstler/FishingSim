@@ -175,6 +175,15 @@ public sealed class VillageSuite : ITestSuite
         t.Check(Get("Staw Karpiowy", "tree_oak") + Get("Staw Karpiowy", "tree_spruce") + Get("Staw Karpiowy", "tree_birch")
             < Get("Jezioro Zielone", "tree_oak") + Get("Jezioro Zielone", "tree_spruce") + Get("Jezioro Zielone", "tree_birch"), "the pond meadow has fewer trees than the forest lake");
         t.Check(Get("Staw Karpiowy", "building_windmill") == 1 && Get("Staw Karpiowy", "building_barn") == 1, "the farm has a windmill and a barn");
+        foreach (var (map, counts) in stats)
+            GD.Print($"  plants on {map}: " + string.Join(", ", new[] { "tree_", "bush", "hazel", "fern", "tuft", "flower", "reed", "rush", "iris", "lily", "lily_flower", "pondweed" }
+                .Select(k => $"{k.TrimEnd('_')} {(k.EndsWith('_') ? counts.Where(kv => kv.Key.StartsWith(k)).Sum(kv => kv.Value) : counts.GetValueOrDefault(k))}")));
+        t.Check(stats.Values.All(c => c.GetValueOrDefault("fern") > 50 && c.GetValueOrDefault("tuft") > 1000 && c.GetValueOrDefault("rush") > 100),
+            "every map has a forest floor of ferns, grassy meadows and rushes at the water's edge");
+        t.Check(Get("Zatoka Szuwarowa", "lily") > Get("Jezioro Zielone", "lily") && Get("Jezioro Zielone", "lily") > Get("Górskie Jezioro", "lily") * 3
+            && Get("Jezioro Zielone", "lily_flower") > 0 && Get("Staw Karpiowy", "pondweed") > 0,
+            $"water lilies cover the warm bay more than the cold mountain lake (bay {Get("Zatoka Szuwarowa", "lily")}, lake {Get("Jezioro Zielone", "lily")}, mountains {Get("Górskie Jezioro", "lily")})");
+        t.Check(Get("Jezioro Zielone", "hazel") > 30 && Get("Jezioro Zielone", "iris") > 20, "hazel shrubs under the trees and yellow irises on the banks");
 
         // main is now the mountain map (last in the loop); go back to the first map for the rest.
         main!.QueueFree();
