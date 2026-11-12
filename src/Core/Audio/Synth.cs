@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace FishingSim.Core.Audio;
 
 /// <summary>What a one-shot sound is made of.</summary>
-public enum OneShot { Splash, SmallSplash, StepWood, StepGrass, Strike, Catch, LineSnap, Bell }
+public enum OneShot { Splash, SmallSplash, StepWood, StepGrass, Strike, Catch, LineSnap, Bell, Coins, Click }
 
 /// <summary>Levels of the continuous sounds (0..1), set every frame by the game.</summary>
 public struct AmbientLevels
@@ -67,6 +67,8 @@ public sealed class Synth
             OneShot.Strike => 0.25f,
             OneShot.Catch => 0.6f,
             OneShot.Bell => 0.9f,
+            OneShot.Coins => 0.55f,
+            OneShot.Click => 0.06f,
             _ => 0.3f,
         };
         _voices.Add(new Voice { Kind = kind, Length = len, Gain = gain, Pitch = 0.85f + 0.3f * (float)_rnd.NextDouble() });
@@ -202,6 +204,23 @@ public sealed class Synth
                 float ring = MathF.Sin(t * MathF.Tau * 2100f) + 0.6f * MathF.Sin(t * MathF.Tau * 2100f * 2.76f) + 0.35f * MathF.Sin(t * MathF.Tau * 2100f * 5.4f);
                 return ring * MathF.Exp(-k * 4f) * 0.09f;
             }
+            case OneShot.Coins:
+            {
+                // Coins tumbling onto a counter: a handful of short metallic clinks at uneven moments.
+                float s = 0f;
+                for (int i = 0; i < 6; i++)
+                {
+                    float at = 0.06f * i + 0.025f * MathF.Sin(i * 12.9898f) * MathF.Sin(i * 3.1f);
+                    float lt = v.T - at;
+                    if (lt < 0f)
+                        continue;
+                    float f = 3200f + 900f * MathF.Sin(i * 7.3f);
+                    s += (MathF.Sin(lt * MathF.Tau * f) + 0.5f * MathF.Sin(lt * MathF.Tau * f * 1.58f)) * MathF.Exp(-lt * 38f) * (1f - 0.1f * i);
+                }
+                return s * 0.07f;
+            }
+            case OneShot.Click:
+                return (MathF.Sin(v.T * MathF.Tau * 1800f) * 0.5f + Noise() * 0.5f) * MathF.Exp(-k * 10f) * 0.12f;
             default:
                 return Noise() * MathF.Exp(-k * 12f) * 0.4f;
         }

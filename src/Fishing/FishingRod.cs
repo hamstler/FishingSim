@@ -141,6 +141,9 @@ public partial class FishingRod : Node3D
     /// <summary>Sound cues for the audio engine (one-shot kind, gain).</summary>
     public event Action<Core.Audio.OneShot, float>? SoundCue;
 
+    /// <summary>Plays a one-shot through the game's sound (the shops' coins and clicks).</summary>
+    public void Cue(Core.Audio.OneShot sound, float gain = 1f) => SoundCue?.Invoke(sound, gain);
+
     /// <summary>True while the drag gives line to a running fish.</summary>
     public bool DragSlipping => State == RodState.Fight && (_fight?.Slipping ?? false);
 

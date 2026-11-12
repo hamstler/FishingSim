@@ -6,91 +6,206 @@ using FishingSim.Data;
 namespace FishingSim.Graphics;
 
 /// <summary>
-/// Pixel-art pictures for the shops, the inventory and the fish lists, drawn in code (64×64, dark outline, two-tone
-/// shading), one per item and per species. Shown with nearest filtering so they stay crisp at any size.
+/// Painted pictures for the shops, the inventory and the fish lists, drawn in code (in a 64-unit space on a canvas
+/// four times finer: smooth shading, a soft dark outline and a drop shadow, 128 px), one per item and per species.
 /// </summary>
 public static class Icons
 {
     public const int Size = 64;
+
+    /// <summary>The finished pictures are this many pixels square.</summary>
+    public const int TextureSize = 128;
     private static readonly Dictionary<string, ImageTexture> Cache = new();
     private static readonly Color Outline = new(0.13f, 0.08f, 0.05f);
 
     // ------------------------------------------------------------------ canvas
+    /// <summary>
+    /// Drawing happens in a 64-unit space on a canvas four times finer, kept in managed memory; the finished picture
+    /// gets a soft dark outline and a small drop shadow and is scaled down to 128 px, so it is smooth, not pixelated.
+    /// </summary>
     private sealed class Canvas
     {
-        public readonly Image Img = Image.CreateEmpty(Size, Size, false, Image.Format.Rgba8);
+        public const int Scale = 4;
+        public const int Res = Size * Scale;
+        public readonly float[] Px4 = new float[Res * Res * 4];
 
+        private void Set(int hx, int hy, Color c)
+        {
+            if (hx < 0 || hy < 0 || hx >= Res || hy >= Res)
+                return;
+            int i = (hy * Res + hx) * 4;
+            // Paint over what is there (respecting the new colour's alpha).
+            float a = c.A, inv = 1f - a;
+            Px4[i] = c.R * a + Px4[i] * inv;
+            Px4[i + 1] = c.G * a + Px4[i + 1] * inv;
+            Px4[i + 2] = c.B * a + Px4[i + 2] * inv;
+            Px4[i + 3] = a + Px4[i + 3] * inv;
+        }
+
+        /// <summary>A unit pixel of the 64-unit space (a 4×4 block on the fine canvas).</summary>
         public void Px(int x, int y, Color c)
         {
-            if (x >= 0 && y >= 0 && x < Size && y < Size)
-                Img.SetPixel(x, y, c);
+            for (int j = 0; j < Scale; j++)
+                for (int i = 0; i < Scale; i++)
+                    Set(x * Scale + i, y * Scale + j, c);
         }
+
+        /// <summary>One fine pixel at a fractional position of the 64-unit space.</summary>
+        public void Fine(float x, float y, Color c) => Set((int)(x * Scale), (int)(y * Scale), c);
 
         public void Disc(float cx, float cy, float rx, float ry, Color c, Color? shade = null)
         {
-            for (int y = (int)(cy - ry - 1); y <= cy + ry + 1; y++)
-                for (int x = (int)(cx - rx - 1); x <= cx + rx + 1; x++)
+            float sx = cx * Scale, sy = cy * Scale, srx = MathF.Max(rx * Scale, 0.5f), sry = MathF.Max(ry * Scale, 0.5f);
+            for (int y = (int)(sy - sry - 2); y <= sy + sry + 2; y++)
+                for (int x = (int)(sx - srx - 2); x <= sx + srx + 2; x++)
                 {
-                    float dx = (x + 0.5f - cx) / rx, dy = (y + 0.5f - cy) / ry;
-                    if (dx * dx + dy * dy > 1f)
+                    float dx = (x + 0.5f - sx) / srx, dy = (y + 0.5f - sy) / sry;
+                    float r = MathF.Sqrt(dx * dx + dy * dy);
+                    // Anti-aliased edge: the last fine pixel fades out.
+                    float edge = Math.Clamp((1f - r) * MathF.Min(srx, sry) + 0.5f, 0f, 1f);
+                    if (edge <= 0f)
                         continue;
-                    // Light from the top-left: the lower-right part takes the shade colour.
-                    bool dark = shade != null && dx * 0.6f + dy * 0.8f > 0.35f;
-                    Px(x, y, dark ? shade!.Value : c);
+                    var col = c;
+                    if (shade != null)
+                    {
+                        // Light from the top-left: a smooth turn into the shade colour, and a soft highlight.
+                        float t = Math.Clamp((dx * 0.6f + dy * 0.8f + 0.15f) / 0.95f, 0f, 1f);
+                        col = c.Lerp(shade.Value, t * t * (3 - 2 * t));
+                        float hl = MathF.Max(0f, 1f - MathF.Sqrt((dx + 0.42f) * (dx + 0.42f) + (dy + 0.42f) * (dy + 0.42f)) / 0.38f);
+                        col = col.Lerp(c.Lightened(0.45f), hl * 0.55f);
+                    }
+                    col.A = c.A * edge;
+                    Set(x, y, col);
                 }
         }
 
         public void Rect(int x0, int y0, int x1, int y1, Color c)
         {
-            for (int y = y0; y <= y1; y++)
-                for (int x = x0; x <= x1; x++)
-                    Px(x, y, c);
+            for (int y = y0 * Scale; y < (y1 + 1) * Scale; y++)
+                for (int x = x0 * Scale; x < (x1 + 1) * Scale; x++)
+                    Set(x, y, c);
         }
 
         public void Line(float x0, float y0, float x1, float y1, float width, Color c)
         {
-            int steps = (int)MathF.Ceiling(MathF.Max(MathF.Abs(x1 - x0), MathF.Abs(y1 - y0)) * 2f) + 1;
-            for (int i = 0; i <= steps; i++)
-            {
-                float t = i / (float)steps;
-                float x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t;
-                if (width <= 1.01f)
-                    Px((int)x, (int)y, c);
-                else
-                    Disc(x, y, width * 0.5f, width * 0.5f, c);
-            }
+            // A capsule: every fine pixel within half the width of the segment.
+            float ax = x0 * Scale + 2f, ay = y0 * Scale + 2f, bx = x1 * Scale + 2f, by = y1 * Scale + 2f;
+            float hw = MathF.Max(width * Scale * 0.5f, 1.2f);
+            int minX = (int)(MathF.Min(ax, bx) - hw - 2), maxX = (int)(MathF.Max(ax, bx) + hw + 2);
+            int minY = (int)(MathF.Min(ay, by) - hw - 2), maxY = (int)(MathF.Max(ay, by) + hw + 2);
+            float vx = bx - ax, vy = by - ay, len2 = MathF.Max(vx * vx + vy * vy, 1e-4f);
+            for (int y = minY; y <= maxY; y++)
+                for (int x = minX; x <= maxX; x++)
+                {
+                    float px = x + 0.5f, py = y + 0.5f;
+                    float t = Math.Clamp(((px - ax) * vx + (py - ay) * vy) / len2, 0f, 1f);
+                    float qx = ax + t * vx - px, qy = ay + t * vy - py;
+                    float d = MathF.Sqrt(qx * qx + qy * qy);
+                    float edge = Math.Clamp(hw - d + 0.5f, 0f, 1f);
+                    if (edge <= 0f)
+                        continue;
+                    var col = c;
+                    col.A = c.A * edge;
+                    Set(x, y, col);
+                }
         }
 
         public void Ring(float cx, float cy, float r, float thickness, Color c)
         {
-            for (int y = (int)(cy - r - 1); y <= cy + r + 1; y++)
-                for (int x = (int)(cx - r - 1); x <= cx + r + 1; x++)
+            float sx = cx * Scale, sy = cy * Scale, sr = r * Scale, st = thickness * Scale;
+            for (int y = (int)(sy - sr - 2); y <= sy + sr + 2; y++)
+                for (int x = (int)(sx - sr - 2); x <= sx + sr + 2; x++)
                 {
-                    float d = MathF.Sqrt((x + 0.5f - cx) * (x + 0.5f - cx) + (y + 0.5f - cy) * (y + 0.5f - cy));
-                    if (d <= r && d >= r - thickness)
-                        Px(x, y, c);
+                    float d = MathF.Sqrt((x + 0.5f - sx) * (x + 0.5f - sx) + (y + 0.5f - sy) * (y + 0.5f - sy));
+                    float edge = Math.Clamp(MathF.Min(sr - d, d - (sr - st)) + 0.5f, 0f, 1f);
+                    if (edge <= 0f)
+                        continue;
+                    var col = c;
+                    col.A = c.A * edge;
+                    Set(x, y, col);
                 }
         }
 
-        /// <summary>One-pixel dark outline around everything drawn (the pixel-art finish).</summary>
+        /// <summary>Outline, drop shadow, scale down to 128 px.</summary>
         public ImageTexture Finish()
         {
-            var copy = (Image)Img.Duplicate();
-            for (int y = 0; y < Size; y++)
-                for (int x = 0; x < Size; x++)
+            const int R = Res;
+            var alpha = new float[R * R];
+            for (int i = 0; i < R * R; i++)
+                alpha[i] = Px4[i * 4 + 3];
+            // The outline: a dilation of the shape by ~1.1 units, drawn dark under the picture.
+            var grow = Dilate(alpha, R, 4);
+            // The shadow: the shape shifted down-right and blurred a little.
+            var shadow = Dilate(Shift(alpha, R, 5, 7), R, 3);
+            var bytes = new byte[R * R * 4];
+            for (int i = 0; i < R * R; i++)
+            {
+                float a = Px4[i * 4 + 3];
+                float r = Px4[i * 4], g = Px4[i * 4 + 1], b = Px4[i * 4 + 2];
+                // Un-premultiply the painted colour.
+                if (a > 1e-4f)
                 {
-                    if (copy.GetPixel(x, y).A > 0.5f)
-                        continue;
-                    bool near = false;
-                    for (int k = 0; k < 4 && !near; k++)
-                    {
-                        int nx = x + (k == 0 ? 1 : k == 1 ? -1 : 0), ny = y + (k == 2 ? 1 : k == 3 ? -1 : 0);
-                        near = nx >= 0 && ny >= 0 && nx < Size && ny < Size && copy.GetPixel(nx, ny).A > 0.5f;
-                    }
-                    if (near)
-                        Img.SetPixel(x, y, Outline);
+                    r /= a; g /= a; b /= a;
                 }
-            return ImageTexture.CreateFromImage(Img);
+                float oa = grow[i] * (1f - a);
+                float sa = shadow[i] * 0.28f * (1f - a) * (1f - oa);
+                float outA = a + oa + sa;
+                var col = outA > 1e-4f
+                    ? new Color((r * a + Outline.R * oa) / outA, (g * a + Outline.G * oa) / outA, (b * a + Outline.B * oa) / outA)
+                    : new Color(0, 0, 0);
+                bytes[i * 4] = (byte)(Math.Clamp(col.R, 0f, 1f) * 255f);
+                bytes[i * 4 + 1] = (byte)(Math.Clamp(col.G, 0f, 1f) * 255f);
+                bytes[i * 4 + 2] = (byte)(Math.Clamp(col.B, 0f, 1f) * 255f);
+                bytes[i * 4 + 3] = (byte)(Math.Clamp(outA, 0f, 1f) * 255f);
+            }
+            var img = Image.CreateFromData(R, R, false, Image.Format.Rgba8, bytes);
+            img.Resize(TextureSize, TextureSize, Image.Interpolation.Lanczos);
+            img.GenerateMipmaps();
+            return ImageTexture.CreateFromImage(img);
+        }
+
+        private static float[] Dilate(float[] a, int n, int radius)
+        {
+            var tmp = new float[n * n];
+            var outp = new float[n * n];
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    float m = 0f;
+                    for (int k = -radius; k <= radius; k++)
+                    {
+                        int xx = x + k;
+                        if (xx >= 0 && xx < n)
+                            m = MathF.Max(m, a[y * n + xx]);
+                    }
+                    tmp[y * n + x] = m;
+                }
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    float m = 0f;
+                    for (int k = -radius; k <= radius; k++)
+                    {
+                        int yy = y + k;
+                        if (yy >= 0 && yy < n)
+                            m = MathF.Max(m, tmp[yy * n + x]);
+                    }
+                    outp[y * n + x] = m;
+                }
+            return outp;
+        }
+
+        private static float[] Shift(float[] a, int n, int dx, int dy)
+        {
+            var o = new float[n * n];
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    int sx = x - dx, sy = y - dy;
+                    if (sx >= 0 && sy >= 0 && sx < n && sy < n)
+                        o[y * n + x] = a[sy * n + sx];
+                }
+            return o;
         }
     }
 
@@ -532,8 +647,9 @@ public static class Icons
         float dorsal = x0 + bodyLen * (1f - sp.DorsalPos);
         c.Line(dorsal - 5, cy - h * 0.45f, dorsal + 3, cy - h * 0.95f, 3f, fin);
         c.Line(x0 + bodyLen * 0.6f, cy + h * 0.45f, x0 + bodyLen * 0.68f, cy + h * 0.8f, 2.5f, fin);
-        for (int y = (int)(cy - h); y <= cy + h; y++)
-            for (int x = (int)x0; x <= x0 + bodyLen; x++)
+        const float step = 1f / Canvas.Scale;
+        for (float y = MathF.Floor(cy - h); y <= cy + h; y += step)
+            for (float x = x0; x <= x0 + bodyLen; x += step)
             {
                 float u = (x - x0) / bodyLen;                                  // 0 nose, 1 tail
                 float upper, lower;
@@ -552,7 +668,7 @@ public static class Icons
                 float v = (y - (cy - upper)) / MathF.Max(upper + lower, 1f);   // 0 back, 1 belly
                 int sw = skin.GetWidth(), sh = skin.GetHeight();
                 var col = skin.GetPixel(Math.Clamp((int)(u * (sw - 1)), 0, sw - 1), Math.Clamp((int)(v * (sh - 1)), 0, sh - 1));
-                c.Px(x, y, col);
+                c.Fine(x, y, col);
             }
         c.Disc(x0 + bodyLen * 0.1f, cy - h * 0.12f, 2.2f, 2.2f, C(0.95f, 0.78f, 0.25f));
         c.Px((int)(x0 + bodyLen * 0.1f), (int)(cy - h * 0.12f), C(0.02f, 0.02f, 0.02f));

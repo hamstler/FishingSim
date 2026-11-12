@@ -38,36 +38,79 @@ public static class UITheme
             return _cached;
         var t = new Theme { DefaultFontSize = 17 };
 
-        t.SetStylebox("panel", "PanelContainer", Box(Background, Border, 0));
-        t.SetStylebox("panel", "Panel", Box(Background, Border, 0));
+        // Carved oak panels with brass studs; inner boards for lists and details.
+        t.SetStylebox("panel", "PanelContainer", UiArt.Nine(UiArt.PanelTexture, 24, 22, tile: true));
+        t.SetStylebox("panel", "Panel", UiArt.Nine(UiArt.PanelTexture, 24, 22, tile: true));
 
-        t.SetStylebox("normal", "Button", Padded(Box(new Color(0.30f, 0.20f, 0.12f), Border, 0), 14, 7));
-        t.SetStylebox("hover", "Button", Padded(Box(new Color(0.42f, 0.28f, 0.15f), Accent, 0), 14, 7));
-        t.SetStylebox("pressed", "Button", Padded(Box(new Color(0.22f, 0.14f, 0.08f), Accent, 0), 14, 7));
-        t.SetStylebox("disabled", "Button", Padded(Box(new Color(0.16f, 0.12f, 0.09f, 0.85f), new Color(0.30f, 0.24f, 0.18f), 0), 14, 7));
-        t.SetStylebox("focus", "Button", Box(new Color(0, 0, 0, 0), Accent, 0, 1));
-        t.SetColor("font_color", "Button", Text);
-        t.SetColor("font_hover_color", "Button", Colors.White);
-        t.SetColor("font_disabled_color", "Button", new Color(0.58f, 0.52f, 0.42f));
+        // Planked buttons: lighter on hover with a gilt rim, pressed into the board.
+        foreach (var type in new[] { "Button", "OptionButton", "MenuButton" })
+        {
+            t.SetStylebox("normal", type, UiArt.Button("normal"));
+            t.SetStylebox("hover", type, UiArt.Button("hover"));
+            t.SetStylebox("pressed", type, UiArt.Button("pressed"));
+            t.SetStylebox("hover_pressed", type, UiArt.Button("pressed"));
+            t.SetStylebox("disabled", type, UiArt.Button("disabled"));
+            t.SetStylebox("focus", type, new StyleBoxEmpty());
+            t.SetColor("font_color", type, Text);
+            t.SetColor("font_hover_color", type, Colors.White);
+            t.SetColor("font_pressed_color", type, Accent);
+            t.SetColor("font_disabled_color", type, new Color(0.58f, 0.52f, 0.42f));
+            t.SetConstant("outline_size", type, 0);
+        }
 
-        t.SetStylebox("normal", "LineEdit", Padded(Box(new Color(0.09f, 0.06f, 0.04f), Border, 0), 10, 6));
-        t.SetStylebox("focus", "LineEdit", Padded(Box(new Color(0.09f, 0.06f, 0.04f), Accent, 0, 1), 10, 6));
+        var field = UiArt.Nine(UiArt.InsetTexture, 4);
+        field.ContentMarginLeft = field.ContentMarginRight = 10;
+        field.ContentMarginTop = field.ContentMarginBottom = 6;
+        t.SetStylebox("normal", "LineEdit", field);
+        var fieldFocus = (StyleBoxTexture)field.Duplicate();
+        fieldFocus.ModulateColor = new Color(1.25f, 1.15f, 0.95f);
+        t.SetStylebox("focus", "LineEdit", fieldFocus);
         t.SetColor("font_color", "LineEdit", Text);
         t.SetColor("font_placeholder_color", "LineEdit", new Color(0.58f, 0.52f, 0.42f));
+        t.SetColor("caret_color", "LineEdit", Accent);
 
-        t.SetStylebox("tab_selected", "TabContainer", Padded(Box(new Color(0, 0, 0, 0), Accent, 0, 0), 14, 6));
-        ((StyleBoxFlat)t.GetStylebox("tab_selected", "TabContainer")).BorderWidthBottom = 2;
-        t.SetStylebox("tab_unselected", "TabContainer", Padded(Box(new Color(0, 0, 0, 0), Border, 0, 0), 14, 6));
-        t.SetStylebox("tab_hovered", "TabContainer", Padded(Box(new Color(1, 1, 1, 0.05f), Border, 0, 0), 14, 6));
-        t.SetStylebox("panel", "TabContainer", Box(new Color(0, 0, 0, 0.15f), new Color(Border, 0.4f), 0, 1, 10));
-        t.SetColor("font_selected_color", "TabContainer", Colors.White);
-        t.SetColor("font_unselected_color", "TabContainer", new Color(0.78f, 0.68f, 0.52f));
+        // Tabs are small planks; the open one is gilded.
+        t.SetStylebox("tab_selected", "TabContainer", UiArt.Button("gold", 14, 6));
+        t.SetStylebox("tab_unselected", "TabContainer", UiArt.Button("normal", 14, 6));
+        t.SetStylebox("tab_hovered", "TabContainer", UiArt.Button("hover", 14, 6));
+        t.SetStylebox("tab_disabled", "TabContainer", UiArt.Button("disabled", 14, 6));
+        t.SetStylebox("panel", "TabContainer", UiArt.Nine(UiArt.InsetTexture, 4, 10));
+        t.SetColor("font_selected_color", "TabContainer", new Color(0.18f, 0.1f, 0.04f));
+        t.SetColor("font_unselected_color", "TabContainer", new Color(0.86f, 0.76f, 0.58f));
         t.SetColor("font_hovered_color", "TabContainer", Colors.White);
+        t.SetConstant("side_margin", "TabContainer", 4);
 
-        t.SetStylebox("background", "ProgressBar", Box(new Color(0.09f, 0.06f, 0.04f), Border, 0));
-        t.SetStylebox("fill", "ProgressBar", Box(Accent, Accent, 0, 0));
+        // Gilded bars in a dark groove.
+        t.SetStylebox("background", "ProgressBar", UiArt.Nine(UiArt.BarBack, 3));
+        t.SetStylebox("fill", "ProgressBar", UiArt.Nine(UiArt.BarFill, 3));
+
+        // Slim brass scroll bars.
+        foreach (var bar in new[] { "VScrollBar", "HScrollBar" })
+        {
+            t.SetStylebox("scroll", bar, Box(new Color(0.07f, 0.05f, 0.03f, 0.6f), new Color(0.07f, 0.05f, 0.03f, 0.6f), 4, 0));
+            t.SetStylebox("grabber", bar, Box(new Color(0.62f, 0.46f, 0.22f), new Color(0.62f, 0.46f, 0.22f), 4, 0));
+            t.SetStylebox("grabber_highlight", bar, Box(Accent, Accent, 4, 0));
+            t.SetStylebox("grabber_pressed", bar, Box(new Color(1f, 0.86f, 0.5f), new Color(1f, 0.86f, 0.5f), 4, 0));
+        }
+
         t.SetColor("font_color", "Label", Text);
+        t.SetColor("font_color", "CheckBox", Text);
+        t.SetColor("font_hover_color", "CheckBox", Colors.White);
+        t.SetColor("font_pressed_color", "CheckBox", Accent);
         _cached = t;
         return t;
+    }
+
+    /// <summary>Makes a button the screen's main action: gilded, with dark lettering.</summary>
+    public static void Primary(Button b)
+    {
+        b.AddThemeStyleboxOverride("normal", UiArt.Button("gold"));
+        b.AddThemeStyleboxOverride("hover", UiArt.Button("goldhover"));
+        b.AddThemeStyleboxOverride("pressed", UiArt.Button("goldpressed"));
+        b.AddThemeStyleboxOverride("hover_pressed", UiArt.Button("goldpressed"));
+        b.AddThemeColorOverride("font_color", new Color(0.2f, 0.11f, 0.04f));
+        b.AddThemeColorOverride("font_hover_color", new Color(0.12f, 0.06f, 0.02f));
+        b.AddThemeColorOverride("font_pressed_color", new Color(0.12f, 0.06f, 0.02f));
+        b.AddThemeColorOverride("icon_normal_color", Colors.White);
     }
 }

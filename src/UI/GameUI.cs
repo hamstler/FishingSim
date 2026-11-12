@@ -33,6 +33,7 @@ public partial class GameUI : CanvasLayer
 
     private TabContainer _tabs = null!;
     private readonly Label[] _slotName = new Label[TackleSlotExtensions.Count];
+    private readonly TextureRect[] _slotIcon = new TextureRect[TackleSlotExtensions.Count];
     private readonly Label[] _slotStats = new Label[TackleSlotExtensions.Count];
     private readonly Button[] _slotPrev = new Button[TackleSlotExtensions.Count];
     private readonly Button[] _slotNext = new Button[TackleSlotExtensions.Count];
@@ -173,7 +174,7 @@ public partial class GameUI : CanvasLayer
         _tabs.AddChild(page);
 
         var left = new VBoxContainer { CustomMinimumSize = new Vector2(600, 0) };
-        left.AddThemeConstantOverride("separation", 10);
+        left.AddThemeConstantOverride("separation", 6);
         page.AddChild(left);
         var leftTitle = new Label { Text = "Założony sprzęt" };
         leftTitle.AddThemeFontSizeOverride("font_size", 20);
@@ -181,25 +182,41 @@ public partial class GameUI : CanvasLayer
         for (int i = 0; i < TackleSlotExtensions.Count; i++)
         {
             int slot = i;
+            // Each piece of the rig: its picture on parchment, its name with arrows to change it, its numbers.
             var card = new PanelContainer();
-            card.AddThemeStyleboxOverride("panel", UITheme.Box(UITheme.Background, UITheme.Border, 8, 1, 10));
+            card.AddThemeStyleboxOverride("panel", UiArt.Nine(UiArt.InsetTexture, 4, 6));
             left.AddChild(card);
-            var v = new VBoxContainer();
-            card.AddChild(v);
+            var h = new HBoxContainer();
+            h.AddThemeConstantOverride("separation", 10);
+            card.AddChild(h);
+            var frame = new PanelContainer { CustomMinimumSize = new Vector2(56, 56) };
+            frame.AddThemeStyleboxOverride("panel", UiArt.Nine(UiArt.ParchmentTexture, 10, 2));
+            h.AddChild(frame);
+            var icon = new TextureRect
+            {
+                ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+                TextureFilter = CanvasItem.TextureFilterEnum.LinearWithMipmaps, CustomMinimumSize = new Vector2(50, 50),
+            };
+            frame.AddChild(icon);
+            _slotIcon[slot] = icon;
+            var v = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+            v.AddThemeConstantOverride("separation", 0);
+            h.AddChild(v);
             var row = new HBoxContainer();
             row.AddThemeConstantOverride("separation", 8);
             v.AddChild(row);
-            row.AddChild(new Label { Text = ((TackleSlot)slot).Title(), CustomMinimumSize = new Vector2(100, 0), Modulate = new Color(1, 1, 1, 0.6f) });
+            row.AddChild(new Label { Text = ((TackleSlot)slot).Title(), CustomMinimumSize = new Vector2(90, 0), Modulate = new Color(1, 1, 1, 0.6f) });
             var prev = new Button { Text = "◀" };
             prev.Pressed += () => CycleSlot(slot, -1);
             row.AddChild(prev);
-            var name = new Label { CustomMinimumSize = new Vector2(250, 0), HorizontalAlignment = HorizontalAlignment.Center };
-            name.AddThemeFontSizeOverride("font_size", 19);
+            var name = new Label { CustomMinimumSize = new Vector2(250, 0), HorizontalAlignment = HorizontalAlignment.Center, ClipText = true };
+            name.AddThemeFontSizeOverride("font_size", 17);
             row.AddChild(name);
             var next = new Button { Text = "▶" };
             next.Pressed += () => CycleSlot(slot, 1);
             row.AddChild(next);
-            var stats = new Label { Modulate = new Color(1, 1, 1, 0.7f) };
+            var stats = new Label { Modulate = new Color(1, 1, 1, 0.7f), AutowrapMode = TextServer.AutowrapMode.WordSmart };
+            stats.AddThemeFontSizeOverride("font_size", 13);
             v.AddChild(stats);
             _slotName[slot] = name;
             _slotStats[slot] = stats;
@@ -267,6 +284,7 @@ public partial class GameUI : CanvasLayer
             var slot = (TackleSlot)s;
             var item = _loadout.Selected(slot);
             _slotName[s].Text = item.DisplayName;
+            _slotIcon[s].Texture = Graphics.Icons.For(item);
             _slotStats[s].Text = ItemStats(slot, item);
             _slotPrev[s].Disabled = !idle;
             _slotNext[s].Disabled = !idle;

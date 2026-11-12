@@ -215,16 +215,17 @@ public partial class ScreenshotTool : Node
                     icons.Add(FishingSim.Graphics.Icons.For(item));
             foreach (var path in FishingSim.Data.SpeciesCatalog.Paths)
                 icons.Add(FishingSim.Graphics.Icons.Fish(GD.Load<FishSpecies>(path)));
-            const int cols = 10, cell = 68;
+            const int cols = 10, iconPx = FishingSim.Graphics.Icons.TextureSize, cell = iconPx + 8;
             int rows = (icons.Count + cols - 1) / cols;
             var sheet = Image.CreateEmpty(cols * cell, rows * cell, false, Image.Format.Rgba8);
             sheet.Fill(new Color(0.93f, 0.86f, 0.7f));
             for (int i = 0; i < icons.Count; i++)
             {
-                var img = icons[i].GetImage();
-                sheet.BlendRect(img, new Rect2I(0, 0, 64, 64), new Vector2I((i % cols) * cell + 2, (i / cols) * cell + 2));
+                var img = (Image)icons[i].GetImage().Duplicate();
+                if (img.HasMipmaps())
+                    img.ClearMipmaps();
+                sheet.BlendRect(img, new Rect2I(0, 0, iconPx, iconPx), new Vector2I((i % cols) * cell + 4, (i / cols) * cell + 4));
             }
-            sheet.Resize(sheet.GetWidth() * 2, sheet.GetHeight() * 2, Image.Interpolation.Nearest);
             sheet.SavePng(output);
             GD.Print($"saved {output} ({icons.Count} icons)");
             GetTree().Quit();
@@ -373,10 +374,13 @@ public partial class ScreenshotTool : Node
             rod.Profile.AddCatch(bream, 1.6f);
             rod.Profile.AddCatch(bream, 2.2f);
             rod.Profile.Money = 340;
+            rod.Profile.Level = 3;
             var shop = main.GetChildren().OfType<Shop>().First();
             shop.Toggle();
             shop.Tabs.CurrentTab = arg;
             rod.Profile.NotifyChanged();
+            await NextFrame();
+            shop.SelectCard(1);
         }
         else if (mode is 10 or 11)
         {
