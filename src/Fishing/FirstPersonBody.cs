@@ -6,11 +6,13 @@ using FishingSim.World.Props;
 namespace FishingSim.Fishing;
 
 /// <summary>
-/// The angler's hands in first person. The right hand is built around the rod handle as a gripping fist (palm on the
-/// side, four fingers wrapped under the blank with the reel foot between the middle and ring finger, thumb along the
-/// top) and is a child of the rod rig, so the rod is really held. The left hand moves to the reel handle and turns
-/// it while reeling, otherwise it rests out of view. Forearms in tunic sleeves connect both hands to the body.
-/// The rod is raised when the player holds the right mouse button (strike, pumping, lifting the fish out).
+/// The angler's arms in first person: the peasant villager's own arms (linen sleeves, real hands with fingers;
+/// World/Props/CharacterAsset), the rest of the body hidden, its skeleton set so the eyes are at the camera. ArmIK
+/// bends shoulder, elbow and wrist each frame so the right hand grips the rod handle (palm on the right of the blank,
+/// fingers round under it with the reel foot between them, thumb along the top) and the left hand turns the reel
+/// handle while reeling, holds the landed fish from below, otherwise hangs at the side. Without a screen (tests) the
+/// old built hands stand in. The rod is raised when the player holds the right mouse button (strike, pumping,
+/// lifting the fish out).
 /// </summary>
 public partial class FirstPersonBody : Node3D
 {
@@ -27,6 +29,25 @@ public partial class FirstPersonBody : Node3D
     private StandardMaterial3D _skin = null!, _sleeve = null!;
     private float _leftOnReel, _raise, _crank, _leftOnFish;
     private Vector3 _lastFishGrip;
+    private ArmIK? _ik;
+    private BodyAction _action;
+
+    public override void _Process(double delta)
+    {
+        // The arms follow the rod every frame, whoever moves it.
+        if (_ik != null && _rig != null)
+            ApplyArms(_action, (float)delta);
+    }
+
+    /// <summary>Where the camera sits on the model (its eyes), in the model's own space (it faces +Z).</summary>
+    private static readonly Vector3 Eyes = new(0f, 1.655f, 0.075f);
+    private const float Lean = 0.15f;
+
+    // The right hand's grip in rod-rig space (rod along +Y, reel hanging at -Z, +X to the right): the palm faces the
+    // blank from the right, the knuckles run forward and down, so the fingers wrap under the handle.
+    private static readonly Vector3 GripHandle = new(0f, 0.1f, 0f);
+    private static readonly Vector3 GripPalm = new(-1f, 0f, 0.1f);
+    private static readonly Vector3 GripFingers = new(0.05f, 0.6f, -1f);
 
     /// <summary>0..1 how far the rod should be raised (right mouse button); set by Main from the rod.</summary>
     public Func<float>? RaiseSource { get; set; }
@@ -45,6 +66,8 @@ public partial class FirstPersonBody : Node3D
 
     public override void _Ready()
     {
+        if (BuildArms())
+            return;
         _sleeve = BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = new Color(0.36f, 0.26f, 0.16f), Roughness = 0.95f });   // wool tunic
         _skin = BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = new Color(0.84f, 0.64f, 0.5f), Roughness = 0.7f });
         var cuffMat = BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = new Color(0.25f, 0.18f, 0.11f), Roughness = 0.95f });
@@ -56,6 +79,30 @@ public partial class FirstPersonBody : Node3D
         _leftHand = new Node3D { Scale = new Vector3(0.85f, 0.85f, 0.85f) };
         AddChild(_leftHand);
         BuildLeftHand(_leftHand);
+    }
+
+    /// <summary>The villager's arms, if the model can be shown; false leaves the built hands to do.</summary>
+    private bool BuildArms()
+    {
+        var look = new Appearance("male_peasant", 0, null, Colors.White, new Color(1f, 0.97f, 0.95f), false, false, Colors.White);
+        if (CharacterAsset.Create(look, idle: null) is not { } body || CharacterAsset.SkeletonOf(body) is not { } skeleton)
+            return false;
+        foreach (var node in body.FindChildren("*", "MeshInstance3D", true, false))
+        {
+            var mi = (MeshInstance3D)node;
+            mi.Visible = mi.Name == "Arms";
+            mi.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+            mi.VisibilityRangeEnd = 0f;
+            // The arms are always right in front of the eyes: never culled by their rest-pose bounds.
+            mi.ExtraCullMargin = 2f;
+        }
+        body.RotationDegrees = new Vector3(0f, 180f, 0f);
+        // A little forward of standing straight: leaning over the rod, the hands reach the handle with the elbows bent.
+        body.Position = new Vector3(Eyes.X, -Eyes.Y, Eyes.Z - Lean);
+        AddChild(body);
+        _ik = new ArmIK();
+        skeleton.AddChild(_ik);
+        return true;
     }
 
     private static MeshInstance3D Part(Node3D parent, Mesh mesh, Material mat, Vector3? pos = null, Vector3? rot = null)
@@ -103,13 +150,21 @@ public partial class FirstPersonBody : Node3D
     /// <summary>Applies one frame of pose. Positions are in the camera's local space.</summary>
     public void Apply(BodyPose pose, BodyAction action, float dt)
     {
-        if (_rig == null || _rightArm == null)
+        if (_rig == null || _rightArm == null && _ik == null)
             return;
 
         // The rod: raised with the right mouse button, lifted while casting/fighting, swaying a little with the gait.
         _raise = Mathf.MoveToward(_raise, Math.Clamp(RaiseSource?.Invoke() ?? 0f, 0f, 1f), dt * 4f);
         _rig.Position = RigBasePosition + new Vector3(pose.ArmSwing * 0.02f, pose.ArmLift * 0.06f + _raise * 0.07f, pose.Lean * 0.2f + _raise * 0.06f);
         _rig.Rotation = RigBaseRotation + new Vector3(pose.ArmLift * 0.3f + _raise * 0.65f, 0f, pose.ArmSwing * 0.04f);
+
+        if (_ik != null)
+        {
+            _action = action;
+            return;
+        }
+        if (_rightArm == null)
+            return;
 
         // Right forearm: from the wrist back and down towards the elbow, below the view.
         var wrist = ToLocal(_rig.ToGlobal(WristLocal));
@@ -139,6 +194,51 @@ public partial class FirstPersonBody : Node3D
         var leftElbow = leftAt + new Vector3(-0.12f, -0.22f, 0.3f);
         Stretch(_leftArm, leftElbow, leftAt + new Vector3(-0.04f, -0.02f, 0.05f));
         Stretch(_leftCuff, leftAt + new Vector3(-0.05f, -0.045f, 0.09f), leftAt + new Vector3(-0.045f, -0.035f, 0.075f));
+    }
+
+    /// <summary>The real arms: the right hand on the rod handle, the left on the reel, the fish or at the side.</summary>
+    private void ApplyArms(BodyAction action, float dt)
+    {
+        var ik = _ik!;
+        var rigBasis = _rig.GlobalTransform.Basis.Orthonormalized();
+        var palm = (rigBasis * GripPalm).Normalized();
+        var fingers = (rigBasis * GripFingers).Normalized();
+        ik.Right.Palm = palm;
+        ik.Right.Fingers = fingers;
+        ik.Right.Wrist = _rig.ToGlobal(GripHandle) - palm * 0.032f - fingers * 0.062f;
+        ik.Right.Pole = ToGlobal(new Vector3(0.5f, -0.6f, 0.35f));
+        ik.Right.Grip = 0.9f;
+
+        bool onReel = action is BodyAction.Fight || (ReelingSource?.Invoke() ?? false);
+        _leftOnReel = Mathf.MoveToward(_leftOnReel, onReel ? 1f : 0f, dt * 5f);
+        if (ReelingSource?.Invoke() ?? false)
+            _crank += dt * 9f;
+        var crankCentre = new Vector3(0.1f, 0.1f, -0.065f);
+        var knob = crankCentre + new Vector3(0f, MathF.Sin(_crank) * 0.03f, MathF.Cos(_crank) * 0.03f - 0.025f);
+        var held = HeldFishSource?.Invoke();
+        _leftOnFish = Mathf.MoveToward(_leftOnFish, held != null ? 1f : 0f, dt * 6f);
+        if (held is FishModel fm)
+            _lastFishGrip = ToLocal(fm.ToGlobal(new Vector3(0f, -0.5f * fm.MaxHeight, 0.12f * fm.Length))) + new Vector3(0f, -0.035f, 0f);
+        else if (held != null)
+            _lastFishGrip = ToLocal(held.GlobalPosition) + new Vector3(0.02f, -0.04f, 0.02f);
+        // Hanging at the side; pinching the reel knob from above; flat under the fish's belly.
+        var restAt = new Vector3(-0.26f, -0.78f, 0.05f);
+        var reelAt = ToLocal(_rig.ToGlobal(knob)) + ToLocal(_rig.ToGlobal(new Vector3(-0.05f, -0.03f, 0.06f))) - ToLocal(_rig.GlobalPosition);
+        var at = restAt.Lerp(reelAt, _leftOnReel).Lerp(_lastFishGrip + new Vector3(0.03f, 0f, 0.08f), _leftOnFish);
+        var basis = GlobalTransform.Basis.Orthonormalized();
+        var restFingers = new Vector3(0.05f, -1f, -0.1f);
+        var restPalm = new Vector3(1f, 0f, 0.1f);
+        var reelFingers = basis.Inverse() * (rigBasis * new Vector3(1f, 0.35f, -0.4f));
+        var reelPalm = basis.Inverse() * (rigBasis * new Vector3(0.1f, 0f, -1f));
+        var fishFingers = new Vector3(0.15f, 0.1f, -1f);
+        var fishPalm = new Vector3(0f, 1f, 0f);
+        var f = restFingers.Normalized().Lerp(reelFingers.Normalized(), _leftOnReel).Lerp(fishFingers.Normalized(), _leftOnFish);
+        var p = restPalm.Normalized().Lerp(reelPalm.Normalized(), _leftOnReel).Lerp(fishPalm, _leftOnFish);
+        ik.Left.Wrist = ToGlobal(at);
+        ik.Left.Fingers = basis * f;
+        ik.Left.Palm = basis * p;
+        ik.Left.Pole = ToGlobal(new Vector3(-0.55f, -0.6f, 0.3f));
+        ik.Left.Grip = Mathf.Lerp(Mathf.Lerp(0.35f, 0.6f, _leftOnReel), 0.3f, _leftOnFish);
     }
 
     /// <summary>Places a unit-height cylinder so it runs from <paramref name="a"/> to <paramref name="b"/>.</summary>

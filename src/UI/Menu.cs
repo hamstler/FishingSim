@@ -44,6 +44,7 @@ public partial class Menu : Control
                 World.Props.GroundTextures.Prewarm();
                 World.Props.Textures.Prewarm();
                 PhotoTextures.Prewarm();
+                World.Props.CharacterAsset.Prewarm();
                 ProceduralTextures.PrewarmFoliage();
             });
         foreach (var path in LakeBed.LocationPaths)

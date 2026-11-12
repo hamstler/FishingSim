@@ -17,7 +17,8 @@ namespace FishingSim.Tests;
 ///   godot --rendering-driver opengl3 --path . res://tests/screenshot.tscn -- HOUR WEATHER LABEL OUT YAW PITCH MODE ARG MAP
 /// MODE: 0 plain, 1 mid-fight, 2 just landed, 3 shop (ARG = tab), 4 pause menu, 5 player screen (ARG = tab),
 ///       6 login screen, 7 map selection, 8 tournament running (ARG = tab), 9 tournament results,
-///       10 standing at the first shop door (prompt), 11 inside that shop's window (ARG = shop kind index).
+///       10 standing at the first shop door (prompt), 11 inside that shop's window (ARG = shop kind index),
+///       23 villagers in a row (studio), 24 standing in front of a villager (ARG = index).
 /// </summary>
 public partial class ScreenshotTool : Node
 {
@@ -59,6 +60,62 @@ public partial class ScreenshotTool : Node
             sheet.Resize(sheet.GetWidth() * 2, sheet.GetHeight() * 2, Image.Interpolation.Nearest);
             sheet.SavePng(output);
             GD.Print($"saved {output}");
+            GetTree().Quit();
+            return;
+        }
+
+        if (mode == 23)
+        {
+            // Villagers in a row: arg 0 = every role as the village dresses it (variant = map index + 1),
+            // 1 = every model in both colourings, 2 = the first five roles up close, 3 = head and shoulders of the first.
+            var root3d = new Node3D();
+            GetTree().Root.AddChild(root3d);
+            var env = new Godot.Environment
+            {
+                BackgroundMode = Godot.Environment.BGMode.Color, BackgroundColor = new Color(0.55f, 0.66f, 0.74f),
+                AmbientLightSource = Godot.Environment.AmbientSource.Color, AmbientLightColor = new Color(0.62f, 0.68f, 0.75f), AmbientLightEnergy = 0.6f,
+                TonemapMode = Godot.Environment.ToneMapper.Aces, SsaoEnabled = true, GlowEnabled = true,
+            };
+            root3d.AddChild(new WorldEnvironment { Environment = env });
+            root3d.AddChild(new DirectionalLight3D { RotationDegrees = new Vector3(-38, 30, 0), LightEnergy = 1.5f, LightColor = new Color(1f, 0.95f, 0.86f), ShadowEnabled = true });
+            root3d.AddChild(new MeshInstance3D
+            {
+                Mesh = new PlaneMesh { Size = new Vector2(40, 40) },
+                MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.36f, 0.42f, 0.26f), Roughness = 1f },
+            });
+            var figures = new List<Node3D>();
+            if (arg == 1)
+                foreach (var id in FishingSim.World.Props.CharacterAsset.Models)
+                    foreach (int v in new[] { 0, 1 })
+                        figures.Add(FishingSim.World.Props.CharacterAsset.Create(new FishingSim.World.Props.Appearance(id, v,
+                            id.StartsWith("male") ? (v == 0 ? "Hair_SimpleParted" : "Hair_Long") : (v == 0 ? "Hair_Buns" : "Hair_Long"),
+                            v == 0 ? new Color(0.45f, 0.3f, 0.18f) : new Color(0.82f, 0.68f, 0.45f), Colors.White, id.StartsWith("male") && v == 1,
+                            id.EndsWith("ranger") && v == 0, Colors.White)) ?? new Node3D());
+            else
+                foreach (var role in Enum.GetValues<FishingSim.World.Props.Role>())
+                    if (arg != 2 && arg != 3 || figures.Count < (arg == 3 ? 1 : 5))
+                        figures.Add(FishingSim.World.Props.People.Create(role, Math.Max(map, 0) + 1));
+            float spacing = 1.05f, width = (figures.Count - 1) * spacing;
+            for (int i = 0; i < figures.Count; i++)
+            {
+                figures[i].Position = new Vector3(i * spacing - width / 2f, 0f, 0f);
+                root3d.AddChild(figures[i]);
+            }
+            float fit = width / 2f + 0.8f;
+            var cam = new Camera3D { Fov = 30f, Current = true };
+            root3d.AddChild(cam);
+            cam.Position = new Vector3(0f, 1.15f, fit / MathF.Tan(Mathf.DegToRad(15f)) * (float)size.Y / size.X + 1.2f);
+            cam.LookAt(new Vector3(0f, 0.95f, 0f));
+            if (arg == 3)
+            {
+                // Head and shoulders of the first, three-quarter view.
+                cam.Position = new Vector3(0.38f, 1.6f, 0.95f);
+                cam.LookAt(new Vector3(0f, 1.45f, 0f));
+            }
+            for (int i = 0; i < 40; i++)
+                await NextFrame();
+            GetViewport().GetTexture().GetImage().SavePng(output);
+            GD.Print($"saved {output} ({figures.Count} figures)");
             GetTree().Quit();
             return;
         }
@@ -381,6 +438,23 @@ public partial class ScreenshotTool : Node
             rod.Profile.NotifyChanged();
             await NextFrame();
             shop.SelectCard(1);
+        }
+        else if (mode == 24)
+        {
+            // In front of a villager (arg = index among the map's people), FISHSIM_SHOT_DIST metres away (default 4.5).
+            var people = main.Scenery.FindChildren("*", "", true, false).OfType<FishingSim.World.Props.Npc>().ToList();
+            var npc = people[Math.Clamp(arg, 0, people.Count - 1)];
+            float dist = float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_DIST"), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float dd) ? dd : 4.5f;
+            var front = npc.GlobalTransform.Basis * new Vector3(0.35f, 0f, 1f).Normalized();
+            var stand = npc.GlobalPosition + front * dist;
+            main.Player.GlobalPosition = stand + new Vector3(0, 0.5f, 0);
+            var d = npc.GlobalPosition - stand;
+            main.Player.RotationDegrees = new Vector3(0, Mathf.RadToDeg(MathF.Atan2(-d.X, -d.Z)), 0);
+            main.Player.Camera.RotationDegrees = new Vector3(-6, 0, 0);
+            GD.Print($"villager {arg}/{people.Count}: {npc.Name} at {npc.GlobalPosition}");
+            for (int i = 0; i < 30; i++)
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         }
         else if (mode is 10 or 11)
         {

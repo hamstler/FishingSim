@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 using FishingSim.Data;
 
@@ -52,17 +53,91 @@ public static class People
         };
     }
 
-    /// <summary>A figure of the given role, feet at the origin, facing +Z, with a body the angler cannot walk through.</summary>
+    /// <summary>
+    /// A figure of the given role, feet at the origin, facing +Z, with a body the angler cannot walk through: one of
+    /// the Quaternius villagers (CharacterAsset) dressed and busy as the role says, or the primitive figure without a
+    /// screen.
+    /// </summary>
     public static Npc Create(Role role, int variant)
     {
         var look = LookFor(role, variant);
         var npc = new Npc { Name = role.ToString() };
-        Build(npc, look, role);
+        var (appearance, idle, gestures) = Dress(role, variant, look);
+        if (CharacterAsset.Create(appearance, idle) is { } model)
+        {
+            model.Scale = Vector3.One * (look.Height / CharacterAsset.HeightOf(appearance.Model));
+            npc.AddChild(model);
+            npc.Rig(model, Greets(role), idle, gestures);
+        }
+        else
+            Build(npc, look, role);
         var body = new StaticBody3D { CollisionLayer = 1, Position = new Vector3(0f, look.Height * 0.5f, 0f) };
         body.AddChild(new CollisionShape3D { Shape = new CapsuleShape3D { Radius = 0.3f, Height = look.Height } });
         npc.AddChild(body);
         return npc;
     }
+
+    /// <summary>Shopkeepers and traders nod when the angler walks up to them.</summary>
+    private static bool Greets(Role role) => role is Role.TackleSeller or Role.BaitSeller or Role.Fishmonger or Role.MarketTrader
+        or Role.Shopkeeper or Role.GuildMaster or Role.Coachman;
+
+    private static readonly Color[] HairColours =
+    {
+        new(0.3f, 0.2f, 0.13f), new(0.48f, 0.33f, 0.19f), new(0.86f, 0.72f, 0.48f), new(0.74f, 0.6f, 0.38f),
+        new(0.16f, 0.13f, 0.11f), new(0.58f, 0.3f, 0.15f), new(0.62f, 0.5f, 0.32f),
+    };
+
+    private static readonly Color[] SkinTints =
+    {
+        new(1f, 1f, 1f), new(1.04f, 1.0f, 0.97f), new(0.96f, 0.9f, 0.85f), new(0.9f, 0.82f, 0.74f), new(1.02f, 0.96f, 0.93f),
+    };
+
+    /// <summary>
+    /// What a role looks like and does: the model (peasant or ranger, man or woman), the outfit's colouring, hair and
+    /// skin, the animation it stands about in and the ones it now and then plays.
+    /// </summary>
+    public static (Appearance Look, string Idle, string[] Gestures) Dress(Role role, int variant, Look l)
+    {
+        var rng = new RandomNumberGenerator { Seed = (ulong)(variant * 6151 + (int)role * 92821 + 3) };
+        T Pick<T>(params T[] items) => items[rng.RandiRange(0, items.Length - 1)];
+        bool woman = role switch
+        {
+            Role.BaitSeller or Role.Woman => true,
+            Role.MarketTrader or Role.Shopkeeper or Role.Camper => variant % 2 == 1,
+            Role.Fishmonger => variant % 3 == 2,
+            _ => false,
+        };
+        bool ranger = role is Role.Hunter or Role.Coachman || role == Role.Camper && variant % 3 == 0;
+        string model = (woman ? "female_" : "male_") + (ranger ? "ranger" : "peasant");
+        var hairs = woman ? new[] { "Hair_Long", "Hair_Buns", "Hair_Long", "Hair_Buns", "Hair_BuzzedFemale" }
+            : new[] { "Hair_SimpleParted", "Hair_Buzzed", "Hair_SimpleParted", "Hair_Long" };
+        var hairColour = role == Role.Elder ? new Color(0.78f, 0.77f, 0.74f) : Pick(HairColours);
+        if (role == Role.GuildMaster)
+            hairColour = hairColour.Lerp(new Color(0.7f, 0.69f, 0.66f), 0.5f);
+        bool beard = !woman && (role is Role.Elder or Role.GuildMaster or Role.Hunter || l.Beard);
+        bool hood = ranger && (role == Role.Hunter || rng.Randf() < 0.5f);
+        float shade = rng.RandfRange(0.9f, 1.04f);
+        var look = new Appearance(model, rng.RandiRange(0, 1), Pick(hairs), hairColour, Pick(SkinTints), beard, hood,
+            new Color(shade, shade, shade * rng.RandfRange(0.96f, 1.03f)));
+        var (idle, gestures) = role switch
+        {
+            Role.TackleSeller => (Pick("Idle_FoldArms_Loop", "Idle_Loop"), new[] { "Interact", "PickUp_Table", "Yes" }),
+            Role.BaitSeller => ("Idle_Talking_Loop", new[] { "PickUp_Table", "Interact" }),
+            Role.Fishmonger => ("Idle_Loop", new[] { "PickUp_Table", "Interact", "Consume" }),
+            Role.MarketTrader => (Pick("Idle_Talking_Loop", "Idle_Loop"), new[] { "PickUp_Table", "Interact", "Yes" }),
+            Role.Shopkeeper => ("Idle_FoldArms_Loop", new[] { "Interact", "Consume" }),
+            Role.GuildMaster => ("Idle_FoldArms_Loop", new[] { "Yes", "Idle_No_Loop" }),
+            Role.Coachman => ("Idle_Loop", new[] { "Consume", "Interact" }),
+            Role.Fisherman => ("Idle_Loop", new[] { "Consume", "Interact" }),
+            Role.Farmer => (Pick("Farm_Watering", "Farm_Harvest", "Farm_PlantSeed"), new[] { "Idle_Loop" }),
+            Role.Woman => (Pick("Idle_Talking_Loop", "Idle_Loop"), new[] { "PickUp_Table", "Consume" }),
+            Role.Elder => ("Idle_Loop", new[] { "Yes", "Idle_No_Loop" }),
+            Role.Hunter => ("Idle_Loop", new[] { "Crouch_Idle_Loop", "Interact" }),
+            _ => (Pick("Idle_Loop", "Idle_Talking_Loop"), new[] { "Consume", "Interact" }),
+        };
+        return (look, idle, gestures);
+    }
+
 
     private static StandardMaterial3D Skin(Color c) => BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = c, Roughness = 0.62f });
 
@@ -246,7 +321,7 @@ public static class People
 /// <summary>A standing figure: breathes, sways, shifts its weight now and then, and watches the angler when near.</summary>
 public partial class Npc : Node3D
 {
-    public Node3D BodyRoot { get; set; } = null!;
+    public Node3D? BodyRoot { get; set; }
     public Node3D? Head { get; set; }
     public Node3D? LeftArm { get; set; }
     public Node3D? RightArm { get; set; }
@@ -255,9 +330,98 @@ public partial class Npc : Node3D
     private readonly float _phase = GD.Randf() * 50f;
     private float _headYaw;
 
+    private AnimationPlayer? _animator;
+    private HeadLook? _look;
+    private bool _greets, _greeted;
+    private float _check, _nextGesture = 8f + GD.Randf() * 20f, _distance = 999f;
+
+    private string _idle = "Idle_Loop";
+    private string[] _gestures = Array.Empty<string>();
+
+    /// <summary>Takes a rigged villager (CharacterAsset): its animations play, its head follows the angler.</summary>
+    public void Rig(Node3D model, bool greets, string idle, string[] gestures)
+    {
+        _animator = CharacterAsset.PlayerOf(model);
+        _greets = greets;
+        _idle = idle;
+        _gestures = gestures;
+        if (CharacterAsset.SkeletonOf(model) is { } skeleton)
+        {
+            // Busy hands keep their eyes on the work.
+            _look = new HeadLook { Wander = idle.StartsWith("Farm_") ? 0f : 1f };
+            skeleton.AddChild(_look);
+        }
+        if (_animator != null)
+            _animator.AnimationFinished += name =>
+            {
+                // Work and gestures play once; then back to standing about (work starts over after a breather).
+                if (name != _idle)
+                    _animator.Play(_idle, 0.4);
+                else if (!_idle.EndsWith("_Loop"))
+                {
+                    _animator.Play(_gestures.Length > 0 ? _gestures[0] : "Idle_Loop", 0.4);
+                }
+            };
+    }
+
+    private void Gesture(string name)
+    {
+        if (_animator == null || !_animator.HasAnimation(name))
+            return;
+        _animator.Play(name, 0.35);
+        // A looping gesture (folding arms, shaking the head) is cut short after a few seconds.
+        if (name.EndsWith("_Loop"))
+            GetTree().CreateTimer(3.5f + GD.Randf() * 2f).Timeout += () =>
+            {
+                if (IsInstanceValid(this) && _animator.CurrentAnimation == name)
+                    _animator.Play(_idle, 0.5);
+            };
+    }
+
+    private void ProcessRigged(float dt)
+    {
+        _check -= dt;
+        if (_check <= 0f)
+        {
+            // Far away villagers stand still (no animation, no head turning): nobody sees the difference.
+            _check = 0.4f;
+            var cam = GetViewport()?.GetCamera3D();
+            _distance = cam == null ? 999f : GlobalPosition.DistanceTo(cam.GlobalPosition);
+            bool near = _distance < 70f;
+            if (_animator!.Active != near)
+                _animator.Active = near;
+            if (_look != null)
+                _look.Active = _distance < 25f;
+            // Shopkeepers nod once as the angler walks up in front of them.
+            if (cam != null && _greets && !_greeted && _distance < 6.5f && ToLocal(cam.GlobalPosition).Z > 0.5f)
+            {
+                _greeted = true;
+                Gesture("Yes");
+                _nextGesture = 12f + GD.Randf() * 15f;
+            }
+            else if (_distance > 12f)
+                _greeted = false;
+        }
+        // Now and then they busy themselves with something.
+        _nextGesture -= dt;
+        if (_nextGesture <= 0f)
+        {
+            _nextGesture = 14f + GD.Randf() * 26f;
+            if (_distance < 40f && _gestures.Length > 0 && _animator!.CurrentAnimation == _idle && _idle.EndsWith("_Loop"))
+                Gesture(_gestures[(int)(GD.Randi() % (uint)_gestures.Length)]);
+        }
+    }
+
     public override void _Process(double delta)
     {
         float dt = (float)delta;
+        if (_animator != null)
+        {
+            ProcessRigged(dt);
+            return;
+        }
+        if (BodyRoot == null)
+            return;
         _t += dt;
         float t = _t + _phase;
         // Breathing and a slow sway; every ~9 s the weight moves to the other foot.

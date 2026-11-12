@@ -184,7 +184,7 @@ public static partial class BuildingFactory
     /// A photographed CC0 material (Graphics/PhotoTextures), mapped at its real size: in object space (triplanar) for
     /// walls and props, by the mesh's UVs in metres for roofs. Null when the set is missing (the painted one stands in).
     /// </summary>
-    private static StandardMaterial3D? Photo(string id, Color tint, float roughness, bool triplanar = true, float scale = 1f)
+    internal static StandardMaterial3D? Photo(string id, Color tint, float roughness, bool triplanar = true, float scale = 1f)
     {
         var p = PhotoTextures.Get(id);
         if (p == null)

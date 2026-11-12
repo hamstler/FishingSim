@@ -29,6 +29,15 @@ i mapa wypukłości) z Poly Haven na licencji CC0 (do użytku komercyjnego). Gra
 bryły budynków mają zaokrąglone krawędzie, chaty są z prawdziwych bali z krzyżującymi się końcami na narożnikach, a dachy
 mają grubość i okap.
 
+**Mieszkańcy i ręce wędkarza:** sprzedawcy, handlarze i mieszkańcy wiosek to realistyczne postacie z darmowych pakietów
+Quaterniusa (CC0): głowy, oczy i fryzury z „Universal Base Characters”, stroje Peasant (lniana koszula, kamizelka,
+buty) i Ranger (skórzany kaftan, kaptur) z „Modular Character Outfits – Fantasy”, z teksturami PBR. Każdy ma własny
+wariant stroju, fryzurę, kolor włosów, odcień skóry i brodę. Animacje z „Universal Animation Library” 1 i 2 (stanie,
+założone ręce, rozmowa, praca w polu, picie, przytaknięcie) są przeniesione na szkielet postaci; sprzedawca kiwa głową,
+gdy podchodzisz, a głowy odwracają się za wędkarzem. W widoku z pierwszej osoby widać prawdziwe ręce tej postaci
+(rękawy koszuli, dłonie z palcami): kości ramion ustawia IK, więc prawa dłoń obejmuje rękojeść wędki, a lewa kręci
+korbką kołowrotka albo podtrzymuje złowioną rybę.
+
 **Tekstury 4K:** tekstury świata (ziemia, kora, budynki, liście) mają 4096 px na kafel 2 m. Gra maluje je sama przy pierwszym uruchomieniu (zaczyna już w menu; na 4 rdzeniach trwa to ok. 2 minut), kompresuje własnym kompresorem blokowym (BC1/BC3/BC5, więc mieszczą się w pamięci karty także w wyeksportowanej grze) i zapisuje w `user://texcache` (ok. 250 MB). Kolejne uruchomienia tylko je wczytują. Okno startuje zmaksymalizowane, a świat renderuje się w natywnej rozdzielczości.
 
 **Interfejs:** rzeźbione dębowe ramy z mosiężnymi ćwiekami, przyciski z desek, pergaminowe karty i złocone paski, wszystko malowane w kodzie. W kramie boczny pasek kategorii z dużymi obrazkami, podkategorie (np. wędki spławikowe, spinningowe, gruntowe, karpiowe; przynęty naturalne, roślinne, karpiowe, sztuczne), wyszukiwarka, sortowanie i filtr „Dostępne”; karty mają wstążkę jakości (zwykły, dobry, wyborny, mistrzowski), pieczęć posiadanego i gwiazdkę używanego przedmiotu, kłódkę na zablokowanych, rosną pod kursorem, a zakup kończy się deszczem monet i brzękiem. Obrazki przedmiotów są gładkie (128 px), z cieniem.
@@ -231,4 +240,9 @@ Zmian, których nie rozpowszechniasz (np. własna wersja do grania w domu), nie 
   piasek, ścieżka, otoczaki, skała, śnieg) pochodzą z [Poly Haven](https://polyhaven.com) i są na licencji **CC0 1.0**
   (domena publiczna): wolno ich używać w każdym celu, także komercyjnym, bez opłat i bez obowiązku podawania autora.
   Lista z autorami jest w [`assets/textures/CREDITS.md`](assets/textures/CREDITS.md); pobiera je `tools/assets/polyhaven.py`.
+- **Postacie mieszkańców i ręce wędkarza** pochodzą z darmowych pakietów [Quaterniusa](https://quaternius.com)
+  („Universal Base Characters”, „Modular Character Outfits – Fantasy”, „Universal Animation Library” 1 i 2) na licencji
+  **CC0 1.0** (domena publiczna, także do użytku komercyjnego). Modele złożone z ich części, z animacjami przeniesionymi
+  na szkielet postaci, są w `assets/characters` (lista w [`assets/characters/CREDITS.md`](assets/characters/CREDITS.md));
+  buduje je `tools/assets/quaternius.py`.
 - Dźwięki są syntezowane w kodzie, pozostałe tekstury malowane w kodzie, a czcionka to wbudowana czcionka Godota.
