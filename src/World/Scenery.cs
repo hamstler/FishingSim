@@ -449,7 +449,7 @@ public partial class Scenery : Node3D
                     var trunk = new MeshInstance3D
                     {
                         Mesh = new CylinderMesh { TopRadius = 0.2f, BottomRadius = 0.24f, Height = 1.5f, RadialSegments = 12 },
-                        Position = new Vector3(0.9f, 0.75f, 0f), MaterialOverride = Props.TreeFactory.BarkMaterial("pine"),
+                        Position = new Vector3(0.9f, 0.75f, 0f), MaterialOverride = Props.CampProps.Bark,
                     };
                     root.AddChild(trunk);
                     var cutter = Props.People.Create(Props.Role.Hunter, n * 5 + 2, "TreeChopping_Loop", Array.Empty<string>(), Props.Everyday.Axe());

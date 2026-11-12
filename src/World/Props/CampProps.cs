@@ -33,6 +33,11 @@ public static class CampProps
         AlbedoColor = new Color(0.38f, 0.27f, 0.17f), Roughness = 0.75f,
     }));
 
+    /// <summary>Photographed pine bark on logs and stumps (the tree shader needs the trees' own vertex data).</summary>
+    public static Material Bark => Cached("bark", () =>
+        BuildingFactory.Photo("pine_bark", new Color(0.85f, 0.8f, 0.74f), 0.92f, scale: 1f)
+        ?? BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = new Color(0.36f, 0.27f, 0.2f), Roughness = 0.95f }));
+
     public static Material Iron => Cached("iron", () => BuildingFactory.Pixel(new StandardMaterial3D
     {
         AlbedoColor = new Color(0.36f, 0.36f, 0.38f), Metallic = 0.85f, Roughness = 0.42f,
@@ -232,7 +237,7 @@ public static class CampProps
         st.Begin(Mesh.PrimitiveType.Triangles);
         Shapes.Log(st, new Vector3(0f, radius, 0f), Vector3.Right, length, radius, seed);
         st.GenerateNormals();
-        root.AddChild(new MeshInstance3D { Mesh = st.Commit(), MaterialOverride = TreeFactory.BarkMaterial("pine") });
+        root.AddChild(new MeshInstance3D { Mesh = st.Commit(), MaterialOverride = Bark });
         return root;
     }
 

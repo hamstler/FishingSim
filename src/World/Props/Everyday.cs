@@ -118,7 +118,7 @@ public static partial class Everyday
             root.AddChild(stump);
         else
             Part(root, new CylinderMesh { TopRadius = 0.28f, BottomRadius = 0.33f, Height = 0.5f, RadialSegments = 14 },
-                TreeFactory.BarkMaterial("oak"), new Vector3(0f, 0.25f, 0f));
+                CampProps.Bark, new Vector3(0f, 0.25f, 0f));
         var axe = Axe();
         axe.Position = new Vector3(0.05f, 0.48f, 0f);
         axe.RotationDegrees = new Vector3(0f, rng.RandfRange(0f, 360f), -62f);
@@ -133,7 +133,7 @@ public static partial class Everyday
             Shapes.Log(st, at, dir, rng.RandfRange(0.32f, 0.45f), rng.RandfRange(0.04f, 0.06f), seed * 10 + i);
         }
         st.GenerateNormals();
-        root.AddChild(new MeshInstance3D { Mesh = st.Commit(), MaterialOverride = TreeFactory.BarkMaterial("pine") });
+        root.AddChild(new MeshInstance3D { Mesh = st.Commit(), MaterialOverride = CampProps.Bark });
         return root;
     }
 
