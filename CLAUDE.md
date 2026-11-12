@@ -3,6 +3,7 @@
 Original RF4-style fishing simulator, Godot 4.3 .NET (C#). Polish README in README.md.
 
 ## Build / test
+- Licence: GPL-3.0-or-later for the whole project (LICENSE; README section "Licencja" lists the third-party parts). Exports: `export_presets.cfg` (Windows, Linux) include `assets/fish/*` and exclude tools/tests/docs; the .glb models carry `importer="keep"` .import files (never a .gdignore in assets/fish: exports skip such folders).
 - `dotnet build` (Godot.NET.Sdk 4.3.0; in offline sandboxes restore via the bundled GodotSharp/Tools/nupkgs source).
 - Tests: `FISHSIM_NO_SAVE=1 godot --headless --path . res://tests/run_tests.tscn -- <suite>` (core, accounts, progress, world, game, tournaments, village, gear).
 - Screenshots: `tests/screenshot.tscn` (use xvfb-run + `--rendering-driver vulkan` with lavapipe, ~30 s per shot; volumetric fog needs Forward+).

@@ -7,5 +7,7 @@ photographer's credit. The game lofts the painted model of the species to this o
 colours (`src/Fishing/FishReference.cs`), so it keeps the game's look while matching the species. The photographs are
 not part of the game; `CREDITS.md` lists them.
 
-The folder has a `.gdignore`, so the editor does not import the files; the game reads them at run time. When
-exporting the game, add `assets/fish/*.json` to the export's non-resource files.
+The game reads these files and the species models (`models/<id>.glb`) at run time. The models have `.import` files
+with `importer="keep"` (written by `tools/fish_model/fish_blender.py`), so the editor does not import them as scenes,
+and the export presets (`export_presets.cfg`) include `assets/fish/*`, so exports carry them as they are. Do not put a
+`.gdignore` here: an export skips folders that have one, and the exported game would have no species models.

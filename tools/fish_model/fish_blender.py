@@ -332,6 +332,11 @@ def main():
     subprocess.run(["python3", os.path.join(HERE, "fishgen.py"), "--textures", species, work, size], check=True)
     objects = build(work)
     export(objects, out)
+    # The editor must not import the model as a scene: "keep" leaves it as it is and exports it as it is (the game
+    # reads it at run time, src/Fishing/FishAsset.cs).
+    if not os.path.exists(out + ".import"):
+        with open(out + ".import", "w", encoding="utf-8") as f:
+            f.write('[remap]\n\nimporter="keep"\n')
     print(f"exported {out} ({os.path.getsize(out) // 1024} KB)")
     if previews:
         os.makedirs(previews, exist_ok=True)

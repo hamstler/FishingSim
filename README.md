@@ -1,5 +1,7 @@
 # Fishing Sim (RF4-like), wersja C#
 
+Wolna gra na licencji **GNU GPL 3.0 lub nowszej**: możesz ją kopiować, zmieniać i rozpowszechniać, a zmienioną wersję udostępniasz na tej samej licencji razem z kodem źródłowym. Szczegóły w sekcji [Licencja](#licencja) i w pliku [`LICENSE`](LICENSE).
+
 **Styl graficzny: nordycki, zbliżony do Valheima** (jedyny): pełna rozdzielczość z ostrymi, ręcznie malowanymi w kodzie teksturami, gęsta mgła wolumetryczna z promieniami słońca, cienie i okluzja otoczenia, poświata jasnych miejsc, chłodne cienie i ciepłe światło, jasne księżycowe noce. Wioska jest średniowieczna: domy z szachulcem i strzechą, latarnie na drewnianych słupach, drewniana wędka. Waluta to grosze (gr), sklepy to kramy, turnieje prowadzi gildia wędkarzy, a na inne łowisko jedzie się wozem.
 
 **Doba:** dzień (06:00-18:00) trwa 40 minut, noc 20 minut czasu rzeczywistego (`src/Core/DayClock.cs`). W prawym górnym rogu jest minimapa (120 m wokół gracza) i zegar z tarczą dnia i nocy, pogodą i czasem do zmroku lub świtu.
@@ -24,11 +26,73 @@
 
 Symulator wędkarski w Godot 4.3 (.NET) napisany w całości w C#. Poza kodem są shadery (`shaders/*.gdshader`: niebo, woda, teren, liście, trawa, gwiazdy, deszcz, wodospad), bo shadery w Godocie piszą się w jego własnym języku, oraz pliki scen i danych (`.tscn`, `.tres`).
 
-## Wymagania i uruchomienie
-- **Godot 4.3 w wersji .NET (Mono)** i **.NET SDK 8**.
-- Otwórz `project.godot` w Godocie .NET, zbuduj (Alt+B albo przycisk Build), potem F5.
-- Logowanie: `admin` / `admin` (jedyne konto, tworzone przy pierwszym uruchomieniu). Hasła są zapisywane jako hasz z solą (`src/Accounts/UserStore.cs`).
-- Bez edytora: `dotnet build`, potem `godot --path .`.
+## Budowanie i uruchamianie
+
+### Czego potrzebujesz
+- **Godot 4.3 w wersji .NET** (na stronie Godota: „Godot Engine - .NET”, wersja 4.3-stable). Zwykły Godot bez .NET nie
+  zbuduje gry, bo cały kod jest w C#.
+- **.NET SDK 8.0** (`dotnet --version` powinno pokazać 8.x).
+- **Git**, żeby pobrać repozytorium. Repozytorium z całą historią zajmuje ok. 750 MB, głównie przez modele ryb
+  (`assets/fish/models`, ok. 350 MB w bieżącej wersji).
+
+### Pobranie i pierwsze uruchomienie
+Sama bieżąca wersja, bez historii (ok. 350 MB):
+```bash
+git clone --depth 1 https://github.com/hamstler/FishingSim.git
+```
+Z całą historią (potrzebna, jeśli chcesz zgłaszać zmiany):
+```bash
+git clone https://github.com/hamstler/FishingSim.git
+```
+1. Uruchom Godota .NET, wybierz **Import** i wskaż plik `project.godot` w pobranym katalogu.
+2. Przy pierwszym otwarciu edytor importuje zasoby, co może potrwać kilka minut.
+3. Zbuduj kod C#: przycisk **Build** w prawym górnym rogu albo **Alt+B**.
+4. Uruchom grę klawiszem **F5**.
+
+Logowanie: `admin` / `admin` (jedyne konto, tworzone przy pierwszym uruchomieniu). Hasła są zapisywane jako hasz z solą
+(`src/Accounts/UserStore.cs`).
+
+Bez edytora, z wiersza poleceń (`godot` to plik wykonywalny Godota .NET, u Ciebie może mieć dłuższą nazwę):
+```bash
+dotnet build
+```
+```bash
+godot --path .
+```
+
+### Zbudowanie gry do pliku wykonywalnego (eksport)
+1. Zainstaluj szablony eksportu dla tej samej wersji: w edytorze **Editor → Manage Export Templates → Download and
+   Install** (szablony „4.3.stable.mono”).
+2. **Project → Export**: projekt ma gotowe ustawienia dla **Windows** i **Linux** (`export_presets.cfg`). Wybierz jedno
+   i kliknij **Export Project**. Gra trafi do `build/windows/` albo `build/linux/` (katalog `build/` nie jest w
+   repozytorium).
+
+To samo z wiersza poleceń (najpierw utwórz katalog docelowy):
+```bash
+mkdir -p build/windows build/linux
+```
+```bash
+godot --headless --path . --export-release "Windows" build/windows/FishingSim.exe
+```
+```bash
+godot --headless --path . --export-release "Linux" build/linux/FishingSim.x86_64
+```
+Zbudowana gra to plik wykonywalny, plik `.pck` z zasobami (ok. 350 MB, głównie modele ryb) i katalog
+`data_FishingSim_*` z bibliotekami .NET. Rozpowszechniaj je razem.
+
+Ustawienia eksportu dołączają katalog `assets/fish` (modele ryb i pomiary gatunków, gra wczytuje je dopiero w trakcie
+działania) i pomijają `tools/`, `tests/` i `docs/`. Modele `.glb` mają pliki `.import` z `importer="keep"`, więc edytor
+ich nie importuje, a eksport dołącza je bez zmian.
+
+### Przebudowa modeli ryb (opcjonalnie)
+Gotowe modele są w repozytorium, więc do zbudowania gry nie są potrzebne żadne dodatkowe narzędzia. Kto chce zmienić
+wygląd ryb, potrzebuje Blendera 4.0 i Pythona 3 z `numpy` i `Pillow` (do ponownego mierzenia ilustracji także
+`opencv-python`):
+```bash
+tools/fish_model/build_all.sh karp lin
+```
+Bez nazw gatunków skrypt przebudowuje wszystkie 66 po kolei, co trwa ponad godzinę i dokłada ok. 270 MB do historii
+repozytorium, więc lepiej przebudowywać tylko zmienione gatunki. Opis całego procesu jest w `CLAUDE.md` (sekcja „Species models”).
 
 ## Sterowanie
 | Klawisz | Działanie |
@@ -108,8 +172,47 @@ godot --headless --path . res://tests/run_tests.tscn -- core game # wybrane zest
 ```
 Zestawy: `core` (hol, brania, postęp), `accounts`, `progress` (profil, sklep, zapis, zgodność ze starymi zapisami), `world` (teren, czas, pogoda, fale), `game` (logowanie, wybór mapy, pauza, ekran gracza, cały cykl połowu), `tournaments`, `village` (układ wiosek, wyrównany teren, ścieżki, biomy, chodzenie, drzwi i sklepy), `gear` (targ, siatki, podbieraki, akcesoria, animacja ciała, ryby w wodzie). Kod wyjścia to liczba nieudanych sprawdzeń. W trybie headless zapis na dysk jest wyłączony.
 
-Zrzuty ekranu (potrzebny ekran i OpenGL, np. `xvfb-run`):
+Zrzuty ekranu (potrzebny ekran, bez monitora np. `xvfb-run`; renderer Vulkan, ok. 30 s na zrzut):
 ```
-godot --rendering-driver opengl3 --path . res://tests/screenshot.tscn -- GODZINA POGODA ETYKIETA PLIK YAW PITCH TRYB ARG MAPA
+godot --rendering-driver vulkan --path . res://tests/screenshot.tscn -- GODZINA POGODA ETYKIETA PLIK YAW PITCH TRYB ARG MAPA
 ```
 Tryby: 0 widok, 1 hol, 2 złowiona ryba, 3 sklep, 4 pauza, 5 ekran gracza, 6 logowanie, 7 wybór mapy, 8 turniej w toku, 9 wyniki turnieju.
+
+## Licencja
+
+Copyright (C) 2026 hamstler i współtwórcy FishingSim.
+
+FishingSim jest wolnym oprogramowaniem: możesz go rozpowszechniać i zmieniać na warunkach **GNU General Public
+License** w wersji 3 albo (według Twojego wyboru) dowolnej późniejszej wersji, opublikowanej przez Free Software
+Foundation. Program jest udostępniany bez żadnej gwarancji. Pełny tekst licencji jest w pliku [`LICENSE`](LICENSE)
+(oficjalny tekst angielski jest jedynym wiążącym).
+
+Licencja obejmuje cały projekt: kod C#, shadery, sceny i dane (`.tscn`, `.tres`, `.json`), narzędzia w `tools/` oraz
+modele i tekstury ryb wygenerowane tymi narzędziami.
+
+**Co wolno:** używać gry w dowolnym celu (także komercyjnym), kopiować ją, badać kod, zmieniać go i rozpowszechniać,
+odpłatnie lub za darmo.
+
+**Co trzeba**, gdy rozpowszechniasz grę albo jej zmienioną wersję (udostępniasz plik, sprzedajesz, wrzucasz do
+internetu):
+- udostępnić całą wersję na tej samej licencji GPL 3.0 lub nowszej, razem z jej kodem źródłowym (albo pisemną ofertą
+  jego udostępnienia);
+- zachować informacje o prawach autorskich i licencji, a zmienione pliki oznaczyć jako zmienione, z datą zmiany;
+- nie dodawać ograniczeń, których GPL nie przewiduje (np. zakazu dalszego kopiowania).
+
+Zmian, których nie rozpowszechniasz (np. własna wersja do grania w domu), nie musisz nikomu udostępniać.
+
+**Wkład w projekt:** wysyłając zmiany (pull request), zgadzasz się, że są one udostępniane na tej samej licencji
+(GPL 3.0 lub nowszej).
+
+### Elementy i materiały innych autorów
+- **Silnik Godot** (licencja MIT, © Juan Linietsky, Ariel Manzur i współtwórcy Godot Engine) i **.NET** (licencja MIT,
+  © .NET Foundation): wbudowane w zbudowaną grę. Licencja MIT jest zgodna z GPL. Rozpowszechniając zbudowaną grę,
+  dołącz informację o licencji Godota (<https://godotengine.org/license>), np. w pliku obok gry lub w napisach.
+- **Proporcje ryb** zmierzono na ilustracjach z [AtlasRyb.online](https://atlasryb.online) (licencja CC BY-NC-SA).
+  Do projektu trafiły wyłącznie liczby (obrysy ciała, położenie płetw i oka, barwy), nie ilustracje. Źródła każdego
+  gatunku są w [`assets/fish/CREDITS.md`](assets/fish/CREDITS.md).
+- **Barwy i kształty części gatunków** zmierzono na zdjęciach z Wikimedia Commons na wolnych licencjach. Same zdjęcia
+  nie są częścią projektu; autorzy i licencje są w `assets/fish/CREDITS.md` i w atlasie ryb w grze.
+- Dźwięki są syntezowane w kodzie, tekstury malowane w kodzie, a czcionka to wbudowana czcionka Godota: projekt nie
+  zawiera plików graficznych ani dźwiękowych innych autorów.
