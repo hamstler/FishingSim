@@ -52,7 +52,8 @@ public partial class HandTools : Node3D
     };
 
     private const float DigSeconds = 2.1f, SweepSeconds = 1.35f;
-    private const float DigPitch = -0.62f, SweepPitch = -0.15f;
+    // Looking down only so far that the shoulders stay below the view: the hands and the blade in front are seen.
+    private const float DigPitch = -0.45f, SweepPitch = -0.15f;
 
     /// <summary>How far the body bends over the work (forward, down) while digging, and where the head goes meanwhile
     /// (a little down and back, so the eyes see the blade in the ground beyond the hands).</summary>
