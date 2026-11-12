@@ -33,14 +33,21 @@ float henyey_greenstein(float cos_theta, float g) {
 	return k * (1.0 - g * g) / (pow(1.0 + g * g - 2.0 * g * cos_theta, 1.5));
 }
 
-float clouds(vec2 uv) {
-	float n = texture(cloud_noise, uv).r * 0.55
+float cloud_shape(vec2 uv) {
+	return texture(cloud_noise, uv).r * 0.55
 		+ texture(cloud_noise, uv * 2.03 + vec2(0.31, 0.17)).r * 0.28
 		+ texture(cloud_noise, uv * 4.11 + vec2(0.71, 0.53)).r * 0.17;
+}
+
+// Cumulus density: a soft ramp over the noise, the thin parts eaten away by finer billows.
+float clouds(vec2 uv, bool detailed) {
 	float threshold = mix(0.72, 0.18, cloud_cover);
-	// Crisp, flat-shaded cloud shapes (pixel-art style): three density steps instead of a soft ramp.
-	float d = smoothstep(threshold, threshold + 0.22, n);
-	return d < 0.35 ? 0.0 : (d < 0.7 ? 0.75 : 1.0);
+	float d = smoothstep(threshold, threshold + 0.24, cloud_shape(uv));
+	if (detailed) {
+		float billow = texture(cloud_noise, uv * 8.7 + vec2(0.11, 0.83)).r * 0.6 + texture(cloud_noise, uv * 17.3 + vec2(0.47, 0.29)).r * 0.4;
+		d = clamp(d - (1.0 - d) * (billow - 0.25) * 1.1, 0.0, 1.0);
+	}
+	return d;
 }
 
 void sky() {
@@ -116,16 +123,24 @@ void sky() {
 	// Cloud layer: a flat sheet projected onto the dome, lit by the sun with a silver lining.
 	if (EYEDIR.y > 0.0 && !AT_CUBEMAP_PASS) {
 		vec2 uv = EYEDIR.xz / (EYEDIR.y + 0.08) * 0.08 + vec2(cloud_drift * 0.004, cloud_drift * 0.0017);
-		float density = clouds(uv);
-		float shade = clouds(uv + sun_dir.xz * 0.02);     // denser towards the sun = darker base
-		vec3 lit = vec3(1.0, 0.97, 0.94) * mix(0.25, 1.05, sun_up) * LIGHT0_COLOR;
-		vec3 base = mix(lit, lit * 0.45 + vec3(0.04, 0.05, 0.07), shade * 0.8);
-		base += LIGHT0_COLOR * pow(max(cos_theta, 0.0), 12.0) * (1.0 - density) * 1.5 * sun_up;
+		float density = clouds(uv, true);
+		// Light through the cloud: how much cloud lies between this point and the sun (three steps towards it).
+		float depth = 0.0;
+		for (int i = 1; i <= 3; i++) {
+			depth += clouds(uv + sun_dir.xz * 0.011 * float(i), false);
+		}
+		float through = exp(-depth * 0.9);
+		float powder = 1.0 - exp(-density * 3.5);         // thin edges glow, the dense middle keeps its body
+		vec3 sun_lit = vec3(1.0, 0.97, 0.93) * mix(0.3, 1.05, sun_up) * LIGHT0_COLOR;
+		vec3 ambient = mix(vec3(0.42, 0.5, 0.62), vec3(0.6, 0.62, 0.66), cloud_cover) * mix(0.18, 0.7, sun_up);
+		vec3 base = mix(ambient, sun_lit, through * mix(0.7, 1.0, powder));
+		// Silver lining towards the sun.
+		base += LIGHT0_COLOR * pow(max(cos_theta, 0.0), 8.0) * (1.0 - density) * 1.6 * sun_up;
 		base = mix(base, overcast * 0.9, cloud_cover * 0.6);
 		base *= mix(1.0, 0.04, night);
-		// Illustrated clouds: white tops with a soft blue shade, like a hand-pixelled sky.
-		vec3 drawn_cloud = mix(vec3(1.0, 0.99, 0.97), vec3(0.70, 0.82, 0.94), shade * 0.85) * mix(0.35, 1.0, sun_up);
-		base = mix(base, drawn_cloud, stylize * smoothstep(0.0, 0.35, sun_dir.y) * (1.0 - cloud_cover * 0.6));
+		// A painted finish: white tops, soft blue-grey shade.
+		vec3 drawn_cloud = mix(vec3(0.68, 0.76, 0.88), vec3(1.0, 0.99, 0.97), through) * mix(0.35, 1.0, sun_up);
+		base = mix(base, drawn_cloud, stylize * 0.6 * smoothstep(0.0, 0.35, sun_dir.y) * (1.0 - cloud_cover * 0.6));
 		// Near the horizon the cloud sheet is seen edge-on and averages into a grey band: fade it out there.
 		float fade = smoothstep(0.06, 0.32, EYEDIR.y);
 		color = mix(color, base * 0.9, density * fade * 0.92);

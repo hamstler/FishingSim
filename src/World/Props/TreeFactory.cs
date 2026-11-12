@@ -35,12 +35,42 @@ public static class TreeFactory
         return meshes;
     }
 
-    private static CylinderMesh Trunk(float top, float bottom, float height) =>
-        new() { TopRadius = top, BottomRadius = bottom, Height = height, RadialSegments = 9, Rings = 3 };
+    /// <summary>
+    /// A trunk centred on its middle like the old cylinder: tapering, a root flare at the foot, white vertex colour (the
+    /// instance colour tints it), bark wrapped once round the girth and repeating up the trunk at the same scale.
+    /// </summary>
+    private static ArrayMesh Trunk(float top, float bottom, float height)
+    {
+        const int sides = 12, rings = 8;
+        var st = new SurfaceTool();
+        st.Begin(Mesh.PrimitiveType.Triangles);
+        float girth = Mathf.Tau * bottom;
+        float Radius(float t) => Mathf.Lerp(bottom, top, t) * (1f + 0.45f * MathF.Exp(-t * height / 0.18f));
+        for (int r = 0; r < rings; r++)
+            for (int i = 0; i < sides; i++)
+            {
+                (int I, int R)[] quad = { (i, r), (i + 1, r), (i + 1, r + 1), (i, r), (i + 1, r + 1), (i, r + 1) };
+                foreach (var (qi, qr) in quad)
+                {
+                    float t = MathF.Pow(qr / (float)rings, 1.5f);      // finer rings at the foot, where the flare is
+                    float a = qi * Mathf.Tau / sides;
+                    float rad = Radius(t);
+                    var dir = new Vector3(MathF.Cos(a), 0f, MathF.Sin(a));
+                    float slope = (Radius(MathF.Max(t - 0.01f, 0f)) - Radius(MathF.Min(t + 0.01f, 1f))) / (0.02f * height);
+                    st.SetNormal((dir + Vector3.Up * slope).Normalized());
+                    st.SetColor(Colors.White);
+                    st.SetUV(new Vector2(qi / (float)sides, -t * height / girth));
+                    st.AddVertex(dir * rad + Vector3.Up * (t - 0.5f) * height);
+                }
+            }
+        st.GenerateTangents();
+        return st.Commit();
+    }
 
     // ------------------------------------------------------------------ materials
     private static ShaderMaterial? _leafMaterial, _needleMaterial, _grassMaterial;
-    private static StandardMaterial3D? _barkMaterial, _rockMaterial;
+    private static ShaderMaterial? _barkMaterial;
+    private static ShaderMaterial? _rockMaterial;
 
     /// <summary>Leaf-card material (shaders/foliage.gdshader); wind and time are set by <see cref="SetWind"/>.</summary>
     public static ShaderMaterial FoliageMaterial(bool needles)
@@ -51,7 +81,7 @@ public static class TreeFactory
         cached = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/foliage.gdshader") };
         cached.SetShaderParameter("leaf_tex", ProceduralTextures.LeafCluster(needles));
         if (needles)
-            cached.SetShaderParameter("translucency", new Color(0.25f, 0.35f, 0.2f));
+            cached.SetShaderParameter("translucency", new Color(0.45f, 0.55f, 0.3f));
         return cached;
     }
 
@@ -61,53 +91,133 @@ public static class TreeFactory
             return _grassMaterial;
         _grassMaterial = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/grass.gdshader") };
         _grassMaterial.SetShaderParameter("gust_noise", ProceduralTextures.Noise(61, 0.01f, 256, octaves: 3));
+        _grassMaterial.SetShaderParameter("noise_tex", ProceduralTextures.Noise(17, 0.01f, 1024));     // the terrain's variation
         return _grassMaterial;
     }
 
-    /// <summary>Bark: furrowed texture with a matching normal map; the instance colour tints it (birch stays white).</summary>
-    public static StandardMaterial3D BarkMaterial()
+    private static ShaderMaterial? _birchBark;
+
+    /// <summary>
+    /// Bark (shaders/bark.gdshader): furrowed plates with lichen, or white birch bark with lenticels and black patches;
+    /// the instance colour tints it.
+    /// </summary>
+    public static ShaderMaterial BarkMaterial(bool birch = false)
     {
-        if (_barkMaterial != null)
-            return _barkMaterial;
-        var bark = ProceduralTextures.Bark();
-        _barkMaterial = new StandardMaterial3D
-        {
-            VertexColorUseAsAlbedo = true,
-            VertexColorIsSrgb = true,
-            AlbedoTexture = bark,
-            NormalEnabled = true,
-            NormalTexture = ProceduralTextures.NormalFrom(bark, 6f),
-            Uv1Scale = new Vector3(2f, 3f, 1f),
-            Roughness = 0.95f,
-        };
-        return _barkMaterial;
+        ref var cached = ref birch ? ref _birchBark : ref _barkMaterial;
+        if (cached != null)
+            return cached;
+        cached = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/bark.gdshader") };
+        if (Renderer.IsHeadless)
+            return cached;      // nothing is drawn without a screen: skip painting the bark
+        var (albedo, normal, mean) = GroundTextures.Bark(birch);
+        cached.SetShaderParameter("bark_albedo", albedo);
+        cached.SetShaderParameter("bark_normal", normal);
+        cached.SetShaderParameter("bark_mean", new Vector3(mean.R, mean.G, mean.B));
+        return cached;
     }
 
-    public static StandardMaterial3D RockMaterial()
+    /// <summary>
+    /// Boulders (shaders/rock.gdshader): the terrain's painted rock, triplanar in world space so neighbouring stones do
+    /// not repeat each other, tinted by the instance colour, with moss on the tops.
+    /// </summary>
+    public static ShaderMaterial RockMaterial()
     {
         if (_rockMaterial != null)
             return _rockMaterial;
-        var noise = ProceduralTextures.Noise(83, 0.05f, 256);
-        _rockMaterial = new StandardMaterial3D
+        _rockMaterial = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/rock.gdshader") };
+        _rockMaterial.SetShaderParameter("noise_tex", ProceduralTextures.Noise(17, 0.01f, 1024));
+        _rockMaterial.SetShaderParameter("tile", GroundTextures.TileMetres);
+        if (!Renderer.IsHeadless)
         {
-            VertexColorUseAsAlbedo = true,
-            VertexColorIsSrgb = true,
-            AlbedoTexture = noise,
-            NormalEnabled = true,
-            NormalTexture = ProceduralTextures.Noise(83, 0.05f, 256, true, 14f),
-            NormalScale = 1.4f,
-            Uv1Triplanar = true,
-            Uv1WorldTriplanar = true,
-            Uv1Scale = new Vector3(0.5f, 0.5f, 0.5f),
-            Roughness = 0.9f,
-        };
+            _rockMaterial.SetShaderParameter("ground_albedo", GroundTextures.Albedo);
+            _rockMaterial.SetShaderParameter("ground_normal", GroundTextures.Normal);
+            var mean = GroundTextures.Mean(GroundTextures.Rock);
+            _rockMaterial.SetShaderParameter("rock_mean", new Vector3(mean.R, mean.G, mean.B));
+        }
         return _rockMaterial;
+    }
+
+    private static readonly ArrayMesh?[] Boulders = new ArrayMesh?[3];
+
+    /// <summary>
+    /// A boulder of unit radius: a subdivided icosahedron pushed in and out by noise (one of three shapes), its foot
+    /// flattened where it sits in the ground.
+    /// </summary>
+    public static ArrayMesh Boulder(int variant)
+    {
+        variant = Math.Clamp(variant, 0, Boulders.Length - 1);
+        if (Boulders[variant] != null)
+            return Boulders[variant]!;
+        float t = (1f + MathF.Sqrt(5f)) / 2f;
+        var verts = new List<Vector3>
+        {
+            new(-1, t, 0), new(1, t, 0), new(-1, -t, 0), new(1, -t, 0), new(0, -1, t), new(0, 1, t),
+            new(0, -1, -t), new(0, 1, -t), new(t, 0, -1), new(t, 0, 1), new(-t, 0, -1), new(-t, 0, 1),
+        };
+        for (int i = 0; i < verts.Count; i++)
+            verts[i] = verts[i].Normalized();
+        var faces = new List<(int, int, int)>
+        {
+            (0, 11, 5), (0, 5, 1), (0, 1, 7), (0, 7, 10), (0, 10, 11), (1, 5, 9), (5, 11, 4), (11, 10, 2), (10, 7, 6), (7, 1, 8),
+            (3, 9, 4), (3, 4, 2), (3, 2, 6), (3, 6, 8), (3, 8, 9), (4, 9, 5), (2, 4, 11), (6, 2, 10), (8, 6, 7), (9, 8, 1),
+        };
+        var mids = new Dictionary<(int, int), int>();
+        int Mid(int a, int b)
+        {
+            var key = a < b ? (a, b) : (b, a);
+            if (mids.TryGetValue(key, out int m))
+                return m;
+            verts.Add(((verts[a] + verts[b]) * 0.5f).Normalized());
+            return mids[key] = verts.Count - 1;
+        }
+        for (int level = 0; level < 2; level++)
+        {
+            var next = new List<(int, int, int)>();
+            foreach (var (a, b, c) in faces)
+            {
+                int ab = Mid(a, b), bc = Mid(b, c), ca = Mid(c, a);
+                next.Add((a, ab, ca));
+                next.Add((b, bc, ab));
+                next.Add((c, ca, bc));
+                next.Add((ab, bc, ca));
+            }
+            faces = next;
+        }
+        var noise = new FastNoiseLite { Seed = 300 + variant, Frequency = 0.9f, FractalOctaves = 3 };
+        var shaped = new Vector3[verts.Count];
+        for (int i = 0; i < verts.Count; i++)
+        {
+            var d = verts[i];
+            float r = 1f + 0.3f * noise.GetNoise3Dv(d * 1.4f) + 0.07f * noise.GetNoise3Dv(d * 4.5f + Vector3.One * 9f);
+            var p = d * r;
+            if (p.Y < -0.25f)
+                p.Y = -0.25f + (p.Y + 0.25f) * 0.25f;      // the foot, sunk and flat
+            shaped[i] = p;
+        }
+        var st = new SurfaceTool();
+        st.Begin(Mesh.PrimitiveType.Triangles);
+        foreach (var v in shaped)
+        {
+            st.SetColor(Colors.White);
+            st.AddVertex(v);
+        }
+        foreach (var (a, b, c) in faces)
+        {
+            // Godot's front faces turn clockwise seen from outside.
+            var centre = (shaped[a] + shaped[b] + shaped[c]) / 3f;
+            bool outwards = (shaped[b] - shaped[a]).Cross(shaped[c] - shaped[a]).Dot(centre) > 0f;
+            st.AddIndex(a);
+            st.AddIndex(outwards ? c : b);
+            st.AddIndex(outwards ? b : c);
+        }
+        st.GenerateNormals();
+        return Boulders[variant] = st.Commit();
     }
 
     /// <summary>Animates every foliage and grass material (called once per frame by the scenery).</summary>
     public static void SetWind(float wind, float time)
     {
-        foreach (var m in new[] { _leafMaterial, _needleMaterial, _grassMaterial })
+        foreach (var m in new[] { _leafMaterial, _needleMaterial, _grassMaterial, _fernMaterial, _flowerMaterial })
         {
             m?.SetShaderParameter("wind", wind);
             m?.SetShaderParameter("time", time);
@@ -118,7 +228,7 @@ public static class TreeFactory
     private readonly record struct Puff(Vector3 Centre, float Radius, float Squash);
 
     /// <summary>A cloud of leaf cards filling the given puffs (ellipsoids). Inner cards are darker (self-shadowing).</summary>
-    private static ArrayMesh LeafCards(int seed, float cardSize, float density, params Puff[] puffs)
+    private static ArrayMesh LeafCards(int seed, int leaf, float cardSize, float density, params Puff[] puffs)
     {
         var rng = new RandomNumberGenerator { Seed = (ulong)seed };
         var st = new SurfaceTool();
@@ -138,7 +248,7 @@ public static class TreeFactory
                 float size = cardSize * rng.RandfRange(0.75f, 1.25f);
                 var normal = (pos - centre * 0.6f).Normalized().Lerp(Vector3.Up, 0.25f).Normalized();
                 float shade = 0.5f + 0.5f * Math.Clamp(r / p.Radius, 0f, 1f) * (0.75f + 0.25f * Math.Clamp(dir.Y + 0.5f, 0f, 1f));
-                Card(st, pos, RandomUnit(rng), size, normal, new Color(shade, shade, shade), rng.Randf() * Mathf.Tau);
+                Card(st, pos, RandomUnit(rng), size, normal, new Color(shade, shade, shade), rng.Randf() * Mathf.Tau, leaf);
             }
         }
         return st.Commit();
@@ -183,7 +293,7 @@ public static class TreeFactory
     }
 
     /// <summary>One quad facing <paramref name="facing"/>, rotated by <paramref name="spin"/>, with a shared lighting normal.</summary>
-    private static void Card(SurfaceTool st, Vector3 centre, Vector3 facing, float size, Vector3 normal, Color shade, float spin)
+    private static void Card(SurfaceTool st, Vector3 centre, Vector3 facing, float size, Vector3 normal, Color shade, float spin, int atlasCell = -1)
     {
         var f = facing.Normalized();
         var u = (MathF.Abs(f.Y) > 0.9f ? Vector3.Right : Vector3.Up).Cross(f).Normalized();
@@ -196,8 +306,9 @@ public static class TreeFactory
         foreach (int i in new[] { 0, 1, 2, 0, 2, 3 })
         {
             st.SetNormal(normal);
-            st.SetColor(shade);
-            st.SetUV(uvs[i]);
+            st.SetColor(new Color(shade.R, shade.G, shade.B, shade.R));     // alpha: depth in the crown, for the shader's occlusion
+            // Broad leaves come from a 2x2 atlas (ProceduralTextures.LeafCluster); needles fill the whole picture.
+            st.SetUV(atlasCell < 0 ? uvs[i] : (uvs[i] + new Vector2(atlasCell % 2, atlasCell / 2)) * 0.5f);
             st.AddVertex(corners[i]);
         }
     }
@@ -222,13 +333,13 @@ public static class TreeFactory
     private static ArrayMesh SpruceCrown() => ConiferCards(1,
         (0.85f, 1.4f, 1.7f), (1.8f, 1.1f, 1.6f), (2.75f, 0.8f, 1.5f), (3.5f, 0.5f, 1.2f));
 
-    private static ArrayMesh RoundCrown() => LeafCards(2, 0.95f, 34f,
+    private static ArrayMesh RoundCrown() => LeafCards(2, ProceduralTextures.LeafOak, 0.95f, 34f,
         new Puff(new Vector3(0, 0, 0), 1.25f, 1.7f),
         new Puff(new Vector3(0.7f, -0.3f, 0.35f), 0.9f, 1.7f),
         new Puff(new Vector3(-0.6f, -0.2f, -0.5f), 0.9f, 1.7f),
         new Puff(new Vector3(0.1f, 0.8f, -0.2f), 0.8f, 1.7f));
 
-    private static ArrayMesh BirchCrown() => LeafCards(3, 0.7f, 40f,
+    private static ArrayMesh BirchCrown() => LeafCards(3, ProceduralTextures.LeafBirch, 0.7f, 40f,
         new Puff(new Vector3(0, 0.2f, 0), 0.75f, 1.6f),
         new Puff(new Vector3(0.45f, -0.5f, 0.15f), 0.6f, 1.6f),
         new Puff(new Vector3(-0.4f, -0.7f, -0.2f), 0.55f, 1.6f),
@@ -237,19 +348,19 @@ public static class TreeFactory
     private static ArrayMesh PineCrown() => ConiferCards(4,
         (-1.2f, 1.2f, 1.1f), (-0.4f, 1.5f, 1.2f), (0.4f, 1.3f, 1.1f), (1.1f, 0.8f, 1.0f));
 
-    private static ArrayMesh WillowCrown() => LeafCards(5, 0.9f, 30f,
+    private static ArrayMesh WillowCrown() => LeafCards(5, ProceduralTextures.LeafWillow, 0.9f, 30f,
         new Puff(new Vector3(0, 0.2f, 0), 1.6f, 1.2f),
         new Puff(new Vector3(0, -1.0f, 0), 2.0f, 1.3f),
         new Puff(new Vector3(1.1f, -0.3f, 0.4f), 1.2f, 1.1f),
         new Puff(new Vector3(-1f, -0.4f, -0.5f), 1.2f, 1.1f));
 
-    private static ArrayMesh BushCrown() => LeafCards(6, 0.55f, 46f,
+    private static ArrayMesh BushCrown() => LeafCards(6, ProceduralTextures.LeafHazel, 0.55f, 46f,
         new Puff(new Vector3(0, 0.15f, 0), 0.55f, 1.6f),
         new Puff(new Vector3(0.45f, 0f, 0.2f), 0.4f, 1.6f),
         new Puff(new Vector3(-0.4f, 0f, -0.2f), 0.4f, 1.6f));
 
     /// <summary>Hazel: a tall, loose shrub of several stems (the forest's understorey).</summary>
-    private static ArrayMesh HazelCrown() => LeafCards(7, 0.6f, 38f,
+    private static ArrayMesh HazelCrown() => LeafCards(7, ProceduralTextures.LeafHazel, 0.6f, 38f,
         new Puff(new Vector3(0, 0.55f, 0), 0.6f, 1.1f),
         new Puff(new Vector3(0.5f, 0.25f, 0.3f), 0.45f, 1.3f),
         new Puff(new Vector3(-0.45f, 0.35f, -0.3f), 0.5f, 1.2f),
@@ -265,39 +376,126 @@ public static class TreeFactory
         var rng = new RandomNumberGenerator { Seed = 77 };
         var st = new SurfaceTool();
         st.Begin(Mesh.PrimitiveType.Triangles);
-        const int fronds = 9, steps = 9;
+        const int fronds = 8, steps = 7;
         for (int f = 0; f < fronds; f++)
         {
-            float yaw = f / (float)fronds * Mathf.Tau + rng.RandfRange(-0.2f, 0.2f);
+            float yaw = f / (float)fronds * Mathf.Tau + rng.RandfRange(-0.25f, 0.25f);
             var dir = new Vector3(MathF.Cos(yaw), 0f, MathF.Sin(yaw));
             var side = new Vector3(-dir.Z, 0f, dir.X);
-            float len = rng.RandfRange(0.55f, 0.8f), rise = rng.RandfRange(0.4f, 0.6f);
-            Vector3 At(float t) => dir * len * t + Vector3.Up * (rise * MathF.Sin(MathF.PI * 0.75f * t) - 0.1f * t * t);
+            float len = rng.RandfRange(0.6f, 0.85f), rise = rng.RandfRange(0.38f, 0.55f), width = len * 0.42f;
+            // The frond rises and arches over; its painted picture (ProceduralTextures.FernFrond) gives the leaflets.
+            Vector3 At(float t) => dir * len * t + Vector3.Up * (rise * MathF.Sin(MathF.PI * 0.8f * t) - 0.08f * t * t);
+            var tilt = side * MathF.Cos(rng.RandfRange(-0.35f, 0.35f)) + Vector3.Up * rng.RandfRange(-0.3f, 0.3f);
             for (int i = 0; i < steps; i++)
             {
                 float t0 = i / (float)steps, t1 = (i + 1f) / steps;
-                var a = At(t0);
-                var b = At(t1);
-                // Leaflets on both sides, longest in the middle of the frond.
-                float w = 0.16f * MathF.Sin(MathF.PI * MathF.Min(t0 * 1.1f + 0.08f, 1f));
-                foreach (float sgn in new[] { -1f, 1f })
+                Vector3 a0 = At(t0), a1 = At(t1);
+                var normal = (a1 - a0).Cross(tilt).Normalized();
+                if (normal.Y < 0f)
+                    normal = -normal;
+                normal = normal.Lerp(Vector3.Up, 0.4f).Normalized();
+                (Vector3 P, Vector2 Uv, float T)[] quad =
                 {
-                    var tip = a.Lerp(b, 0.7f) + side * sgn * w + Vector3.Up * 0.02f;
-                    var normal = (b - a).Cross(side * sgn).Normalized();
-                    if (normal.Y < 0f)
-                        normal = -normal;
-                    foreach (var (pt, tt) in new[] { (a, t0), (b, t1), (tip, (t0 + t1) * 0.5f) })
-                    {
-                        st.SetNormal(normal.Lerp(Vector3.Up, 0.5f).Normalized());
-                        st.SetUV(new Vector2(0.5f, tt));
-                        st.AddVertex(pt);
-                    }
+                    (a0 - tilt * width * 0.5f, new Vector2(0f, t0), t0), (a0 + tilt * width * 0.5f, new Vector2(1f, t0), t0),
+                    (a1 + tilt * width * 0.5f, new Vector2(1f, t1), t1), (a1 - tilt * width * 0.5f, new Vector2(0f, t1), t1),
+                };
+                foreach (int k in new[] { 0, 1, 2, 0, 2, 3 })
+                {
+                    float shade = 0.55f + 0.45f * quad[k].T;
+                    st.SetNormal(normal);
+                    st.SetColor(new Color(shade, shade, shade, shade));
+                    st.SetUV(quad[k].Uv);
+                    st.AddVertex(quad[k].P);
                 }
             }
         }
         _fern = st.Commit();
         return _fern;
     }
+
+    private static ShaderMaterial? _fernMaterial, _flowerMaterial;
+
+    /// <summary>Fern fronds: the foliage shader with the painted frond.</summary>
+    public static ShaderMaterial FernMaterial()
+    {
+        if (_fernMaterial != null)
+            return _fernMaterial;
+        _fernMaterial = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/foliage.gdshader") };
+        _fernMaterial.SetShaderParameter("leaf_tex", ProceduralTextures.FernFrond());
+        return _fernMaterial;
+    }
+
+    /// <summary>Wild flowers (shaders/flower.gdshader): green stalk and leaves, petals in the instance colour, a golden eye.</summary>
+    public static ShaderMaterial FlowerMaterial() =>
+        _flowerMaterial ??= new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/flower.gdshader") };
+
+    /// <summary>
+    /// A wild flower: a thin stalk with two leaves and a head of <paramref name="petals"/> cupped petals around a domed
+    /// eye. UV.x tells the shader the part (0 stalk, 0.5 eye, 1 petal), UV.y the height along the stalk (for the wind).
+    /// </summary>
+    public static ArrayMesh Wildflower(int petals = 6, float height = 0.32f, float petalLength = 0.04f, float petalWidth = 0.018f)
+    {
+        string key = $"{petals}:{height}:{petalLength}:{petalWidth}";
+        if (Flowers.TryGetValue(key, out var cached))
+            return cached;
+        var st = new SurfaceTool();
+        st.Begin(Mesh.PrimitiveType.Triangles);
+        void Tri(Vector3 a, Vector3 b, Vector3 c, float part, Vector3 n)
+        {
+            foreach (var v in new[] { a, b, c })
+            {
+                st.SetNormal(n);
+                st.SetColor(Colors.White);
+                st.SetUV(new Vector2(part, Math.Clamp(v.Y / height, 0f, 1f)));
+                st.AddVertex(v);
+            }
+        }
+        var top = new Vector3(0.01f, height, 0f);
+        // The stalk: two crossed thin strips with a slight lean.
+        foreach (var side in new[] { new Vector3(0.0035f, 0f, 0f), new Vector3(0f, 0f, 0.0035f) })
+        {
+            var n = side.Cross(Vector3.Up).Normalized();
+            Tri(-side, side, top + side * 0.6f, 0f, n);
+            Tri(-side, top + side * 0.6f, top - side * 0.6f, 0f, n);
+        }
+        // Two leaves on the stalk.
+        foreach (var (y, a) in new[] { (height * 0.25f, 0.4f), (height * 0.45f, 3.3f) })
+        {
+            var d = new Vector3(MathF.Cos(a), 0.35f, MathF.Sin(a)).Normalized();
+            var w = new Vector3(-d.Z, 0f, d.X) * 0.012f;
+            var b = new Vector3(0f, y, 0f);
+            var mid = b + d * 0.05f;
+            Tri(b, mid + w, b + d * 0.1f, 0f, Vector3.Up);
+            Tri(b, b + d * 0.1f, mid - w, 0f, Vector3.Up);
+        }
+        // Petals: diamonds cupped upwards around the eye.
+        for (int i = 0; i < petals; i++)
+        {
+            float a = i * Mathf.Tau / petals;
+            var d = new Vector3(MathF.Cos(a), 0f, MathF.Sin(a));
+            var side = new Vector3(-d.Z, 0f, d.X);
+            var b = top + d * 0.004f;
+            var tip = top + d * petalLength + Vector3.Up * petalLength * 0.35f;
+            var mid = top + d * petalLength * 0.5f + Vector3.Up * petalLength * 0.08f;
+            var n = (Vector3.Up - d * 0.3f).Normalized();
+            Tri(b, mid + side * petalWidth * 0.5f, tip, 1f, n);
+            Tri(b, tip, mid - side * petalWidth * 0.5f, 1f, n);
+        }
+        // The eye: a small dome.
+        const int seg = 7;
+        for (int i = 0; i < seg; i++)
+        {
+            float a0 = i * Mathf.Tau / seg, a1 = (i + 1) * Mathf.Tau / seg;
+            float r = petalLength * 0.28f;
+            Tri(top + Vector3.Up * r * 0.6f, top + new Vector3(MathF.Cos(a0), 0.1f, MathF.Sin(a0)) * r, top + new Vector3(MathF.Cos(a1), 0.1f, MathF.Sin(a1)) * r,
+                0.5f, Vector3.Up);
+        }
+        var mesh = st.Commit();
+        Flowers[key] = mesh;
+        return mesh;
+    }
+
+    private static readonly Dictionary<string, ArrayMesh> Flowers = new();
 
     /// <summary>Rushes at the waterline: a clump of thin, straight, dark stems.</summary>
     public static ArrayMesh Rush() => _rush ??= BladeClump(21, 16, 1.0f, 0.016f, 0.14f);
@@ -429,7 +627,7 @@ public static class TreeFactory
     {
         if (_tuft != null)
             return _tuft;
-        _tuft = BladeClump(9, 7, 0.55f, 0.045f, 0.22f);
+        _tuft = BladeClump(9, 20, 0.5f, 0.02f, 0.22f);
         return _tuft;
     }
 
@@ -474,12 +672,11 @@ public static class TreeFactory
         return st.Commit();
     }
 
-    private static ArrayMesh? _tuft;
+    private static ArrayMesh? _tuft, _meadow;
 
-    /// <summary>A small blossom on a short stalk (the stalk is tinted along with the petals).</summary>
-    public static SphereMesh Blossom() => new() { Radius = 0.09f, Height = 0.14f, RadialSegments = 6, Rings = 3 };
+    /// <summary>The short meadow grass around the player (Graphics/GrassField): many thin blades per clump.</summary>
+    public static ArrayMesh MeadowClump() => _meadow ??= BladeClump(17, 16, 0.3f, 0.016f, 0.22f);
 
-    public static SphereMesh Rock() => new() { Radius = 1f, Height = 2f, RadialSegments = 7, Rings = 4 };
 
     public static CylinderMesh Reed() => new() { TopRadius = 0.004f, BottomRadius = 0.014f, Height = 1.5f, RadialSegments = 4, Rings = 1 };
 

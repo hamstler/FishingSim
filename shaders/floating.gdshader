@@ -31,6 +31,9 @@ void vertex() {
 }
 
 void fragment() {
+	if (!FRONT_FACING) {
+		NORMAL = -NORMAL;     // both sides of a leaf lit alike
+	}
 	vec3 c = srgb_to_linear(COLOR.rgb);
 	ALBEDO = c;
 	ROUGHNESS = 0.6;

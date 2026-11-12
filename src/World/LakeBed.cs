@@ -250,6 +250,37 @@ public partial class LakeBed : Node3D
         return new Color(c.R + n, c.G + n, c.B + n);
     }
 
+    /// <summary>
+    /// How much of the painted grounds lies at a point (terrain.gdshader): sand, dirt path, forest floor, lake bed; the
+    /// meadow is the rest, rock and snow come from slope and height in the shader.
+    /// </summary>
+    public Vector4 GroundAt(LocationData loc, float x, float z, float h)
+    {
+        if (h < 0f)
+        {
+            float bed = Smooth(0.25f, 1.6f, -h);
+            return new Vector4(1f - bed, 0f, 0f, bed);
+        }
+        float sand = 1f - Smooth(0.5f, 1.25f, h);
+        var layout = LayoutFor(loc);
+        float path = h >= 0.4f ? (1f - Smooth(0.8f, 2.0f, layout.PathDistance(x, z))) * 0.95f : 0f;
+        // Trodden ground around the buildings.
+        path = MathF.Max(path, (1f - Smooth(-2.5f, 0.8f, layout.PadDistance(x, z))) * 0.5f * Smooth(0.6f, 1.2f, h));
+        // The forest floor where the trees stand (Scenery plants them where ForestDensity passes this threshold).
+        float threshold = -0.08f + (1f - loc.TreeDensity) * 0.5f;
+        float forest = Smooth(threshold - 0.04f, threshold + 0.14f, ForestDensity(x, z)) * Smooth(1.2f, 2.6f, h) * 0.95f;
+        forest *= 1f - path;
+        sand *= 1f - path;
+        float sum = sand + path + forest;
+        if (sum > 1f)
+        {
+            sand /= sum;
+            path /= sum;
+            forest /= sum;
+        }
+        return new Vector4(sand, path, forest, 0f);
+    }
+
     private ShaderMaterial? _terrainMaterial;
 
     /// <summary>The ground material (shaders/terrain.gdshader); also animated (caustics) by <see cref="_Process"/>.</summary>
@@ -259,9 +290,43 @@ public partial class LakeBed : Node3D
             return _terrainMaterial;
         _terrainMaterial = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/terrain.gdshader") };
         _terrainMaterial.SetShaderParameter("noise_tex", Graphics.ProceduralTextures.Noise(17, 0.01f, 1024));
-        _terrainMaterial.SetShaderParameter("detail_normal", Graphics.ProceduralTextures.Noise(23, 0.015f, 1024, true, 10f));
         _terrainMaterial.SetShaderParameter("caustics_tex", Graphics.ProceduralTextures.Caustics());
+        _terrainMaterial.SetShaderParameter("tile", Props.GroundTextures.TileMetres);
+        // The painted grounds (a few seconds the first time, then from the disk cache); not needed without a screen.
+        if (!Graphics.Renderer.IsHeadless)
+        {
+            _terrainMaterial.SetShaderParameter("ground_albedo", Props.GroundTextures.Albedo);
+            _terrainMaterial.SetShaderParameter("ground_normal", Props.GroundTextures.Normal);
+        }
         return _terrainMaterial;
+    }
+
+    /// <summary>Tints the painted grounds with the map's colours: each layer's average becomes the map's colour.</summary>
+    private void ApplyGroundTints(LocationData loc)
+    {
+        if (Graphics.Renderer.IsHeadless)
+            return;
+        var material = TerrainMaterial();
+        static Vector3 Lin(Color c) => new(Props.GroundTextures.Lin(c.R), Props.GroundTextures.Lin(c.G), Props.GroundTextures.Lin(c.B));
+        Vector3 Towards(Color mapColour, int layer, float amount)
+        {
+            var mean = Props.GroundTextures.Mean(layer);
+            var want = Lin(mapColour);
+            var k = new Vector3(want.X / MathF.Max(mean.R, 0.001f), want.Y / MathF.Max(mean.G, 0.001f), want.Z / MathF.Max(mean.B, 0.001f));
+            return Vector3.One.Lerp(k, amount);
+        }
+        var tints = new Vector3[Props.GroundTextures.Count];
+        // Meadows a touch calmer than the map's colour (lit smoothly now, without the old banding, they read brighter).
+        static Color Calm(Color c) => new Color(c.Luminance, c.Luminance, c.Luminance).Lerp(c, 0.85f) * 0.92f;
+        tints[Props.GroundTextures.Grass] = Towards(Calm(loc.GrassColor), Props.GroundTextures.Grass, 1f);
+        tints[Props.GroundTextures.Forest] = Towards(loc.DarkGrassColor.Lerp(loc.PathColor, 0.6f) * 0.75f, Props.GroundTextures.Forest, 0.35f);
+        tints[Props.GroundTextures.Sand] = Towards(loc.SandColor, Props.GroundTextures.Sand, 1f);
+        tints[Props.GroundTextures.Path] = Towards(Calm(loc.PathColor), Props.GroundTextures.Path, 1f);
+        tints[Props.GroundTextures.Bed] = Towards(loc.SandColor * 0.7f, Props.GroundTextures.Bed, 0.5f);
+        tints[Props.GroundTextures.Rock] = Vector3.One;
+        tints[Props.GroundTextures.Snow] = Vector3.One;
+        material.SetShaderParameter("layer_tint", tints);
+        material.SetShaderParameter("dark_grass_tint", Towards(Calm(loc.DarkGrassColor), Props.GroundTextures.Grass, 1f));
     }
 
     private float _time;
@@ -295,7 +360,10 @@ public partial class LakeBed : Node3D
             {
                 float x = XMin + ix * Step, z = ZMin + iz * Step;
                 float h = HeightAt(loc, x, z);
+                var ground = GroundAt(loc, x, z, h);
                 st.SetColor(ColorAt(loc, x, z, h));
+                st.SetUV(new Vector2(ground.X, ground.Y));
+                st.SetUV2(new Vector2(ground.Z, ground.W));
                 st.AddVertex(new Vector3(x, h, z));
             }
         }
@@ -311,6 +379,7 @@ public partial class LakeBed : Node3D
         st.GenerateNormals();
         var mesh = st.Commit();
 
+        ApplyGroundTints(loc);
         _body = new StaticBody3D { CollisionLayer = 1 };
         _body.AddChild(new MeshInstance3D { Mesh = mesh, MaterialOverride = TerrainMaterial() });
         var shape = mesh.CreateTrimeshShape();

@@ -401,10 +401,10 @@ public partial class Scenery : Node3D
     // ------------------------------------------------------------------ trees
     private static Color CrownColor(string kind) => kind switch
     {
-        "spruce" => new Color(0.09f, 0.25f, 0.15f),
+        "spruce" => new Color(0.19f, 0.37f, 0.23f),
         "oak" => new Color(0.24f, 0.42f, 0.11f),
         "birch" => new Color(0.42f, 0.62f, 0.2f),
-        "pine" => new Color(0.1f, 0.27f, 0.14f),
+        "pine" => new Color(0.22f, 0.4f, 0.21f),
         "willow" => new Color(0.38f, 0.52f, 0.2f),
         _ => new Color(0.2f, 0.4f, 0.12f),
     };
@@ -484,7 +484,7 @@ public partial class Scenery : Node3D
         {
             var meshes = TreeFactory.Get(kind);
             if (meshes.Trunk != null)
-                AddMultiMesh(meshes.Trunk, trunks[kind], trunkColors[kind], TreeFactory.BarkMaterial());
+                AddMultiMesh(meshes.Trunk, trunks[kind], trunkColors[kind], TreeFactory.BarkMaterial(kind == "birch"));
             AddMultiMesh(meshes.Crown, crowns[kind], crownColors[kind], TreeFactory.FoliageMaterial(meshes.Needles));
         }
     }
@@ -518,7 +518,7 @@ public partial class Scenery : Node3D
             }
             else if (kindRoll < 0.4f && patch > 0.0f && flowers.Count < maxFlowers)
             {
-                flowers.Add(new Transform3D(Basis.Identity.Scaled(new Vector3(s, s, s) * 0.8f), new Vector3(x, h + 0.14f, z)));
+                flowers.Add(new Transform3D(new Basis(Vector3.Up, yaw).Scaled(new Vector3(s, s * rng.RandfRange(0.7f, 1.3f), s)), new Vector3(x, h - 0.03f, z)));
                 flowerColors.Add(palette[rng.RandiRange(0, palette.Length - 1)]);
             }
             else if (tufts.Count < maxTufts && patch > -0.35f)
@@ -564,9 +564,9 @@ public partial class Scenery : Node3D
 
         AddMultiMeshChunked(TreeFactory.Get("bush").Crown, bushes, bushColors, TreeFactory.FoliageMaterial(false), 220f);
         AddMultiMeshChunked(TreeFactory.Get("hazel").Crown, hazels, hazelColors, TreeFactory.FoliageMaterial(false), 220f);
-        AddMultiMeshChunked(TreeFactory.Blossom(), flowers, flowerColors, null, 80f, shadows: false);
+        AddMultiMeshChunked(TreeFactory.Wildflower(), flowers, flowerColors, TreeFactory.FlowerMaterial(), 80f, shadows: false);
         AddMultiMeshChunked(TreeFactory.Tuft(), tufts, tuftColors, TreeFactory.GrassMaterial(), 90f, shadows: false);
-        AddMultiMeshChunked(TreeFactory.Fern(), ferns, fernColors, TreeFactory.GrassMaterial(), 90f, shadows: false);
+        AddMultiMeshChunked(TreeFactory.Fern(), ferns, fernColors, TreeFactory.FernMaterial(), 90f, shadows: false);
         Count("bush", bushes.Count);
         Count("hazel", hazels.Count);
         Count("flower", flowers.Count);
@@ -680,14 +680,14 @@ public partial class Scenery : Node3D
                 irisColors.Add(Tint(new Color(0.3f, 0.45f, 0.18f), rng.RandfRange(-0.04f, 0.04f)));
                 if (rng.Randf() < 0.7f)
                 {
-                    irisFlowers.Add(new Transform3D(Basis.Identity.Scaled(new Vector3(0.7f, 0.9f, 0.7f)), new Vector3(x + 0.05f, h + 0.68f * sc, z)));
+                    irisFlowers.Add(new Transform3D(new Basis(Vector3.Up, rng.Randf() * Mathf.Tau).Scaled(new Vector3(sc, sc, sc)), new Vector3(x + 0.05f, h - 0.02f, z)));
                     irisFlowerColors.Add(new Color(0.98f, 0.84f, 0.15f));
                 }
             }
         }
         AddMultiMeshChunked(TreeFactory.Rush(), rushes, rushColors, TreeFactory.GrassMaterial(), 140f, 48f, shadows: false);
         AddMultiMeshChunked(TreeFactory.IrisLeaves(), irises, irisColors, TreeFactory.GrassMaterial(), 120f, 48f, shadows: false);
-        AddMultiMeshChunked(TreeFactory.Blossom(), irisFlowers, irisFlowerColors, null, 120f, 48f, shadows: false);
+        AddMultiMeshChunked(TreeFactory.Wildflower(3, 0.85f, 0.07f, 0.045f), irisFlowers, irisFlowerColors, TreeFactory.FlowerMaterial(), 120f, 48f, shadows: false);
         Count("rush", rushes.Count);
         Count("iris", irises.Count);
     }
@@ -794,7 +794,12 @@ public partial class Scenery : Node3D
             float gr = rng.RandfRange(0.38f, 0.55f);
             colors.Add(new Color(gr, gr * 0.98f, gr * 0.93f));
         }
-        AddMultiMesh(TreeFactory.Rock(), rocks, colors, TreeFactory.RockMaterial());
+        // Three boulder shapes, each rock one of them.
+        for (int v = 0; v < 3; v++)
+        {
+            var mine = Enumerable.Range(0, rocks.Count).Where(i => i % 3 == v).ToList();
+            AddMultiMesh(TreeFactory.Boulder(v), mine.Select(i => rocks[i]).ToList(), mine.Select(i => colors[i]).ToList(), TreeFactory.RockMaterial());
+        }
         Count("rock", rocks.Count);
     }
 }

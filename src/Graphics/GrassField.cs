@@ -18,7 +18,6 @@ public partial class GrassField : Node3D
     private Node3D _follow = null!;
     private MultiMeshInstance3D _instance = null!;
     private Vector2 _centre = new(float.MaxValue, float.MaxValue);
-    private static ArrayMesh? _clump;
 
     public int Count => _instance?.Multimesh?.InstanceCount ?? 0;
 
@@ -134,6 +133,10 @@ public partial class GrassField : Node3D
                 var c = _bed.ColorAt(loc, x, z, h);
                 if (c.G < c.R * 1.02f || c.G < c.B)          // sand, path, rock or snow
                     continue;
+                // Only the meadow gets blades; under the trees (forest floor) just a few.
+                var ground = _bed.GroundAt(loc, x, z, h);
+                if (1f - ground.X - ground.Y - ground.Z - ground.W < 0.5f && (ground.Z < 0.4f || Hash(ix, iz, 8) > 0.2f))
+                    continue;
                 float s = (0.7f + 0.6f * Hash(ix, iz, 4)) * (1f - edge * 0.5f);
                 var basis = new Basis(Vector3.Up, Hash(ix, iz, 5) * Mathf.Tau).Scaled(new Vector3(s, s * (0.8f + 0.5f * Hash(ix, iz, 6)), s));
                 transforms.Add(new Transform3D(basis, new Vector3(x, h - 0.02f, z)));
@@ -146,7 +149,7 @@ public partial class GrassField : Node3D
         {
             TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
             UseColors = true,
-            Mesh = _clump ??= TreeFactory.BladeClump(17, 6, 0.42f, 0.035f, 0.2f),
+            Mesh = TreeFactory.MeadowClump(),
             InstanceCount = transforms.Count,
         };
         for (int i = 0; i < transforms.Count; i++)
