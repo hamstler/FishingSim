@@ -1,0 +1,14 @@
+{
+ "id": "medieval_wood",
+ "name": "Medieval Wood",
+ "authors": [
+  "Rob Tuytel"
+ ],
+ "metres": [
+  2.0,
+  2.0
+ ],
+ "licence": "CC0 1.0 (public domain)",
+ "source": "https://polyhaven.com/a/medieval_wood",
+ "grey": false
+}

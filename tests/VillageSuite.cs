@@ -61,7 +61,7 @@ public sealed class VillageSuite : ITestSuite
 
             bool onLand = layout.Specs.All(s => bed.InsideMetres(loc, s.Position.X, s.Position.Y) < -2f);
             t.Check(onLand, "every building stands on land");
-            bool inBounds = layout.Specs.All(s => s.Position.X is > -150f and < 150f && s.Position.Y is > 0f and < 66f);
+            bool inBounds = layout.Specs.All(s => bed.PlayDistance(s.Position.X, s.Position.Y) < -25f && s.Position.Y > 0f);
             t.Check(inBounds, "every building is inside the walkable area");
 
             float worstPad = 0f;
@@ -153,8 +153,16 @@ public sealed class VillageSuite : ITestSuite
             stats[loc.DisplayName] = new Dictionary<string, int>(scenery.Stats);
             int functional = loc.BuildingSpecs().Count(s => s.IsFunctional);
             int sights = loc.Landmarks.Count(l => !l.StartsWith("platforms"));
-            t.Check(scenery.Interactables.Count == functional && scenery.Markers.Count == functional + sights,
-                $"{loc.DisplayName}: {functional} doors with a prompt, map markers for them and {sights} landmarks");
+            int doors = scenery.Interactables.Count(x => x.Kind is not (InteractKind.Campfire or InteractKind.Forage or InteractKind.Smokehouse or InteractKind.NoticeBoard));
+            int fires = scenery.Campfires.Count;
+            int smokehouses = loc.BuildingSpecs().Count(s => s.Kind == BuildingKind.Smokehouse);
+            int boards = scenery.Interactables.Count(x => x.Kind == InteractKind.NoticeBoard);
+            int forage = scenery.Interactables.Count(x => x.Kind == InteractKind.Forage);
+            t.Check(doors == functional && fires == 2 && smokehouses == 1 && boards == 1 && forage == scenery.Forage.Count && forage >= 12
+                    && scenery.Interactables.Count == functional + fires + smokehouses + boards + forage
+                    && scenery.Markers.Count == functional + sights + fires + smokehouses + boards,
+                $"{loc.DisplayName}: {functional} doors with a prompt, {fires} campfires (camp and hearth), a smokehouse, a notice board, "
+                + $"{forage} forest pickings, map markers for them and {sights} landmarks");
             t.Check(loc.Landmarks.Length > 0 && scenery.Stats.Where(kv => kv.Key.StartsWith("landmark_")).Sum(kv => kv.Value) == loc.Landmarks.Length,
                 $"{loc.DisplayName}: its own landmarks are built ({string.Join(", ", loc.Landmarks.Select(l => l.Split(',')[0]))})");
             t.Check(scenery.Stats.Where(kv => kv.Key.StartsWith("building_")).Sum(kv => kv.Value) == loc.Buildings.Length, $"{loc.DisplayName}: every building was built");
@@ -175,6 +183,15 @@ public sealed class VillageSuite : ITestSuite
         t.Check(Get("Staw Karpiowy", "tree_oak") + Get("Staw Karpiowy", "tree_spruce") + Get("Staw Karpiowy", "tree_birch")
             < Get("Jezioro Zielone", "tree_oak") + Get("Jezioro Zielone", "tree_spruce") + Get("Jezioro Zielone", "tree_birch"), "the pond meadow has fewer trees than the forest lake");
         t.Check(Get("Staw Karpiowy", "building_windmill") == 1 && Get("Staw Karpiowy", "building_barn") == 1, "the farm has a windmill and a barn");
+        foreach (var (map, counts) in stats)
+            GD.Print($"  plants on {map}: " + string.Join(", ", new[] { "tree_", "bush", "hazel", "fern", "tuft", "flower", "reed", "rush", "iris", "lily", "lily_flower", "pondweed" }
+                .Select(k => $"{k.TrimEnd('_')} {(k.EndsWith('_') ? counts.Where(kv => kv.Key.StartsWith(k)).Sum(kv => kv.Value) : counts.GetValueOrDefault(k))}")));
+        t.Check(stats.Values.All(c => c.GetValueOrDefault("fern") > 50 && c.GetValueOrDefault("tuft") > 1000 && c.GetValueOrDefault("rush") > 100),
+            "every map has a forest floor of ferns, grassy meadows and rushes at the water's edge");
+        t.Check(Get("Zatoka Szuwarowa", "lily") > Get("Jezioro Zielone", "lily") && Get("Jezioro Zielone", "lily") > Get("Górskie Jezioro", "lily") * 3
+            && Get("Jezioro Zielone", "lily_flower") > 0 && Get("Staw Karpiowy", "pondweed") > 0,
+            $"water lilies cover the warm bay more than the cold mountain lake (bay {Get("Zatoka Szuwarowa", "lily")}, lake {Get("Jezioro Zielone", "lily")}, mountains {Get("Górskie Jezioro", "lily")})");
+        t.Check(Get("Jezioro Zielone", "hazel") > 30 && Get("Jezioro Zielone", "iris") > 20, "hazel shrubs under the trees and yellow irises on the banks");
 
         // main is now the mountain map (last in the loop); go back to the first map for the rest.
         main!.QueueFree();
@@ -239,7 +256,7 @@ public sealed class VillageSuite : ITestSuite
         int total = shop.Tabs.GetTabCount();
         foreach (var (kind, shown) in new[]
         {
-            (InteractKind.Tackle, 7), (InteractKind.Bait, 1), (InteractKind.FishBuyer, 2), (InteractKind.Market, 2), (InteractKind.General, 10),
+            (InteractKind.Tackle, 8), (InteractKind.Bait, 1), (InteractKind.FishBuyer, 2), (InteractKind.Market, 2), (InteractKind.General, 11),
             (InteractKind.BusStop, 1),
         })
         {
@@ -269,7 +286,9 @@ public sealed class VillageSuite : ITestSuite
         lake.SetLocation(2);
         await t.NextFrame();
         t.Check(lake.LocationIndex == 2 && player.GlobalPosition.DistanceTo(Player.SpawnPoint) < 0.5f && rod.State == RodState.Idle, "a new map puts the player back on the pier");
-        t.Check(main.Scenery.Interactables.Count == lake.Location.BuildingSpecs().Count(s => s.IsFunctional), "the new map's doors replace the old ones");
+        t.Check(main.Scenery.Interactables.Count(x => x.Kind is not (InteractKind.Campfire or InteractKind.Forage or InteractKind.Smokehouse or InteractKind.NoticeBoard))
+                == lake.Location.BuildingSpecs().Count(s => s.IsFunctional)
+                && main.Scenery.Campfires.Count == 2, "the new map's doors and campfires replace the old ones");
 
         t.Section("night");
         var building = main.Scenery.GetChildren().OfType<Building>().First(b => b.Spec.IsFunctional);

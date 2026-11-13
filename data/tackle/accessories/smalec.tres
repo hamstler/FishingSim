@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AccessoryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/AccessoryData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Gęsi smalec do kołowrotka"
+Kind = 7
+Power = 0.12
+Description = "Nasmarowany kołowrotek zwija o jedną ósmą szybciej."
+Price = 15
+RequiredLevel = 1

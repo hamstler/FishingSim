@@ -1,0 +1,54 @@
+{
+ "id": "male_peasant",
+ "sex": "M",
+ "hair": [
+  "Hair_SimpleParted",
+  "Hair_Buzzed",
+  "Hair_Long",
+  "Hair_Beard"
+ ],
+ "materials": {
+  "skin": {
+   "albedo": [
+    "skin_m_a"
+   ],
+   "normal": "skin_m_n",
+   "roughness": "skin_m_r"
+  },
+  "eye": {
+   "albedo": [
+    "eye_a"
+   ],
+   "normal": "eye_n",
+   "roughness_value": 0.35
+  },
+  "hair1": {
+   "albedo": [
+    "hair1_a"
+   ],
+   "normal": "hair1_n",
+   "roughness_value": 0.82
+  },
+  "hair2": {
+   "albedo": [
+    "hair2_a"
+   ],
+   "normal": "hair2_n",
+   "roughness_value": 0.82
+  },
+  "outfit": {
+   "albedo": [
+    "peasant_a",
+    "peasant2_a"
+   ],
+   "normal": "peasant_n",
+   "orm": "peasant_orm"
+  }
+ },
+ "author": "Quaternius",
+ "licence": "CC0 1.0 (public domain)",
+ "sources": [
+  "https://quaternius.com/packs/universalbasecharacters.html",
+  "https://quaternius.com/packs/modularcharacteroutfitsfantasy.html"
+ ]
+}

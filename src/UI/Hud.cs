@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 using Godot;
 using FishingSim.Core;
@@ -23,6 +24,55 @@ public partial class Hud : CanvasLayer
     private FishingRod _rod = null!;
     private TournamentManager _tournaments = null!;
     private InteractionManager _interactions = null!;
+    private HBoxContainer _toolbar = null!;
+    private Label _meal = null!;
+    private string _toolbarKey = "";
+
+    /// <summary>The angler's tools (set by Main), shown as a little bar when more than the rod is owned.</summary>
+    public HandTools? Tools { get; set; }
+
+    private void UpdateToolbar()
+    {
+        if (Tools == null)
+            return;
+        var list = Tools.Available();
+        string key = string.Join(",", list) + "|" + Tools.Current;
+        if (key != _toolbarKey)
+        {
+            _toolbarKey = key;
+            foreach (var c in _toolbar.GetChildren())
+                c.QueueFree();
+            foreach (var tool in list)
+            {
+                bool on = tool == Tools.Current;
+                var slot = new PanelContainer { CustomMinimumSize = new Vector2(52, 52), TooltipText = HandTools.NameOf(tool) };
+                slot.AddThemeStyleboxOverride("panel", UiArt.Nine(UiArt.InsetTexture, 4, 3));
+                slot.Modulate = on ? Colors.White : new Color(1f, 1f, 1f, 0.55f);
+                slot.AddChild(new TextureRect
+                {
+                    Texture = IconOf(tool), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                    StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered, CustomMinimumSize = new Vector2(44, 44),
+                });
+                if (on)
+                    slot.AddThemeStyleboxOverride("panel", UITheme.Box(new Color(0.3f, 0.22f, 0.1f, 0.85f), UITheme.Accent, 4, 2, 3));
+                _toolbar.AddChild(slot);
+            }
+            var hint = new Label { Text = "Q", SizeFlagsVertical = Control.SizeFlags.ShrinkCenter };
+            hint.AddThemeFontSizeOverride("font_size", 14);
+            hint.AddThemeColorOverride("font_color", new Color(Ink, 0.8f));
+            _toolbar.AddChild(hint);
+        }
+        _toolbar.Visible = list.Count > 1 && !_helpOpen;
+    }
+
+    private Texture2D IconOf(HandTool tool) => tool switch
+    {
+        HandTool.Shovel => Graphics.Icons.For(GD.Load<Data.AccessoryData>("res://data/tackle/accessories/lopata.tres")),
+        HandTool.Net => Graphics.Icons.For(GD.Load<Data.AccessoryData>("res://data/tackle/accessories/siatka_na_owady.tres")),
+        HandTool.LiftNet => Graphics.Icons.For(GD.Load<Data.AccessoryData>("res://data/tackle/accessories/podrywka.tres")),
+        _ => Graphics.Icons.For(_rod.Loadout.Rod),
+    };
+
     private Label _status = null!, _purse = null!, _tackle = null!, _time = null!, _banner = null!, _prompt = null!, _tournament = null!;
     private Label _help = null!, _hint = null!, _dev = null!, _drag = null!;
     private ProgressBar _power = null!;
@@ -118,6 +168,14 @@ public partial class Hud : CanvasLayer
         _banner = Text(26, Ink, HorizontalAlignment.Center);
         Anchor(_banner, 0.5f, 0f, -420, 90, 420, 220);
 
+        // The tools in hand (Q): rod, shovel, insect net; and the meal's buff under them.
+        _toolbar = new HBoxContainer { Visible = false };
+        _toolbar.AddThemeConstantOverride("separation", 6);
+        Anchor(_toolbar, 0f, 1f, 16, -168, 300, -112);
+        AddChild(_toolbar);
+        _meal = Text(14, new Color(1f, 0.86f, 0.55f));
+        Anchor(_meal, 0f, 1f, 16, -196, 520, -170);
+
         _prompt = Text(19, Gold, HorizontalAlignment.Center);
         Anchor(_prompt, 0.5f, 1f, -400, -170, 400, -140);
 
@@ -129,10 +187,9 @@ public partial class Hud : CanvasLayer
         _gauge = new TensionGauge { Rod = _rod };
         Anchor(_gauge, 0.5f, 1f, -GaugeHalfWidth, GaugeTop, GaugeHalfWidth, GaugeTop + GaugeHeight);
         AddChild(_gauge);
-        // After a landing: keep it or let it go (above the status line, the fish is held up in the left hand).
+        // After a landing: the catch on its stage, keep it or let it go (over everything, the world dimmed).
         _catchPanel = new CatchPanel();
         _catchPanel.Setup(_rod);
-        Anchor(_catchPanel, 0.5f, 1f, -320, -300, 320, -130);
         AddChild(_catchPanel);
         _power = new ProgressBar { ShowPercentage = false, Theme = UITheme.Make() };
         Anchor(_power, 0.5f, 1f, -160, -80, 160, -72);
@@ -142,7 +199,8 @@ public partial class Hud : CanvasLayer
         _drag = Text(17, Ink, HorizontalAlignment.Right);
         PlaceDrag(false);
         _purse = Text(15, new Color(Ink, 0.9f), HorizontalAlignment.Right);
-        Anchor(_purse, 1f, 1f, -460, -66, -16, -40);
+        Anchor(_purse, 1f, 1f, -560, -92, -16, -40);
+        _purse.VerticalAlignment = VerticalAlignment.Bottom;
         _tackle = Text(14, new Color(Ink, 0.85f));
         Anchor(_tackle, 0f, 1f, 16, -100, 520, -14);
 
@@ -216,13 +274,20 @@ public partial class Hud : CanvasLayer
         _power.Value = rod.CastPower * 100f;
 
         SetText(_drag, $"Hamulec {Mathf.RoundToInt(rod.DragSetting * 100f)}%");
+        // The drag belongs to the rod: not shown with a tool in hand.
+        _drag.Visible = !rod.Holstered;
         SetText(_banner, rod.BannerTime > 0f ? rod.BannerText : _banner.Text);
-        Fade(_banner, rod.BannerTime > 0f, dt);
+        // While the catch panel is open it says it all.
+        Fade(_banner, rod.BannerTime > 0f && !_catchPanel.Visible, dt);
 
         // Purse and keepnet: flash when they change.
         var pr = rod.Profile;
         string limit = pr.KeepnetLimit is { } net ? $"/{net.MaxFish}" : "";
         string purse = $"{Lore.Money(pr.Money)}  ·  siatka {pr.Keepnet.Count}{limit}  ·  poziom {pr.Level}";
+        // The pantry and the smoked fish, when there are any.
+        string pantry = Core.Camp.Foraging.Describe(pr.Pantry);
+        if (pantry.Length > 0 || pr.Smoked.Count > 0)
+            purse += "\n" + string.Join("  ·  ", new[] { pantry, pr.Smoked.Count > 0 ? $"wędzonki ×{pr.Smoked.Count}" : "" }.Where(x => x.Length > 0));
         if (purse != _lastPurse)
         {
             if (_lastPurse != "")
@@ -234,7 +299,8 @@ public partial class Hud : CanvasLayer
         Fade(_purse, _purseFlash > 0f || details, dt);
 
         var lo = rod.Loadout;
-        string tackle = $"{lo.Rod.DisplayName}, {lo.Reel.DisplayName}\n{lo.Line.DisplayName}, {lo.Hook.DisplayName}\n{lo.Bait.DisplayName} ×{lo.BaitCount}";
+        string leader = lo.Leader.ItemId == Progress.TackleSlotExtensions.NoLeader ? "" : $", {lo.Leader.DisplayName}";
+        string tackle = $"{lo.Rod.DisplayName}, {lo.Reel.DisplayName}\n{lo.Line.DisplayName}{leader}, {lo.Hook.DisplayName}\n{lo.Bait.DisplayName} ×{lo.BaitCount}";
         if (tackle != _lastTackle)
         {
             if (_lastTackle != "")
@@ -248,6 +314,15 @@ public partial class Hud : CanvasLayer
         SetText(_time, $"{rod.World.TimeText}  ·  {rod.World.Weather.DisplayName()}\n{rod.Lake.Location.DisplayName}");
         if (_minimap == null)
             Fade(_time, details, dt);
+
+        UpdateToolbar();
+        bool soaking = Tools is { Current: HandTool.LiftNet, Lift: HandTools.LiftStage.Down };
+        SetText(_meal, soaking
+            ? $"Podrywka w wodzie: {Tools!.Soak:0} s  (LPM podrywa)"
+            : pr.ActiveMeal is { } meal
+            ? $"{meal.Name}: +{meal.XpBonus * 100f:0}% XP, szybsze brania ({pr.MealHoursLeft:0.0} h)"
+            : "");
+        Fade(_meal, soaking || pr.ActiveMeal != null, dt);
 
         var spot = _interactions.Current;
         if (spot != null)

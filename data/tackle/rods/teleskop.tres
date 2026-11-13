@@ -11,3 +11,5 @@ ShockAbsorb = 0.2
 Price = 120
 RequiredLevel = 2
 Action = 0.5
+Kind = 0
+Description = "Uniwersalna wędka z jesionu do łowienia na spławik."

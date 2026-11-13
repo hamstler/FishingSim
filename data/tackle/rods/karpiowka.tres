@@ -11,3 +11,5 @@ ShockAbsorb = 0.12
 Price = 600
 RequiredLevel = 5
 Action = 0.9
+Kind = 3
+Description = "Sztywna i mocna, pracuje całym blankiem: na karpie i amury."

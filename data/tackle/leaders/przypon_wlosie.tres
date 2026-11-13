@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="LeaderData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/LeaderData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Przypon z cienkiego włosia"
+Strength = 2.2
+Visibility = 0.7
+BiteProof = 0.0
+Price = 6
+RequiredLevel = 1
+Description = "Prawie niewidoczny dla płochliwych ryb, ale słaby."

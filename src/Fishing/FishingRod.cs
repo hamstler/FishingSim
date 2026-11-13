@@ -141,6 +141,9 @@ public partial class FishingRod : Node3D
     /// <summary>Sound cues for the audio engine (one-shot kind, gain).</summary>
     public event Action<Core.Audio.OneShot, float>? SoundCue;
 
+    /// <summary>Plays a one-shot through the game's sound (the shops' coins and clicks).</summary>
+    public void Cue(Core.Audio.OneShot sound, float gain = 1f) => SoundCue?.Invoke(sound, gain);
+
     /// <summary>True while the drag gives line to a running fish.</summary>
     public bool DragSlipping => State == RodState.Fight && (_fight?.Slipping ?? false);
 
@@ -164,7 +167,7 @@ public partial class FishingRod : Node3D
     public float LineOut => _fight?.LineOut ?? _lineOutOutsideFight;
     public float FishStamina => _fight?.Stamina ?? 1f;
 
-    /// <summary>Weakest link of the setup: the line or the rod, whichever gives first.</summary>
+    /// <summary>Weakest link of the setup: the line (with its leader) or the rod, whichever gives first.</summary>
     public float EffectiveLimit => MathF.Min(LineStrength, RodMaxLoad);
 
     public string StateName => StateNames[State];
@@ -205,15 +208,18 @@ public partial class FishingRod : Node3D
         var rod = Loadout.Rod;
         var reel = Loadout.Reel;
         var line = Loadout.Line;
+        var leader = Loadout.Leader;
         RodMaxLoad = rod.MaxLoad;
-        _rodShock = rod.ShockAbsorb;
+        // A stretchy line soaks up part of every surge on top of the rod; a braid passes it all on.
+        _rodShock = MathF.Min(rod.ShockAbsorb + 0.12f * line.Stretch, 0.5f);
         _castMin = BaseCastMin * rod.CastMult;
         _castMax = BaseCastMax * rod.CastMult;
         DragMax = reel.DragMax;
-        _reelSpeed = reel.ReelSpeed;
+        _reelSpeed = reel.ReelSpeed * (1f + (Gear?.Accessory(AccessoryKind.ReelGrease)?.Power ?? 0f));
         MaxLine = reel.LineCapacity;
-        LineStrength = line.Strength;
-        _lineVisibility = line.Visibility;
+        // The leader is part of the line: the weaker of the two holds, and the fish see the leader, not the line.
+        LineStrength = MathF.Min(line.Strength, leader.Strength);
+        _lineVisibility = leader.Visibility > 0f ? leader.Visibility : line.Visibility;
         // Rated power: the rod's own limit; it reads as fully bent near that load.
         _bendModel = new Core.Physics.RodBendModel(RodRig.Joints * RodRig.SegmentLength, rod.MaxLoad, rod.Action);
         // A snapped rod is gone: nothing left in the hand until a new one is bought or handed out.
@@ -281,8 +287,13 @@ public partial class FishingRod : Node3D
     public float Attraction() => BiteModel.Attraction(_species, MakeBiteContext(CurrentDepth()));
 
     // ------------------------------------------------------------------ input
+    /// <summary>True while another tool is in the hands (shovel, insect net): the rod is put away, it does nothing.</summary>
+    public bool Holstered { get; set; }
+
     public override void _UnhandledInput(InputEvent @event)
     {
+        if (Holstered)
+            return;
         if (InputBlocked)
         {
             if (AllowHookKey && @event is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Right })
@@ -383,7 +394,7 @@ public partial class FishingRod : Node3D
                     ShowBanner("Kolejne łowisko odblokujesz na wyższym poziomie");
                 }
                 break;
-            case >= Key.Key1 and <= Key.Key5 when State == RodState.Idle:
+            case >= Key.Key1 and <= Key.Key6 when State == RodState.Idle:
                 Loadout.Cycle((TackleSlot)(key.Keycode - Key.Key1), key.ShiftPressed ? -1 : 1);
                 ApplyTackle();
                 Profile.NotifyChanged();
@@ -398,7 +409,7 @@ public partial class FishingRod : Node3D
         if (_bobber == null)
             return;
         float dt = (float)delta;
-        bool captured = !InputBlocked && Input.MouseMode == Input.MouseModeEnum.Captured;
+        bool captured = !InputBlocked && !Holstered && Input.MouseMode == Input.MouseModeEnum.Captured;
         Reeling = ReelOverride || (captured && Input.IsMouseButtonPressed(MouseButton.Left));
         Lifting = LiftOverride || (captured && Input.IsMouseButtonPressed(MouseButton.Right));
         BannerTime = MathF.Max(BannerTime - dt, 0f);
@@ -458,6 +469,9 @@ public partial class FishingRod : Node3D
         State = s;
         _stateTime = 0f;
     }
+
+    /// <summary>Shows a line in the banner (camp tools, cooking).</summary>
+    public void Notify(string text, float seconds = 3f) => ShowBanner(text, seconds);
 
     private void ShowBanner(string text, float seconds = 3f)
     {
@@ -559,7 +573,8 @@ public partial class FishingRod : Node3D
     private void NewBiteTimer() =>
         _biteTimer = DevInstantBite
             ? 0.5f
-            : BiteModel.WaitSeconds(_rng, BiteWaitMin, BiteWaitMax, _lineVisibility, Attraction());
+            : BiteModel.WaitSeconds(_rng, BiteWaitMin, BiteWaitMax, _lineVisibility, Attraction())
+              / (1f + (Profile.ActiveMeal?.BiteBonus ?? 0f));   // a well-fed angler waits a little less
 
     private void TickWaiting(float dt)
     {
@@ -579,7 +594,12 @@ public partial class FishingRod : Node3D
         {
             _bobber.DriveVelocity = Vector3.Zero;
         }
-        _biteTimer -= dt;
+        // A lure only fishes while it moves: the clock to the next bite runs while it is reeled in (faster on a spinning
+        // rod), and barely at all while it lies still.
+        float pace = 1f;
+        if (Loadout.LureOn)
+            pace = Reeling ? (Loadout.Rod.Kind == RodKind.Spinning ? 3.2f : 2.4f) : 0.1f;
+        _biteTimer -= dt * pace;
         if (_biteTimer <= 0f)
             StartNibble();
     }
@@ -680,8 +700,9 @@ public partial class FishingRod : Node3D
                 SetState(RodState.Waiting);
                 break;
             case RodState.Bite:
-                // A badly sized hook loses fish.
-                float chance = 0.5f + 0.5f * BiteModel.HookFit(CurrentSpecies!, Loadout.Hook.Size);
+                // A badly sized hook loses fish; a sharpened hook and a braid that does not stretch set it better.
+                float chance = (0.5f + 0.5f * BiteModel.HookFit(CurrentSpecies!, Loadout.Hook.Size))
+                    * (1f + (Loadout.Line.Kind == LineKind.Braid ? 0.1f : 0f) + (Gear?.Accessory(AccessoryKind.HookHone)?.Power ?? 0f));
                 if (DevInstantBite || _rng.NextFloat() <= chance)
                 {
                     StartFight();
@@ -744,6 +765,14 @@ public partial class FishingRod : Node3D
             case FightOutcome.Landed:
                 EnterClose();
                 return;
+        }
+
+        // Teeth: a pike (or a wels, a zander) may bite through anything but a wire leader.
+        float bite = CurrentSpecies!.BiteOff * (1f - Loadout.Leader.BiteProof);
+        if (bite > 0f && !DevUnbreakable && _rng.NextFloat() < bite * dt)
+        {
+            BreakLine($"{CurrentSpecies.SpeciesName} przegryzł linkę! Przyda się przypon z drutu.", TackleSlot.Hook);
+            return;
         }
 
         // Fish position and visuals: where the fight model has it, facing the way it swims.
@@ -954,6 +983,18 @@ public partial class FishingRod : Node3D
         if (destroyed is TackleSlot slot && !DevUnbreakable)
         {
             var lost = Loadout.Selected(slot);
+            if (slot == TackleSlot.Hook)
+            {
+                // The hook goes with the fish, and with it the lure on it and the leader above it.
+                if (Loadout.Bait.Reusable && Loadout.BaitCount > 0)
+                {
+                    text += $" Stracono przynętę: {Loadout.Bait.DisplayName}.";
+                    Loadout.LoseLure();
+                }
+                var leader = Loadout.Leader;
+                if (Profile.Destroy(TackleSlot.Leader, leader.ItemId))
+                    text += $" Stracono: {leader.DisplayName}.";
+            }
             if (Profile.Destroy(slot, lost.ItemId))
             {
                 Loadout.Resync();
@@ -984,20 +1025,15 @@ public partial class FishingRod : Node3D
     private void ShowHeldFish(FishSpecies species, float weight)
     {
         ClearHeldFish();
-        // Held up side-on above the catch panel, like a photo of the catch, at its real size: a bigger, heavier fish
-        // fills more of the view (only a giant is held further off so it still fits).
+        // The detailed model at its real size; the catch panel puts it on its stage and turns it slowly. Until then
+        // (or without a panel, in tests) it waits hidden by the camera, where its skin is painted in the background.
         var model = FishModel.Create(species, weight, detailed: true);
-        float fit = MathF.Min(1f, 1.15f / model.Length);
-        float shown = model.Length * fit, distance = Math.Clamp(0.42f + 0.32f * shown, 0.42f, 0.8f);
-        model.Scale = new Vector3(fit, fit, fit);
-        model.Wiggle = 0.25f;
-        model.Position = new Vector3(0.02f, 0.1f * distance / 0.6f, -distance);
-        model.RotationDegrees = new Vector3(-4f, -80f, 6f);
+        model.Visible = false;
         _camera.AddChild(model);
         _heldFish = model;
     }
 
-    /// <summary>A fish has just been landed and is held up: the catch panel asks where it goes.</summary>
+    /// <summary>A fish has just been landed: the catch panel shows it and asks where it goes.</summary>
     public bool AwaitingDecision { get; private set; }
 
     /// <summary>What the last landing earned (XP, record, value) for the catch panel.</summary>
@@ -1043,7 +1079,7 @@ public partial class FishingRod : Node3D
         ClearHeldFish();
     }
 
-    /// <summary>The landed fish shown in front of the camera (held in the left hand), or null.</summary>
+    /// <summary>The landed fish (on the catch panel's stage), or null.</summary>
     public Node3D? HeldFish => _heldFish;
 
     /// <summary>The held fish's model (to check its detailed skin).</summary>

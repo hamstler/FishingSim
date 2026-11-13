@@ -30,6 +30,9 @@ public partial class FishSpecies : Resource
     [Export] public float BurstMult { get; set; } = 1.5f;
     [Export] public float BurstRate { get; set; } = 1f;
 
+    /// <summary>Teeth: the chance per second of the fight that it bites through a leader that is not wire (0 = none).</summary>
+    [Export] public float BiteOff { get; set; }
+
     // --- habitat & feeding ---
     /// <summary>Hook size (1..10) this species takes best.</summary>
     [Export] public float MouthSize { get; set; } = 5f;
@@ -65,9 +68,17 @@ public partial class FishSpecies : Resource
     /// <summary>The lord's minimum size (as a weight): smaller fish must go back into the water.</summary>
     public float LegalWeight => MinWeight + (MaxWeight - MinWeight) * 0.12f;
 
-    /// <summary>Affinity for a bait id (0 when the species ignores it).</summary>
-    public float AffinityFor(string baitId) =>
-        BaitAffinity.TryGetValue(baitId, out var v) ? v.AsSingle() : 0f;
+    /// <summary>
+    /// Affinity for a bait id (0 when the species ignores it): its own entry, or else the entry for the bait's family
+    /// times the bait's scale (a hemp seed is judged as corn, a brass spoon as "spoon").
+    /// </summary>
+    public float AffinityFor(string baitId)
+    {
+        if (BaitAffinity.TryGetValue(baitId, out var v))
+            return v.AsSingle();
+        var (family, scale) = BaitFamilies.Of(baitId);
+        return family != "" && BaitAffinity.TryGetValue(family, out var f) ? f.AsSingle() * scale : 0f;
+    }
 
     /// <summary>Weather multiplier for a weather key (1 when unspecified).</summary>
     public float WeatherMultiplier(string weatherKey) =>

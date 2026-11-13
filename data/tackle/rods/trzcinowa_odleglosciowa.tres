@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Trzcinowa wędka odległościowa 4,2 m"
+Kind = 0
+CastMult = 1.35
+MaxLoad = 4.0
+ShockAbsorb = 0.28
+Action = 0.4
+Price = 300
+RequiredLevel = 4
+Description = "Lekka, długa trzcina: rzuca daleko delikatnym zestawem."

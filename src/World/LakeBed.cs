@@ -14,7 +14,15 @@ namespace FishingSim.World;
 public partial class LakeBed : Node3D
 {
     public const float Step = 2.5f;
-    public const float XMin = -170f, XMax = 170f, ZMin = -200f, ZMax = 70f;
+
+    /// <summary>The playable map (also the minimap's area): the angler is stopped at its rounded edge (<see cref="PlayDistance"/>).</summary>
+    public const float XMin = -190f, XMax = 190f, ZMin = -220f, ZMax = 100f;
+
+    /// <summary>The terrain is detailed (one vertex every <see cref="Step"/>) this far beyond the playable map...</summary>
+    public const float DetailMargin = 30f;
+
+    /// <summary>...and reaches this far beyond it with ever wider spacing, so the mountains around fill the horizon.</summary>
+    public const float Outer = 380f;
     public const float PierEndZ = -4f;
 
     /// <summary>Metres over which depth ramps up from the waterline.</summary>
@@ -22,6 +30,9 @@ public partial class LakeBed : Node3D
 
     /// <summary>Largest water depth (m) a player may wade into.</summary>
     public const float WadeDepth = 0.5f;
+
+    /// <summary>How deep the angler may wade here and now (deeper with waders).</summary>
+    public float WadeLimit { get; set; } = WadeDepth;
 
     public static readonly string[] LocationPaths =
     {
@@ -85,13 +96,35 @@ public partial class LakeBed : Node3D
         var layout = new MapLayout();
         layout.Specs.AddRange(loc.BuildingSpecs());
         var plaza = loc.PlazaCenter;
-        layout.Pads.Add(new Pad(plaza, 6f, MathF.Max(NaturalHeight(loc, plaza.X, plaza.Y), 1.25f)));
+        layout.PlazaHeight = MathF.Max(NaturalHeight(loc, plaza.X, plaza.Y), 1.25f);
+        layout.Pads.Add(new Pad(plaza, 6f, layout.PlazaHeight));
         foreach (var spec in layout.Specs.Where(s => s.PadRadius > 0f))
-            layout.Pads.Add(new Pad(spec.Position, spec.PadRadius, MathF.Max(NaturalHeight(loc, spec.Position.X, spec.Position.Y), 1.25f)));
+        {
+            var p = spec.Position;
+            float ground = VillageGround(loc, p.X, p.Y, NaturalHeight(loc, p.X, p.Y), layout.PlazaHeight);
+            layout.Pads.Add(new Pad(p, spec.PadRadius, MathF.Max(ground, 1.25f)));
+        }
 
         layout.Paths.Add(new PathSegment(MapLayout.PierRoot, plaza));
-        foreach (var spec in layout.Specs.Where(s => s.IsFunctional || s.Kind is BuildingKind.House))
-            layout.Paths.Add(new PathSegment(plaza, spec.DoorPoint(plaza)));
+        // Streets, then a short path from every door to the nearest street (or straight to the square without streets).
+        var streets = new List<PathSegment>();
+        foreach (var entry in loc.Streets)
+            if (LocationData.Numbers(entry) is { Length: >= 4 } n)
+                streets.Add(new PathSegment(new Vector2(n[0], n[1]), new Vector2(n[2], n[3])));
+        layout.Paths.AddRange(streets);
+        foreach (var spec in layout.Specs.Where(s => s.IsFunctional || s.IsDwelling))
+        {
+            var door = spec.DoorPoint(plaza);
+            var to = plaza;
+            float best = door.DistanceTo(plaza);
+            foreach (var street in streets)
+            {
+                var q = street.Closest(door);
+                if (door.DistanceTo(q) < best)
+                    (best, to) = (door.DistanceTo(q), q);
+            }
+            layout.Paths.Add(new PathSegment(to, door));
+        }
         _layouts[loc] = layout;
         return layout;
     }
@@ -173,6 +206,109 @@ public partial class LakeBed : Node3D
 
     public float HeightAt(float x, float z) => HeightAt(Location, x, z);
 
+    /// <summary>
+    /// Signed distance (m) from the edge of the playable map: negative inside. A rounded rectangle whose edge wanders a
+    /// little, so the dense forest and the foot of the mountains that hide it do not run in straight lines.
+    /// </summary>
+    public float PlayDistance(float x, float z)
+    {
+        const float r = 60f;
+        float cx = (XMin + XMax) * 0.5f, cz = (ZMin + ZMax) * 0.5f;
+        float qx = MathF.Abs(x - cx) - (XMax - XMin) * 0.5f + r, qz = MathF.Abs(z - cz) - (ZMax - ZMin) * 0.5f + r;
+        float outside = MathF.Sqrt(MathF.Max(qx, 0f) * MathF.Max(qx, 0f) + MathF.Max(qz, 0f) * MathF.Max(qz, 0f));
+        return outside + MathF.Min(MathF.Max(qx, qz), 0f) - r + _noise.GetNoise2D(x * 0.8f + 300f, z * 0.8f) * 7f;
+    }
+
+    /// <summary>
+    /// The mountains closing the map in: they start rising in the forest belt inside the edge, a few metres high where
+    /// the angler is stopped, and climb to <see cref="LocationData.RimHeight"/> with ridges, peaks and saddles.
+    /// </summary>
+    public float RimAt(LocationData loc, float x, float z)
+    {
+        float d = PlayDistance(x, z);
+        if (d < -45f)
+            return 0f;
+        float t = Smooth(-40f, 170f, d);
+        float ridge = 1f - MathF.Abs(_noise.GetNoise2D(x * 0.55f + 77f, z * 0.55f - 31f));
+        float peaks = 0.5f + 0.45f * ridge * ridge + 0.25f * _noise.GetNoise2D(x * 1.7f - 12f, z * 1.7f + 40f);
+        // A steeper bank right at the edge: the ground rises in front of the angler instead of an invisible wall.
+        float bank = 5f * Smooth(-14f, 12f, d);
+        return loc.RimHeight * MathF.Pow(t, 1.6f) * peaks + bank;
+    }
+
+    private static float Hash(int x, int z, int k, int seed)
+    {
+        unchecked
+        {
+            uint h = (uint)(x * 73856093) ^ (uint)(z * 19349663) ^ (uint)(k * 83492791) ^ (uint)(seed * 2654435761u);
+            h ^= h >> 13;
+            h *= 0x5bd1e995;
+            h ^= h >> 15;
+            return (h & 0xFFFFFF) / (float)0xFFFFFF;
+        }
+    }
+
+    /// <summary>A stable number per map (string hashes change between runs in .NET).</summary>
+    private static int SeedOf(LocationData loc)
+    {
+        int h = 17;
+        foreach (char c in loc.DisplayName)
+            h = h * 31 + c;
+        return h;
+    }
+
+    /// <summary>
+    /// Knolls and hills on the land: about three in four 46 m cells hold one, a smooth dome stretched in some direction,
+    /// small or large (up to ~0.45 of its radius high, so they stay walkable), taller on hilly maps.
+    /// </summary>
+    public float HillsAt(LocationData loc, float x, float z)
+    {
+        const float cell = 46f;
+        int seed = SeedOf(loc);
+        int cx = (int)MathF.Floor(x / cell), cz = (int)MathF.Floor(z / cell);
+        float h = 0f;
+        for (int dz = -1; dz <= 1; dz++)
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                int ix = cx + dx, iz = cz + dz;
+                if (Hash(ix, iz, 1, seed) > 0.75f)
+                    continue;
+                float hx = (ix + Hash(ix, iz, 2, seed)) * cell, hz = (iz + Hash(ix, iz, 3, seed)) * cell;
+                float radius = 12f + 26f * Hash(ix, iz, 4, seed);
+                float a = Hash(ix, iz, 6, seed) * MathF.PI, stretch = 0.55f + 0.45f * Hash(ix, iz, 7, seed);
+                float px = x - hx, pz = z - hz;
+                float u = (px * MathF.Cos(a) + pz * MathF.Sin(a)) / radius;
+                float v = (-px * MathF.Sin(a) + pz * MathF.Cos(a)) / (radius * stretch);
+                float d2 = u * u + v * v;
+                if (d2 >= 1f)
+                    continue;
+                float height = (1.2f + 8f * MathF.Pow(Hash(ix, iz, 5, seed), 1.5f)) * (0.45f + 0.55f * loc.HillScale);
+                height = MathF.Min(height, 0.45f * radius * stretch);
+                float k = 1f - d2;
+                h += height * k * k;
+            }
+        return h;
+    }
+
+    private readonly Dictionary<LocationData, List<(Vector2 P, float R)>> _flat = new();
+
+    /// <summary>0 where the ground must stay level (the village square, around the buildings), 1 away from them.</summary>
+    private float Unflattened(LocationData loc, float x, float z)
+    {
+        if (!_flat.TryGetValue(loc, out var spots))
+        {
+            spots = new List<(Vector2, float)> { (loc.PlazaCenter, 14f) };
+            foreach (var spec in loc.BuildingSpecs())
+                spots.Add((spec.Position, spec.PadRadius + 2f));
+            _flat[loc] = spots;
+        }
+        float k = 1f;
+        var p = new Vector2(x, z);
+        foreach (var (c, r) in spots)
+            k = MathF.Min(k, Smooth(r, r + 22f, p.DistanceTo(c)));
+        return k;
+    }
+
     /// <summary>Terrain height without the levelled building pads.</summary>
     public float NaturalHeight(LocationData loc, float x, float z)
     {
@@ -182,9 +318,12 @@ public partial class LakeBed : Node3D
         float sd = -inside;
         float hill = loc.HillScale;
         float h = 1.05f * Smooth(0f, 4f, sd);
-        h += 0.045f * MathF.Pow(MathF.Max(sd - 8f, 0f), 1.25f) * hill;
+        h += 0.045f * MathF.Pow(Math.Clamp(sd - 8f, 0f, 90f), 1.25f) * hill;
         h += _noise.GetNoise2D(x * 1.5f, z * 1.5f) * 3f * hill * Math.Clamp(sd / 40f, 0f, 1f);
         h += _noise.GetNoise2D(x * 8f, z * 8f) * 0.4f * Math.Clamp(sd / 10f, 0f, 1f);
+        // Hills of every size on the land (not on the beach, not in the village), then the mountains at the edge.
+        h += HillsAt(loc, x, z) * Smooth(8f, 30f, sd) * Unflattened(loc, x, z);
+        h += RimAt(loc, x, z);
         return h;
     }
 
@@ -193,8 +332,10 @@ public partial class LakeBed : Node3D
         float h = NaturalHeight(loc, x, z);
         if (h < 0f)
             return h;
+        var layout = LayoutFor(loc);
+        h = VillageGround(loc, x, z, h, layout.PlazaHeight);
         var p = new Vector2(x, z);
-        foreach (var pad in LayoutFor(loc).Pads)
+        foreach (var pad in layout.Pads)
         {
             float d = p.DistanceTo(pad.Center);
             float t = 1f - Smooth(pad.Radius * 0.75f, pad.Radius * 1.6f, d);
@@ -204,12 +345,28 @@ public partial class LakeBed : Node3D
         return h;
     }
 
+    /// <summary>
+    /// The village lies on one gentle level: within ~30 m of the square the ground eases to the square's height
+    /// (fading out towards the open land and towards the beach), so houses do not stand on mounds or in pits.
+    /// </summary>
+    private float VillageGround(LocationData loc, float x, float z, float h, float plazaHeight)
+    {
+        float d = new Vector2(x, z).DistanceTo(loc.PlazaCenter);
+        if (d > 70f)
+            return h;
+        float w = (1f - Smooth(30f, 68f, d)) * Smooth(5f, 14f, -InsideMetres(loc, x, z));
+        return h + (plazaHeight - h) * w;
+    }
+
     /// <summary>True where the player may stand: on land, in the shallows, or on the pier.</summary>
     public bool IsWalkable(float x, float z)
     {
         if (OnPier(x, z))
             return true;
-        return DepthAt(x, z) <= WadeDepth;
+        // The edge of the map lies in the dense forest at the foot of the mountains: the angler goes no further.
+        if (PlayDistance(x, z) > 0f)
+            return false;
+        return DepthAt(x, z) <= WadeLimit;
     }
 
     public static bool OnPier(float x, float z) => MathF.Abs(x) <= 1.6f && z >= -4.2f && z <= 6.2f;
@@ -247,6 +404,61 @@ public partial class LakeBed : Node3D
         return new Color(c.R + n, c.G + n, c.B + n);
     }
 
+    /// <summary>
+    /// The ground under a point for digging and insects: water, rock above the rock line, a trodden path, a sandy beach
+    /// at the water's edge, the damp bank just above it (best for worms), the forest floor, else the meadow.
+    /// </summary>
+    public Core.Camp.GroundKind GroundKindAt(float x, float z)
+    {
+        var loc = Location;
+        float h = HeightAt(loc, x, z);
+        if (h < 0.03f)
+            return Core.Camp.GroundKind.Water;
+        if (h > loc.RockLine)
+            return Core.Camp.GroundKind.Rock;
+        var g = GroundAt(loc, x, z, h);
+        if (g.Y > 0.5f)
+            return Core.Camp.GroundKind.Path;
+        if (g.X > 0.7f && h < 0.7f)
+            return Core.Camp.GroundKind.Sand;
+        if (h < 1.3f)
+            return Core.Camp.GroundKind.Mud;
+        if (g.Z > 0.5f)
+            return Core.Camp.GroundKind.Forest;
+        return Core.Camp.GroundKind.Meadow;
+    }
+
+    /// <summary>
+    /// How much of the painted grounds lies at a point (terrain.gdshader): sand, dirt path, forest floor, lake bed; the
+    /// meadow is the rest, rock and snow come from slope and height in the shader.
+    /// </summary>
+    public Vector4 GroundAt(LocationData loc, float x, float z, float h)
+    {
+        if (h < 0f)
+        {
+            float bed = Smooth(0.25f, 1.6f, -h);
+            return new Vector4(1f - bed, 0f, 0f, bed);
+        }
+        float sand = 1f - Smooth(0.5f, 1.25f, h);
+        var layout = LayoutFor(loc);
+        float path = h >= 0.4f ? (1f - Smooth(0.8f, 2.0f, layout.PathDistance(x, z))) * 0.95f : 0f;
+        // Trodden ground around the buildings.
+        path = MathF.Max(path, (1f - Smooth(-2.5f, 0.8f, layout.PadDistance(x, z))) * 0.5f * Smooth(0.6f, 1.2f, h));
+        // The forest floor where the trees stand (Scenery plants them where ForestDensity passes this threshold).
+        float threshold = -0.08f + (1f - loc.TreeDensity) * 0.5f;
+        float forest = Smooth(threshold - 0.04f, threshold + 0.14f, ForestDensity(x, z)) * Smooth(1.2f, 2.6f, h) * 0.95f;
+        forest *= 1f - path;
+        sand *= 1f - path;
+        float sum = sand + path + forest;
+        if (sum > 1f)
+        {
+            sand /= sum;
+            path /= sum;
+            forest /= sum;
+        }
+        return new Vector4(sand, path, forest, 0f);
+    }
+
     private ShaderMaterial? _terrainMaterial;
 
     /// <summary>The ground material (shaders/terrain.gdshader); also animated (caustics) by <see cref="_Process"/>.</summary>
@@ -256,9 +468,46 @@ public partial class LakeBed : Node3D
             return _terrainMaterial;
         _terrainMaterial = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/terrain.gdshader") };
         _terrainMaterial.SetShaderParameter("noise_tex", Graphics.ProceduralTextures.Noise(17, 0.01f, 1024));
-        _terrainMaterial.SetShaderParameter("detail_normal", Graphics.ProceduralTextures.Noise(23, 0.015f, 1024, true, 10f));
         _terrainMaterial.SetShaderParameter("caustics_tex", Graphics.ProceduralTextures.Caustics());
+        _terrainMaterial.SetShaderParameter("tile", Props.GroundTextures.TileMetres);
+        // The painted grounds (a few seconds the first time, then from the disk cache); not needed without a screen.
+        if (!Graphics.Renderer.IsHeadless)
+        {
+            _terrainMaterial.SetShaderParameter("ground_albedo", Props.GroundTextures.Albedo);
+            _terrainMaterial.SetShaderParameter("ground_normal", Props.GroundTextures.Normal);
+        }
         return _terrainMaterial;
+    }
+
+    /// <summary>Tints the painted grounds with the map's colours: each layer's average becomes the map's colour.</summary>
+    private void ApplyGroundTints(LocationData loc)
+    {
+        if (Graphics.Renderer.IsHeadless)
+            return;
+        var material = TerrainMaterial();
+        static Vector3 Lin(Color c) => new(Props.GroundTextures.Lin(c.R), Props.GroundTextures.Lin(c.G), Props.GroundTextures.Lin(c.B));
+        Vector3 Towards(Color mapColour, int layer, float amount)
+        {
+            var mean = Props.GroundTextures.Mean(layer);
+            var want = Lin(mapColour);
+            var k = new Vector3(want.X / MathF.Max(mean.R, 0.001f), want.Y / MathF.Max(mean.G, 0.001f), want.Z / MathF.Max(mean.B, 0.001f));
+            return Vector3.One.Lerp(k, amount);
+        }
+        var tints = new Vector3[Props.GroundTextures.Count];
+        // Meadows a touch calmer than the map's colour (lit smoothly now, without the old banding, they read brighter).
+        static Color Calm(Color c) => new Color(c.Luminance, c.Luminance, c.Luminance).Lerp(c, 0.85f) * 0.92f;
+        tints[Props.GroundTextures.Grass] = Towards(Calm(loc.GrassColor), Props.GroundTextures.Grass, 1f);
+        tints[Props.GroundTextures.Forest] = Towards(loc.DarkGrassColor.Lerp(loc.PathColor, 0.6f) * 0.75f, Props.GroundTextures.Forest, 0.35f);
+        tints[Props.GroundTextures.Sand] = Towards(loc.SandColor, Props.GroundTextures.Sand, 1f);
+        tints[Props.GroundTextures.Path] = Towards(Calm(loc.PathColor), Props.GroundTextures.Path, 1f);
+        tints[Props.GroundTextures.Bed] = Towards(loc.SandColor * 0.7f, Props.GroundTextures.Bed, 0.5f);
+        tints[Props.GroundTextures.Rock] = Vector3.One;
+        tints[Props.GroundTextures.Snow] = Vector3.One;
+        material.SetShaderParameter("layer_tint", tints);
+        material.SetShaderParameter("layer_rough", Props.GroundTextures.Roughness);
+        material.SetShaderParameter("snow_line", loc.SnowLine);
+        material.SetShaderParameter("rock_line", loc.RockLine);
+        material.SetShaderParameter("dark_grass_tint", Towards(Calm(loc.DarkGrassColor), Props.GroundTextures.Grass, 1f));
     }
 
     private float _time;
@@ -277,30 +526,69 @@ public partial class LakeBed : Node3D
         }
     }
 
+    /// <summary>
+    /// The terrain's grid lines along one axis: every <see cref="Step"/> across the playable map and its margin, then
+    /// wider and wider apart (up to 14 m) out to the distant mountains.
+    /// </summary>
+    private static List<float> GridLines(float min, float max)
+    {
+        var lines = new List<float>();
+        float a = min - DetailMargin, b = max + DetailMargin;
+        for (float v = a; v <= b + 0.001f; v += Step)
+            lines.Add(v);
+        var low = new List<float>();
+        float step = Step, at = a;
+        while (at > min - Outer)
+        {
+            step = MathF.Min(step * 1.08f, 14f);
+            at -= step;
+            low.Add(at);
+        }
+        low.Reverse();
+        step = Step;
+        at = lines[^1];
+        while (at < max + Outer)
+        {
+            step = MathF.Min(step * 1.08f, 14f);
+            at += step;
+            lines.Add(at);
+        }
+        low.AddRange(lines);
+        return low;
+    }
+
     public void Rebuild()
     {
         _body?.QueueFree();
         var loc = Location;
-        int xs = (int)MathF.Round((XMax - XMin) / Step);
-        int zs = (int)MathF.Round((ZMax - ZMin) / Step);
+        var xs = GridLines(XMin, XMax);
+        var zs = GridLines(ZMin, ZMax);
+        int nx = xs.Count, nz = zs.Count;
+        var heights = new float[nx * nz];
+        for (int iz = 0; iz < nz; iz++)
+            for (int ix = 0; ix < nx; ix++)
+                heights[iz * nx + ix] = HeightAt(loc, xs[ix], zs[iz]);
 
         var st = new SurfaceTool();
         st.Begin(Mesh.PrimitiveType.Triangles);
-        for (int iz = 0; iz <= zs; iz++)
+        for (int iz = 0; iz < nz; iz++)
         {
-            for (int ix = 0; ix <= xs; ix++)
+            for (int ix = 0; ix < nx; ix++)
             {
-                float x = XMin + ix * Step, z = ZMin + iz * Step;
-                float h = HeightAt(loc, x, z);
+                float x = xs[ix], z = zs[iz];
+                float h = heights[iz * nx + ix];
+                var ground = GroundAt(loc, x, z, h);
                 st.SetColor(ColorAt(loc, x, z, h));
+                st.SetUV(new Vector2(ground.X, ground.Y));
+                st.SetUV2(new Vector2(ground.Z, ground.W));
                 st.AddVertex(new Vector3(x, h, z));
             }
         }
-        for (int iz = 0; iz < zs; iz++)
+        for (int iz = 0; iz < nz - 1; iz++)
         {
-            for (int ix = 0; ix < xs; ix++)
+            for (int ix = 0; ix < nx - 1; ix++)
             {
-                int a = iz * (xs + 1) + ix, b = a + 1, c = a + xs + 1, d = c + 1;
+                int a = iz * nx + ix, b = a + 1, c = a + nx, d = c + 1;
                 foreach (int i in new[] { a, b, d, a, d, c })
                     st.AddIndex(i);
             }
@@ -308,9 +596,24 @@ public partial class LakeBed : Node3D
         st.GenerateNormals();
         var mesh = st.Commit();
 
+        // Collision only where the angler can get to (the playable map and a little beyond).
+        var col = new SurfaceTool();
+        col.Begin(Mesh.PrimitiveType.Triangles);
+        int x0 = xs.FindIndex(v => v >= XMin - 12f), x1 = xs.FindLastIndex(v => v <= XMax + 12f);
+        int z0 = zs.FindIndex(v => v >= ZMin - 12f), z1 = zs.FindLastIndex(v => v <= ZMax + 12f);
+        for (int iz = z0; iz < z1; iz++)
+            for (int ix = x0; ix < x1; ix++)
+            {
+                Vector3 V(int i, int j) => new(xs[i], heights[j * nx + i], zs[j]);
+                foreach (var v in new[] { V(ix, iz), V(ix + 1, iz), V(ix + 1, iz + 1), V(ix, iz), V(ix + 1, iz + 1), V(ix, iz + 1) })
+                    col.AddVertex(v);
+            }
+        var collision = col.Commit();
+
+        ApplyGroundTints(loc);
         _body = new StaticBody3D { CollisionLayer = 1 };
         _body.AddChild(new MeshInstance3D { Mesh = mesh, MaterialOverride = TerrainMaterial() });
-        var shape = mesh.CreateTrimeshShape();
+        var shape = collision.CreateTrimeshShape();
         shape.BackfaceCollision = true;
         _body.AddChild(new CollisionShape3D { Shape = shape });
         AddChild(_body);

@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AccessoryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/AccessoryData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Wodery z natłuszczonej skóry"
+Kind = 5
+Power = 1.2
+Description = "Wejdziesz do wody aż po pas (do 1,2 m), bliżej ryb."
+Price = 90
+RequiredLevel = 2

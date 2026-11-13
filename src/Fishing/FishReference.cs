@@ -53,13 +53,24 @@ public sealed class FishReference
 
     public static bool Has(FishSpecies sp) => For(sp) != null;
 
+    private static readonly object Gate = new();
+
+    /// <summary>The species' measured reference (read once; skins are painted on worker threads, so the cache is locked).</summary>
     public static FishReference? For(FishSpecies sp)
     {
         string id = IdOf(sp);
         if (id == "")
             return null;
-        if (Cache.TryGetValue(id, out var cached))
-            return cached;
+        lock (Gate)
+        {
+            if (!Cache.TryGetValue(id, out var found))
+                Cache[id] = found = Load(id);
+            return found;
+        }
+    }
+
+    private static FishReference? Load(string id)
+    {
         FishReference? found = null;
         string json = $"res://assets/fish/{id}.json";
         if (FileAccess.FileExists(json) && JsonNode.Parse(FileAccess.GetFileAsString(json)) is JsonObject meta)
@@ -94,7 +105,6 @@ public sealed class FishReference
                     _credit = meta["credit"]?.GetValue<string>() ?? "",
                 };
         }
-        Cache[id] = found;
         return found;
     }
 

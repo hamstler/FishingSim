@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Sumowy kij z dębu i rogu"
+Kind = 2
+CastMult = 1.0
+MaxLoad = 18.0
+ShockAbsorb = 0.1
+Action = 0.95
+Price = 900
+RequiredLevel = 6
+Description = "Dębowy blank wzmocniony rogiem: wytrzyma sumy i największe karpie."

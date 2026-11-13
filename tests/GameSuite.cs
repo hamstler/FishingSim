@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
+using FishingSim.World.Props;
 using FishingSim.Accounts;
 using FishingSim.Core;
 using FishingSim.Data;
@@ -180,6 +181,25 @@ public sealed class GameSuite : ITestSuite
         loadout.Index[(int)TackleSlot.Rod] = 0;
         rod.ApplyTackle();
 
+        t.Section("leaders and lures in the game");
+        float lineOnly = rod.LineStrength;
+        int hair = loadout.Items(TackleSlot.Leader).ToList().FindIndex(i => i.ItemId == "przypon_wlosie");
+        loadout.Index[(int)TackleSlot.Leader] = hair;
+        rod.ApplyTackle();
+        t.Check(MathF.Abs(rod.LineStrength - MathF.Min(lineOnly, loadout.Leader.Strength)) < 0.001f && rod.LineStrength < lineOnly,
+            $"a thin leader is the weakest link ({lineOnly:0.0} -> {rod.LineStrength:0.0} kg)");
+        loadout.Index[(int)TackleSlot.Leader] = 0;
+        rod.ApplyTackle();
+        t.Check(MathF.Abs(rod.LineStrength - lineOnly) < 0.001f, "without a leader the line holds as before");
+        var gearCatalog = rod.Gear!;
+        var waders = gearCatalog.Items(GearSlot.Accessory).First(i => i.ItemId == "wodery");
+        int cash = profile.Money;
+        profile.Money = 1000;
+        profile.Level = Math.Max(profile.Level, waders.RequiredLevel);
+        t.Check(gearCatalog.Buy(GearSlot.Accessory, waders) == null && rod.Lake.WadeLimit > LakeBed.WadeDepth,
+            $"waders let the angler wade deeper ({rod.Lake.WadeLimit:0.0} m)");
+        profile.Money = cash;
+
         t.Section("fishing loop end to end");
         rod.DevInstantBite = true;
         rod.DevSpeciesIndex = 0;
@@ -270,6 +290,170 @@ public sealed class GameSuite : ITestSuite
         t.Check(profile.Owns(TackleSlot.Rod, "junior") && loadout.Ready && main.Player.Rig.Visible && !shop.FreeKitButton.Visible,
             "the free kit puts a rod back in the hand");
         shop.Close();
+
+        t.Section("camp life: shovel, insect net, campfire");
+        rod.ResetToIdle();
+        var tools = main.Tools;
+        t.Check(!tools.Select(HandTool.Shovel) && tools.Current == HandTool.Rod, "without a shovel there is nothing to switch to");
+        profile.Money = 1000;
+        foreach (var id in new[] { "lopata", "siatka_na_owady", "garnek" })
+            t.Check(main.Gear.Buy(GearSlot.Accessory, GD.Load<TackleItem>($"res://data/tackle/accessories/{id}.tres")) == null, $"the {id} can be bought");
+        t.Check(tools.Available().Count == 3 && tools.Select(HandTool.Shovel) && rod.Holstered && !main.Player.Rig.Visible,
+            "Q takes the shovel: the rod is put away");
+        // Stand on the damp bank by the pier and dig.
+        var campLake = main.Rod.Lake;
+        Vector3? bank = null;
+        for (float r = 6f; r < 60f && bank == null; r += 1.5f)
+            for (float ang = 0f; ang < Mathf.Tau && bank == null; ang += 0.25f)
+            {
+                float x = MathF.Cos(ang) * r, z = MathF.Sin(ang) * r - 6f;
+                var ahead = new Vector3(x, 0, z) + new Vector3(MathF.Cos(ang), 0, MathF.Sin(ang)) * 0.85f;
+                if (campLake.GroundKindAt(x, z) is FishingSim.Core.Camp.GroundKind.Mud or FishingSim.Core.Camp.GroundKind.Meadow
+                    && campLake.GroundKindAt(ahead.X, ahead.Z) is FishingSim.Core.Camp.GroundKind.Mud or FishingSim.Core.Camp.GroundKind.Meadow)
+                {
+                    bank = new Vector3(x, campLake.HeightAt(x, z) + 0.05f, z);
+                    main.Player.GlobalPosition = bank.Value;
+                    main.Player.Rotation = new Vector3(0f, MathF.Atan2(-MathF.Cos(ang), -MathF.Sin(ang)), 0f);
+                }
+            }
+        await t.NextFrame();
+        int baitsBefore = profile.BaitCounts.Values.Sum();
+        int holesBefore = main.DigMarks.HoleCount;
+        t.Check(bank != null && tools.Use() && tools.Working && main.Player.Busy, "the left button digs: the angler stands still");
+        await t.Seconds(2.6);
+        var marks = main.DigMarks;
+        t.Check(!tools.Working && tools.LastHaul != null && marks.HoleCount == holesBefore + 1,
+            $"a dig leaves a hole ({tools.LastHaul?.Message})");
+        t.Check(profile.BaitCounts.Values.Sum() == baitsBefore + (tools.LastHaul?.Total ?? 0), "the bait dug up goes into the bait box");
+        tools.Use();
+        await t.Seconds(2.6);
+        t.Check(tools.LastHaul?.Total == 0 && tools.LastHaul.Message.Contains("już"), "the same spot again gives nothing");
+        t.Check(tools.Select(HandTool.Net) && tools.Use(), "the insect net swings");
+        await t.Seconds(1.8);
+        t.Check(!tools.Working && tools.LastHaul != null, $"a sweep of the net reports its catch ({tools.LastHaul?.Message})");
+        t.Check(tools.Select(HandTool.Rod) && !rod.Holstered && main.Player.Rig.Visible, "back to the rod");
+
+        var camp = main.Scenery.Campfires.FirstOrDefault(c => c.PlayerCamp);
+        t.Check(camp != null && main.Scenery.Campfires.Count == 2, "a camp by the pier and a hearth in the village");
+        var campSpot = main.Scenery.Interactables.FirstOrDefault(i => i.Kind == InteractKind.Campfire && i.Target == camp);
+        t.Check(campSpot != null, "the camp can be used (E)");
+        profile.Keepnet.Clear();
+        profile.Keep(GD.Load<FishSpecies>("res://data/fish/ploc.tres"), 0.3f);
+        profile.Keep(GD.Load<FishSpecies>("res://data/fish/ploc.tres"), 0.4f);
+        main.Interactions.Activate(campSpot!);
+        t.Check(main.Cooking.IsOpen && rod.InputBlocked && !camp!.Lit, "E at the camp opens the cooking panel; the fire is out");
+        t.Check(!main.Cooking.Cook(FishingSim.Core.Camp.Cooking.Roast), "nothing cooks on a cold fire");
+        main.Cooking.LightFire();
+        t.Check(camp.Lit && main.Cooking.Cook(FishingSim.Core.Camp.Cooking.Soup) && camp.Cooking != null && !main.Cooking.IsOpen && !rod.InputBlocked,
+            "lit, the soup goes into the pot and the panel closes");
+        await t.Seconds(FishingSim.Core.Camp.Cooking.Soup.Seconds + 0.5);
+        t.Check(camp.Cooking == null && profile.Keepnet.Count == 0 && profile.ActiveMeal?.Name == FishingSim.Core.Camp.Cooking.Soup.Buff.Name,
+            $"the soup is eaten: the fish left the keepnet, the buff is on ({rod.BannerText})");
+        camp.PassTime(1f);
+        t.Check(camp.Lit, "the fire keeps burning a while");
+        camp.PassTime(Campfire.BurnHours - 1f);
+        t.Check(!camp.Lit, "then it burns down");
+        t.Check(main.Scenery.Stats.GetValueOrDefault("rowboat") > 0, $"rowboats lie on the shore ({main.Scenery.Stats.GetValueOrDefault("rowboat")})");
+
+        t.Section("camp life: lift net, forest, smokehouse, notices");
+        profile.Level = Math.Max(profile.Level, 2);
+        t.Check(main.Gear.Buy(GearSlot.Accessory, GD.Load<TackleItem>("res://data/tackle/accessories/podrywka.tres")) == null, "the lift net can be bought");
+        // A bank with a metre of water a lift net's reach out.
+        var bankSpot = TestSpots.LiftNetBank(campLake);
+        Vector3? shore = bankSpot is { } bs ? bs.Stand + Vector3.Up * 0.05f : null;
+        Vector3 toWater = bankSpot?.ToWater ?? Vector3.Forward;
+        main.Player.GlobalPosition = shore ?? Vector3.Zero;
+        main.Player.Rotation = new Vector3(0f, MathF.Atan2(-toWater.X, -toWater.Z), 0f);
+        await t.NextFrame();
+        int liveBefore = profile.BaitCounts.GetValueOrDefault("livebait");
+        int baitTotal = profile.BaitCounts.Sum(b => b.Value);   // a slice of bread goes over the net
+        bool selected = tools.Select(HandTool.LiftNet), lowered = selected && tools.Use();
+        t.Check(shore != null && lowered && tools.Lift == HandTools.LiftStage.Lowering && main.Player.Busy,
+            $"the lift net goes down from the bank; the angler stands still (at {shore}, selected {selected}, {rod.BannerText})");
+        await t.Seconds(2.2);
+        t.Check(tools.Lift == HandTools.LiftStage.Down && tools.LiftNetTop.Y - FishingSim.World.Props.CampProps.LiftDrop < 0f,
+            $"it rests in the water (cord top at {tools.LiftNetTop.Y:0.00} m)");
+        t.Check(!tools.Select(HandTool.Rod) && tools.Current == HandTool.LiftNet, "the net must come up before the rod is taken");
+        tools.AddSoak(40f);
+        t.Check(tools.Use() && tools.Lift == HandTools.LiftStage.Lifting, "the second click lifts it");
+        await t.Seconds(1.6);
+        var fry = tools.FryInNet;
+        t.Check(tools.Lift == HandTools.LiftStage.Showing && fry.Shown == Math.Min(fry.Caught, FishingSim.Core.Camp.LiftNetting.MaxFish),
+            $"the catch flaps in the lifted net ({fry.Shown} of {fry.Caught}, net top at {tools.LiftNetTop.Y:0.00} m)");
+        await t.Seconds(2.6);
+        t.Check(tools.Lift == HandTools.LiftStage.Up && !main.Player.Busy && tools.LastHaul != null
+                && (tools.LastHaul.Message.StartsWith("Podrywka") || tools.LastHaul.Message.StartsWith("Pusto"))
+                && profile.BaitCounts.GetValueOrDefault("livebait") == liveBefore + tools.LastHaul.Total
+                && profile.BaitCounts.Sum(b => b.Value) == baitTotal + tools.LastHaul.Total - 1,
+            $"the small fish go into the bait box as live bait ({tools.LastHaul?.Message})");
+        main.Player.GlobalPosition = main.Scenery.CampPosition + Vector3.Up * 0.1f;
+        await t.NextFrame();
+        t.Check(!tools.Use() && tools.Lift == HandTools.LiftStage.Up, "on dry land the net is not lowered");
+        tools.Select(HandTool.Rod);
+
+        var patches = main.Scenery.Forage;
+        t.Check(patches.Count >= 12 && patches.Select(p => p.Kind).Distinct().Count() == 3,
+            $"porcini, chanterelles and blueberries grow in the woods ({patches.Count})");
+        var patch = patches[0];
+        var patchSpot = main.Scenery.Interactables.First(i => i.Target == patch);
+        main.Player.GlobalPosition = patchSpot.GlobalPosition + Vector3.Up * 0.1f;
+        await t.NextFrame();
+        await t.NextFrame();
+        string pickId = FishingSim.Core.Camp.Foraging.IdOf(patch.Kind);
+        int pantryBefore = profile.Pantry.GetValueOrDefault(pickId);
+        t.Check(main.Interactions.Current == patchSpot, $"E picks the {patch.Title} in front of the angler");
+        main.Interactions.Activate(patchSpot);
+        t.Check(profile.Pantry.GetValueOrDefault(pickId) > pantryBefore && !patch.Ripe && !patchSpot.Active, "picked: into the pantry, the spot is bare");
+        await t.NextFrame();
+        t.Check(main.Interactions.Current != patchSpot, "a picked spot offers nothing");
+        rod.World.Advance(12f);
+        rod.World.Advance(12.5f);
+        t.Check(patch.Ripe && patchSpot.Active, "a day later it has grown back");
+
+        // The smokehouse: two fish in, two smoked fish out, sold to the smoker.
+        var smokeSpot = main.Scenery.Interactables.FirstOrDefault(i => i.Kind == InteractKind.Smokehouse);
+        t.Check(smokeSpot != null && main.Scenery.HasSmokehouse, "the village has a smokehouse with its smoker");
+        profile.Keepnet.Clear();
+        profile.Keep(GD.Load<FishSpecies>("res://data/fish/ploc.tres"), 0.35f);
+        profile.Keep(GD.Load<FishSpecies>("res://data/fish/okon.tres"), 0.4f);
+        main.Interactions.Activate(smokeSpot!);
+        t.Check(main.Smokehouse.IsOpen && rod.InputBlocked, "E at the smokehouse opens its panel");
+        int moneyBefore = profile.Money;
+        t.Check(main.Smokehouse.SmokeSelected() == 2 && profile.Keepnet.Count == 0 && profile.Smokery.Count == 2 && profile.Money < moneyBefore,
+            "both fish hang in the smoke, the wood is paid for");
+        t.Check(main.Smokehouse.Collect() == 0, "not ready at once");
+        rod.World.Advance(FishingSim.Core.Camp.Smoking.Hours + 0.1f);
+        t.Check(main.Smokehouse.Collect() == 2 && profile.Smoked.Count == 2, "two hours later the smoked fish are taken");
+        int smokedValue = profile.SmokedValue;
+        moneyBefore = profile.Money;
+        t.Check(main.Smokehouse.SellSmoked() == smokedValue && profile.Money == moneyBefore + smokedValue && profile.Smoked.Count == 0,
+            $"the smoker buys them ({smokedValue} gr)");
+        main.Smokehouse.Close();
+
+        // The notice board: hand in the fish notice.
+        var boardSpot = main.Scenery.Interactables.FirstOrDefault(i => i.Kind == InteractKind.NoticeBoard);
+        t.Check(boardSpot != null && main.Scenery.NoticeBoard != null, "a notice board stands on the square");
+        main.Interactions.Activate(boardSpot!);
+        t.Check(main.Board.IsOpen && profile.Notices.Count == FishingSim.Core.Camp.NoticeBoard.PerDay, "E opens the board with the day's three notices");
+        var wanted = profile.Notices[0];
+        var wantedSpecies = rod.Species.First(s => s.SpeciesName == wanted.Item);
+        for (int i = 0; i < wanted.Count; i++)
+            profile.Keep(wantedSpecies, wanted.MinWeight + 0.02f + i * 0.01f);
+        moneyBefore = profile.Money;
+        t.Check(main.Board.HandIn(0) && profile.Notices[0].Done && profile.Money == moneyBefore + wanted.Reward,
+            $"the fish are handed in ({wanted.Wanted}, {wanted.Reward} gr)");
+        t.Check(!main.Board.HandIn(0), "and only once");
+        main.Board.Close();
+
+        // A mushroom dish from the pantry.
+        int berries = profile.Pantry.GetValueOrDefault(FishingSim.Core.Camp.Foraging.Blueberry);
+        profile.AddPantry(new Dictionary<string, int> { [FishingSim.Core.Camp.Foraging.Blueberry] = 12 });
+        main.Interactions.Activate(campSpot!);
+        main.Cooking.LightFire();
+        t.Check(main.Cooking.Cook(FishingSim.Core.Camp.Cooking.Compote), "blueberry compote goes on the fire");
+        await t.Seconds(FishingSim.Core.Camp.Cooking.Compote.Seconds + 0.5);
+        t.Check(profile.ActiveMeal?.Name == FishingSim.Core.Camp.Cooking.Compote.Buff.Name && profile.Pantry.GetValueOrDefault(FishingSim.Core.Camp.Foraging.Blueberry) == berries,
+            $"the compote is drunk: the berries are used, its buff is on ({profile.ActiveMeal?.Name}, {rod.BannerText})");
 
         main.QueueFree();
         await t.NextFrame();

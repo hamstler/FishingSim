@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Jesionowy spinning szczupakowy 2,4 m"
+Kind = 1
+CastMult = 1.3
+MaxLoad = 8.0
+ShockAbsorb = 0.14
+Action = 0.35
+Price = 380
+RequiredLevel = 4
+Description = "Mocny spinning na szczupaki i sandacze. Z przynętą sztuczną brania przychodzą szybciej."

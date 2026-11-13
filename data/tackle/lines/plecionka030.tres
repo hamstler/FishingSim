@@ -9,3 +9,6 @@ Strength = 13.0
 Visibility = 1.1
 Price = 220
 RequiredLevel = 4
+Kind = 1
+Stretch = 0.05
+Description = "Mocna plecionka: nie rozciąga się, więc zacięcie jest pewniejsze, ale zrywy ryby idą prosto w wędkę."

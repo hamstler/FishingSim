@@ -36,6 +36,17 @@ public partial class Menu : Control
         Input.MouseMode = Input.MouseModeEnum.Visible;
         GetTree().Paused = false;
         UserStore.EnsureDefault();
+        // The painted world textures (4096 px) take a minute or two to paint on the very first start: begin while the
+        // angler logs in and picks a map. Later starts only read them from the disk cache.
+        if (!Renderer.IsHeadless)
+            Task.Run(() =>
+            {
+                World.Props.GroundTextures.Prewarm();
+                World.Props.Textures.Prewarm();
+                PhotoTextures.Prewarm();
+                World.Props.CharacterAsset.Prewarm();
+                ProceduralTextures.PrewarmFoliage();
+            });
         foreach (var path in LakeBed.LocationPaths)
             _locations.Add(GD.Load<LocationData>(path));
         BuildBackground();
@@ -176,7 +187,7 @@ public partial class Menu : Control
                 CustomMinimumSize = id == "karp" ? new Vector2(150, 112) : new Vector2(96, 72),
                 ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
                 StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-                TextureFilter = TextureFilterEnum.Nearest,
+                TextureFilter = TextureFilterEnum.LinearWithMipmaps,
                 SizeFlagsVertical = SizeFlags.ShrinkCenter,
             });
         }
@@ -293,9 +304,11 @@ public partial class Menu : Control
         var loc = _locations[index];
         bool locked = profile.Level < loc.RequiredLevel;
         var panel = new PanelContainer { CustomMinimumSize = new Vector2(292, 0) };
+        // A slimmer frame than the big panels, so four ground cards fit side by side.
+        panel.AddThemeStyleboxOverride("panel", UiArt.Nine(UiArt.PanelTexture, 24, 10, tile: true));
         var margin = new MarginContainer();
         foreach (var side in new[] { "left", "right", "top", "bottom" })
-            margin.AddThemeConstantOverride("margin_" + side, 10);
+            margin.AddThemeConstantOverride("margin_" + side, 4);
         panel.AddChild(margin);
         var box = new VBoxContainer();
         box.AddThemeConstantOverride("separation", 8);

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Ciasto z mąki i miodu"
+Kind = 1
+AffinityAs = "bread"
+AffinityScale = 1.15
+Reusable = false
+StartCount = 20
+PackSize = 10
+Price = 10
+RequiredLevel = 1
+Description = "Słodkie ciasto lepsze od chleba."

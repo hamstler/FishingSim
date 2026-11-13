@@ -1,0 +1,53 @@
+{
+ "id": "female_ranger",
+ "sex": "F",
+ "hair": [
+  "Hair_Long",
+  "Hair_Buns",
+  "Hair_BuzzedFemale"
+ ],
+ "materials": {
+  "skin": {
+   "albedo": [
+    "skin_f_a"
+   ],
+   "normal": "skin_f_n",
+   "roughness": "skin_f_r"
+  },
+  "eye": {
+   "albedo": [
+    "eye_a"
+   ],
+   "normal": "eye_n",
+   "roughness_value": 0.35
+  },
+  "hair1": {
+   "albedo": [
+    "hair1_a"
+   ],
+   "normal": "hair1_n",
+   "roughness_value": 0.82
+  },
+  "hair2": {
+   "albedo": [
+    "hair2_a"
+   ],
+   "normal": "hair2_n",
+   "roughness_value": 0.82
+  },
+  "outfit": {
+   "albedo": [
+    "ranger_a",
+    "ranger3_a"
+   ],
+   "normal": "ranger_n",
+   "orm": "ranger_orm"
+  }
+ },
+ "author": "Quaternius",
+ "licence": "CC0 1.0 (public domain)",
+ "sources": [
+  "https://quaternius.com/packs/universalbasecharacters.html",
+  "https://quaternius.com/packs/modularcharacteroutfitsfantasy.html"
+ ]
+}

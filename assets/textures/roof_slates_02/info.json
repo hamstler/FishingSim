@@ -1,0 +1,14 @@
+{
+ "id": "roof_slates_02",
+ "name": "Roof Slates 02",
+ "authors": [
+  "Rob Tuytel"
+ ],
+ "metres": [
+  3.0,
+  3.0
+ ],
+ "licence": "CC0 1.0 (public domain)",
+ "source": "https://polyhaven.com/a/roof_slates_02",
+ "grey": false
+}

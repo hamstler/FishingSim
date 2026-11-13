@@ -30,7 +30,26 @@ public static class ProfileSerializer
     {
         var keepnet = new JsonArray();
         foreach (var c in p.Keepnet)
-            keepnet.Add(new JsonObject { ["species"] = c.Species, ["weight"] = c.Weight, ["value"] = c.Value, ["condition"] = c.Condition, ["undersized"] = c.Undersized });
+            keepnet.Add(Fish(c));
+        var smoked = new JsonArray();
+        foreach (var c in p.Smoked)
+            smoked.Add(Fish(c));
+        var smokery = new JsonArray();
+        foreach (var lot in p.Smokery)
+        {
+            var o = Fish(lot.Fish);
+            o["started_at"] = lot.StartedAt;
+            smokery.Add(o);
+        }
+        var notices = new JsonArray();
+        foreach (var r in p.Notices)
+        {
+            notices.Add(new JsonObject
+            {
+                ["kind"] = r.Kind.ToString(), ["item"] = r.Item, ["item_name"] = r.ItemName, ["count"] = r.Count, ["min_weight"] = r.MinWeight,
+                ["reward"] = r.Reward, ["xp"] = r.Xp, ["from"] = r.From, ["text"] = r.Text, ["done"] = r.Done,
+            });
+        }
 
         var journal = new JsonArray();
         foreach (var e in p.Journal)
@@ -92,10 +111,32 @@ public static class ProfileSerializer
                 ["hours"] = p.Market.Hours,
                 ["saturation"] = FromMap(p.Market.Saturation, v => v),
             },
+            ["pantry"] = FromMap(p.Pantry, v => v),
+            ["smoked"] = smoked,
+            ["smokery"] = smokery,
+            ["notices"] = new JsonObject { ["day"] = p.NoticesDay, ["place"] = p.NoticesPlace, ["list"] = notices },
             ["location_idx"] = p.LocationIdx,
             ["hour"] = p.Hour,
+            ["meal"] = p.ActiveMeal is { } meal
+                ? new JsonObject
+                {
+                    ["name"] = meal.Name, ["hours"] = meal.Hours, ["xp_bonus"] = meal.XpBonus, ["bite_bonus"] = meal.BiteBonus,
+                    ["left"] = p.MealHoursLeft,
+                }
+                : null,
         };
     }
+
+    private static JsonObject Fish(CatchRecord c) => new()
+    {
+        ["species"] = c.Species, ["weight"] = c.Weight, ["value"] = c.Value, ["condition"] = c.Condition, ["undersized"] = c.Undersized,
+    };
+
+    private static CatchRecord? ReadFish(JsonNode? n) =>
+        n is JsonObject o && Str(o["species"]) is string sp
+            ? new CatchRecord(sp, Float(o["weight"], 0f), Int(o["value"], 0), Float(o["condition"], 1f),
+                o["undersized"] is JsonValue u && u.TryGetValue<bool>(out var und) && und)
+            : null;
 
     private static JsonObject FromMap<T>(Dictionary<string, T> map, Func<T, JsonNode?> convert)
     {
@@ -140,11 +181,29 @@ public static class ProfileSerializer
         p.Hour = Float(d["hour"], p.Hour);
 
         if (d["keepnet"] is JsonArray net)
-        {
             foreach (var n in net)
+                if (ReadFish(n) is { } c)
+                    p.Keepnet.Add(c);
+        if (d["smoked"] is JsonArray smoked)
+            foreach (var n in smoked)
+                if (ReadFish(n) is { } c)
+                    p.Smoked.Add(c);
+        if (d["smokery"] is JsonArray smokery)
+            foreach (var n in smokery)
+                if (ReadFish(n) is { } c)
+                    p.Smokery.Add(new SmokingLot(c, Float(n!["started_at"], 0f)));
+        ReadMap(d["pantry"], p.Pantry, n => Int(n, 0));
+        if (d["notices"] is JsonObject board && board["list"] is JsonArray noticeList)
+        {
+            p.NoticesDay = Int(board["day"], -1);
+            p.NoticesPlace = Int(board["place"], -1);
+            foreach (var n in noticeList)
             {
-                if (n is JsonObject o && o["species"] is JsonNode sp)
-                    p.Keepnet.Add(new CatchRecord(sp.GetValue<string>(), Float(o["weight"], 0f), Int(o["value"], 0), Float(o["condition"], 1f), o["undersized"] is JsonValue u && u.TryGetValue<bool>(out var und) && und));
+                if (n is not JsonObject o || !Enum.TryParse<Core.Camp.RequestKind>(Str(o["kind"]), out var kind))
+                    continue;
+                p.Notices.Add(new Core.Camp.VillageRequest(kind, Str(o["item"]) ?? "", Str(o["item_name"]) ?? "", Int(o["count"], 1),
+                    Float(o["min_weight"], 0f), Int(o["reward"], 0), Int(o["xp"], 0), Str(o["from"]) ?? "", Str(o["text"]) ?? "",
+                    o["done"] is JsonValue dv && dv.TryGetValue<bool>(out var done) && done));
             }
         }
         if (d["journal"] is JsonArray journal)
@@ -195,6 +254,11 @@ public static class ProfileSerializer
         {
             foreach (var (k, v) in eq)
                 if (v != null) p.Equipped[k] = v.GetValue<string>();
+        }
+        if (d["meal"] is JsonObject m && Str(m["name"]) is string mealName)
+        {
+            p.Meal = new Core.Camp.MealBuff(mealName, Float(m["hours"], 1f), Float(m["xp_bonus"], 0f), Float(m["bite_bonus"], 0f));
+            p.MealHoursLeft = Float(m["left"], 0f);
         }
         // Saves from before keepnets/landing nets keep the starter gear that Reset() gave them.
         if (d["gear"] is JsonObject gear)

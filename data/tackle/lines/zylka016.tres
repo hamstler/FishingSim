@@ -9,3 +9,6 @@ Strength = 2.8
 Visibility = 0.85
 Price = 10
 RequiredLevel = 1
+Kind = 0
+Stretch = 0.55
+Description = "Cienka i mało widoczna, ale słaba."

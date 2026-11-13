@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="LineData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/LineData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Linka z jelita, cienka"
+Kind = 0
+Strength = 3.5
+Visibility = 0.75
+Stretch = 0.5
+Price = 35
+RequiredLevel = 2
+Description = "Linka z jelita: przezroczysta i elastyczna."

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ReelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/ReelData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Lekki kołowrotek z orzecha"
+DragMax = 3.0
+ReelSpeed = 3.6
+LineCapacity = 80.0
+Price = 140
+RequiredLevel = 2
+Description = "Lekki i szybki: do zwijania sztucznych przynęt."

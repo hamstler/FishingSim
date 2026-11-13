@@ -9,3 +9,5 @@ StartCount = 10
 Price = 60
 PackSize = 10
 RequiredLevel = 3
+Kind = 2
+Description = "Twarda kulka na karpie."

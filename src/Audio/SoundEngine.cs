@@ -96,6 +96,12 @@ public partial class SoundEngine : Node
         bool lineOut = _rod.State is RodState.Waiting or RodState.Fight or RodState.Nibble or RodState.Bite;
         L.Reel = _rod.Reeling && lineOut ? 1f : 0f;
         L.Drag = Mathf.MoveToward(L.Drag, _rod.DragSlipping ? 1f : 0f, dt * 8f);
+        // The nearest burning campfire crackles.
+        float fire = 0f;
+        foreach (var f in World.Props.Campfire.All)
+            if (f.Lit && GodotObject.IsInstanceValid(f) && f.IsInsideTree())
+                fire = MathF.Max(fire, Math.Clamp(1f - (f.GlobalPosition.DistanceTo(p) - 2f) / 14f, 0f, 1f));
+        L.Fire = Mathf.MoveToward(L.Fire, fire, dt * 2f);
 
         // A beaten fish splashes at the surface.
         if (_rod.State == RodState.Close && _rod.Lift < 0.3f)

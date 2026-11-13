@@ -33,7 +33,7 @@ public partial class Water : MeshInstance3D
         CustomAabb = new Aabb(new Vector3(-160, -1, -160), new Vector3(320, 2, 320));
         CastShadow = ShadowCastingSetting.Off;
         _material = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/water.gdshader") };
-        _material.SetShaderParameter("foam_noise", Graphics.ProceduralTextures.Noise(53, 0.02f, 256));
+        _material.SetShaderParameter("foam_noise", Graphics.ProceduralTextures.Noise(53, 0.005f, 1024));
         MaterialOverride = _material;
         PushParameters();
     }
@@ -60,6 +60,9 @@ public partial class Water : MeshInstance3D
     {
         _material.SetShaderParameter("wave_time", _waveTime);
         _material.SetShaderParameter("amp", Amplitude);
+        // Floating plants (lily pads, pondweed) ride the same waves: shaders/floating.gdshader reads these.
+        RenderingServer.GlobalShaderParameterSet("water_time", _waveTime);
+        RenderingServer.GlobalShaderParameterSet("water_amp", Amplitude);
         _material.SetShaderParameter("rain", Rain);
     }
 

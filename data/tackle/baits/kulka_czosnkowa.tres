@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Kulka czosnkowa"
+Kind = 2
+AffinityAs = "boilie"
+AffinityScale = 1.1
+Reusable = false
+StartCount = 20
+PackSize = 10
+Price = 70
+RequiredLevel = 3
+Description = "Ostry zapach wabi karpie z daleka."

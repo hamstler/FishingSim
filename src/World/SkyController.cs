@@ -50,7 +50,7 @@ public partial class SkyController : Node
     {
         // Physically based sky with clouds (shaders/sky.gdshader); its radiance lights and reflects the scene.
         _skyMaterial = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/sky.gdshader") };
-        _skyMaterial.SetShaderParameter("cloud_noise", ProceduralTextures.Noise(71, 0.008f, 512, octaves: 4));
+        _skyMaterial.SetShaderParameter("cloud_noise", ProceduralTextures.Noise(71, 0.002f, 2048, octaves: 6));
         _env = new Godot.Environment
         {
             BackgroundMode = Godot.Environment.BGMode.Sky,

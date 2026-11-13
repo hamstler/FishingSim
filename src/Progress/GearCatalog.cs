@@ -27,7 +27,10 @@ public sealed class GearCatalog
     {
         "res://data/tackle/accessories/okulary_polaryzacyjne.tres", "res://data/tackle/accessories/latarka_czolowa.tres",
         "res://data/tackle/accessories/podporka.tres", "res://data/tackle/accessories/krzeselko.tres",
-        "res://data/tackle/accessories/wiadro.tres",
+        "res://data/tackle/accessories/wiadro.tres", "res://data/tackle/accessories/wodery.tres",
+        "res://data/tackle/accessories/oselka.tres", "res://data/tackle/accessories/smalec.tres",
+        "res://data/tackle/accessories/lopata.tres", "res://data/tackle/accessories/siatka_na_owady.tres",
+        "res://data/tackle/accessories/garnek.tres", "res://data/tackle/accessories/podrywka.tres",
     };
 
     private readonly Dictionary<GearSlot, List<TackleItem>> _items;

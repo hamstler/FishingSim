@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AccessoryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/AccessoryData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Podrywka"
+Kind = 11
+Power = 1.0
+Description = "Kwadratowa siatka na skrzyżowanych pałąkach, na długiej tyczce. Opuść ją z brzegu lub pomostu, odczekaj i poderwij: drobnica (ukleje, płotki, kiełbie) to żywce na szczupaka i sandacza. Najlepiej o świcie i zmierzchu, nad pokruszonym chlebem. Q zmienia narzędzie w ręku."
+Price = 70
+RequiredLevel = 2

@@ -1,0 +1,14 @@
+{
+ "id": "medieval_wall_01",
+ "name": "Medieval Wall 01",
+ "authors": [
+  "Rob Tuytel"
+ ],
+ "metres": [
+  2.0,
+  2.0
+ ],
+ "licence": "CC0 1.0 (public domain)",
+ "source": "https://polyhaven.com/a/medieval_wall_01",
+ "grey": false
+}

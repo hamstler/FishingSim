@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="LeaderData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/LeaderData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Przypon z kutego drutu"
+Strength = 16.0
+Visibility = 1.4
+BiteProof = 1.0
+Price = 90
+RequiredLevel = 3
+Description = "Żadne zęby go nie przetną. Dobrze widoczny."

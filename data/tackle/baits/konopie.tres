@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Ziarno konopi"
+Kind = 2
+AffinityAs = "corn"
+AffinityScale = 1.2
+Reusable = false
+StartCount = 40
+PackSize = 20
+Price = 18
+RequiredLevel = 2
+Description = "Ulubione ziarno płoci i karpi."

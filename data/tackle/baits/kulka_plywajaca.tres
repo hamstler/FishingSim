@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Kulka pływająca z korkiem"
+Kind = 2
+AffinityAs = "boilie"
+AffinityScale = 1.2
+Reusable = false
+StartCount = 16
+PackSize = 8
+Price = 80
+RequiredLevel = 4
+Description = "Unosi się nad dnem, gdzie karp ją łatwo znajdzie."

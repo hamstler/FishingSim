@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Grabowy kij gruntowy 2,7 m"
+Kind = 2
+CastMult = 1.25
+MaxLoad = 7.0
+ShockAbsorb = 0.18
+Action = 0.6
+Price = 260
+RequiredLevel = 3
+Description = "Do łowienia z dna daleko od brzegu: leszcze, karpie, brzany."

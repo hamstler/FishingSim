@@ -9,3 +9,5 @@ StartCount = 15
 Price = 12
 PackSize = 10
 RequiredLevel = 1
+Kind = 0
+Description = "Koniki polne: klenie, jazie, pstrągi."

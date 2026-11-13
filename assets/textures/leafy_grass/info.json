@@ -1,0 +1,14 @@
+{
+ "id": "leafy_grass",
+ "name": "Leafy Grass",
+ "authors": [
+  "Charlotte Baglioni"
+ ],
+ "metres": [
+  2.0,
+  2.0
+ ],
+ "licence": "CC0 1.0 (public domain)",
+ "source": "https://polyhaven.com/a/leafy_grass",
+ "grey": false
+}

@@ -15,6 +15,20 @@ public enum AccessoryKind
     Chair,
     /// <summary>Wiadro na przynęty: keeps live bait alive longer (planned).</summary>
     BaitBucket,
+    /// <summary>Wodery: wade deeper (Power = how deep, in metres).</summary>
+    Waders,
+    /// <summary>Osełka: sharper hooks set better (Power = extra share of strikes that hold).</summary>
+    HookHone,
+    /// <summary>Smalec do kołowrotka: the reel winds faster (Power = extra share of speed).</summary>
+    ReelGrease,
+    /// <summary>Łopata: a hand tool (Q) to dig for worms, night crawlers and grubs (Core/Camp/Digging).</summary>
+    Shovel,
+    /// <summary>Siatka na owady: a hand tool (Q) to catch mayflies, grasshoppers and chafers (Core/Camp/Sweeping).</summary>
+    InsectNet,
+    /// <summary>Garnek: cook fish soup over a campfire (Core/Camp/Cooking).</summary>
+    CookingPot,
+    /// <summary>Podrywka: a hand tool (Q) lowered into the water from the bank to catch live bait (Core/Camp/LiftNetting).</summary>
+    LiftNet,
 }
 
 /// <summary>Any other accessory. Owning one is enough for it to work (they are not equipped in a slot).</summary>
@@ -26,5 +40,4 @@ public partial class AccessoryData : TackleItem
     /// <summary>Strength of the effect; meaning depends on <see cref="Kind"/> (e.g. extra visibility in metres).</summary>
     [Export] public float Power { get; set; } = 1f;
 
-    [Export(PropertyHint.MultilineText)] public string Description { get; set; } = "";
 }

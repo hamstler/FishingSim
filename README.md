@@ -1,34 +1,155 @@
 # Fishing Sim (RF4-like), wersja C#
 
+Wolna gra na licencji **GNU GPL 3.0 lub nowszej**: możesz ją kopiować, zmieniać i rozpowszechniać, a zmienioną wersję udostępniasz na tej samej licencji razem z kodem źródłowym. Szczegóły w sekcji [Licencja](#licencja) i w pliku [`LICENSE`](LICENSE).
+
 **Styl graficzny: nordycki, zbliżony do Valheima** (jedyny): pełna rozdzielczość z ostrymi, ręcznie malowanymi w kodzie teksturami, gęsta mgła wolumetryczna z promieniami słońca, cienie i okluzja otoczenia, poświata jasnych miejsc, chłodne cienie i ciepłe światło, jasne księżycowe noce. Wioska jest średniowieczna: domy z szachulcem i strzechą, latarnie na drewnianych słupach, drewniana wędka. Waluta to grosze (gr), sklepy to kramy, turnieje prowadzi gildia wędkarzy, a na inne łowisko jedzie się wozem.
 
 **Doba:** dzień (06:00-18:00) trwa 40 minut, noc 20 minut czasu rzeczywistego (`src/Core/DayClock.cs`). W prawym górnym rogu jest minimapa (120 m wokół gracza) i zegar z tarczą dnia i nocy, pogodą i czasem do zmroku lub świtu.
 
-**Ryby:** 66 gatunków (rodzime i zadomowione), każdy z nazwą łacińską i opisem. Skóry są malowane w kodzie piksel po pikselu: łuski z ciemnymi krawędziami, linia boczna, pokrywa skrzelowa, plamki z obwódkami, pręgi, marmurkowanie, lustra karpia, tarczki jesiotra, plus mapa normalnych. Ryba na haku, w dłoni i w atlasie dostaje skórę 4096×2048 (2048×1024 na niskiej jakości), ryby w wodzie 512×256. **Atlas ryb** jest w menu głównym i w menu pauzy: obracający się model 3D, opis, wagi, cena, przynęty, głębokość, pora i łowiska, wyszukiwarka i filtr łowiska.
+**Ryby:** 66 gatunków (rodzime i zadomowione), każdy z nazwą łacińską i opisem. Skóry są malowane w kodzie piksel po pikselu: łuski z ciemnymi krawędziami, linia boczna, pokrywa skrzelowa, plamki z obwódkami, pręgi, marmurkowanie, lustra karpia, tarczki jesiotra, plus mapa normalnych. Ryba na haku, na panelu połowu i w atlasie dostaje skórę 4096×2048 (2048×1024 na niskiej jakości), ryby w wodzie 512×256. **Atlas ryb** jest w menu głównym i w menu pauzy: obracający się model 3D, opis, wagi, cena, przynęty, głębokość, pora i łowiska, wyszukiwarka i filtr łowiska.
 
 **Hol:** ryba ma prawdziwą pozycję, kierunek i prędkość: płynie najwyżej z prędkością zrywu wynikającą z długości ciała (płoć ok. 1 m/s, duży karp czy szczupak 3 m/s), skręca z ograniczoną szybkością i kołysze się na napiętej lince jak wahadło, zamiast przeskakiwać. Linkę zabiera tylko wtedy, gdy przeciąga hamulec, a wędkarz zyskuje linkę powoli, póki ryba ciągnie. Walka zaczyna się od pierwszego odjazdu zaraz po zacięciu, wędka szarpie przy każdym zrywie, a zmęczenie zależy od tego, jak mocno ryba walczy z hamulcem. Płoć to ok. pół minuty, karp 12 kg ok. 2 minuty na sprzęcie karpiowym (na teleskopie wyciąga całą linkę). Startowy zestaw jest słaby (kij 2,4 kg, hamulec 2 kg).
+
+**Sprzęt:** 10 wędek (spławikowe, spinningowe, gruntowe, karpiowe i sumowe), 7 kołowrotków, żyłki z włosia, jelita i jedwabiu oraz plecionki z lnu, konopi i jedwabiu, 6 przyponów, 7 haczyków, 26 przynęt i akcesoria. Żyłka rozciąga się i tłumi zrywy ryby, plecionka jest mocniejsza i pewniej zacina, ale zrywy idą prosto w wędkę. Przypon to część linki: cienki z włosia czy jelita jest mało widoczny (szybsze brania), ale słabszy, a drut chroni przed zębami: szczupak, sum i sandacze potrafią przegryźć linkę bez drucianego przyponu. Przynęty sztuczne (błystki, rybki, przynęty miękkie, muchy) nie zużywają się, giną tylko z haczykiem przy zerwaniu i biorą tylko wtedy, gdy się je zwija (LPM), szybciej na wędce spinningowej. Każdy gatunek ma swoje upodobania (szczupak: błystki wahadłowe i rybki, sandacz: przynęty miękkie, lipień i pstrąg: muchy). Wodery pozwalają wejść głębiej do wody, osełka poprawia zacięcie, a smalec przyspiesza kołowrotek.
 
 **Zniszczony sprzęt:** złamana wędka znika z ekwipunku i z ręki, przy zerwanej żyłce przepada haczyk, a gdy ryba wyciągnie całą linkę, przepada żyłka. Bez kompletnego zestawu nie da się zarzucić. W kramie wędkarskim można odebrać darmowy zestaw, ale tylko wtedy, gdy brakujących części nie da się kupić za pieniądze z sakiewki.
 
 **Modele ryb:** każdy gatunek ma własną budowę (`src/Fishing/FishBody.cs`): wysokość i szerokość ciała, garb, płaski brzuch, długość pyska, szeroka lub płaska głowa, trzon ogonowy, kształt ogona (od zaokrąglonego po głęboko wcięty i rekinowy u jesiotrów), rodzaj płetwy grzbietowej (miękka, kolczasta, żagiel lipienia, długa karpia, ciągła węgorza, kolce ciernika), płetwa tłuszczowa, wąsy i oko dopasowane do głowy.
 
-**Ryby z bliska:** ryba na haku, w dłoni i w atlasie ma skórę 4096×2048 z mapą wypukłości łusek, płetwy malowane promień po promieniu (przezroczysta błona, postrzępiona krawędź, wzory gatunku: czarna plama okonia, cętki szczupaka, białe krawędzie płetw pstrąga, żagiel lipienia), szparę pyska z wargami, nozdrza, wypukłą pokrywę skrzelową, oczodół i oko z kolorową tęczówką pod błyszczącą rogówką. Całe ciało z płetwami wygina się jedną falą podczas pływania (shadery `fish_body`/`fish_fin`).
+**Ryby z bliska:** ryba na haku, na panelu połowu i w atlasie ma skórę 4096×2048 z mapą wypukłości łusek, płetwy malowane promień po promieniu (przezroczysta błona, postrzępiona krawędź, wzory gatunku: czarna plama okonia, cętki szczupaka, białe krawędzie płetw pstrąga, żagiel lipienia), szparę pyska z wargami, nozdrza, wypukłą pokrywę skrzelową, oczodół i oko z kolorową tęczówką pod błyszczącą rogówką. Całe ciało z płetwami wygina się jedną falą podczas pływania (shadery `fish_body`/`fish_fin`).
 
-**Ryby według prawdziwych okazów:** kształt ciała i barwy (grzbiet, bok, brzuch) części gatunków są zmierzone na wolnych zdjęciach z Wikimedia Commons (`assets/fish`, narzędzia w `tools/fish_photos`), a ryba nadal jest malowana w stylu gry; same zdjęcia nie trafiają do gry, autorzy są w `assets/fish/CREDITS.md` i w atlasie. **Ryba rośnie z wagą:** cięższa jest dłuższa, wyższa i grubsza, młoda smukła z większymi oczami, a złowioną rybę trzymasz w prawdziwej wielkości.
+**Ryby według prawdziwych okazów:** kształt ciała i barwy (grzbiet, bok, brzuch) części gatunków są zmierzone na wolnych zdjęciach z Wikimedia Commons (`assets/fish`, narzędzia w `tools/fish_photos`), a ryba nadal jest malowana w stylu gry; same zdjęcia nie trafiają do gry, autorzy są w `assets/fish/CREDITS.md` i w atlasie. **Ryba rośnie z wagą:** cięższa jest dłuższa, wyższa i grubsza, młoda smukła z większymi oczami, a na panelu połowu widać jej prawdziwą długość.
 
-**Modele ryb z Blendera:** każdy z 66 gatunków ma własny model 3D (`assets/fish/models/<id>.glb`). Proporcje ciała, każdej płetwy i oka są zmierzone na ilustracjach z AtlasRyb.online (bez kopiowania samych ilustracji; gatunki, których atlas nie ma, biorą proporcje od najbliższego krewnego albo z tabeli budowy gatunku), a głowa (pysk z wargami, kość szczęki, pokrywa skrzelowa, nozdrza) jest przeniesiona z dopracowanego modelu okonia. Skóra jest malowana w kodzie: nachodzące na siebie łuski albo gładka skóra, wzory gatunku (prążki, cętki, tęczowy pas, marmurkowanie, tarczki jesiotra, lustra karpia), mapa wypukłości; płetwy z promieniami, wąsiki, oczy pod rogówką. Grzbiet i brzuch pod płetwami biegną gładkim łukiem (bez garbów przy płetwach). Pysk jest rzeźbiony w proporcji do wielkości gęby: wargi i szpara gęby przechodząca przez czubek pyska, zaokrąglony nos; oczy siedzą płasko w oczodołach pod przezroczystą rogówką, a tęczówka jest metaliczna aż po brzeg. Tekstury 4K: skóra 4096×2048 z pełną mapą wypukłości, łuski z ostrym brzegiem, słojami przyrostu i pigmentem, płetwy 1024×512; zapisane w WebP i wczytywane z mipmapami, więc ryba z bliska jest ostra, a z daleka nie migocze. Narzędzia: `tools/fish_model` (`build_all.sh` przebudowuje wszystko).
+**Modele ryb z Blendera:** każdy z 66 gatunków ma własny model 3D (`assets/fish/models/<id>.glb`). Proporcje ciała, każdej płetwy i oka są zmierzone na ilustracjach z AtlasRyb.online (bez kopiowania samych ilustracji; gatunki, których atlas nie ma, biorą proporcje od najbliższego krewnego albo z tabeli budowy gatunku), a głowa (pysk z wargami, kość szczęki, pokrywa skrzelowa, nozdrza) jest przeniesiona z dopracowanego modelu okonia. Skóra jest malowana w kodzie: nachodzące na siebie łuski albo gładka skóra, wzory gatunku (prążki, cętki, tęczowy pas, marmurkowanie, tarczki jesiotra, lustra karpia), mapa wypukłości; płetwy z promieniami, wąsiki, oczy pod rogówką. Grzbiet i brzuch pod płetwami biegną gładkim łukiem (bez garbów przy płetwach). Pysk jest rzeźbiony w proporcji do wielkości gęby: wargi i szpara gęby przechodząca przez czubek pyska, zaokrąglony nos; oczy siedzą płasko w oczodołach pod przezroczystą rogówką, a tęczówka jest metaliczna aż po brzeg. Tekstury 4K: skóra 4096×2048 z pełną mapą wypukłości, łuski z ostrym brzegiem, słojami przyrostu i pigmentem, płetwy 1024×512; zapisane raz w WebP z bezstratnych źródeł i wczytywane z mipmapami, więc ryba z bliska jest ostra, a z daleka nie migocze. Narzędzia: `tools/fish_model` (`build_all.sh` przebudowuje wszystko).
 
-**Tekstury QHD:** tekstury świata mają 1024 px na 2 m i filtrowanie anizotropowe; malują się wielowątkowo i są zapisywane w pamięci podręcznej (`user://texcache`). Okno startuje zmaksymalizowane, a świat renderuje się w natywnej rozdzielczości.
+**Malowana przyroda:** ziemia składa się z siedmiu ręcznie „malowanych” w kodzie warstw (łąka ze źdźbłami i koniczyną, leśna ściółka z liśćmi, igłami, gałązkami i mchem, piasek ze zmarszczkami i kamyczkami, ubita ścieżka ze żwirem, kamieniste dno, skała z porostami, śnieg), które łączą się według wysokości: trawa wrasta w piasek, kamyki wystają z mułu. Głazy mają tę samą skałę z mchem na wierzchu, pnie korę z bruzdami (brzozy białą z ciemnymi plamami), korony liście kształtu dębu, brzozy, wierzby i leszczyny, a paprocie, kwiaty i chmury mają własne kształty i cieniowanie.
+
+**Budynki i tekstury ze zdjęć:** ściany, dachy, drewno, tkaniny, kora i grunt mają fotograficzne materiały PBR (kolor
+i mapa wypukłości) z Poly Haven na licencji CC0 (do użytku komercyjnego). Gra sama je dekoduje i kompresuje. Wszystkie
+bryły budynków mają zaokrąglone krawędzie, chaty są z prawdziwych bali z krzyżującymi się końcami na narożnikach, a dachy
+mają grubość i okap.
+
+**Mieszkańcy i ręce wędkarza:** sprzedawcy, handlarze i mieszkańcy wiosek to realistyczne postacie z darmowych pakietów
+Quaterniusa (CC0): głowy, oczy i fryzury z „Universal Base Characters”, stroje Peasant (lniana koszula, kamizelka,
+buty) i Ranger (skórzany kaftan, kaptur) z „Modular Character Outfits – Fantasy”, z teksturami PBR. Każdy ma własny
+wariant stroju, fryzurę, kolor włosów, odcień skóry i brodę. Animacje z „Universal Animation Library” 1 i 2 (stanie,
+założone ręce, rozmowa, praca w polu, picie, przytaknięcie) są przeniesione na szkielet postaci; sprzedawca kiwa głową,
+gdy podchodzisz, a głowy odwracają się za wędkarzem. W widoku z pierwszej osoby widać prawdziwe ręce tej postaci
+(rękawy koszuli, dłonie z palcami): kości ramion ustawia IK, więc prawa dłoń obejmuje rękojeść wędki, a lewa kręci
+korbką kołowrotka.
+
+**Życie obozowe:** pod Q masz w ręku wędkę, łopatę albo siatkę na owady. Łopatą kopiesz w wilgotnej ziemi (kamera
+pochyla się nad robotą, ostrze wchodzi w ziemię, grudka z wijącymi się robakami ląduje obok, zostaje dołek): najwięcej
+robaków jest na wilgotnym brzegu i łące, w lesie trafiają się pędraki, rosówki wychodzą nocą i po deszczu, a w tym
+samym miejscu drugi raz nic nie znajdziesz. Siatką machasz nad wodą o zmierzchu, gdzie tańczą roje jętek (widać je nad
+brzegiem), w dzień po łące za konikami polnymi, a o zmroku przy drzewach za chrabąszczami. Przy pomoście stoi twoje
+obozowisko (krąg kamieni, trójnóg, kłody, drewno, wbita łopata, wiadro), a na placu każdej wioski palenisko. Rozpalasz
+ogień (płomienie, iskry, dym, migoczące światło, trzask) i gotujesz rybę z siatki: rybę z rożna albo zupę rybną w
+garnku. Posiłek daje premię na kilka godzin gry (więcej XP, szybsze brania), widoczną na HUD.
+
+**Podrywka:** kwadratowa siatka na dwóch skrzyżowanych pałąkach, na długiej tyczce (kram, od 2. poziomu). Pierwsze LPM
+opuszcza ją do wody przed tobą (z brzegu, z płycizny albo z pomostu; jeśli masz chleb, kruszysz kromkę nad siatką),
+siatka kołysze się na lince i osiada na dnie. Po chwili drugie LPM ją podrywa: ukleje, płotki, kiełbie i okonki
+trzepoczą w oczkach siatki, a potem trafiają do przynęt jako żywce. Najwięcej drobnicy jest o świcie i zmierzchu,
+przy roślinach wodnych i nad pokruszonym chlebem; im dłużej siatka leży, tym więcej ryb nad nią wpłynie (HUD liczy
+sekundy).
+
+**Grzybobranie:** w lasach rosną borowiki (przy pniach), kurki (w mchu pod świerkami i sosnami) i krzaczki jagód. E
+zbiera je do spiżarni; zebrane miejsce odrasta po dobie gry, a po deszczu grzybów jest więcej. Ze spiżarni przy ognisku
+powstają nowe dania: ryba z kurkami, zupa rybna z borowikami (najmocniejsza premia) i kompot z jagód (bez ryby).
+
+**Wędzarnia:** w każdej wiosce stoi wędzarnia z wędzarzem. Wybierasz ryby z siatki, płacisz za olchowe drewno, a po
+dwóch godzinach gry odbierasz złociste wędzonki: nie tracą świeżości, a wędzarz płaci za nie 1,8 raza tyle co skup
+(mniej za ryby zmęczone w siatce). Niewymiarowych i bardzo małych ryb wędzarz nie przyjmie.
+
+**Tablica ogłoszeń:** na placu wioski mieszkańcy codziennie przypinają trzy zlecenia: ryby danego gatunku i wagi na
+obiad, przynęty (robaki, rosówki, jętki, żywce), grzyby lub jagody albo wędzoną rybę. Gdy masz, czego potrzebują,
+oddajesz to przyciskiem i dostajesz pieniądze oraz doświadczenie. Następnego dnia pojawiają się nowe ogłoszenia.
+
+**Codzienne życie wiosek:** przy domach schnie pranie na sznurach, drwal rąbie drewno przy pieńku z siekierą, stoją
+stojaki z widłami, grabiami i łopatą, na żerdziach suszą się sieci z pływakami, na wsiach ogrodnik podlewa grządki, a
+przy palenisku siedzą i rozmawiają mieszkańcy. Na brzegu obok pomostu leżą wyciągnięte łodzie z wiosłami.
+
+**Panel połowu:** po wyjęciu ryby świat przygasa, a na rzeźbionej karcie złowiona ryba obraca się powoli wokół własnej
+osi w świetle studyjnego reflektora (wjeżdża z lekkim obrotem i porusza płetwami). Pod nią waga, długość, cena w skupie,
+doświadczenie i rekord, stan siatki, ostrzeżenie o wymiarze ochronnym albo pełnej siatce oraz wybór: do siatki (E) albo
+do wody (R).
+
+**Tekstury 4K:** tekstury świata (ziemia, kora, budynki, liście) mają 4096 px na kafel 2 m. Gra maluje je sama przy pierwszym uruchomieniu (zaczyna już w menu; na 4 rdzeniach trwa to ok. 2 minut), kompresuje własnym kompresorem blokowym (BC1/BC3/BC5, więc mieszczą się w pamięci karty także w wyeksportowanej grze) i zapisuje w `user://texcache` (ok. 250 MB). Kolejne uruchomienia tylko je wczytują. Okno startuje zmaksymalizowane, a świat renderuje się w natywnej rozdzielczości.
+
+**Interfejs:** rzeźbione dębowe ramy z mosiężnymi ćwiekami, przyciski z desek, pergaminowe karty i złocone paski, wszystko malowane w kodzie. W kramie boczny pasek kategorii z dużymi obrazkami, podkategorie (np. wędki spławikowe, spinningowe, gruntowe, karpiowe; przynęty naturalne, roślinne, karpiowe, sztuczne), wyszukiwarka, sortowanie i filtr „Dostępne”; karty mają wstążkę jakości (zwykły, dobry, wyborny, mistrzowski), pieczęć posiadanego i gwiazdkę używanego przedmiotu, kłódkę na zablokowanych, rosną pod kursorem, a zakup kończy się deszczem monet i brzękiem. Obrazki przedmiotów są gładkie (128 px), z cieniem.
 
 **Minimalistyczny interfejs:** podczas zwykłego rozglądania na ekranie jest tylko mała kropka celownika. Stan wędki i cienki pasek napięcia pojawiają się w trakcie łowienia, sakiewka i siatka na chwilę po zmianie, a sprzęt na chwilę po przełączeniu. Tab pokazuje wszystko naraz, H sterowanie.
 
 Symulator wędkarski w Godot 4.3 (.NET) napisany w całości w C#. Poza kodem są shadery (`shaders/*.gdshader`: niebo, woda, teren, liście, trawa, gwiazdy, deszcz, wodospad), bo shadery w Godocie piszą się w jego własnym języku, oraz pliki scen i danych (`.tscn`, `.tres`).
 
-## Wymagania i uruchomienie
-- **Godot 4.3 w wersji .NET (Mono)** i **.NET SDK 8**.
-- Otwórz `project.godot` w Godocie .NET, zbuduj (Alt+B albo przycisk Build), potem F5.
-- Logowanie: `admin` / `admin` (jedyne konto, tworzone przy pierwszym uruchomieniu). Hasła są zapisywane jako hasz z solą (`src/Accounts/UserStore.cs`).
-- Bez edytora: `dotnet build`, potem `godot --path .`.
+## Budowanie i uruchamianie
+
+### Czego potrzebujesz
+- **Godot 4.3 w wersji .NET** (na stronie Godota: „Godot Engine - .NET”, wersja 4.3-stable). Zwykły Godot bez .NET nie
+  zbuduje gry, bo cały kod jest w C#.
+- **.NET SDK 8.0** (`dotnet --version` powinno pokazać 8.x).
+- **Git**, żeby pobrać repozytorium. Repozytorium z całą historią zajmuje ok. 750 MB, głównie przez modele ryb
+  (`assets/fish/models`, ok. 350 MB w bieżącej wersji).
+
+### Pobranie i pierwsze uruchomienie
+Sama bieżąca wersja, bez historii (ok. 350 MB):
+```bash
+git clone --depth 1 https://github.com/hamstler/FishingSim.git
+```
+Z całą historią (potrzebna, jeśli chcesz zgłaszać zmiany):
+```bash
+git clone https://github.com/hamstler/FishingSim.git
+```
+1. Uruchom Godota .NET, wybierz **Import** i wskaż plik `project.godot` w pobranym katalogu.
+2. Przy pierwszym otwarciu edytor importuje zasoby, co może potrwać kilka minut.
+3. Zbuduj kod C#: przycisk **Build** w prawym górnym rogu albo **Alt+B**.
+4. Uruchom grę klawiszem **F5**.
+
+Logowanie: `admin` / `admin` (jedyne konto, tworzone przy pierwszym uruchomieniu). Hasła są zapisywane jako hasz z solą
+(`src/Accounts/UserStore.cs`).
+
+Bez edytora, z wiersza poleceń (`godot` to plik wykonywalny Godota .NET, u Ciebie może mieć dłuższą nazwę):
+```bash
+dotnet build
+```
+```bash
+godot --path .
+```
+
+### Zbudowanie gry do pliku wykonywalnego (eksport)
+1. Zainstaluj szablony eksportu dla tej samej wersji: w edytorze **Editor → Manage Export Templates → Download and
+   Install** (szablony „4.3.stable.mono”).
+2. **Project → Export**: projekt ma gotowe ustawienia dla **Windows** i **Linux** (`export_presets.cfg`). Wybierz jedno
+   i kliknij **Export Project**. Gra trafi do `build/windows/` albo `build/linux/` (katalog `build/` nie jest w
+   repozytorium).
+
+To samo z wiersza poleceń (najpierw utwórz katalog docelowy):
+```bash
+mkdir -p build/windows build/linux
+```
+```bash
+godot --headless --path . --export-release "Windows" build/windows/FishingSim.exe
+```
+```bash
+godot --headless --path . --export-release "Linux" build/linux/FishingSim.x86_64
+```
+Zbudowana gra to plik wykonywalny, plik `.pck` z zasobami (ok. 350 MB, głównie modele ryb) i katalog
+`data_FishingSim_*` z bibliotekami .NET. Rozpowszechniaj je razem.
+
+Ustawienia eksportu dołączają katalog `assets/fish` (modele ryb i pomiary gatunków, gra wczytuje je dopiero w trakcie
+działania) i pomijają `tools/`, `tests/` i `docs/`. Modele `.glb` mają pliki `.import` z `importer="keep"`, więc edytor
+ich nie importuje, a eksport dołącza je bez zmian.
+
+### Przebudowa modeli ryb (opcjonalnie)
+Gotowe modele są w repozytorium, więc do zbudowania gry nie są potrzebne żadne dodatkowe narzędzia. Kto chce zmienić
+wygląd ryb, potrzebuje Blendera 4.0 i Pythona 3 z `numpy` i `Pillow` (do ponownego mierzenia ilustracji także
+`opencv-python`):
+```bash
+tools/fish_model/build_all.sh karp lin
+```
+Bez nazw gatunków skrypt przebudowuje wszystkie 66 po kolei, co trwa ponad godzinę i dokłada ok. 270 MB do historii
+repozytorium, więc lepiej przebudowywać tylko zmienione gatunki. Opis całego procesu jest w `CLAUDE.md` (sekcja „Species models”).
 
 ## Sterowanie
 | Klawisz | Działanie |
@@ -39,7 +160,13 @@ Symulator wędkarski w Godot 4.3 (.NET) napisany w całości w C#. Poza kodem s�
 | Spacja | kasarek (podbierak): wyjmuje rybę przy brzegu. Trzeba go kupić; bez kasarka Spacja nic nie robi |
 | Kółko myszy | hamulec (wartość w procentach w prawym dolnym rogu) |
 | E / R (zaraz po złowieniu) | ryba do siatki / do wody (+3 XP) |
-| 1-5 (Shift = wstecz) | wędka, kołowrotek, żyłka, hak, przynęta (tylko przed rzutem) |
+| Q (Shift+Q wstecz) | narzędzie w ręku: wędka, łopata, siatka na owady, podrywka (kupisz je w kramie) |
+| LPM z łopatą / siatką | kopanie (robaki, rosówki, pędraki) / zamach siatką (jętki, koniki polne, chrabąszcze) |
+| LPM z podrywką | opuszczenie do wody, drugie LPM poderwanie (żywce) |
+| E przy ognisku | panel ogniska: rozpalenie i gotowanie ryb z siatki (i grzybów ze spiżarni) |
+| E przy grzybach / jagodach | zbieranie do spiżarni |
+| E przy wędzarni / tablicy ogłoszeń | wędzenie ryb z siatki / zlecenia mieszkańców |
+| 1-6 (Shift = wstecz) | wędka, kołowrotek, żyłka, hak, przynęta, przypon (tylko przed rzutem) |
 | I / M / J / T | ekwipunek, mapa, dziennik, turnieje |
 | E | wejście do kramu, gildii, na targ lub na postój wozów (przy drzwiach budynku) |
 | Shift | bieg |
@@ -55,6 +182,8 @@ Symulator wędkarski w Godot 4.3 (.NET) napisany w całości w C#. Poza kodem s�
   - *Zatoka Szuwarowa*: mokradło, wierzby, gęste trzciny, mgła, chata wędkarza, skup ryb, łodzie na brzegu.
   - *Staw Karpiowy* (poziom 3): łąka z kwiatami, gospodarstwo z wiatrakiem, stodołą i stogami siana.
   - *Górskie Jezioro* (poziom 4): sosny, skały, wysokie wzgórza ze śniegiem, górska chata.
+- **Ukształtowanie terenu:** na lądzie są pagórki i większe wzgórza (łagodne, żeby dało się na nie wejść; plaże i wioska zostają płaskie), a całą mapę zamyka pierścień gór: lesiste na Jeziorze Zielonym, niższe przy Stawie i Zatoce, ostre, skaliste i ośnieżone w Górach. Kraniec mapy leży w gęstym lesie u stóp gór, gdzie teren zaczyna się wznosić, więc nie ma gołej niewidzialnej ściany, a za lasem widać tylko kolejne zbocza.
+- **Pełna roślinność** (`src/World/Scenery.cs`, siatki w `src/World/Props/TreeFactory.cs`): gęsty las (dąb, brzoza, świerk, sosna, wierzba), pod drzewami leszczyna i paprocie, łąki z kępami traw i kwiatów, krzewy; na brzegu sity w płytkiej wodzie i żółte kosaćce, dalej pasy trzcin i pałki wodnej; na płyciznach kępy grzybieni (białe i różowawe kwiaty), grążeli (żółte) i rdestnicy, które kołyszą się na falach razem z wodą. Ile lilii, mówi `LilyDensity` mapy (najwięcej w Zatoce i na Stawie, mało w zimnym górskim jeziorze); przy pomoście woda zostaje wolna do rzutów. Rośliny są rysowane w kwadratach z zasięgiem widoczności, który skraca ustawienie jakości grafiki (Niska/Średnia).
 - **Budynki** (`src/World/Props/BuildingFactory.cs`, wszystko z prymitywów): kramy i domy z szachulcem i strzechą, stodoła, wiatrak z obracającymi się skrzydłami, skup ryb ze stoiskiem i suszarnią, gildia z chorągwią, wóz z plandeką przy drogowskazie, latarnie na słupach (migoczą po zmroku), ławki, łodzie, płoty, skrzynie i beczki. Okna i latarnie świecą po zmroku.
 - **Kramy to budynki:** podejdź do drzwi i naciśnij E. Kram wędkarski sprzedaje sprzęt (wędki, kołowrotki, linki, haczyki, siatki, kasarki, akcesoria), kram z przynętami przynęty, skup ryb kupuje po stałej cenie, targ rybny (Jezioro Zielone) płaci według cen dnia z premią za świeże i trofeowe ryby, na postoju wozów zmienia się łowisko, a gildia wędkarzy prowadzi turnieje (zakładka T działa też z daleka).
 - **Siatka i podbierak:** siatka ma limit ryb i kilogramów (pełna = ryba wypuszczona), a ryby tracą w niej kondycję. Na start nie masz kasarka: małą rybę podciągasz wędką (PPM) aż do siebie, dużą trzeba wyjąć kasarkiem (Spacja), bo przy podnoszeniu zerwie linkę. Za mały kasarek też jej nie utrzyma.
@@ -99,7 +228,7 @@ Przy dodawaniu: nowa ryba = plik w `data/fish/`, wpis w `SpeciesCatalog.Paths` i
 - **Turnieje** (T): wpisowe, dojazd na łowisko, wynik to suma N najcięższych ryb, rywale to boty o różnych umiejętnościach. Nagrody (pieniądze i XP) według miejsca, historia w zapisie.
 
 ## Zapis gry
-`user://saves/<login>.json` (pieniądze, XP, sprzęt, przynęty, siatka, rekordy, dziennik, historia turniejów, łowisko, godzina). Zapisy z wersji w GDScript wczytują się bez zmian, a hasze w `users.json` pozostają ważne.
+`user://saves/<login>.json` (pieniądze, XP, sprzęt, przynęty, siatka, rekordy, dziennik, historia turniejów, łowisko, godzina, posiłek, spiżarnia, ryby w wędzarni i wędzonki, ogłoszenia dnia). Zapisy z wersji w GDScript wczytują się bez zmian, a hasze w `users.json` pozostają ważne.
 
 ## Testy
 ```
@@ -108,8 +237,55 @@ godot --headless --path . res://tests/run_tests.tscn -- core game # wybrane zest
 ```
 Zestawy: `core` (hol, brania, postęp), `accounts`, `progress` (profil, sklep, zapis, zgodność ze starymi zapisami), `world` (teren, czas, pogoda, fale), `game` (logowanie, wybór mapy, pauza, ekran gracza, cały cykl połowu), `tournaments`, `village` (układ wiosek, wyrównany teren, ścieżki, biomy, chodzenie, drzwi i sklepy), `gear` (targ, siatki, podbieraki, akcesoria, animacja ciała, ryby w wodzie). Kod wyjścia to liczba nieudanych sprawdzeń. W trybie headless zapis na dysk jest wyłączony.
 
-Zrzuty ekranu (potrzebny ekran i OpenGL, np. `xvfb-run`):
+Zrzuty ekranu (potrzebny ekran, bez monitora np. `xvfb-run`; renderer Vulkan, ok. 30 s na zrzut):
 ```
-godot --rendering-driver opengl3 --path . res://tests/screenshot.tscn -- GODZINA POGODA ETYKIETA PLIK YAW PITCH TRYB ARG MAPA
+godot --rendering-driver vulkan --path . res://tests/screenshot.tscn -- GODZINA POGODA ETYKIETA PLIK YAW PITCH TRYB ARG MAPA
 ```
 Tryby: 0 widok, 1 hol, 2 złowiona ryba, 3 sklep, 4 pauza, 5 ekran gracza, 6 logowanie, 7 wybór mapy, 8 turniej w toku, 9 wyniki turnieju.
+
+## Licencja
+
+Copyright (C) 2026 hamstler i współtwórcy FishingSim.
+
+FishingSim jest wolnym oprogramowaniem: możesz go rozpowszechniać i zmieniać na warunkach **GNU General Public
+License** w wersji 3 albo (według Twojego wyboru) dowolnej późniejszej wersji, opublikowanej przez Free Software
+Foundation. Program jest udostępniany bez żadnej gwarancji. Pełny tekst licencji jest w pliku [`LICENSE`](LICENSE)
+(oficjalny tekst angielski jest jedynym wiążącym).
+
+Licencja obejmuje cały projekt: kod C#, shadery, sceny i dane (`.tscn`, `.tres`, `.json`), narzędzia w `tools/` oraz
+modele i tekstury ryb wygenerowane tymi narzędziami.
+
+**Co wolno:** używać gry w dowolnym celu (także komercyjnym), kopiować ją, badać kod, zmieniać go i rozpowszechniać,
+odpłatnie lub za darmo.
+
+**Co trzeba**, gdy rozpowszechniasz grę albo jej zmienioną wersję (udostępniasz plik, sprzedajesz, wrzucasz do
+internetu):
+- udostępnić całą wersję na tej samej licencji GPL 3.0 lub nowszej, razem z jej kodem źródłowym (albo pisemną ofertą
+  jego udostępnienia);
+- zachować informacje o prawach autorskich i licencji, a zmienione pliki oznaczyć jako zmienione, z datą zmiany;
+- nie dodawać ograniczeń, których GPL nie przewiduje (np. zakazu dalszego kopiowania).
+
+Zmian, których nie rozpowszechniasz (np. własna wersja do grania w domu), nie musisz nikomu udostępniać.
+
+**Wkład w projekt:** wysyłając zmiany (pull request), zgadzasz się, że są one udostępniane na tej samej licencji
+(GPL 3.0 lub nowszej).
+
+### Elementy i materiały innych autorów
+- **Silnik Godot** (licencja MIT, © Juan Linietsky, Ariel Manzur i współtwórcy Godot Engine) i **.NET** (licencja MIT,
+  © .NET Foundation): wbudowane w zbudowaną grę. Licencja MIT jest zgodna z GPL. Rozpowszechniając zbudowaną grę,
+  dołącz informację o licencji Godota (<https://godotengine.org/license>), np. w pliku obok gry lub w napisach.
+- **Proporcje ryb** zmierzono na ilustracjach z [AtlasRyb.online](https://atlasryb.online) (licencja CC BY-NC-SA).
+  Do projektu trafiły wyłącznie liczby (obrysy ciała, położenie płetw i oka, barwy), nie ilustracje. Źródła każdego
+  gatunku są w [`assets/fish/CREDITS.md`](assets/fish/CREDITS.md).
+- **Barwy i kształty części gatunków** zmierzono na zdjęciach z Wikimedia Commons na wolnych licencjach. Same zdjęcia
+  nie są częścią projektu; autorzy i licencje są w `assets/fish/CREDITS.md` i w atlasie ryb w grze.
+- **Tekstury fotograficzne** (drewno, bale, strzecha, dachówka, gont, tynk, kamień, len, juta, kora, trawa, ściółka,
+  piasek, ścieżka, otoczaki, skała, śnieg) pochodzą z [Poly Haven](https://polyhaven.com) i są na licencji **CC0 1.0**
+  (domena publiczna): wolno ich używać w każdym celu, także komercyjnym, bez opłat i bez obowiązku podawania autora.
+  Lista z autorami jest w [`assets/textures/CREDITS.md`](assets/textures/CREDITS.md); pobiera je `tools/assets/polyhaven.py`.
+- **Postacie mieszkańców i ręce wędkarza** pochodzą z darmowych pakietów [Quaterniusa](https://quaternius.com)
+  („Universal Base Characters”, „Modular Character Outfits – Fantasy”, „Universal Animation Library” 1 i 2) na licencji
+  **CC0 1.0** (domena publiczna, także do użytku komercyjnego). Modele złożone z ich części, z animacjami przeniesionymi
+  na szkielet postaci, są w `assets/characters` (lista w [`assets/characters/CREDITS.md`](assets/characters/CREDITS.md));
+  buduje je `tools/assets/quaternius.py`.
+- Dźwięki są syntezowane w kodzie, pozostałe tekstury malowane w kodzie, a czcionka to wbudowana czcionka Godota.

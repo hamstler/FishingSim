@@ -73,6 +73,15 @@ public static class GraphicsQuality
         _ => 40f,
     };
 
+    /// <summary>How far the scattered plants (grass tufts, flowers, ferns, reeds, lilies) are drawn, as a share of their full range.</summary>
+    public static float FoliageRange => Level switch
+    {
+        QualityLevel.Low => 0.45f,
+        QualityLevel.Medium => 0.7f,
+        QualityLevel.High => 1f,
+        _ => 1.3f,
+    };
+
     /// <summary>Distance (m) between grass clumps.</summary>
     public static float GrassSpacing => Level >= QualityLevel.Ultra ? 0.42f : 0.5f;
 

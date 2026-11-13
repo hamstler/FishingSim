@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Wierzbowa spławikówka 3,6 m"
+Kind = 0
+CastMult = 1.05
+MaxLoad = 3.5
+ShockAbsorb = 0.32
+Action = 0.25
+Price = 90
+RequiredLevel = 2
+Description = "Długa i miękka: delikatne zestawy na płocie i leszcze."

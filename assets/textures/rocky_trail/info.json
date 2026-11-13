@@ -1,0 +1,14 @@
+{
+ "id": "rocky_trail",
+ "name": "Rocky Trail",
+ "authors": [
+  "Amal Kumar"
+ ],
+ "metres": [
+  2.0,
+  2.0
+ ],
+ "licence": "CC0 1.0 (public domain)",
+ "source": "https://polyhaven.com/a/rocky_trail",
+ "grey": false
+}

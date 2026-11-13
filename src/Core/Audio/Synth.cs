@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace FishingSim.Core.Audio;
 
 /// <summary>What a one-shot sound is made of.</summary>
-public enum OneShot { Splash, SmallSplash, StepWood, StepGrass, Strike, Catch, LineSnap, Bell }
+public enum OneShot { Splash, SmallSplash, StepWood, StepGrass, Strike, Catch, LineSnap, Bell, Coins, Click, Dig, Swish, Ignite, Bubble }
 
 /// <summary>Levels of the continuous sounds (0..1), set every frame by the game.</summary>
 public struct AmbientLevels
@@ -16,6 +16,7 @@ public struct AmbientLevels
     public float Rain;
     public float Reel;      // reel handle turning
     public float Drag;      // drag giving line (the "scream")
+    public float Fire;      // a campfire nearby (crackle and hiss)
 }
 
 /// <summary>
@@ -54,6 +55,8 @@ public sealed class Synth
         _rnd = new Random(seed);
     }
 
+    private float _fireLp, _crackle, _swishLp;
+
     private float Noise() => (float)_rnd.NextDouble() * 2f - 1f;
 
     public void Play(OneShot kind, float gain = 1f)
@@ -67,6 +70,12 @@ public sealed class Synth
             OneShot.Strike => 0.25f,
             OneShot.Catch => 0.6f,
             OneShot.Bell => 0.9f,
+            OneShot.Coins => 0.55f,
+            OneShot.Click => 0.06f,
+            OneShot.Dig => 0.45f,
+            OneShot.Swish => 0.35f,
+            OneShot.Ignite => 0.9f,
+            OneShot.Bubble => 0.25f,
             _ => 0.3f,
         };
         _voices.Add(new Voice { Kind = kind, Length = len, Gain = gain, Pitch = 0.85f + 0.3f * (float)_rnd.NextDouble() });
@@ -155,6 +164,20 @@ public sealed class Synth
                 s += _dragLp * L.Drag * 0.22f;
             }
 
+            // Campfire: a soft hiss of burning wood with crackles and the odd pop.
+            if (L.Fire > 0.01f)
+            {
+                _fireLp += (Noise() - _fireLp) * 0.08f;
+                s += _fireLp * L.Fire * 0.12f;
+                if (_rnd.NextDouble() < dt * 9f * L.Fire)
+                    _crackle = 1f;
+                if (_crackle > 0.001f)
+                {
+                    s += Noise() * _crackle * L.Fire * 0.35f;
+                    _crackle *= 0.985f;
+                }
+            }
+
             // One-shots.
             for (int v = _voices.Count - 1; v >= 0; v--)
             {
@@ -188,6 +211,28 @@ public sealed class Synth
                 return Noise() * MathF.Exp(-k * 6f) * MathF.Sin(MathF.PI * MathF.Min(k * 4f, 1f)) * 0.12f;
             case OneShot.Strike:
                 return Noise() * MathF.Exp(-k * 7f) * 0.25f + MathF.Sin(v.T * MathF.Tau * 90f) * decay * 0.2f;
+            case OneShot.Dig:
+            {
+                // The blade cuts in (a dull thump) and grinds through soil and roots.
+                float thump = MathF.Sin(v.T * MathF.Tau * (95f * v.Pitch - 40f * k)) * MathF.Exp(-k * 12f);
+                float grit = Noise() * MathF.Exp(-k * 3.5f) * (0.6f + 0.4f * MathF.Sin(v.T * MathF.Tau * 37f));
+                return thump * 0.45f + grit * 0.16f;
+            }
+            case OneShot.Swish:
+            {
+                // Air through the net: band-passed noise swelling and fading.
+                _swishLp += (Noise() - _swishLp) * (0.15f + 0.4f * k);
+                return _swishLp * MathF.Sin(MathF.PI * k) * 0.5f;
+            }
+            case OneShot.Ignite:
+            {
+                // Dry kindling catching: a soft whoomph and a burst of crackles.
+                _swishLp += (Noise() - _swishLp) * 0.05f;
+                float crack = _rnd.NextDouble() < 0.004 ? 1f : 0f;
+                return _swishLp * MathF.Sin(MathF.PI * MathF.Min(k * 3f, 1f)) * MathF.Exp(-k * 2f) * 0.8f + crack * Noise() * 0.5f;
+            }
+            case OneShot.Bubble:
+                return MathF.Sin(v.T * MathF.Tau * (300f * v.Pitch + 500f * k)) * MathF.Sin(MathF.PI * k) * 0.12f;
             case OneShot.Catch:
             {
                 // Two bright plucked notes: a little fanfare.
@@ -202,6 +247,23 @@ public sealed class Synth
                 float ring = MathF.Sin(t * MathF.Tau * 2100f) + 0.6f * MathF.Sin(t * MathF.Tau * 2100f * 2.76f) + 0.35f * MathF.Sin(t * MathF.Tau * 2100f * 5.4f);
                 return ring * MathF.Exp(-k * 4f) * 0.09f;
             }
+            case OneShot.Coins:
+            {
+                // Coins tumbling onto a counter: a handful of short metallic clinks at uneven moments.
+                float s = 0f;
+                for (int i = 0; i < 6; i++)
+                {
+                    float at = 0.06f * i + 0.025f * MathF.Sin(i * 12.9898f) * MathF.Sin(i * 3.1f);
+                    float lt = v.T - at;
+                    if (lt < 0f)
+                        continue;
+                    float f = 3200f + 900f * MathF.Sin(i * 7.3f);
+                    s += (MathF.Sin(lt * MathF.Tau * f) + 0.5f * MathF.Sin(lt * MathF.Tau * f * 1.58f)) * MathF.Exp(-lt * 38f) * (1f - 0.1f * i);
+                }
+                return s * 0.07f;
+            }
+            case OneShot.Click:
+                return (MathF.Sin(v.T * MathF.Tau * 1800f) * 0.5f + Noise() * 0.5f) * MathF.Exp(-k * 10f) * 0.12f;
             default:
                 return Noise() * MathF.Exp(-k * 12f) * 0.4f;
         }

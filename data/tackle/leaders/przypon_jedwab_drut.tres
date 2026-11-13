@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="LeaderData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/LeaderData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Przypon jedwabny z drutem"
+Strength = 12.0
+Visibility = 0.95
+BiteProof = 0.95
+Price = 220
+RequiredLevel = 5
+Description = "Jedwab owinięty cienkim drutem: mocny, odporny na zęby i mało widoczny."

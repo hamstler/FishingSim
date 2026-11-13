@@ -66,6 +66,23 @@ public partial class LocationData : Resource
     /// <summary>Multiplier for how tall the surrounding hills are.</summary>
     [Export] public float HillScale { get; set; } = 1f;
 
+    /// <summary>
+    /// How the village is built: "timber" (half-timbered plaster, thatch), "farm" (painted board houses, clay tiles),
+    /// "fishing" (weathered boards, wooden shingles), "mountain" (log cabins with turf roofs). See BuildingFactory.Style.
+    /// </summary>
+    [Export] public string VillageStyle { get; set; } = "timber";
+
+    /// <summary>Main streets of the village ("x1,z1,x2,z2"): every door gets a short path to the nearest street.</summary>
+    [Export] public string[] Streets { get; set; } = System.Array.Empty<string>();
+
+    /// <summary>Height (m) of the mountains that close the map in (they rise behind a dense forest at the map's edge).</summary>
+    [Export] public float RimHeight { get; set; } = 60f;
+
+    /// <summary>Height (m) above which the mountains are snowy, and above which bare rock shows through.</summary>
+    [Export] public float SnowLine { get; set; } = 26f;
+
+    [Export] public float RockLine { get; set; } = 10.5f;
+
     // --- look: vegetation ---
     /// <summary>Overall amount of trees (1 = the default forest).</summary>
     [Export] public float TreeDensity { get; set; } = 1f;
@@ -76,6 +93,9 @@ public partial class LocationData : Resource
     [Export] public float FlowerDensity { get; set; } = 1f;
     [Export] public float ReedDensity { get; set; } = 1f;
     [Export] public float RockDensity { get; set; } = 1f;
+
+    /// <summary>Water lilies and pondweed on the shallows (warm, still water: many; a cold mountain lake: few).</summary>
+    [Export] public float LilyDensity { get; set; } = 1f;
 
     // --- village ---
     /// <summary>Where the paths meet; buildings face this point.</summary>

@@ -11,3 +11,5 @@ ShockAbsorb = 0.3
 Price = 40
 RequiredLevel = 1
 Action = 0.15
+Kind = 0
+Description = "Prosty kij z leszczyny: wygina się sama szczytówka. Na płocie i okonie."

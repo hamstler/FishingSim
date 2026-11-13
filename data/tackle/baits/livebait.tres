@@ -9,3 +9,5 @@ StartCount = 8
 Price = 40
 PackSize = 5
 RequiredLevel = 3
+Kind = 0
+Description = "Mała żywa rybka na drapieżniki."

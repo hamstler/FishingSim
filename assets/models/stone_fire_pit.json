@@ -1,0 +1,14 @@
+{
+ "id": "stone_fire_pit",
+ "name": "Stone Fire Pit",
+ "authors": [
+  "Sebastian Platen"
+ ],
+ "size_m": [
+  1.448,
+  1.433,
+  0.388
+ ],
+ "licence": "CC0 1.0 (public domain)",
+ "source": "https://polyhaven.com/a/stone_fire_pit"
+}

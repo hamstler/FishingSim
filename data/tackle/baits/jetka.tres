@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Jętka"
+Kind = 0
+AffinityAs = "insect"
+AffinityScale = 1.35
+Reusable = false
+StartCount = 0
+PackSize = 6
+Price = 22
+RequiredLevel = 1
+Description = "Delikatna jętka złapana siatką nad wodą o zmierzchu: pstrągi, lipienie, klenie i jelce nie przepuszczą."

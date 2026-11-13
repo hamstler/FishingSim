@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Cisowy kij spinningowy 2,1 m"
+Kind = 1
+CastMult = 1.2
+MaxLoad = 4.5
+ShockAbsorb = 0.15
+Action = 0.2
+Price = 160
+RequiredLevel = 2
+Description = "Krótki, sprężysty kij do sztucznych przynęt. Z przynętą sztuczną brania przychodzą szybciej."

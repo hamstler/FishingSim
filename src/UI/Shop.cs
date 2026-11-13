@@ -23,13 +23,26 @@ public partial class Shop : CanvasLayer
 {
     private static readonly (string Key, string Title)[] TabDefinitions =
     {
-        ("rod", "Wędki"), ("reel", "Kołowrotki"), ("line", "Linki"), ("hook", "Haczyki"),
+        ("rod", "Wędki"), ("reel", "Kołowrotki"), ("line", "Linki"), ("leader", "Przypony"), ("hook", "Haczyki"),
         ("keepnet", "Siatki"), ("landingnet", "Kasarki"), ("accessory", "Akcesoria"),
         ("bait", "Przynęty"), ("fish", "Ryby"), ("market", "Targ"), ("records", "Rekordy"), ("travel", "Łowiska"),
     };
 
     private static readonly Color Gold = new(1f, 0.84f, 0.45f);
     private static readonly Color Muted = new(0.85f, 0.78f, 0.65f, 0.75f);
+
+    // Browsing: the category rail, sub-categories, search, sort and the "only what I can buy" switch.
+    private readonly Dictionary<string, Button> _rail = new();
+    private HBoxContainer _chips = null!;
+    private Control _filterBar = null!;
+    private LineEdit _search = null!;
+    private OptionButton _sort = null!;
+    private CheckBox _onlyAvailable = null!;
+    private readonly Dictionary<string, int> _subcategory = new();
+    private bool _animateCards;
+    private Control _root = null!;
+    private TextureRect _coin = null!;
+    private int _shownMoney = -1;
 
     private FishingRod _rod = null!;
     private Profile _profile = null!;
@@ -104,40 +117,62 @@ public partial class Shop : CanvasLayer
     {
         Layer = 10;
         Visible = false;
-        var dim = new ColorRect { Color = new Color(0.03f, 0.02f, 0.01f, 0.6f) };
+        var dim = new ColorRect { Color = new Color(0.03f, 0.02f, 0.01f, 0.62f) };
         dim.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         AddChild(dim);
 
         var panel = new PanelContainer { Theme = UITheme.Make() };
         panel.AnchorLeft = panel.AnchorRight = panel.AnchorTop = panel.AnchorBottom = 0.5f;
-        panel.OffsetLeft = -620; panel.OffsetRight = 620; panel.OffsetTop = -345; panel.OffsetBottom = 345;
+        panel.OffsetLeft = -630; panel.OffsetRight = 630; panel.OffsetTop = -350; panel.OffsetBottom = 350;
+        panel.Resized += () => panel.PivotOffset = panel.Size / 2f;
         AddChild(panel);
-        var margin = new MarginContainer();
-        foreach (var side in new[] { "left", "right", "top", "bottom" })
-            margin.AddThemeConstantOverride("margin_" + side, 12);
-        panel.AddChild(margin);
+        _root = panel;
         var box = new VBoxContainer();
         box.AddThemeConstantOverride("separation", 8);
-        margin.AddChild(box);
+        panel.AddChild(box);
 
+        // Header: the stall's name, the purse with a coin, the angler's level.
         var head = new HBoxContainer();
-        head.AddThemeConstantOverride("separation", 12);
+        head.AddThemeConstantOverride("separation", 10);
         box.AddChild(head);
         _title = new Label { Text = "Kram wędkarski", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         _title.AddThemeFontSizeOverride("font_size", 28);
         _title.AddThemeColorOverride("font_color", Gold);
+        _title.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.7f));
+        _title.AddThemeConstantOverride("shadow_offset_x", 2);
+        _title.AddThemeConstantOverride("shadow_offset_y", 2);
         head.AddChild(_title);
+        _coin = new TextureRect
+        {
+            Texture = UiArt.Coin, CustomMinimumSize = new Vector2(30, 30), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+        };
+        _coin.Resized += () => _coin.PivotOffset = _coin.Size / 2f;
+        head.AddChild(_coin);
         _money = new Label { VerticalAlignment = VerticalAlignment.Center };
-        _money.AddThemeFontSizeOverride("font_size", 20);
+        _money.AddThemeFontSizeOverride("font_size", 22);
+        _money.AddThemeColorOverride("font_color", Gold);
         head.AddChild(_money);
 
         var body = new HBoxContainer { SizeFlagsVertical = Control.SizeFlags.ExpandFill };
-        body.AddThemeConstantOverride("separation", 12);
+        body.AddThemeConstantOverride("separation", 10);
         box.AddChild(body);
 
-        _tabs = new TabContainer { SizeFlagsVertical = Control.SizeFlags.ExpandFill, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-        _tabs.AddThemeFontSizeOverride("font_size", 14);
-        body.AddChild(_tabs);
+        // The category rail: a big picture and a name for every kind of goods at this counter.
+        var railScroll = new ScrollContainer { CustomMinimumSize = new Vector2(176, 0), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        body.AddChild(railScroll);
+        var rail = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        rail.AddThemeConstantOverride("separation", 4);
+        railScroll.AddChild(rail);
+        var railGroup = new ButtonGroup();
+
+        var center = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        center.AddThemeConstantOverride("separation", 6);
+        body.AddChild(center);
+        center.AddChild(BuildFilterBar());
+
+        _tabs = new TabContainer { SizeFlagsVertical = Control.SizeFlags.ExpandFill, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, TabsVisible = false };
+        center.AddChild(_tabs);
         foreach (var (key, tabTitle) in TabDefinitions)
         {
             var scroll = new ScrollContainer { Name = tabTitle, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
@@ -147,28 +182,215 @@ public partial class Shop : CanvasLayer
             list.AddThemeConstantOverride("h_separation", 10);
             list.AddThemeConstantOverride("v_separation", 10);
             list.AddThemeConstantOverride("separation", 8);
-            scroll.AddChild(list);
+            var pad = new MarginContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+            foreach (var side in new[] { "left", "right", "top", "bottom" })
+                pad.AddThemeConstantOverride("margin_" + side, 6);
+            pad.AddChild(list);
+            scroll.AddChild(pad);
             _tabs.AddChild(scroll);
             _lists[key] = list;
+
+            var k = key;
+            var railButton = new Button
+            {
+                Text = tabTitle, Icon = TabIcon(key), ToggleMode = true, ButtonGroup = railGroup, ExpandIcon = false,
+                Alignment = HorizontalAlignment.Left, CustomMinimumSize = new Vector2(0, 50),
+            };
+            railButton.AddThemeConstantOverride("icon_max_width", 42);
+            railButton.AddThemeConstantOverride("h_separation", 10);
+            railButton.AddThemeFontSizeOverride("font_size", 16);
+            railButton.AddThemeStyleboxOverride("pressed", UiArt.Button("gold"));
+            railButton.AddThemeStyleboxOverride("hover_pressed", UiArt.Button("goldhover"));
+            railButton.AddThemeColorOverride("font_pressed_color", new Color(0.2f, 0.11f, 0.04f));
+            railButton.AddThemeColorOverride("font_hover_pressed_color", new Color(0.2f, 0.11f, 0.04f));
+            railButton.Pressed += () => ShowCategory(k);
+            rail.AddChild(railButton);
+            _rail[key] = railButton;
         }
-        for (int i = 0; i < TabDefinitions.Length; i++)
-            _tabs.SetTabIcon(i, Small(TabIcon(TabDefinitions[i].Key)));
-        _tabs.TabChanged += _ => ShowNothing();
+        _tabs.TabChanged += _ =>
+        {
+            if (_rail.TryGetValue(CurrentKey, out var current))
+                current.SetPressedNoSignal(true);
+            ShowNothing();
+            UpdateFilterBar();
+        };
 
         body.AddChild(BuildDetailPanel());
 
-        _message = new Label();
+        _message = new Label { HorizontalAlignment = HorizontalAlignment.Center };
         _message.AddThemeColorOverride("font_color", Gold);
+        _message.AddThemeFontSizeOverride("font_size", 18);
         box.AddChild(_message);
         // The free starter kit: only at the tackle counter, only for anglers with nothing to fish with and no money.
         _freeKit = new Button { CustomMinimumSize = new Vector2(0, 40), Visible = false };
         _freeKit.Pressed += ClaimFreeKit;
         box.AddChild(_freeKit);
-        box.AddChild(new Label { Text = "Esc - wyjdź  |  kliknij kartę, aby zobaczyć szczegóły  |  lepszy sprzęt odblokowuje się z poziomem", Modulate = Muted });
+        box.AddChild(new Label
+        {
+            Text = "Esc - wyjdź  |  kliknij kartę, aby zobaczyć szczegóły i porównać ze sprzętem w użyciu  |  lepszy sprzęt odblokowuje się z poziomem",
+            Modulate = Muted, HorizontalAlignment = HorizontalAlignment.Center,
+        });
         _profile.Changed += Refresh;
     }
 
-    private static bool IsGridTab(string key) => key is "rod" or "reel" or "line" or "hook" or "keepnet" or "landingnet" or "accessory" or "bait" or "records";
+    /// <summary>Shows a category (from the rail): its page, its sub-categories, cards that fade in.</summary>
+    private void ShowCategory(string key)
+    {
+        int i = Array.FindIndex(TabDefinitions, d => d.Key == key);
+        if (i < 0)
+            return;
+        _rod.Cue(Core.Audio.OneShot.Click, 0.6f);
+        _animateCards = true;
+        _tabs.CurrentTab = i;
+        Refresh();
+    }
+
+    private string CurrentKey => _tabs.CurrentTab >= 0 ? TabDefinitions[_tabs.CurrentTab].Key : "";
+
+    // ------------------------------------------------------------------ browsing: sub-categories, search, sort
+    private static readonly string[] SortNames = { "Polecane", "Cena: od najtańszych", "Cena: od najdroższych", "Poziom", "Nazwa" };
+
+    private Control BuildFilterBar()
+    {
+        // Two rows: the sub-categories, then search, order and the "only what I can buy" switch.
+        var rows = new VBoxContainer();
+        rows.AddThemeConstantOverride("separation", 6);
+        _chips = new HBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        _chips.AddThemeConstantOverride("separation", 4);
+        rows.AddChild(_chips);
+        var bar = new HBoxContainer();
+        bar.AddThemeConstantOverride("separation", 8);
+        rows.AddChild(bar);
+        _search = new LineEdit { PlaceholderText = "Szukaj…", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, ClearButtonEnabled = true };
+        _search.TextChanged += _ =>
+        {
+            _animateCards = false;
+            Refresh();
+        };
+        bar.AddChild(_search);
+        _sort = new OptionButton { CustomMinimumSize = new Vector2(150, 0), TooltipText = "Kolejność" };
+        foreach (var name in SortNames)
+            _sort.AddItem(name);
+        _sort.ItemSelected += _ =>
+        {
+            _animateCards = true;
+            Refresh();
+        };
+        bar.AddChild(_sort);
+        _onlyAvailable = new CheckBox { Text = "Dostępne", TooltipText = "Pokaż tylko to, co możesz kupić na swoim poziomie" };
+        _onlyAvailable.Toggled += _ =>
+        {
+            _animateCards = true;
+            Refresh();
+        };
+        bar.AddChild(_onlyAvailable);
+        _filterBar = rows;
+        return rows;
+    }
+
+    /// <summary>The sub-categories of a page: a name and which items belong to it ("Wszystkie" first).</summary>
+    private static List<(string Name, Func<TackleItem, bool> Has)> Subcategories(string key)
+    {
+        var all = new List<(string, Func<TackleItem, bool>)> { ("Wszystkie", _ => true) };
+        switch (key)
+        {
+            case "rod":
+                all.Add(("Spławikowe", i => i is RodData { Kind: RodKind.Float }));
+                all.Add(("Spinningowe", i => i is RodData { Kind: RodKind.Spinning }));
+                all.Add(("Gruntowe", i => i is RodData { Kind: RodKind.Bottom }));
+                all.Add(("Karpiowe", i => i is RodData { Kind: RodKind.Carp }));
+                break;
+            case "reel":
+                all.Add(("Lekkie", i => i is ReelData { LineCapacity: <= 80f }));
+                all.Add(("Uniwersalne", i => i is ReelData { LineCapacity: > 80f and <= 130f }));
+                all.Add(("Duże", i => i is ReelData { LineCapacity: > 130f }));
+                break;
+            case "line":
+                all.Add(("Żyłki", i => i is LineData { Kind: LineKind.Mono }));
+                all.Add(("Plecionki", i => i is LineData { Kind: LineKind.Braid }));
+                break;
+            case "leader":
+                all.Add(("Niewidoczne", i => i is LeaderData { BiteProof: <= 0f, Visibility: > 0f }));
+                all.Add(("Z drutu", i => i is LeaderData { BiteProof: > 0f }));
+                break;
+            case "hook":
+                all.Add(("Małe", i => i is HookData { Size: <= 3f }));
+                all.Add(("Średnie", i => i is HookData { Size: > 3f and < 7f }));
+                all.Add(("Duże", i => i is HookData { Size: >= 7f }));
+                break;
+            case "bait":
+                all.Add(("Naturalne", i => i is BaitData { Kind: BaitKind.Natural }));
+                all.Add(("Roślinne", i => i is BaitData { Kind: BaitKind.Plant }));
+                all.Add(("Karpiowe", i => i is BaitData { Kind: BaitKind.Carp }));
+                all.Add(("Sztuczne", i => i is BaitData { Kind: BaitKind.Lure }));
+                break;
+        }
+        return all;
+    }
+
+    private void UpdateFilterBar()
+    {
+        string key = CurrentKey;
+        bool goods = IsGoods(key);
+        _filterBar.Visible = goods || key == "records";
+        _sort.Visible = _onlyAvailable.Visible = goods;
+        _chips.Visible = goods && Subcategories(key).Count > 1;
+        foreach (var c in _chips.GetChildren())
+            c.QueueFree();
+        if (!goods)
+            return;
+        var subs = Subcategories(key);
+        if (subs.Count <= 1)
+            return;
+        var group = new ButtonGroup();
+        int current = _subcategory.GetValueOrDefault(key);
+        for (int i = 0; i < subs.Count; i++)
+        {
+            int index = i;
+            var chip = new Button { Text = subs[i].Name, ToggleMode = true, ButtonGroup = group, ButtonPressed = i == current };
+            chip.AddThemeFontSizeOverride("font_size", 14);
+            chip.AddThemeStyleboxOverride("normal", UiArt.Button("normal", 10, 4));
+            chip.AddThemeStyleboxOverride("hover", UiArt.Button("hover", 10, 4));
+            chip.AddThemeStyleboxOverride("pressed", UiArt.Button("gold", 10, 4));
+            chip.AddThemeStyleboxOverride("hover_pressed", UiArt.Button("goldhover", 10, 4));
+            chip.AddThemeColorOverride("font_pressed_color", new Color(0.2f, 0.11f, 0.04f));
+            chip.AddThemeColorOverride("font_hover_pressed_color", new Color(0.2f, 0.11f, 0.04f));
+            chip.Pressed += () =>
+            {
+                _subcategory[key] = index;
+                _rod.Cue(Core.Audio.OneShot.Click, 0.5f);
+                _animateCards = true;
+                Refresh();
+            };
+            _chips.AddChild(chip);
+        }
+    }
+
+    private static bool IsGoods(string key) => key is "rod" or "reel" or "line" or "leader" or "hook" or "bait" or "keepnet" or "landingnet" or "accessory";
+
+    /// <summary>The items of a page as the browsing controls want them: in the chosen sub-category, matching the search,
+    /// buyable if so asked, in the chosen order.</summary>
+    private List<(int Index, TackleItem Item)> Browse(string key, IReadOnlyList<TackleItem> items)
+    {
+        var subs = Subcategories(key);
+        var has = subs[Math.Clamp(_subcategory.GetValueOrDefault(key), 0, subs.Count - 1)].Has;
+        string q = _search.Text.Trim().ToLowerInvariant();
+        var list = items.Select((item, i) => (Index: i, Item: item))
+            .Where(p => has(p.Item))
+            .Where(p => q == "" || p.Item.DisplayName.ToLowerInvariant().Contains(q))
+            .Where(p => !_onlyAvailable.ButtonPressed || p.Item.RequiredLevel <= _profile.Level)
+            .ToList();
+        return _sort.Selected switch
+        {
+            1 => list.OrderBy(p => p.Item.Price).ToList(),
+            2 => list.OrderByDescending(p => p.Item.Price).ToList(),
+            3 => list.OrderBy(p => p.Item.RequiredLevel).ThenBy(p => p.Item.Price).ToList(),
+            4 => list.OrderBy(p => p.Item.DisplayName).ToList(),
+            _ => list.OrderBy(p => p.Item.RequiredLevel > _profile.Level ? 1 : 0).ThenBy(p => p.Item.RequiredLevel).ThenBy(p => p.Item.Price).ToList(),
+        };
+    }
+
+    private static bool IsGridTab(string key) => key is "rod" or "reel" or "line" or "leader" or "hook" or "keepnet" or "landingnet" or "accessory" or "bait" or "records";
 
     private Texture2D TabIcon(string key) => key switch
     {
@@ -178,49 +400,78 @@ public partial class Shop : CanvasLayer
         _ => Icons.Category(key),
     };
 
-    /// <summary>A half-size copy of a 64 px icon for the tab bar.</summary>
-    private static Texture2D Small(Texture2D icon)
-    {
-        var img = (Image)icon.GetImage().Duplicate();
-        img.Resize(24, 24, Image.Interpolation.Nearest);
-        return ImageTexture.CreateFromImage(img);
-    }
+
+    private Label _detailTier = null!;
+    private ColorRect _flash = null!;
 
     private Control BuildDetailPanel()
     {
         var panel = new PanelContainer { CustomMinimumSize = new Vector2(300, 0) };
-        panel.AddThemeStyleboxOverride("panel", UITheme.Box(new Color(0.2f, 0.13f, 0.08f, 0.9f), UITheme.Border, 0, 1, 12));
+        panel.AddThemeStyleboxOverride("panel", UiArt.Nine(UiArt.InsetTexture, 4, 12));
         var box = new VBoxContainer();
         box.AddThemeConstantOverride("separation", 8);
         panel.AddChild(box);
-        var frame = new PanelContainer();
-        frame.AddThemeStyleboxOverride("panel", UITheme.Box(new Color(0.93f, 0.86f, 0.7f), new Color(0.45f, 0.3f, 0.16f), 0, 2, 6));
+        // The picture on parchment, in a pool of light.
+        var frame = new PanelContainer { CustomMinimumSize = new Vector2(0, 146) };
+        frame.AddThemeStyleboxOverride("panel", UiArt.Nine(UiArt.ParchmentTexture, 10, 4));
         box.AddChild(frame);
+        frame.AddChild(new TextureRect { Texture = UiArt.Spotlight, ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.Scale });
         _detailIcon = new TextureRect
         {
-            CustomMinimumSize = new Vector2(150, 150),
+            CustomMinimumSize = new Vector2(136, 136),
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            TextureFilter = CanvasItem.TextureFilterEnum.Linear,
+            TextureFilter = CanvasItem.TextureFilterEnum.LinearWithMipmaps,
         };
+        _detailIcon.Resized += () => _detailIcon.PivotOffset = _detailIcon.Size / 2f;
         frame.AddChild(_detailIcon);
+        _flash = new ColorRect { Color = new Color(1f, 0.92f, 0.6f, 0f), MouseFilter = Control.MouseFilterEnum.Ignore };
+        frame.AddChild(_flash);
         _detailName = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart, HorizontalAlignment = HorizontalAlignment.Center };
-        _detailName.AddThemeFontSizeOverride("font_size", 22);
+        _detailName.AddThemeFontSizeOverride("font_size", 20);
         _detailName.AddThemeColorOverride("font_color", Gold);
+        _detailName.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.6f));
+        _detailName.AddThemeConstantOverride("shadow_offset_y", 2);
         box.AddChild(_detailName);
+        _detailTier = new Label { HorizontalAlignment = HorizontalAlignment.Center };
+        _detailTier.AddThemeFontSizeOverride("font_size", 13);
+        box.AddChild(_detailTier);
         _detailText = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart, Modulate = Muted };
         box.AddChild(_detailText);
         _detailStats = new VBoxContainer();
-        _detailStats.AddThemeConstantOverride("separation", 4);
+        _detailStats.AddThemeConstantOverride("separation", 2);
         box.AddChild(_detailStats);
         box.AddChild(new Control { SizeFlagsVertical = Control.SizeFlags.ExpandFill });
         _detailState = new Label { HorizontalAlignment = HorizontalAlignment.Center };
         box.AddChild(_detailState);
-        _detailButton = new Button { CustomMinimumSize = new Vector2(0, 46) };
+        _detailButton = new Button { CustomMinimumSize = new Vector2(0, 46), Icon = UiArt.Coin, ExpandIcon = false };
+        _detailButton.AddThemeConstantOverride("icon_max_width", 26);
         _detailButton.AddThemeFontSizeOverride("font_size", 18);
+        UITheme.Primary(_detailButton);
         _detailButton.Pressed += () => _detailAction?.Invoke();
         box.AddChild(_detailButton);
         return panel;
+    }
+
+    /// <summary>A purchase: the picture flashes, coins burst from the button, the purse jingles.</summary>
+    private void PurchaseEffect()
+    {
+        _rod.Cue(Core.Audio.OneShot.Coins, 1f);
+        _flash.Color = new Color(1f, 0.92f, 0.6f, 0.65f);
+        _flash.CreateTween().TweenProperty(_flash, "color:a", 0f, 0.45f);
+        var pop = _detailIcon.CreateTween();
+        pop.TweenProperty(_detailIcon, "scale", new Vector2(1.12f, 1.12f), 0.08f);
+        pop.TweenProperty(_detailIcon, "scale", Vector2.One, 0.3f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+        var coins = new CpuParticles2D
+        {
+            Texture = UiArt.Coin, Amount = 22, OneShot = true, Explosiveness = 0.9f, Lifetime = 1.0,
+            Direction = new Vector2(0, -1), Spread = 65f, InitialVelocityMin = 220f, InitialVelocityMax = 380f,
+            Gravity = new Vector2(0, 900f), ScaleAmountMin = 0.45f, ScaleAmountMax = 0.8f,
+            AngularVelocityMin = -360f, AngularVelocityMax = 360f, Position = _detailButton.Size / 2f,
+        };
+        _detailButton.AddChild(coins);
+        coins.Emitting = true;
+        GetTree().CreateTimer(1.4).Timeout += coins.QueueFree;
     }
 
     public override void _ExitTree()
@@ -240,12 +491,12 @@ public partial class Shop : CanvasLayer
 
     private static readonly Dictionary<ShopKind, (string Title, string[] Tabs)> Kinds = new()
     {
-        [ShopKind.Tackle] = ("Kram wędkarski", new[] { "rod", "reel", "line", "hook", "keepnet", "landingnet", "accessory" }),
+        [ShopKind.Tackle] = ("Kram wędkarski", new[] { "rod", "reel", "line", "leader", "hook", "keepnet", "landingnet", "accessory" }),
         [ShopKind.Bait] = ("Kram z przynętami", new[] { "bait" }),
         [ShopKind.FishBuyer] = ("Skup ryb", new[] { "fish", "records" }),
         [ShopKind.Market] = ("Targ rybny", new[] { "market", "records" }),
         [ShopKind.General] = ("Kram wędkarski i przynęty",
-            new[] { "rod", "reel", "line", "hook", "keepnet", "landingnet", "accessory", "bait", "fish", "records" }),
+            new[] { "rod", "reel", "line", "leader", "hook", "keepnet", "landingnet", "accessory", "bait", "fish", "records" }),
         [ShopKind.Travel] = ("Postój wozów: dokąd jedziesz?", new[] { "travel" }),
     };
 
@@ -262,11 +513,23 @@ public partial class Shop : CanvasLayer
         {
             bool shown = tabs.Contains(TabDefinitions[i].Key);
             _tabs.SetTabHidden(i, !shown);
+            _rail[TabDefinitions[i].Key].Visible = shown;
             if (shown && first < 0)
                 first = i;
         }
         Visible = true;
         _tabs.CurrentTab = Math.Max(first, 0);
+        _rail[TabDefinitions[_tabs.CurrentTab].Key].ButtonPressed = true;
+        _rail.Values.First(b => b.Visible).GetParent<Control>().GetParent<Control>().Visible = tabs.Length > 1;
+        UpdateFilterBar();
+        _animateCards = true;
+        _shownMoney = -1;
+        // The stall opens: the board fades in and settles.
+        _root.Modulate = new Color(1, 1, 1, 0);
+        _root.Scale = new Vector2(0.97f, 0.97f);
+        var open = _root.CreateTween().SetParallel();
+        open.TweenProperty(_root, "modulate:a", 1f, 0.18f);
+        open.TweenProperty(_root, "scale", Vector2.One, 0.22f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
         _rod.InputBlocked = true;
         Input.MouseMode = Input.MouseModeEnum.Visible;
         _message.Text = "";
@@ -294,7 +557,7 @@ public partial class Shop : CanvasLayer
     {
         if (!Visible)
             return;
-        _money.Text = $"Sakiewka: {Lore.Money(_profile.Money)}   ·   poziom {_profile.Level}";
+        ShowMoney();
         UpdateFreeKit();
         for (int s = 0; s < TackleSlotExtensions.Count; s++)
             FillTackle((TackleSlot)s);
@@ -308,6 +571,27 @@ public partial class Shop : CanvasLayer
             Reselect();
         else
             ShowNothing();
+        _animateCards = false;
+    }
+
+    /// <summary>The purse: counts to the new sum and the coin jumps when it changes.</summary>
+    private void ShowMoney()
+    {
+        int target = _profile.Money;
+        string Text(int m) => $"{Lore.Money(m)}   ·   poziom {_profile.Level}";
+        if (_shownMoney < 0 || _shownMoney == target)
+        {
+            _shownMoney = target;
+            _money.Text = Text(target);
+            return;
+        }
+        int from = _shownMoney;
+        _shownMoney = target;
+        var tw = _money.CreateTween();
+        tw.TweenMethod(Callable.From<float>(v => _money.Text = Text(Mathf.RoundToInt(v))), (float)from, (float)target, 0.5f);
+        var jump = _coin.CreateTween();
+        jump.TweenProperty(_coin, "scale", new Vector2(1.35f, 1.35f), 0.08f);
+        jump.TweenProperty(_coin, "scale", Vector2.One, 0.25f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
     }
 
     private static void Clear(Container list)
@@ -317,44 +601,122 @@ public partial class Shop : CanvasLayer
     }
 
     // ------------------------------------------------------------------ cards
-    /// <summary>A picture card: icon on parchment, name and a status line. Clicking it selects the item.</summary>
-    private Button Card(Container list, Texture2D icon, string name, string status, Color statusColor, Action onSelect, bool dark = false)
+    private enum Badge { None, Owned, InUse, Locked }
+
+    /// <summary>Quality tiers by the level that unlocks an item: the colour of the card's ribbon and its name.</summary>
+    private static (Color Color, string Name) Tier(int level) => level switch
     {
-        var card = new Button { CustomMinimumSize = new Vector2(150, 176), ToggleMode = false, ClipText = true };
+        <= 1 => (new Color(0.62f, 0.5f, 0.36f), "zwykły"),
+        <= 3 => (new Color(0.42f, 0.68f, 0.32f), "dobry"),
+        <= 5 => (new Color(0.36f, 0.56f, 0.86f), "wyborny"),
+        _ => (new Color(0.86f, 0.5f, 0.92f), "mistrzowski"),
+    };
+
+    /// <summary>
+    /// A goods card: a quality ribbon, the picture on parchment in a pool of light, the name and a price or state line,
+    /// a seal for owned and in-use goods, a padlock over locked ones. It grows a little under the mouse.
+    /// </summary>
+    private Button Card(Container list, Texture2D icon, string name, string status, Color statusColor, Action onSelect, bool dark = false,
+        int level = 0, Badge badge = Badge.None, bool price = false)
+    {
+        var card = new Button { CustomMinimumSize = new Vector2(138, 180), ClipText = true, FocusMode = Control.FocusModeEnum.None };
+        card.AddThemeStyleboxOverride("normal", UiArt.Button("normal", 6, 6));
+        card.AddThemeStyleboxOverride("hover", UiArt.Button("hover", 6, 6));
+        card.AddThemeStyleboxOverride("pressed", UiArt.Button("goldpressed", 6, 6));
+        card.Resized += () => card.PivotOffset = card.Size / 2f;
         var box = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
         box.AddThemeConstantOverride("separation", 2);
         box.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        box.OffsetLeft = 6; box.OffsetRight = -6; box.OffsetTop = 6; box.OffsetBottom = -6;
+        box.OffsetLeft = 7; box.OffsetRight = -7; box.OffsetTop = 7; box.OffsetBottom = -6;
         card.AddChild(box);
-        var frame = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-        frame.AddThemeStyleboxOverride("panel", UITheme.Box(new Color(0.93f, 0.86f, 0.7f), new Color(0.45f, 0.3f, 0.16f), 0, 1, 2));
+        if (level > 0)
+        {
+            var tier = Tier(level);
+            var ribbon = new ColorRect { Color = tier.Color, CustomMinimumSize = new Vector2(0, 4), MouseFilter = Control.MouseFilterEnum.Ignore };
+            box.AddChild(ribbon);
+        }
+        var frame = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore, CustomMinimumSize = new Vector2(0, 96) };
+        frame.AddThemeStyleboxOverride("panel", UiArt.Nine(UiArt.ParchmentTexture, 10, 2));
         box.AddChild(frame);
         frame.AddChild(new TextureRect
         {
-            Texture = icon,
-            CustomMinimumSize = new Vector2(96, 96),
-            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            TextureFilter = CanvasItem.TextureFilterEnum.Linear,
-            Modulate = dark ? new Color(0.08f, 0.06f, 0.05f) : Colors.White,
+            Texture = UiArt.Spotlight, ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.Scale,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         });
+        frame.AddChild(new TextureRect
+        {
+            Texture = icon,
+            CustomMinimumSize = new Vector2(92, 92),
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            TextureFilter = CanvasItem.TextureFilterEnum.LinearWithMipmaps,
+            Modulate = dark ? new Color(0.08f, 0.06f, 0.05f) : badge == Badge.Locked ? new Color(0.62f, 0.58f, 0.54f) : Colors.White,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        });
+        if (badge != Badge.None)
+        {
+            // The seal in the corner (owned / in use) or a padlock in the middle (locked).
+            var mark = new TextureRect
+            {
+                Texture = badge switch { Badge.Owned => UiArt.Owned, Badge.InUse => UiArt.Star, _ => UiArt.Lock },
+                ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+                MouseFilter = Control.MouseFilterEnum.Ignore,
+                CustomMinimumSize = badge == Badge.Locked ? new Vector2(40, 40) : new Vector2(28, 28),
+                SizeFlagsHorizontal = badge == Badge.Locked ? Control.SizeFlags.ShrinkCenter : Control.SizeFlags.ShrinkEnd,
+                SizeFlagsVertical = badge == Badge.Locked ? Control.SizeFlags.ShrinkCenter : Control.SizeFlags.ShrinkBegin,
+            };
+            frame.AddChild(mark);
+        }
         var title = new Label
         {
             Text = name,
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
             HorizontalAlignment = HorizontalAlignment.Center,
-            CustomMinimumSize = new Vector2(130, 36),
+            VerticalAlignment = VerticalAlignment.Center,
+            CustomMinimumSize = new Vector2(120, 36),
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
         title.AddThemeFontSizeOverride("font_size", 13);
         box.AddChild(title);
+        var line = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center, MouseFilter = Control.MouseFilterEnum.Ignore };
+        line.AddThemeConstantOverride("separation", 4);
+        if (price)
+            line.AddChild(new TextureRect
+            {
+                Texture = UiArt.Coin, CustomMinimumSize = new Vector2(16, 16), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered, MouseFilter = Control.MouseFilterEnum.Ignore,
+            });
         var st = new Label { Text = status, HorizontalAlignment = HorizontalAlignment.Center, MouseFilter = Control.MouseFilterEnum.Ignore };
         st.AddThemeFontSizeOverride("font_size", 13);
         st.AddThemeColorOverride("font_color", statusColor);
-        box.AddChild(st);
-        card.Pressed += onSelect;
+        line.AddChild(st);
+        box.AddChild(line);
+        card.Pressed += () =>
+        {
+            _rod.Cue(Core.Audio.OneShot.Click, 0.5f);
+            onSelect();
+        };
+        // Under the mouse the card comes forward a little.
+        card.MouseEntered += () =>
+        {
+            card.ZIndex = 1;
+            card.CreateTween().TweenProperty(card, "scale", new Vector2(1.05f, 1.05f), 0.09f).SetTrans(Tween.TransitionType.Sine);
+        };
+        card.MouseExited += () =>
+        {
+            card.ZIndex = 0;
+            card.CreateTween().TweenProperty(card, "scale", Vector2.One, 0.12f).SetTrans(Tween.TransitionType.Sine);
+        };
         list.AddChild(card);
+        if (_animateCards)
+        {
+            // A new page: the cards come in one after another.
+            int n = list.GetChildCount() - 1;
+            card.Modulate = new Color(1, 1, 1, 0);
+            var tw = card.CreateTween();
+            tw.TweenInterval(Math.Min(n * 0.025f, 0.45f));
+            tw.TweenProperty(card, "modulate:a", 1f, 0.16f);
+        }
         return card;
     }
 
@@ -364,29 +726,37 @@ public partial class Shop : CanvasLayer
     {
         var list = _lists[slot.Key()];
         Clear(list);
-        var items = _loadout.Items(slot);
-        for (int i = 0; i < items.Count; i++)
+        foreach (var (i, item) in Browse(slot.Key(), _loadout.Items(slot)))
         {
             int index = i;
-            var item = items[i];
             bool locked = _profile.Level < item.RequiredLevel;
             string status;
             Color color;
+            Badge badge;
+            bool price = false;
             if (slot == TackleSlot.Bait)
             {
-                (status, color) = locked ? ($"poziom {item.RequiredLevel}", Locked) : ($"masz {_profile.BaitCounts.GetValueOrDefault(item.ItemId)} · {Lore.Money(item.Price)}", Price);
+                int have = _profile.BaitCounts.GetValueOrDefault(item.ItemId);
+                badge = locked ? Badge.Locked : _loadout.Index[(int)slot] == i && have > 0 ? Badge.InUse : have > 0 ? Badge.Owned : Badge.None;
+                (status, color) = locked ? ($"poziom {item.RequiredLevel}", Locked) : ($"{item.Price} gr · masz {have}", Price);
+                price = !locked;
             }
             else if (_profile.Owns(slot, item.ItemId))
             {
                 bool worn = _loadout.Index[(int)slot] == i;
                 (status, color) = worn ? ("w użyciu", Owned) : ("posiadane", Owned);
+                badge = worn ? Badge.InUse : Badge.Owned;
             }
             else
             {
                 (status, color) = locked ? ($"poziom {item.RequiredLevel}", Locked) : (Lore.Money(item.Price), Price);
+                badge = locked ? Badge.Locked : Badge.None;
+                price = !locked;
             }
-            Card(list, Icons.For(item), item.DisplayName, status, color, () => SelectTackle(slot, index));
+            Card(list, Icons.For(item), item.DisplayName, status, color, () => SelectTackle(slot, index), level: item.RequiredLevel, badge: badge, price: price);
         }
+        if (list.GetChildCount() == 0)
+            list.AddChild(new Label { Text = "Nic tu nie pasuje do wybranych filtrów.", Modulate = Muted });
     }
 
     private void FillGear(GearSlot slot)
@@ -395,7 +765,7 @@ public partial class Shop : CanvasLayer
         Clear(list);
         if (_gear == null)
             return;
-        foreach (var item in _gear.Items(slot))
+        foreach (var (_, item) in Browse(slot.Key(), _gear.Items(slot)))
         {
             var it = item;
             bool locked = _profile.Level < item.RequiredLevel;
@@ -403,8 +773,12 @@ public partial class Shop : CanvasLayer
             bool used = owned && (!slot.IsEquippable() || _profile.Gear.EquippedId(slot) == item.ItemId);
             var (status, color) = used ? ("w użyciu", Owned) : owned ? ("posiadane", Owned)
                 : locked ? ($"poziom {item.RequiredLevel}", Locked) : (Lore.Money(item.Price), Price);
-            Card(list, Icons.For(item), item.DisplayName, status, color, () => SelectGear(slot, it));
+            var badge = used ? Badge.InUse : owned ? Badge.Owned : locked ? Badge.Locked : Badge.None;
+            Card(list, Icons.For(item), item.DisplayName, status, color, () => SelectGear(slot, it), level: item.RequiredLevel, badge: badge,
+                price: !owned && !locked);
         }
+        if (list.GetChildCount() == 0)
+            list.AddChild(new Label { Text = "Nic tu nie pasuje do wybranych filtrów.", Modulate = Muted });
     }
 
     // ------------------------------------------------------------------ detail panel
@@ -414,6 +788,8 @@ public partial class Shop : CanvasLayer
         _reselect = null;
         _detailIcon.Modulate = Colors.White;
         _detailState.Text = "";
+        if (_detailTier != null)
+            _detailTier.Text = "";
         Clear(_detailStats);
         _detailButton.Visible = false;
         string key = _tabs.CurrentTab >= 0 ? TabDefinitions[_tabs.CurrentTab].Key : "";
@@ -448,23 +824,55 @@ public partial class Shop : CanvasLayer
     private void Show(object key, Texture2D icon, string name, string text, IEnumerable<(string Label, float Value, float Current, string Shown)> stats,
         string state, string? button, bool enabled, Action? action)
     {
+        bool fresh = !Equals(_selected, key);
         _selected = key;
         _detailIcon.Modulate = Colors.White;
         _detailIcon.Texture = icon;
         _detailName.Text = name;
         _detailText.Text = text;
         _detailState.Text = state;
+        if (key is TackleItem item)
+        {
+            var tier = Tier(item.RequiredLevel);
+            _detailTier.Text = $"{KindName(item)} · {tier.Name} · poziom {item.RequiredLevel}";
+            _detailTier.AddThemeColorOverride("font_color", tier.Color);
+        }
+        else
+        {
+            _detailTier.Text = "";
+        }
         Clear(_detailStats);
         foreach (var (label, value, current, shown) in stats)
-            _detailStats.AddChild(StatBar(label, value, current, shown));
+            _detailStats.AddChild(StatBar(label, value, current, shown, fresh));
+        if (fresh)
+        {
+            // A new item: its picture pops into the light.
+            _detailIcon.Scale = new Vector2(0.82f, 0.82f);
+            _detailIcon.CreateTween().TweenProperty(_detailIcon, "scale", Vector2.One, 0.28f)
+                .SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+        }
         _detailButton.Visible = button != null;
         _detailButton.Text = button ?? "";
         _detailButton.Disabled = !enabled;
         _detailAction = action;
     }
 
+    /// <summary>What kind of thing an item is, in a few words (the detail panel's subtitle).</summary>
+    private static string KindName(TackleItem item) => item switch
+    {
+        RodData r => r.Kind switch { RodKind.Spinning => "wędka spinningowa", RodKind.Bottom => "wędka gruntowa", RodKind.Carp => "wędka karpiowa", _ => "wędka spławikowa" },
+        ReelData => "kołowrotek",
+        LineData l => l.Kind == LineKind.Braid ? "plecionka" : "żyłka",
+        LeaderData => "przypon",
+        HookData => "haczyk",
+        BaitData b => b.Kind switch { BaitKind.Lure => "przynęta sztuczna", BaitKind.Plant => "przynęta roślinna", BaitKind.Carp => "przynęta karpiowa", _ => "przynęta naturalna" },
+        KeepnetData => "siatka",
+        LandingNetData => "kasarek",
+        _ => "akcesorium",
+    };
+
     /// <summary>A labelled bar (0..1) with a tick for the item in use, so better and worse read at a glance.</summary>
-    private static Control StatBar(string label, float value, float current, string shown)
+    private static Control StatBar(string label, float value, float current, string shown, bool animate = false)
     {
         var row = new VBoxContainer();
         row.AddThemeConstantOverride("separation", 1);
@@ -474,8 +882,11 @@ public partial class Shop : CanvasLayer
         val.AddThemeColorOverride("font_color", current < 0f ? Colors.White : value > current + 0.01f ? Owned : value < current - 0.01f ? Locked : Colors.White);
         top.AddChild(val);
         row.AddChild(top);
-        var bar = new ProgressBar { ShowPercentage = false, MaxValue = 1, Value = Math.Clamp(value, 0f, 1f), CustomMinimumSize = new Vector2(0, 10) };
+        var bar = new ProgressBar { ShowPercentage = false, MaxValue = 1, Step = 0, Value = animate ? 0f : Math.Clamp(value, 0f, 1f), CustomMinimumSize = new Vector2(0, 12) };
         row.AddChild(bar);
+        if (animate)
+            bar.CreateTween().TweenProperty(bar, "value", (double)Math.Clamp(value, 0f, 1f), 0.4f)
+                .SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
         if (current >= 0f)
         {
             var tick = new ColorRect { Color = Colors.White, CustomMinimumSize = new Vector2(2, 14), MouseFilter = Control.MouseFilterEnum.Ignore };
@@ -493,20 +904,28 @@ public partial class Shop : CanvasLayer
             case RodData r:
                 var cr = current as RodData;
                 yield return ("Zasięg rzutu", r.CastMult / 1.4f, cr?.CastMult / 1.4f ?? -1f, $"x{r.CastMult:0.00}");
-                yield return ("Wytrzymałość", r.MaxLoad / 15f, cr?.MaxLoad / 15f ?? -1f, $"{r.MaxLoad:0} kg");
+                yield return ("Wytrzymałość", r.MaxLoad / 18f, cr?.MaxLoad / 18f ?? -1f, $"{r.MaxLoad:0} kg");
                 yield return ("Amortyzacja zrywów", r.ShockAbsorb / 0.5f, cr?.ShockAbsorb / 0.5f ?? -1f, $"{r.ShockAbsorb * 200f:0}%");
                 yield return ("Akcja (szczytowa → paraboliczna)", r.Action, cr?.Action ?? -1f, r.Action < 0.34f ? "szczytowa" : r.Action < 0.67f ? "średnia" : "paraboliczna");
                 break;
             case ReelData r:
                 var ce = current as ReelData;
-                yield return ("Siła hamulca", r.DragMax / 12f, ce?.DragMax / 12f ?? -1f, $"{r.DragMax:0} kg");
+                yield return ("Siła hamulca", r.DragMax / 14f, ce?.DragMax / 14f ?? -1f, $"{r.DragMax:0} kg");
                 yield return ("Szybkość zwijania", r.ReelSpeed / 4f, ce?.ReelSpeed / 4f ?? -1f, $"{r.ReelSpeed:0.0} m/s");
-                yield return ("Pojemność szpuli", r.LineCapacity / 200f, ce?.LineCapacity / 200f ?? -1f, $"{r.LineCapacity:0} m");
+                yield return ("Pojemność szpuli", r.LineCapacity / 220f, ce?.LineCapacity / 220f ?? -1f, $"{r.LineCapacity:0} m");
                 break;
             case LineData l:
                 var cl = current as LineData;
-                yield return ("Wytrzymałość", l.Strength / 15f, cl?.Strength / 15f ?? -1f, $"{l.Strength:0} kg");
+                yield return ("Wytrzymałość", l.Strength / 26f, cl?.Strength / 26f ?? -1f, $"{l.Strength:0} kg");
                 yield return ("Niewidoczność w wodzie", 1f / MathF.Max(l.Visibility, 0.5f) * 0.6f, cl != null ? 1f / MathF.Max(cl.Visibility, 0.5f) * 0.6f : -1f, $"x{l.Visibility:0.00}");
+                yield return ("Rozciągliwość (tłumi zrywy)", l.Stretch / 0.6f, cl != null ? cl.Stretch / 0.6f : -1f, l.Kind == LineKind.Braid ? "plecionka" : $"{l.Stretch * 100f:0}%");
+                break;
+            case LeaderData d:
+                var cd = current as LeaderData;
+                bool none = d.ItemId == TackleSlotExtensions.NoLeader;
+                yield return ("Wytrzymałość", none ? 1f : d.Strength / 16f, cd == null ? -1f : cd.ItemId == TackleSlotExtensions.NoLeader ? 1f : cd.Strength / 16f, none ? "jak linka" : $"{d.Strength:0} kg");
+                yield return ("Niewidoczność w wodzie", none ? 0.6f : 1f / MathF.Max(d.Visibility, 0.5f) * 0.6f, cd == null ? -1f : cd.Visibility <= 0f ? 0.6f : 1f / MathF.Max(cd.Visibility, 0.5f) * 0.6f, none ? "jak linka" : $"x{d.Visibility:0.00}");
+                yield return ("Odporność na zęby", d.BiteProof, cd?.BiteProof ?? -1f, $"{d.BiteProof * 100f:0}%");
                 break;
             case HookData h:
                 var ch = current as HookData;
@@ -523,13 +942,17 @@ public partial class Shop : CanvasLayer
                 yield return ("Największa ryba", n.MaxWeight / 25f, cn?.MaxWeight / 25f ?? -1f, $"{n.MaxWeight:0.#} kg");
                 yield return ("Długość rączki", n.Reach / 3.5f, cn?.Reach / 3.5f ?? -1f, $"{n.Reach:0.#} m");
                 break;
+            case BaitData { Reusable: true }:
+                break;
             case BaitData b:
                 yield return ("W paczce", b.PackSize / 20f, -1f, $"{b.PackSize} szt.");
                 break;
         }
     }
 
-    private static string Describe(TackleItem item) => item switch
+    private static string Describe(TackleItem item) => item.Description != "" && item is not AccessoryData
+        ? item.Description + (item is BaitData { Kind: BaitKind.Lure } ? "\nPrzynęta sztuczna: nie zużywa się, bierze tylko podczas zwijania (LPM)." : "")
+        : item switch
     {
         RodData => "Wędka decyduje o zasięgu rzutu i o tym, ile ryba może pociągnąć, zanim kij pęknie.",
         ReelData => "Kołowrotek: hamulec oddaje linkę uciekającej rybie, szpula mieści zapas linki.",
@@ -556,7 +979,8 @@ public partial class Shop : CanvasLayer
         {
             int pack = ((BaitData)item).PackSize;
             state = $"Masz: {_profile.BaitCounts.GetValueOrDefault(item.ItemId)} szt.";
-            button = locked ? $"Wymaga poziomu {item.RequiredLevel}" : $"Kup paczkę ({pack} szt.) za {Lore.Money(item.Price)}";
+            button = locked ? $"Wymaga poziomu {item.RequiredLevel}"
+                : pack == 1 ? $"Kup za {Lore.Money(item.Price)}" : $"Kup paczkę ({pack} szt.) za {Lore.Money(item.Price)}";
             enabled = !locked && _profile.Money >= item.Price;
             action = () => Buy(slot, index);
         }
@@ -610,7 +1034,13 @@ public partial class Shop : CanvasLayer
             state = locked ? $"Odblokujesz na poziomie {item.RequiredLevel}." : $"Cena: {Lore.Money(item.Price)}";
             button = locked ? "Zablokowane" : $"Kup za {Lore.Money(item.Price)}";
             enabled = !locked && _profile.Money >= item.Price;
-            action = () => { _message.Text = _gear.Buy(slot, item) ?? $"Kupiono: {item.DisplayName}"; };
+            action = () =>
+            {
+                string? error = _gear.Buy(slot, item);
+                _message.Text = error ?? $"Kupiono: {item.DisplayName}";
+                if (error == null)
+                    PurchaseEffect();
+            };
         }
         Show(item, Icons.For(item), item.DisplayName, Describe(item), Stats(item, current), state, button, enabled, action);
     }
@@ -622,6 +1052,8 @@ public partial class Shop : CanvasLayer
         bool hadOne = slot == TackleSlot.Bait || _profile.Owns(slot, _loadout.Selected(slot).ItemId);
         string? error = _profile.Buy(slot, item.ItemId, item.Price, item.RequiredLevel, pack);
         _message.Text = error ?? $"Kupiono: {item.DisplayName}";
+        if (error == null)
+            PurchaseEffect();
         // Replacing a destroyed piece: put the new one on straight away.
         if (error == null && !hadOne)
             Equip(slot, index);
@@ -745,9 +1177,12 @@ public partial class Shop : CanvasLayer
     {
         var list = _lists["records"];
         Clear(list);
+        string q = _search.Text.Trim().ToLowerInvariant();
         foreach (var sp in _rod.Species)
         {
             var s = sp;
+            if (q != "" && !(_profile.CatchCounts.GetValueOrDefault(sp.SpeciesName) > 0 && sp.SpeciesName.ToLowerInvariant().Contains(q)))
+                continue;
             float best = _profile.Records.GetValueOrDefault(sp.SpeciesName);
             int n = _profile.CatchCounts.GetValueOrDefault(sp.SpeciesName);
             bool known = n > 0;
