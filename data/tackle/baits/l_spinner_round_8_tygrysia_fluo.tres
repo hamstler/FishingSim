@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Obrotówka okrągła nr 3, tygrysia fluo"
+Kind = 3
+AffinityAs = "spinner"
+AffinityScale = 1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 40
+RequiredLevel = 2
+Description = "Okrągłe skrzydełko wiruje szeroko i pracuje już przy wolnym zwijaniu. 8 g, 5,5 cm."
+Shape = "round"
+LureColor = Color(0.45, 0.9, 0.15, 1)
+AccentColor = Color(1, 0.55, 0.08, 1)
+Pattern = "bars"
+Metallic = false
+SizeCm = 5.5
+WeightG = 8
+SinkScale = 1
+SinkOffset = 0
+DepthScale = 1
+DepthOffset = 0

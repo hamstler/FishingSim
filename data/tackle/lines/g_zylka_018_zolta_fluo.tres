@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="LineData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/LineData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Żyłka 0,18 mm, żółta fluo"
+Kind = 0
+Strength = 3.4
+Visibility = 1.24
+Stretch = 0.55
+Diameter = 0.18
+LineColor = Color(0.95, 0.95, 0.25, 1)
+Price = 21
+RequiredLevel = 2
+Description = "Rozciągliwa żyłka pochłania zrywy ryby i unosi się lekko na wodzie."

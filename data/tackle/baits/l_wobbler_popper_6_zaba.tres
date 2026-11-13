@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Popper powierzchniowy 6 cm, żaba"
+Kind = 3
+AffinityAs = "wobbler"
+AffinityScale = 1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 70
+RequiredLevel = 2
+Description = "Wklęsły pyszczek chlapie po powierzchni przy podszarpnięciach: bolenie, klenie i szczupaki o zmierzchu."
+Shape = "popper"
+LureColor = Color(0.3, 0.6, 0.2, 1)
+AccentColor = Color(0.95, 0.9, 0.4, 1)
+Pattern = "dots"
+Metallic = false
+SizeCm = 6
+WeightG = 9
+SinkScale = 1
+SinkOffset = 0
+DepthScale = 0
+DepthOffset = 0

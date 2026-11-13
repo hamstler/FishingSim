@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Nimfa: złotogłówka, zajęcza"
+Kind = 3
+AffinityAs = "fly"
+AffinityScale = 1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 14
+RequiredLevel = 1
+Description = "Tonie powoli i płynie pół metra pod powierzchnią jak larwa owada."
+Shape = "nymph"
+LureColor = Color(0.55, 0.45, 0.32, 1)
+AccentColor = Color(0.95, 0.75, 0.25, 1)
+Pattern = "redhead"
+Metallic = false
+SizeCm = 1.8
+WeightG = 0.8
+SinkScale = 1
+SinkOffset = 0.25
+DepthScale = 1
+DepthOffset = 0.5

@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Wahadłówka szeroka 15 g, miedziana"
+Kind = 3
+AffinityAs = "spoon"
+AffinityScale = 1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 45
+RequiredLevel = 2
+Description = "Szeroka blacha chodzi płytko i wolno, szerokim łukiem: dobra nad zielskiem."
+Shape = "wide"
+LureColor = Color(0.82, 0.48, 0.28, 1)
+AccentColor = Color(0.15, 0.1, 0.08, 1)
+Pattern = "plain"
+Metallic = true
+SizeCm = 7
+WeightG = 15
+SinkScale = 0.6
+SinkOffset = 0
+DepthScale = 0.6
+DepthOffset = 0

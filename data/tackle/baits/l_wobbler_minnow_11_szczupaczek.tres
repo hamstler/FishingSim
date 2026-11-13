@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Wobler szczupakowy 11 cm, szczupaczek"
+Kind = 3
+AffinityAs = "wobbler"
+AffinityScale = 1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 140
+RequiredLevel = 4
+Description = "Duża rybka na szczupaki i sandacze: schodzi do 2 m."
+Shape = "minnow"
+LureColor = Color(0.35, 0.45, 0.2, 1)
+AccentColor = Color(0.88, 0.86, 0.6, 1)
+Pattern = "dots"
+Metallic = false
+SizeCm = 11
+WeightG = 16
+SinkScale = 1
+SinkOffset = 0
+DepthScale = 1.6
+DepthOffset = 0

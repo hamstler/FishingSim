@@ -139,6 +139,15 @@ public partial class Bobber : RigidBody3D
         GlobalPosition = at;
     }
 
+    /// <summary>Lets the float ride the water by itself again after the rod held it (drawn in by the line).</summary>
+    public void Release()
+    {
+        if (!Visible)
+            return;
+        Freeze = false;
+        LinearVelocity = Vector3.Zero;
+    }
+
     public void Stow()
     {
         Visible = false;
@@ -190,17 +199,24 @@ public partial class Bobber : RigidBody3D
     }
 
     // ------------------------------------------------------------------ lures and the feeder
-    /// <summary>Chooses what hangs on the line for the next cast.</summary>
-    public void SetTerminal(FishingMethod method, LureFamily family)
+    private string _lureId = "";
+
+    /// <summary>Chooses what hangs on the line for the next cast: the float, the feeder, or this lure (built from its
+    /// family, model, colours and size: <see cref="LureModels"/>).</summary>
+    public void SetTerminal(FishingMethod method, Data.BaitData? bait)
     {
         _method = method;
         TerminalVisible = true;
         LureSpeed = 0f;
-        if (method != FishingMethod.Spinning || (_lure != null && family == _family))
+        if (method != FishingMethod.Spinning || bait == null)
             return;
-        _family = family;
+        string key = bait.ResourcePath.Length > 0 ? bait.ResourcePath : bait.DisplayName;
+        if (_lure != null && key == _lureId)
+            return;
+        _lureId = key;
+        _family = Core.Methods.Method.FamilyOf(bait.AffinityAs);
         _lure?.QueueFree();
-        _lure = BuildLure(family, out _spin, out _tail);
+        _lure = LureModels.Build(bait, out _spin, out _tail);
         _lureRoot.AddChild(_lure);
     }
 
@@ -250,120 +266,6 @@ public partial class Bobber : RigidBody3D
         };
         parent.AddChild(mi);
         return mi;
-    }
-
-    /// <summary>A small treble hook hanging at a point (three bent points round a shank).</summary>
-    private static void Treble(Node3D parent, Vector3 at, float size)
-    {
-        var steel = Metal(new Color(0.3f, 0.3f, 0.32f), 0.35f);
-        var hook = new Node3D { Position = at };
-        parent.AddChild(hook);
-        Part(hook, new TorusMesh { InnerRadius = size * 0.12f, OuterRadius = size * 0.2f, Rings = 8, RingSegments = 4 }, steel,
-            new Vector3(0f, 0f, 0f), new Vector3(0f, 0f, Mathf.Pi / 2f));
-        Part(hook, new CylinderMesh { TopRadius = size * 0.04f, BottomRadius = size * 0.04f, Height = size * 0.8f, RadialSegments = 4 }, steel,
-            new Vector3(0f, 0f, -size * 0.45f), new Vector3(Mathf.Pi / 2f, 0f, 0f));
-        for (int i = 0; i < 3; i++)
-        {
-            float a = i / 3f * Mathf.Tau;
-            var dir = new Vector3(MathF.Cos(a), MathF.Sin(a), 0f);
-            Part(hook, new TorusMesh { InnerRadius = size * 0.26f, OuterRadius = size * 0.32f, Rings = 10, RingSegments = 4 }, steel,
-                new Vector3(0f, 0f, -size * 0.85f) + dir * size * 0.28f, new Vector3(0f, Mathf.Pi / 2f, a), new Vector3(1f, 1f, 0.6f));
-        }
-    }
-
-    /// <summary>One lure, nose towards +Z, the line's eye at the origin, about 5-7 cm long.</summary>
-    private static Node3D BuildLure(LureFamily family, out Node3D? spin, out Node3D? tail)
-    {
-        spin = null;
-        tail = null;
-        var root = new Node3D { Name = "Lure" };
-        var wire = Metal(new Color(0.78f, 0.78f, 0.8f), 0.2f);
-        switch (family)
-        {
-            case LureFamily.Spinner:
-            {
-                // A wire shaft, a clevis with the blade turning round it, brass beads and body, a treble at the back.
-                Part(root, new CylinderMesh { TopRadius = 0.0007f, BottomRadius = 0.0007f, Height = 0.06f, RadialSegments = 4 }, wire,
-                    new Vector3(0f, 0f, -0.03f), new Vector3(Mathf.Pi / 2f, 0f, 0f));
-                var brass = Metal(new Color(0.85f, 0.66f, 0.3f));
-                Part(root, new SphereMesh { Radius = 0.0035f, Height = 0.007f, RadialSegments = 8, Rings = 4 }, brass, new Vector3(0f, 0f, -0.018f));
-                Part(root, new SphereMesh { Radius = 0.0045f, Height = 0.018f, RadialSegments = 10, Rings = 6 }, brass, new Vector3(0f, 0f, -0.03f));
-                Part(root, new SphereMesh { Radius = 0.0025f, Height = 0.005f, RadialSegments = 8, Rings = 4 }, Paint(new Color(0.85f, 0.1f, 0.08f)), new Vector3(0f, 0f, -0.04f));
-                spin = new Node3D { Position = new Vector3(0f, 0f, -0.008f) };
-                root.AddChild(spin);
-                var blade = Part(spin, new SphereMesh { Radius = 0.5f, Height = 1f, RadialSegments = 14, Rings = 6 }, Metal(new Color(0.92f, 0.93f, 0.95f), 0.12f),
-                    new Vector3(0.0075f, 0f, -0.012f), new Vector3(0f, 0.35f, 0f), new Vector3(0.012f, 0.0018f, 0.024f));
-                blade.Name = "Blade";
-                Treble(root, new Vector3(0f, 0f, -0.062f), 0.012f);
-                break;
-            }
-            case LureFamily.Spoon:
-            {
-                // A curved brass plate, polished inside, a split ring at each end and the treble.
-                var plate = Part(root, new SphereMesh { Radius = 0.5f, Height = 1f, RadialSegments = 18, Rings = 8, IsHemisphere = true },
-                    Metal(new Color(0.9f, 0.72f, 0.35f), 0.18f), new Vector3(0f, 0f, -0.028f), new Vector3(Mathf.Pi, 0f, 0f), new Vector3(0.019f, 0.006f, 0.052f));
-                plate.Name = "Plate";
-                Part(root, new SphereMesh { Radius = 0.003f, Height = 0.001f, RadialSegments = 10, Rings = 2 }, Paint(new Color(0.8f, 0.08f, 0.06f)), new Vector3(0f, 0.0005f, -0.035f));
-                Part(root, new TorusMesh { InnerRadius = 0.002f, OuterRadius = 0.003f, Rings = 8, RingSegments = 4 }, wire, new Vector3(0f, 0f, -0.002f), new Vector3(0f, 0f, Mathf.Pi / 2f));
-                Treble(root, new Vector3(0f, 0f, -0.058f), 0.012f);
-                break;
-            }
-            case LureFamily.Wobbler:
-            {
-                // A painted wooden fish: green back, yellow flanks, a clear diving lip under the nose, eyes, two trebles.
-                var bodyMat = Paint(new Color(0.42f, 0.55f, 0.18f), 0.35f);
-                Part(root, new SphereMesh { Radius = 0.5f, Height = 1f, RadialSegments = 16, Rings = 10 }, bodyMat,
-                    new Vector3(0f, 0f, -0.028f), null, new Vector3(0.013f, 0.017f, 0.056f));
-                Part(root, new SphereMesh { Radius = 0.5f, Height = 1f, RadialSegments = 16, Rings = 10 }, Paint(new Color(0.95f, 0.78f, 0.2f), 0.35f),
-                    new Vector3(0f, -0.003f, -0.028f), null, new Vector3(0.0136f, 0.012f, 0.05f));
-                foreach (float z in new[] { -0.018f, -0.03f, -0.042f })
-                    Part(root, new BoxMesh { Size = new Vector3(0.0138f, 0.009f, 0.0025f) }, Paint(new Color(0.12f, 0.2f, 0.06f)), new Vector3(0f, 0.004f, z));
-                Part(root, new BoxMesh { Size = new Vector3(0.012f, 0.0012f, 0.016f) },
-                    new StandardMaterial3D { AlbedoColor = new Color(0.9f, 0.95f, 1f, 0.45f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, Roughness = 0.05f },
-                    new Vector3(0f, -0.006f, 0.005f), new Vector3(0.6f, 0f, 0f));
-                foreach (float x in new[] { -0.0062f, 0.0062f })
-                    Part(root, new SphereMesh { Radius = 0.0022f, Height = 0.0044f, RadialSegments = 8, Rings = 4 }, Paint(new Color(0.05f, 0.04f, 0.03f), 0.1f), new Vector3(x, 0.003f, -0.008f));
-                Treble(root, new Vector3(0f, -0.012f, -0.02f), 0.009f);
-                Treble(root, new Vector3(0f, -0.004f, -0.06f), 0.009f);
-                break;
-            }
-            case LureFamily.Softbait:
-            {
-                // A lead head painted red with the hook's point up through the back, a pale soft body and a paddle tail.
-                Part(root, new SphereMesh { Radius = 0.0068f, Height = 0.0136f, RadialSegments = 12, Rings = 6 }, Paint(new Color(0.75f, 0.12f, 0.1f), 0.4f), new Vector3(0f, 0f, -0.005f));
-                Part(root, new SphereMesh { Radius = 0.0018f, Height = 0.0036f, RadialSegments = 8, Rings = 4 }, Paint(new Color(0.95f, 0.85f, 0.2f), 0.2f), new Vector3(0.0055f, 0.002f, -0.003f));
-                var soft = Paint(new Color(0.9f, 0.92f, 0.8f), 0.6f);
-                Part(root, new CylinderMesh { TopRadius = 0.005f, BottomRadius = 0.0035f, Height = 0.045f, RadialSegments = 10, Rings = 4 }, soft,
-                    new Vector3(0f, 0f, -0.033f), new Vector3(-Mathf.Pi / 2f, 0f, 0f));
-                Part(root, new CylinderMesh { TopRadius = 0.0006f, BottomRadius = 0.0006f, Height = 0.012f, RadialSegments = 4 }, Metal(new Color(0.35f, 0.35f, 0.37f)),
-                    new Vector3(0f, 0.006f, -0.03f), new Vector3(0.25f, 0f, 0f));
-                tail = new Node3D { Position = new Vector3(0f, 0f, -0.055f) };
-                root.AddChild(tail);
-                Part(tail, new CylinderMesh { TopRadius = 0.0035f, BottomRadius = 0.0022f, Height = 0.008f, RadialSegments = 8 }, soft,
-                    new Vector3(0f, 0f, -0.004f), new Vector3(-Mathf.Pi / 2f, 0f, 0f));
-                Part(tail, new BoxMesh { Size = new Vector3(0.0025f, 0.012f, 0.009f) }, soft, new Vector3(0f, 0f, -0.011f));
-                break;
-            }
-            default:
-            {
-                // A fly: a dark body wound on the hook, a ruff of cock's hackle, a short tail.
-                Part(root, new CylinderMesh { TopRadius = 0.002f, BottomRadius = 0.0025f, Height = 0.014f, RadialSegments = 8 }, Paint(new Color(0.18f, 0.1f, 0.05f), 0.8f),
-                    new Vector3(0f, 0f, -0.008f), new Vector3(Mathf.Pi / 2f, 0f, 0f));
-                var hackle = Paint(new Color(0.75f, 0.45f, 0.18f), 0.9f);
-                for (int i = 0; i < 10; i++)
-                {
-                    float a = i / 10f * Mathf.Tau;
-                    Part(root, new CylinderMesh { TopRadius = 0.0002f, BottomRadius = 0.0006f, Height = 0.012f, RadialSegments = 3 }, hackle,
-                        new Vector3(MathF.Cos(a) * 0.005f, MathF.Sin(a) * 0.005f, -0.001f), new Vector3(0f, 0f, a - Mathf.Pi / 2f));
-                }
-                Part(root, new CylinderMesh { TopRadius = 0.0003f, BottomRadius = 0.0012f, Height = 0.012f, RadialSegments = 4 }, hackle,
-                    new Vector3(0f, 0.001f, -0.02f), new Vector3(Mathf.Pi / 2f + 0.2f, 0f, 0f));
-                Part(root, new TorusMesh { InnerRadius = 0.003f, OuterRadius = 0.0036f, Rings = 10, RingSegments = 4 }, Metal(new Color(0.3f, 0.3f, 0.32f)),
-                    new Vector3(0f, -0.004f, -0.014f), new Vector3(0f, Mathf.Pi / 2f, 0f), new Vector3(1f, 1f, 0.5f));
-                break;
-            }
-        }
-        return root;
     }
 
     /// <summary>The feeder: an open green cage with a lead strip along its bottom, lying on its side, and its groundbait.</summary>

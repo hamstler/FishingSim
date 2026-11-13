@@ -228,6 +228,7 @@ public static class Icons
         ReelData r => Reel(r),
         LineData l => Line(l),
         HookData h => Hook(h),
+        BaitData { Kind: BaitKind.Lure } b => Lure(b),
         BaitData b => Bait(b.ItemId),
         LeaderData d => Leader(d),
         KeepnetData k => Keepnet(k),
@@ -290,29 +291,206 @@ public static class Icons
 
     private static ImageTexture Line(LineData l) => Cached("line:" + l.ItemId, c =>
     {
-        var thread = l.ItemId switch
-        {
-            "plecionka030" => C(0.82f, 0.74f, 0.55f), "zylka016" => C(0.93f, 0.9f, 0.84f), "jelito_cienkie" or "jelito_mocne" => C(0.88f, 0.7f, 0.42f),
-            "jedwab_skrecany" or "plecionka_jedwabna" => C(0.97f, 0.95f, 0.9f), "plecionka_konopna" => C(0.6f, 0.58f, 0.4f),
-            "plecionka_smolowana" => C(0.18f, 0.16f, 0.14f), _ => C(0.86f, 0.82f, 0.72f),
-        };
+        // A spool wound with the line in its own colour: windings as thick as the line (a braid woven, a
+        // fluorocarbon glassy), a multicoloured braid in bands.
+        var thread = l.LineColor;
+        bool multi = l.DisplayName.Contains("wielokolorowa");
+        float w = Math.Clamp(0.6f + l.Diameter * 5f, 0.7f, 2.6f);
         c.Rect(14, 14, 50, 50, C(0.45f, 0.3f, 0.18f));                                  // spool flanges
-        c.Rect(18, 18, 46, 46, thread);
+        c.Rect(18, 18, 46, 46, l.Kind == LineKind.Fluoro ? thread.Darkened(0.35f) : thread);
+        Color Band(int y) => multi ? (y / 5 % 4) switch { 0 => C(0.9f, 0.25f, 0.2f), 1 => C(0.95f, 0.85f, 0.2f), 2 => C(0.25f, 0.5f, 0.9f), _ => C(0.3f, 0.75f, 0.3f) } : thread;
         if (l.Kind == LineKind.Braid)
         {
             for (int k = -28; k < 28; k += 4)                                          // the braid's weave
             {
-                c.Line(18 + MathF.Max(k, 0), 18 - MathF.Min(k, 0), 46 - MathF.Max(-k, 0), 46 + MathF.Min(-k, 0) - 0.01f, 1f, thread.Darkened(0.22f));
-                c.Line(46 - MathF.Max(k, 0), 18 - MathF.Min(k, 0), 18 + MathF.Max(-k, 0), 46 + MathF.Min(-k, 0) - 0.01f, 1f, thread.Lightened(0.15f));
+                var t = Band(k + 28);
+                c.Line(18 + MathF.Max(k, 0), 18 - MathF.Min(k, 0), 46 - MathF.Max(-k, 0), 46 + MathF.Min(-k, 0) - 0.01f, w * 0.6f, t.Darkened(0.22f));
+                c.Line(46 - MathF.Max(k, 0), 18 - MathF.Min(k, 0), 18 + MathF.Max(-k, 0), 46 + MathF.Min(-k, 0) - 0.01f, w * 0.6f, t.Lightened(0.15f));
             }
         }
         else
         {
-            for (int y = 20; y < 46; y += 3)
-                c.Line(18, y, 46, y + 1, 1f, thread.Darkened(0.18f));                  // windings
+            float step = Math.Clamp(w * 1.6f, 2f, 4f);
+            for (float y = 20; y < 46; y += step)
+                c.Line(18, y, 46, y + 1, w, l.Kind == LineKind.Fluoro ? thread.Lightened(0.3f) : thread.Darkened(0.18f));   // windings
+            if (l.Kind == LineKind.Fluoro)
+                c.Line(20, 22, 30, 44, 1.5f, C(1f, 1f, 1f, 0.6f));                     // the glassy sheen
         }
         c.Disc(32, 32, 4, 4, C(0.3f, 0.2f, 0.12f));
-        c.Line(46, 40, 58, 56, 1f, thread);                                             // loose end
+        c.Line(46, 40, 58, 56, w, multi ? C(0.9f, 0.25f, 0.2f) : thread);               // loose end
+        return c;
+    });
+
+    /// <summary>A lure drawn from its data: family, model, colours, pattern (every lure of the catalogue).</summary>
+    private static ImageTexture Lure(BaitData b) => Cached("lure:" + b.ItemId, c =>
+    {
+        var main = b.LureColor;
+        var acc = b.AccentColor;
+        var iron = C(0.55f, 0.56f, 0.6f);
+        var dark = main.Darkened(0.55f);
+        string shape = b.Shape;
+        void Treble(float x, float y)
+        {
+            c.Line(x, y, x + 6, y + 7, 1.5f, iron);
+            c.Line(x, y, x + 6, y - 7, 1.5f, iron);
+            c.Line(x, y, x + 8, y, 1.5f, iron);
+        }
+        switch (Core.Methods.Method.FamilyOf(b.AffinityAs))
+        {
+            case Core.Methods.LureFamily.Spoon:
+            {
+                float wide = shape == "wide" ? 1.3f : shape == "narrow" ? 0.7f : 1f;
+                for (int i = 0; i < 30; i++)
+                {
+                    float t = i / 29f;
+                    var col = b.Pattern == "halves" && t > 0.5f ? acc : main;
+                    float r = (3f + 7f * MathF.Sin(MathF.PI * MathF.Pow(t, 0.7f))) * wide;
+                    c.Disc(14 + t * 34, 22 + t * 16, r, r * 0.86f, col, col.Darkened(0.3f));
+                }
+                if (b.Pattern == "stripes")
+                    foreach (float t in new[] { 0.35f, 0.65f })
+                        c.Line(14 + t * 34 - 5, 22 + t * 16 + 5, 14 + t * 34 + 5, 22 + t * 16 - 5, 2.5f, acc);
+                else if (b.Pattern == "bars")
+                    foreach (float t in new[] { 0.3f, 0.5f, 0.7f })
+                        c.Line(14 + t * 34 - 5, 22 + t * 16 + 5, 14 + t * 34 + 5, 22 + t * 16 - 5, 2.2f, dark);
+                else if (b.Pattern != "halves")
+                    c.Disc(36, 32, 2.5f, 2.5f, C(0.85f, 0.1f, 0.08f));
+                c.Line(22, 26, 40, 34, 1f, main.Lightened(0.45f));                     // shine
+                c.Ring(11, 20, 3, 1.2f, iron);
+                c.Line(50, 40, 56, 50, 1.5f, iron);
+                c.Line(56, 50, 60, 46, 1.5f, iron);
+                break;
+            }
+            case Core.Methods.LureFamily.Wobbler:
+            {
+                float len = shape == "jerk" ? 23 : shape == "crank" ? 16 : 20, h = shape == "crank" ? 10 : 8;
+                c.Disc(32, 32, len, h, main, main.Darkened(0.25f));                         // the back
+                c.Disc(32, 35, len * 0.92f, h * 0.55f, acc, acc.Darkened(0.2f));             // flanks and belly
+                if (b.Pattern == "bars")
+                    for (int i = 0; i < 4; i++)
+                        c.Line(24 + i * 6, 25, 22 + i * 6, 33, 2.2f, dark);
+                else if (b.Pattern == "dots")
+                    foreach (var (x, y) in new[] { (24, 28), (32, 27), (40, 29), (28, 33), (37, 34) })
+                        c.Disc(x, y, 1.6f, 1.6f, main.Lightened(0.5f));
+                else if (b.Pattern == "redhead")
+                    c.Disc(32 - len * 0.78f, 32, 5, h * 0.9f, acc);
+                float nose = 32 - len;
+                c.Disc(nose + 5, 30, 2.2f, 2.2f, C(0.95f, 0.8f, 0.15f));
+                c.Disc(nose + 5, 30, 1.1f, 1.1f, C(0.05f, 0.05f, 0.05f));
+                if (shape == "popper")
+                    c.Disc(nose + 1, 32, 2.2f, h * 0.7f, C(0.08f, 0.06f, 0.05f));
+                else if (shape != "jerk")
+                    c.Line(nose + 1, 35, nose - (shape == "crank" ? 9 : 6), 40, shape == "crank" ? 3.5f : 2.5f, C(0.85f, 0.88f, 0.92f));   // the lip
+                c.Line(30, 32 + h, 28, 32 + h + 8, 1.5f, iron);
+                Treble(32 + len, 32);
+                break;
+            }
+            case Core.Methods.LureFamily.Softbait:
+            {
+                var head = b.Pattern == "redhead" ? C(0.8f, 0.1f, 0.08f) : C(0.48f, 0.49f, 0.53f);
+                c.Disc(14, 32, 7, 7, head, head.Darkened(0.35f));                           // jig head
+                c.Disc(11, 30, 1.6f, 1.6f, C(0.95f, 0.8f, 0.15f));
+                c.Line(18, 26, 22, 20, 1.5f, iron);                                          // the hook's point
+                switch (shape)
+                {
+                    case "twister":
+                        c.Line(20, 32, 40, 32, 7f, main);
+                        for (int i = 0; i < 14; i++)
+                        {
+                            float a = i / 13f * 3.6f;
+                            c.Disc(42 + MathF.Sin(a) * 9f, 32 - (1f - MathF.Cos(a)) * 6f, 3f - i * 0.12f, 2f, main, main.Darkened(0.2f));
+                        }
+                        break;
+                    case "worm":
+                        for (int i = 0; i < 40; i++)
+                        {
+                            float t = i / 39f;
+                            c.Disc(20 + t * 38, 32 + MathF.Sin(t * 8f) * 4f, 3.2f - t * 1.8f, 3.2f - t * 1.8f, main, main.Darkened(0.25f));
+                        }
+                        break;
+                    case "craw":
+                        c.Disc(34, 32, 13, 6, main, main.Darkened(0.3f));
+                        c.Disc(20, 24, 7, 3, main, main.Darkened(0.3f));
+                        c.Disc(20, 40, 7, 3, main, main.Darkened(0.3f));
+                        c.Disc(50, 32, 4, 6, main, main.Darkened(0.3f));
+                        break;
+                    default:
+                        c.Line(20, 32, 46, 32, 8f, main);
+                        for (int i = 0; i < 5; i++)
+                            c.Line(24 + i * 4, 28, 24 + i * 4, 36, 1f, main.Darkened(0.2f));       // ribs
+                        c.Line(46, 32, 52, 32, 4f, main);
+                        c.Disc(55, 32, 3, 8, main, main.Darkened(0.3f));                         // paddle tail
+                        break;
+                }
+                if (b.Pattern == "glitter")
+                    foreach (var (x, y) in new[] { (26, 30), (31, 34), (36, 31), (41, 33), (29, 33) })
+                        c.Disc(x, y, 0.9f, 0.9f, acc);
+                break;
+            }
+            case Core.Methods.LureFamily.Fly:
+            {
+                c.Line(18, 38, 46, 38, 1.5f, iron);                                         // the hook
+                c.Line(46, 38, 50, 46, 1.5f, iron);
+                c.Line(50, 46, 44, 48, 1.5f, iron);
+                switch (shape)
+                {
+                    case "nymph":
+                        c.Disc(32, 35, 11, 5, main, main.Darkened(0.3f));
+                        c.Disc(20, 34, 4, 4, b.Pattern == "redhead" ? C(0.95f, 0.75f, 0.25f) : acc);
+                        for (int k = 0; k < 5; k++)
+                            c.Line(26 + k * 3, 38, 24 + k * 3, 43, 1f, acc);
+                        break;
+                    case "streamer":
+                        c.Line(18, 36, 30, 36, 4f, acc);
+                        for (int k = 0; k < 4; k++)
+                            c.Line(26, 34 + k, 60, 30 + k * 2, 2f, main);
+                        c.Disc(20, 35, 1.6f, 1.6f, C(0.95f, 0.8f, 0.15f));
+                        break;
+                    case "wet":
+                        c.Line(20, 36, 40, 36, 3f, main);
+                        c.Disc(36, 30, 10, 3, acc, acc.Darkened(0.3f));
+                        break;
+                    default:
+                        c.Line(20, 36, 44, 36, 3f, main);
+                        c.Disc(24, 26, 9, 6, acc, acc.Darkened(0.3f));                         // hackle
+                        c.Disc(30, 20, 3, 8, main.Lightened(0.4f));                            // upright wing
+                        c.Line(44, 35, 54, 31, 1.5f, acc);                                     // tail
+                        break;
+                }
+                break;
+            }
+            default:
+            {
+                // Spinner: shaft, the blade, beads and body, a treble (with a hair tail, or a lead head in front).
+                c.Line(8, 32, 54, 32, 1.5f, iron);
+                c.Ring(6, 32, 2.5f, 1.2f, iron);
+                if (shape == "headed")
+                    c.Disc(14, 32, 6, 6, C(0.45f, 0.46f, 0.5f), C(0.3f, 0.31f, 0.35f));
+                float bw = shape == "long" ? 11 : 9, bh = shape == "long" ? 4.5f : 7;
+                float bx = shape == "headed" ? 27 : 23;
+                c.Disc(bx, 24, bw, bh, main, main.Darkened(0.3f));
+                if (b.Pattern == "dots")
+                {
+                    c.Disc(bx - 3, 23, 1.7f, 1.7f, acc);
+                    c.Disc(bx + 3, 25, 1.7f, 1.7f, acc);
+                }
+                else if (b.Pattern == "bars")
+                {
+                    c.Line(bx - 4, 19, bx - 4, 29, 1.8f, C(0.06f, 0.06f, 0.06f));
+                    c.Line(bx + 2, 19, bx + 2, 29, 1.8f, C(0.06f, 0.06f, 0.06f));
+                }
+                if (b.Metallic)
+                    c.Line(bx - 5, 22, bx + 3, 21, 1f, main.Lightened(0.5f));             // shine
+                var brass = b.Metallic ? main : C(0.85f, 0.66f, 0.3f);
+                c.Disc(37, 32, 4.5f, 4.5f, brass, brass.Darkened(0.3f));
+                c.Disc(44, 32, 2.6f, 2.6f, C(0.8f, 0.15f, 0.12f));
+                Treble(52, 32);
+                if (shape == "tail")
+                    for (int k = -3; k <= 3; k++)
+                        c.Line(54, 32, 63, 32 + k * 2.2f, 1.4f, acc);
+                break;
+            }
+        }
         return c;
     });
 

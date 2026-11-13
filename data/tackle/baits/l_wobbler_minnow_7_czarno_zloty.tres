@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Wobler pływający 7 cm, czarno-złoty"
+Kind = 3
+AffinityAs = "wobbler"
+AffinityScale = 1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 80
+RequiredLevel = 2
+Description = "Smukła rybka ze sterem: wypływa, gdy stoi, schodzi na ok. 0,8 m przy zwijaniu."
+Shape = "minnow"
+LureColor = Color(0.08, 0.08, 0.08, 1)
+AccentColor = Color(0.95, 0.75, 0.25, 1)
+Pattern = "plain"
+Metallic = false
+SizeCm = 7
+WeightG = 7
+SinkScale = 1
+SinkOffset = 0
+DepthScale = 1
+DepthOffset = 0

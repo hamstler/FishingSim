@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Obrotówka okrągła nr 2, złota"
+Kind = 3
+AffinityAs = "spinner"
+AffinityScale = 1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 32
+RequiredLevel = 1
+Description = "Okrągłe skrzydełko wiruje szeroko i pracuje już przy wolnym zwijaniu. 5 g, 4,5 cm."
+Shape = "round"
+LureColor = Color(0.92, 0.74, 0.32, 1)
+AccentColor = Color(0.85, 0.12, 0.1, 1)
+Pattern = "plain"
+Metallic = true
+SizeCm = 4.5
+WeightG = 5
+SinkScale = 1
+SinkOffset = 0
+DepthScale = 1
+DepthOffset = 0

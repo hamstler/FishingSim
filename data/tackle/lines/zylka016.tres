@@ -12,3 +12,5 @@ RequiredLevel = 1
 Kind = 0
 Stretch = 0.55
 Description = "Cienka i mało widoczna, ale słaba."
+Diameter = 0.16
+LineColor = Color(0.88, 0.86, 0.8, 1)

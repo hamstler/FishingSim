@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Ripper 7 cm, główka 10 g, perłowa"
+Kind = 3
+AffinityAs = "softbait"
+AffinityScale = 1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 20
+RequiredLevel = 1
+Description = "Guma z ogonkiem-kopytkiem na jigowej główce: spada do dna i bierze na opadzie (metoda stop and go)."
+Shape = "ripper"
+LureColor = Color(0.93, 0.92, 0.88, 1)
+AccentColor = Color(0.75, 0.75, 0.8, 1)
+Pattern = "glitter"
+Metallic = false
+SizeCm = 7
+WeightG = 10
+SinkScale = 1.27
+SinkOffset = 0
+DepthScale = 1
+DepthOffset = 0

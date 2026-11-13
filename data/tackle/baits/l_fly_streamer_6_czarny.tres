@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Streamer 6 cm, czarny"
+Kind = 3
+AffinityAs = "fly"
+AffinityScale = 1.1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 22
+RequiredLevel = 2
+Description = "Długie pióra udają małą rybkę: pstrągi, okonie i szczupaki."
+Shape = "streamer"
+LureColor = Color(0.08, 0.08, 0.08, 1)
+AccentColor = Color(0.5, 0.2, 0.6, 1)
+Pattern = "plain"
+Metallic = false
+SizeCm = 6
+WeightG = 2.5
+SinkScale = 1
+SinkOffset = 0.4
+DepthScale = 1
+DepthOffset = 0.9

@@ -12,3 +12,5 @@ RequiredLevel = 1
 Kind = 0
 Stretch = 0.55
 Description = "Zwykła linka z końskiego włosia. Rozciąga się i tłumi zrywy ryby."
+Diameter = 0.25
+LineColor = Color(0.86, 0.84, 0.76, 1)

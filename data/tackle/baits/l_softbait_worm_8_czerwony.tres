@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Gumowy robak 8 cm, główka 5 g, czerwony"
+Kind = 3
+AffinityAs = "softbait"
+AffinityScale = 1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 18
+RequiredLevel = 1
+Description = "Wije się przy dnie jak prawdziwy robak: leszcze, okonie, klenie."
+Shape = "worm"
+LureColor = Color(0.8, 0.1, 0.08, 1)
+AccentColor = Color(0.3, 0.05, 0.05, 1)
+Pattern = "plain"
+Metallic = false
+SizeCm = 8
+WeightG = 5
+SinkScale = 0.9
+SinkOffset = 0
+DepthScale = 1
+DepthOffset = 0

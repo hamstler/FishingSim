@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="LineData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/LineData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Plecionka 4-splotowa 0,2 mm, wielokolorowa"
+Kind = 1
+Strength = 20.8
+Visibility = 1.35
+Stretch = 0.05
+Diameter = 0.2
+LineColor = Color(0.9, 0.3, 0.3, 1)
+Price = 144
+RequiredLevel = 3
+Description = "Bardzo mocna jak na swoją grubość i nierozciągliwa: daleki rzut i pewne zacięcie, ale zrywy idą prosto w wędkę."

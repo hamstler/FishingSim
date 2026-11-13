@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="LineData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/LineData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Plecionka 4-splotowa 0,3 mm, zielona"
+Kind = 1
+Strength = 46.8
+Visibility = 1.2
+Stretch = 0.05
+Diameter = 0.3
+LineColor = Color(0.25, 0.42, 0.22, 1)
+Price = 300
+RequiredLevel = 3
+Description = "Bardzo mocna jak na swoją grubość i nierozciągliwa: daleki rzut i pewne zacięcie, ale zrywy idą prosto w wędkę."

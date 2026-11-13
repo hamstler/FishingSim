@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Wahadłówka klasyczna 18 g, okoniowa"
+Kind = 3
+AffinityAs = "spoon"
+AffinityScale = 1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 42
+RequiredLevel = 2
+Description = "Wygięta blacha kołysze się na boki i błyska: szczupak, okoń, boleń. 6,5 cm."
+Shape = "classic"
+LureColor = Color(0.55, 0.62, 0.2, 1)
+AccentColor = Color(0.95, 0.75, 0.15, 1)
+Pattern = "bars"
+Metallic = false
+SizeCm = 6.5
+WeightG = 18
+SinkScale = 1.16
+SinkOffset = 0
+DepthScale = 1
+DepthOffset = 0

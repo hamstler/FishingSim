@@ -19,14 +19,14 @@ public sealed class TackleLoadout
     private static readonly string[] ReelPaths = Paths("reels",
         "mlynek1000", "mlynek3000", "freerunner", "szpula_lipowa", "orzechowy_lekki", "mosiezny_hamulec", "beben_sumowy");
     private static readonly string[] LinePaths = Paths("lines",
-        "zylka016", "zylka025", "plecionka030", "jelito_cienkie", "jelito_mocne", "jedwab_skrecany",
-        "plecionka_konopna", "plecionka_jedwabna", "plecionka_smolowana");
+        new[] { "zylka016", "zylka025", "plecionka030", "jelito_cienkie", "jelito_mocne", "jedwab_skrecany",
+            "plecionka_konopna", "plecionka_jedwabna", "plecionka_smolowana" }.Concat(GeneratedTackle.Lines).ToArray());
     private static readonly string[] HookPaths = Paths("hooks", "hak2", "hak5", "hak8", "hak1", "hak3", "hak6", "hak10");
     private static readonly string[] BaitPaths = Paths("baits",
-        "worm", "corn", "bread", "boilie", "livebait", "maggot", "insect",
-        "rosowka", "ochotka", "chrabaszcz", "martwa_rybka", "ciasto", "groch", "kasza", "konopie", "kulka_czosnkowa",
-        "kulka_plywajaca", "blystka_obrotowa", "blystka_mosiezna", "rybka_kora", "rybka_drewniana", "piorko_olowiane",
-        "skorka_wegorza", "mucha_kogut", "mucha_zajac", "blystka_srebrna", "jetka", "pedrak");
+        new[] { "worm", "corn", "bread", "boilie", "livebait", "maggot", "insect",
+            "rosowka", "ochotka", "chrabaszcz", "martwa_rybka", "ciasto", "groch", "kasza", "konopie", "kulka_czosnkowa",
+            "kulka_plywajaca", "blystka_obrotowa", "blystka_mosiezna", "rybka_kora", "rybka_drewniana", "piorko_olowiane",
+            "skorka_wegorza", "mucha_kogut", "mucha_zajac", "blystka_srebrna", "jetka", "pedrak" }.Concat(GeneratedTackle.Lures).ToArray());
     private static readonly string[] LeaderPaths = Paths("leaders",
         TackleSlotExtensions.NoLeader, "przypon_wlosie", "przypon_jelito", "przypon_mosiezny", "przypon_stalowy",
         "przypon_jedwab_drut");

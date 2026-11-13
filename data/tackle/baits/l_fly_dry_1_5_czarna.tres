@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Mucha sucha: mrówka, czarna"
+Kind = 3
+AffinityAs = "fly"
+AffinityScale = 1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 12
+RequiredLevel = 1
+Description = "Unosi się na powierzchni jak owad, który wpadł do wody: pstrągi, klenie, jelce."
+Shape = "dry"
+LureColor = Color(0.06, 0.05, 0.05, 1)
+AccentColor = Color(0.3, 0.25, 0.2, 1)
+Pattern = "plain"
+Metallic = false
+SizeCm = 1.5
+WeightG = 0.3
+SinkScale = 1
+SinkOffset = 0
+DepthScale = 1
+DepthOffset = 0

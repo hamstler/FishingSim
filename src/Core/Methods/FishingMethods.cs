@@ -78,6 +78,71 @@ public static class Method
         FishingMethod.Bottom => 1.8f,
         _ => 1.2f,
     };
+
+    /// <summary>A bigger lure acts like a bigger hook (in hook sizes): it draws bigger fish and puts small mouths off.</summary>
+    public static float SizeHookShift(float sizeCm) => sizeCm <= 0f ? 0f : Math.Clamp((sizeCm - 6f) / 2.5f, -1.5f, 3.5f);
+
+    /// <summary>Small lures are taken more often (up to 1.2x), big ones less (down to 0.75x).</summary>
+    public static float SizePace(float sizeCm) => sizeCm <= 0f ? 1f : Math.Clamp(1.2f - (sizeCm - 4f) * 0.04f, 0.75f, 1.2f);
+
+    /// <summary>
+    /// How far a cast goes against the rod's full range: a heavier lure flies further (a fly or a light spinner
+    /// barely 0.8, a 25 g spoon 1.2), a thicker line drags more (0.12 mm 1.02, 0.25 mm 0.92, 0.40 mm 0.8).
+    /// </summary>
+    public static float CastFactor(float weightG, float diameterMm, bool lure) =>
+        (lure && weightG > 0f ? Math.Clamp(0.72f + 0.1f * MathF.Pow(weightG, 0.55f), 0.7f, 1.2f) : 1f)
+        * Math.Clamp(1.12f - diameterMm * 0.8f, 0.75f, 1.08f);
+
+    /// <summary>Daylight reaching the water (0 night .. 1 bright day): dawn and dusk in between, clouds and rain dim it.</summary>
+    public static float LightLevel(float hour, Weather weather)
+    {
+        float h = (hour % 24f + 24f) % 24f;
+        float sun = h < 5f || h > 19.5f ? 0.08f
+            : h < 6f ? 0.08f + (h - 5f) * 0.27f
+            : h < 9f ? 0.35f + (h - 6f) / 3f * 0.65f
+            : h <= 16f ? 1f
+            : h < 18f ? 1f - (h - 16f) / 2f * 0.65f
+            : 0.35f - (h - 18f) / 1.5f * 0.27f;
+        float dim = weather switch { Weather.Cloudy => 0.75f, Weather.Rain => 0.55f, _ => 1f };
+        return Math.Clamp(sun > 0.1f ? sun * dim : sun, 0f, 1f);
+    }
+
+    /// <summary>
+    /// How a lure's colours suit the light and the water (multiplies the bite clock, about 0.8-1.3): fluorescent,
+    /// white and pearl lures show in murky water and poor light; natural colours work best in clear water by day;
+    /// polished metal flashes in the sun; black stands out against the sky at dusk and at night. The main colour counts
+    /// three quarters, the accent a quarter.
+    /// </summary>
+    public static float ColourAppeal(Godot.Color main, Godot.Color accent, bool metallic, float light, float clarity)
+    {
+        float murk = Math.Clamp((3.5f - clarity) / 2.5f, 0f, 1f);
+        float dim = MathF.Max(1f - light, murk);
+        float One(Godot.Color c, bool metal)
+        {
+            float v = MathF.Max(c.R, MathF.Max(c.G, c.B)), lo = MathF.Min(c.R, MathF.Min(c.G, c.B));
+            float sat = v > 0f ? (v - lo) / v : 0f;
+            if (metal)
+                return 1f + 0.22f * light * (1f - murk) - 0.08f * (1f - light);
+            if (v < 0.25f)
+                return 0.9f + 0.35f * (1f - light);
+            if ((sat > 0.6f && v > 0.85f) || (v > 0.88f && sat < 0.15f))
+                return 0.88f + 0.4f * dim;
+            return 1.15f - 0.35f * dim;
+        }
+        return 0.75f * One(main, metallic) + 0.25f * One(accent, false);
+    }
+
+    /// <summary>A word for the HUD on how the colour suits the conditions.</summary>
+    public static string ColourWord(float appeal) => appeal >= 1.08f ? "kolor pasuje" : appeal <= 0.94f ? "kolor słabo widać" : "";
+}
+
+/// <summary>How one lure differs from its family's usual run (from its data): sink faster or slower, run deeper or
+/// shallower; a lure that runs at depth 0 and does not sink stays on the surface (a dry fly, a popper).</summary>
+public readonly record struct LureTuning(float SinkScale, float SinkOffset, float DepthScale, float DepthOffset)
+{
+    public static readonly LureTuning None = new(1f, 0f, 1f, 0f);
+
+    public static LureTuning From(BaitData bait) => new(bait.SinkScale, bait.SinkOffset, bait.DepthScale, bait.DepthOffset);
 }
 
 /// <summary>
@@ -129,11 +194,22 @@ public sealed class LureMotion
     private float _liftBonus;     // seconds of the "just lifted" jig bonus left
     private float _pulled;        // seconds a snag has been pulled on
 
-    public LureMotion(LureFamily family)
+    /// <summary>Rides the surface film (a dry fly, a popper): never sinks or snags.</summary>
+    public bool Surface { get; }
+
+    public LureMotion(LureFamily family, LureTuning? tuning = null)
     {
         Family = family;
-        Spec = SpecOf(family);
-        Depth = family == LureFamily.Fly ? 0f : 0.05f;
+        var t = tuning ?? LureTuning.None;
+        var b = SpecOf(family);
+        Spec = b with
+        {
+            SinkRate = b.SinkRate * t.SinkScale + t.SinkOffset,
+            RunDepth = b.RunDepth * t.DepthScale + t.DepthOffset,
+            FastRunDepth = b.FastRunDepth * t.DepthScale + t.DepthOffset,
+        };
+        Surface = Spec.SinkRate <= 0f && Spec.RunDepth <= 0.01f && Spec.FastRunDepth <= 0.01f;
+        Depth = Surface ? 0f : 0.05f;
     }
 
     /// <summary>The depth it runs at when drawn at this speed.</summary>
@@ -169,8 +245,8 @@ public sealed class LureMotion
         else
             Depth += Spec.SinkRate * dt;
         float floor = MathF.Max(bottom - 0.04f, 0f);
-        Depth = Family == LureFamily.Fly ? 0f : Math.Clamp(Depth, 0.02f, MathF.Max(floor, 0.02f));
-        OnBottom = Family != LureFamily.Fly && bottom > 0.08f && Depth >= floor - 0.01f;
+        Depth = Surface ? 0f : Math.Clamp(Depth, 0.02f, MathF.Max(floor, 0.02f));
+        OnBottom = !Surface && bottom > 0.08f && Depth >= floor - 0.01f;
         Falling = !reeled && !OnBottom && Depth - before > 0.15f * dt;
         if (!reeled && Depth > before)
             _fell += Depth - before;

@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Obrotówka z ołowianą główką, miedziana"
+Kind = 3
+AffinityAs = "spinner"
+AffinityScale = 1.05
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 45
+RequiredLevel = 2
+Description = "Ołowiana główka przed skrzydełkiem: daleki rzut i prowadzenie przy dnie. 7 g."
+Shape = "headed"
+LureColor = Color(0.82, 0.48, 0.28, 1)
+AccentColor = Color(0.15, 0.1, 0.08, 1)
+Pattern = "plain"
+Metallic = true
+SizeCm = 5
+WeightG = 7
+SinkScale = 1.8
+SinkOffset = 0
+DepthScale = 1.6
+DepthOffset = 0

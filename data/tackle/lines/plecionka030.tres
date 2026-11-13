@@ -12,3 +12,5 @@ RequiredLevel = 4
 Kind = 1
 Stretch = 0.05
 Description = "Mocna plecionka: nie rozciąga się, więc zacięcie jest pewniejsze, ale zrywy ryby idą prosto w wędkę."
+Diameter = 0.3
+LineColor = Color(0.82, 0.74, 0.55, 1)

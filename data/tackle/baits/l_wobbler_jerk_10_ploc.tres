@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Jerk tonący 10 cm, płoć"
+Kind = 3
+AffinityAs = "wobbler"
+AffinityScale = 1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 130
+RequiredLevel = 4
+Description = "Bez steru: tonie i ucieka w bok przy każdym szarpnięciu (PPM). Na szczupaki."
+Shape = "jerk"
+LureColor = Color(0.3, 0.38, 0.5, 1)
+AccentColor = Color(0.86, 0.88, 0.9, 1)
+Pattern = "plain"
+Metallic = false
+SizeCm = 10
+WeightG = 22
+SinkScale = 1
+SinkOffset = 0.55
+DepthScale = 0.4
+DepthOffset = 0

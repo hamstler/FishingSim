@@ -114,12 +114,16 @@ public sealed class GameSuite : ITestSuite
         await t.Seconds(1.2);
         float sank = rod.Lure?.Depth ?? 0f;
         t.Check(sank > 0.25f && rod.Bobber.GlobalPosition.Y < -0.2f, $"left alone it sinks ({sank:0.00} m, y {rod.Bobber.GlobalPosition.Y:0.00})");
-        float outBefore = rod.LineOut;
+        float outBefore = rod.LineOut, slackBefore = rod.Slack;
+        t.Check(slackBefore > 0.1f, $"the cast leaves some slack on the water ({slackBefore:0.0} m)");
         rod.ReelOverride = true;
-        await t.Seconds(1.0);
+        await t.Seconds(1.5);
         var lure = rod.Lure;
-        t.Check(lure != null && rod.LineOut < outBefore - 0.3f && lure.Speed > 0f && rod.Reeling,
-            $"reeling draws it in ({outBefore:0.0} -> {rod.LineOut:0.0} m, {lure?.Judgement.Title()})");
+        t.Check(lure != null && rod.Slack < 0.1f && rod.LineOut < outBefore - 0.2f && lure.Speed > 0f && rod.Reeling,
+            $"reeling takes up the slack, then draws the lure in ({outBefore:0.0} -> {rod.LineOut:0.0} m, slack {rod.Slack:0.0} m, {lure?.Judgement.Title()})");
+        var ropePts = rod.Rope.Positions.ToArray();
+        t.Check(ropePts.Length == FishingSim.Core.Physics.LineRope.Points && ropePts[0].DistanceTo(main.Player.RodTip.GlobalPosition) < 0.05f
+                && ropePts[^1].DistanceTo(rod.Bobber.GlobalPosition) < 0.05f, "the line runs from the rod tip to the lure");
         rod.ReelOverride = false;
         await t.NextFrame();
         float beforeTwitch = rod.LineOut;
@@ -149,6 +153,29 @@ public sealed class GameSuite : ITestSuite
         t.Check(rod.State == RodState.Fight && !rod.Bobber.TerminalVisible, $"struck (or hooked by itself) it fights, the lure in its mouth ({rod.State})");
         rod.ReelOverride = false;
         rod.ResetToIdle();
+
+        // A float: LMB draws it over the water all the way in until it comes out of the water.
+        loadout.Index[(int)TackleSlot.Rod] = rodBefore;
+        loadout.Index[(int)TackleSlot.Bait] = BaitIndex("worm");
+        loadout.BaitCounts["worm"] = 10;
+        rod.ApplyTackle();
+        rod.DevInstantBite = false;
+        rod.DevSpeciesIndex = -1;
+        rod.CastNow(0.5f);
+        await WaitForState(t, rod, RodState.Waiting, 6);
+        float floatOut = rod.LineOut;
+        rod.ReelOverride = true;
+        rod.FastReelOverride = true;
+        waited = 0;
+        while (rod.State == RodState.Waiting && waited < 60)
+        {
+            await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+            waited += 1.0 / Engine.PhysicsTicksPerSecond;
+        }
+        rod.ReelOverride = false;
+        rod.FastReelOverride = false;
+        t.Check(rod.State == RodState.Idle && rod.BannerText.Contains("wyjęty"),
+            $"LMB draws the float in from {floatOut:0} m until it comes out of the water ({rod.State}, {waited:0} s)");
 
         // Bottom: the feeder, the baited spot, the rod rest.
         loadout.BaitCounts["worm"] = 10;
@@ -185,6 +212,29 @@ public sealed class GameSuite : ITestSuite
         rod.TryHook();
         t.Check(rod.State == RodState.Fight && !rod.OnRest && main.Player.Rig.GetParent() == main.Player.Camera,
             "RMB from close by picks the rod up and strikes");
+        rod.ResetToIdle();
+        // The feeder dragged over the bottom all the way out.
+        rod.DevInstantBite = false;
+        rod.CastNow(0.4f);
+        await WaitForState(t, rod, RodState.Waiting, 6);
+        waited = 0;
+        while (!rod.RigSettled && waited < 8)
+        {
+            await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+            waited += 1.0 / Engine.PhysicsTicksPerSecond;
+        }
+        rod.ReelOverride = true;
+        rod.FastReelOverride = true;
+        waited = 0;
+        // A fish may take the dragged bait on the way: the missed bite passes and the drag goes on.
+        while (rod.State is RodState.Waiting or RodState.Nibble or RodState.Bite && waited < 90)
+        {
+            await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+            waited += 1.0 / Engine.PhysicsTicksPerSecond;
+        }
+        rod.ReelOverride = false;
+        rod.FastReelOverride = false;
+        t.Check(rod.State == RodState.Idle && rod.BannerText.Contains("wyjęty"), $"LMB drags the feeder over the bottom until it is out ({rod.State}, {waited:0} s)");
         rod.ResetToIdle();
         rod.DevInstantBite = false;
         rod.DevSpeciesIndex = -1;

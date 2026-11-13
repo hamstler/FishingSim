@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Wobler głęboko nurkujący 7 cm, okoń"
+Kind = 3
+AffinityAs = "wobbler"
+AffinityScale = 1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 110
+RequiredLevel = 3
+Description = "Krępy, z dużym sterem: szybko schodzi głęboko i mocno pracuje. Na sandacze i okonie przy dnie."
+Shape = "crank"
+LureColor = Color(0.42, 0.55, 0.18, 1)
+AccentColor = Color(0.95, 0.78, 0.2, 1)
+Pattern = "bars"
+Metallic = false
+SizeCm = 7
+WeightG = 14
+SinkScale = 1
+SinkOffset = 0
+DepthScale = 2.4
+DepthOffset = 0

@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Ripper 5 cm, główka 5 g, różowa fluo"
+Kind = 3
+AffinityAs = "softbait"
+AffinityScale = 1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 15
+RequiredLevel = 1
+Description = "Guma z ogonkiem-kopytkiem na jigowej główce: spada do dna i bierze na opadzie (metoda stop and go)."
+Shape = "ripper"
+LureColor = Color(1, 0.4, 0.65, 1)
+AccentColor = Color(1, 0.95, 0.95, 1)
+Pattern = "plain"
+Metallic = false
+SizeCm = 5
+WeightG = 5
+SinkScale = 0.933
+SinkOffset = 0
+DepthScale = 1
+DepthOffset = 0

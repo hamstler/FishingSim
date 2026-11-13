@@ -289,6 +289,8 @@ public sealed class CoreSuite : ITestSuite
 
         LiftNetForestSmoke(t, roach);
         FishingMethods(t, Species("szczupak"), Species("leszcz"));
+        TackleCatalogue(t);
+        LineRopePhysics(t);
     }
 
     /// <summary>The lift net, mushrooms and berries, the smokehouse and the notice board (Core/Camp).</summary>
@@ -487,6 +489,120 @@ public sealed class CoreSuite : ITestSuite
         float faded = spots.HeatAt(10f, -30f);
         spots.Decay(6f);
         t.Check(faded is > 0.9f and < 1.3f && spots.Spots.Count == 0, $"groundbait fades over game hours ({faded:0.00} after 1.5 h, gone after 7.5)");
+    }
+
+    /// <summary>The lure and line catalogue: every lure's run, colours, size and weight; every line's diameter.</summary>
+    private static void TackleCatalogue(TestContext t)
+    {
+        t.Section("tackle catalogue: lures and lines");
+        var loadout = new TackleLoadout();
+        var lures = loadout.Items(TackleSlot.Bait).OfType<BaitData>().Where(b => b.Kind == BaitKind.Lure).ToList();
+        var lines = loadout.Items(TackleSlot.Line).OfType<LineData>().ToList();
+        var families = lures.GroupBy(b => b.AffinityAs).ToDictionary(g => g.Key, g => g.Count());
+        t.Check(lures.Count >= 120 && families.Count == 5 && families.Values.All(n => n >= 10),
+            $"a big lure catalogue ({lures.Count}: {string.Join(", ", families.Select(kv => $"{kv.Key} {kv.Value}"))})");
+        t.Check(lures.All(b => b.Reusable && b.Price > 0 && b.Description.Length > 10 && b.Shape.Length > 0 && b.SizeCm > 0f && b.WeightG > 0f),
+            "every lure has a model, a size, a weight, a price and a description");
+        t.Check(lures.Select(b => b.LureColor).Distinct().Count() >= 25, $"in many colours ({lures.Select(b => b.LureColor).Distinct().Count()})");
+        var kinds = lines.GroupBy(l => l.Kind).ToDictionary(g => g.Key, g => g.Count());
+        t.Check(lines.Count >= 50 && kinds.Count == 3 && lines.All(l => l.Diameter > 0f && l.Strength > 0f),
+            $"many lines: monofilament, braid and fluorocarbon ({lines.Count}: {string.Join(", ", kinds.Select(kv => $"{kv.Key} {kv.Value}"))})");
+        t.Check(lines.Select(l => l.Diameter).Distinct().Count() >= 15 && lines.Select(l => l.LineColor).Distinct().Count() >= 8,
+            "in many diameters and colours");
+        bool Thicker(LineKind kind) => lines.Where(l => l.Kind == kind && l.ItemId.StartsWith("g_")).GroupBy(l => l.LineColor)
+            .All(g => g.OrderBy(l => l.Diameter).Zip(g.OrderBy(l => l.Diameter).Skip(1)).All(p => p.Second.Strength > p.First.Strength));
+        t.Check(Thicker(LineKind.Mono) && Thicker(LineKind.Braid) && Thicker(LineKind.Fluoro), "a thicker line holds more");
+        var mono = lines.First(l => l.ItemId == "g_zylka_020_przezroczysta");
+        var braid = lines.First(l => l.ItemId == "g_plecionka_020_zielona");
+        t.Check(braid.Strength > mono.Strength * 3f && braid.Stretch < mono.Stretch, "a braid is far stronger than a monofilament of its diameter and does not stretch");
+
+        // How the lures run.
+        LureMotion Still(BaitData b, float seconds)
+        {
+            var l = new LureMotion(Method.FamilyOf(b.AffinityAs), LureTuning.From(b));
+            for (float s = 0f; s < seconds; s += 0.05f)
+                l.Step(0.05f, 0f, 5f, new FixedRng(0.99f));
+            return l;
+        }
+        var popper = lures.First(b => b.Shape == "popper");
+        var nymph = lures.First(b => b.Shape == "nymph");
+        var dry = lures.First(b => b.Shape == "dry");
+        var jerk = lures.First(b => b.Shape == "jerk");
+        var minnow = lures.First(b => b.Shape == "minnow" && b.ItemId.StartsWith("l_"));
+        t.Check(Still(popper, 3f) is { Surface: true, Depth: 0f } && Still(dry, 3f).Surface, "a popper and a dry fly stay on the surface");
+        t.Check(Still(nymph, 3f) is { Surface: false } n && n.Depth > 0.4f, "a nymph sinks under the surface");
+        t.Check(Still(jerk, 3f).Depth > 0.6f && Still(minnow, 3f).Depth < 0.1f, "a sinking jerk goes down where a floating minnow comes up");
+        var deep = lures.First(b => b.Shape == "crank");
+        var drawn = new LureMotion(LureFamily.Wobbler, LureTuning.From(deep));
+        var shallow = new LureMotion(LureFamily.Wobbler, LureTuning.From(lures.First(b => b.Shape == "minnow" && b.DepthScale < 0.7f)));
+        for (int i = 0; i < 100; i++)
+        {
+            drawn.Step(0.05f, 1f, 6f, new FixedRng(0.99f));
+            shallow.Step(0.05f, 1f, 6f, new FixedRng(0.99f));
+        }
+        t.Check(drawn.Depth > shallow.Depth * 2.5f, $"a crank with a big lip runs deep ({drawn.Depth:0.0} m), a shallow minnow high ({shallow.Depth:0.0} m)");
+
+        // Colours, size, weight and line.
+        var chartreuse = new Color(0.75f, 1f, 0.15f);
+        var natural = new Color(0.42f, 0.55f, 0.18f);
+        var black = new Color(0.07f, 0.07f, 0.08f);
+        var silver = new Color(0.86f, 0.87f, 0.9f);
+        float dusk = Method.LightLevel(19f, Weather.Cloudy), noon = Method.LightLevel(12f, Weather.Clear);
+        t.Check(noon > 0.95f && dusk < 0.4f && Method.LightLevel(1f, Weather.Clear) < 0.1f && Method.LightLevel(12f, Weather.Rain) < noon,
+            "daylight: full at noon, dim at dusk, dark at night, less in the rain");
+        t.Check(Method.ColourAppeal(chartreuse, chartreuse, false, dusk, 1.2f) > Method.ColourAppeal(natural, natural, false, dusk, 1.2f) * 1.2f,
+            "a fluorescent lure wins in murky water at dusk");
+        t.Check(Method.ColourAppeal(natural, natural, false, noon, 5f) > Method.ColourAppeal(chartreuse, chartreuse, false, noon, 5f),
+            "a natural colour wins in clear water by day");
+        t.Check(Method.ColourAppeal(silver, silver, true, noon, 5f) > Method.ColourAppeal(silver, silver, true, 0.08f, 5f)
+                && Method.ColourAppeal(black, black, false, 0.08f, 3f) > Method.ColourAppeal(black, black, false, noon, 3f),
+            "polished metal flashes in the sun, black shows at night");
+        t.Check(Method.SizeHookShift(14f) > 2f && Method.SizeHookShift(3f) < 0f && Method.SizePace(3f) > Method.SizePace(14f),
+            "a big lure acts as a big hook and is taken less often");
+        t.Check(Method.CastFactor(25f, 0.2f, true) > Method.CastFactor(3f, 0.2f, true) * 1.2f && Method.CastFactor(0f, 0.12f, false) > Method.CastFactor(0f, 0.4f, false) * 1.2f,
+            "a heavy lure and a thin line cast further");
+    }
+
+    /// <summary>The fishing line as a rope (Core/Physics/LineRope).</summary>
+    private static void LineRopePhysics(TestContext t)
+    {
+        t.Section("line physics");
+        var tip = new Vector3(0f, 3f, 0f);
+        var end = new Vector3(0f, 0f, -20f);
+        FishingSim.Core.Physics.LineRope Run(float length, float seconds, Vector3 wind, int kind = 0, float bottom = -50f)
+        {
+            var rope = new FishingSim.Core.Physics.LineRope { WaterY = 0f, Length = length, Wind = wind, BottomY = (_, _) => bottom };
+            var (sink, floats) = FishingSim.Core.Physics.LineRope.Behaviour(kind);
+            rope.SinkSpeed = sink;
+            rope.Floats = floats;
+            rope.Reset(tip, end);
+            for (float s = 0f; s < seconds; s += 1f / 60f)
+                rope.Step(1f / 60f, tip, end);
+            return rope;
+        }
+        var slack = Run(24f, 4f, Vector3.Zero);
+        var pts = slack.Positions.ToArray();
+        int onWater = pts.Count(p => MathF.Abs(p.Y) < 0.02f);
+        t.Check(onWater > pts.Length / 3 && pts.All(p => p.Y >= -0.001f), $"a slack monofilament lies on the water ({onWater}/{pts.Length} points on the surface, none under it)");
+        float seg = 24f / (FishingSim.Core.Physics.LineRope.Points - 1);
+        bool stretched = false;
+        for (int i = 0; i < pts.Length - 1; i++)
+            stretched |= pts[i].DistanceTo(pts[i + 1]) > seg * 1.05f;
+        t.Check(!stretched, "the line never stretches beyond its length");
+        var windy = Run(24f, 6f, new Vector3(3f, 0f, 0f)).Positions.ToArray();
+        float bow = windy.Max(p => p.X);
+        t.Check(bow > 0.5f, $"the wind blows the slack into a bow ({bow:0.0} m downwind)");
+        var taut = Run(tip.DistanceTo(end), 1f, Vector3.Zero).Positions.ToArray();
+        t.Check(taut.All(p => (p - tip.Lerp(end, (p.Z - tip.Z) / (end.Z - tip.Z))).Length() < 0.01f), "a tight line runs straight");
+        var fluoro = Run(24f, 8f, Vector3.Zero, kind: 2, bottom: -1.5f).Positions.ToArray();
+        float deepest = fluoro.Min(p => p.Y);
+        t.Check(deepest < -0.5f && deepest >= -1.5f + 0.005f, $"a fluorocarbon sinks under the surface ({deepest:0.00} m), down to the bottom and no further");
+        var air = new FishingSim.Core.Physics.LineRope { WaterY = -10f, Length = 22f };
+        air.Reset(tip, new Vector3(0f, 3f, -20f));
+        for (int i = 0; i < 60; i++)
+            air.Step(1f / 60f, tip, new Vector3(0f, 3f, -20f));
+        t.Check(air.Positions[FishingSim.Core.Physics.LineRope.Points / 2].Y < 2f, "in the air the slack line hangs under the chord");
+        t.Check(slack.Slack(tip, end) > 3f && taut.Length > 0, "the slack is the line paid out beyond the straight distance");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

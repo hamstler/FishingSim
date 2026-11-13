@@ -34,6 +34,45 @@ Wolna gra na licencji **GNU GPL 3.0 lub nowszej**: możesz ją kopiować, zmieni
   się przy braniu. Ręce są wtedy wolne i można się oddalić, ale zaciąć (PPM) da się tylko z bliska (do 3,5 m): wędka
   wraca wtedy do rąk. Z przy podpórce podnosi wędkę.
 
+**Przynęty i żyłki:** kram ma duży katalog przynęt spinningowych (ponad 130) i żyłek (55), każdą w swoim kolorze.
+Generuje go `tools/tackle/generate_tackle.py`.
+- **Obrotówki:** okrągłe, wydłużone, z chwostem i z ołowianą główką, w numerach 1–3. Kolory: srebrne, złote,
+  miedziane, czarne w kropki, srebrne w czerwone kropki i tygrysie fluo.
+- **Wahadłówki:** klasyczne (10, 18, 25 g), wąskie dalekiego rzutu i szerokie płytkie, w kilku kolorach, w tym
+  dwukolorowe i okoniowe.
+- **Woblery:** pływające 5/7/9/11 cm (okoń, płoć, tygrys fluo, pstrąg, czarno-złoty, szczupaczek), głęboko nurkujące
+  z dużym sterem, tonące jerki bez steru i poppery powierzchniowe.
+- **Gumy na główkach:** rippery 5/7/10/14 cm z główkami 5–25 g, twistery, gumowe robaki i raki, w kolorach perłowym,
+  seledynowym fluo, motor oil, różowym, srebrnym brokacie i innych.
+- **Muchy:** suche (pływają), nimfy (toną pod powierzchnię), mokre i streamery.
+
+Każda przynęta ma własny model 3D (kształt, kolory, wzór: kropki, pasy, prążki, połówki, brokat, czerwona główka) i
+rozmiar oraz ikonę w kramie. Ma to znaczenie w łowieniu:
+- waga zmienia zasięg rzutu;
+- rozmiar działa jak większy hak: duża przynęta przyciąga większe ryby, ale rzadziej;
+- wzór pracy decyduje, czy przynęta tonie, wypływa, chodzi płytko, schodzi głęboko, czy zostaje na powierzchni;
+- kolory działają według warunków: fluo, biel i perła w mętnej wodzie i o zmierzchu, kolory naturalne w czystej wodzie
+  w dzień, metal błyska w słońcu, czerń widać nocą. Pasek stanu podpowiada „kolor pasuje” albo „kolor słabo widać”.
+
+Żyłki: przezroczyste, zielone, brązowe i żółte fluo od 0,12 do 0,40 mm; plecionki 8- i 4-splotowe od 0,06 do 0,30 mm
+(zielone, szare, żółte i pomarańczowe fluo, wielokolorowe w metrowe pasy); fluorocarbon od 0,18 do 0,35 mm.
+- Grubsza żyłka jest mocniejsza, ale rzuca się nią bliżej.
+- Plecionka jest kilka razy mocniejsza od żyłki tej samej grubości i się nie rozciąga.
+- Fluorocarbon jest prawie niewidoczny i tonie.
+- W kramie są podkategorie: obrotówki, wahadłówki, woblery, gumy, muchy oraz żyłki, plecionki, fluorocarbon, cienkie
+  i grube.
+
+**Fizyka żyłki:** żyłka to sznur punktów od szczytówki do zestawu, w kolorze i grubości wybranej żyłki.
+- W locie wysnuwa się za zestawem i zwisa łukiem.
+- Po zarzuceniu luz leży na wodzie, a wiatr wygina go w łuk. Żyłka i plecionka pływają, fluorocarbon tonie (nie
+  głębiej niż dno).
+- Zwijanie najpierw wybiera luz, dopiero potem ciągnie zestaw. Pasek stanu pokazuje, ile jest luzu.
+- Przy zamkniętym kabłąku napięta żyłka zatrzymuje spławik.
+- W holu żyłka jest napięta i czerwienieje przy granicy wytrzymałości.
+
+**Ściąganie zestawu (LPM):** spławik przeciąga się po wodzie, przez płyciznę aż do brzegu, a koszyczek po dnie (z
+Shiftem szybciej). Zestaw wychodzi z wody na brzegu albo pod szczytówką.
+
 **Grafika na laptopie:** przy pierwszym uruchomieniu na zintegrowanej grafice gra sama ustawia jakość Niską, bliski
 zasięg widzenia i 3D w 70% (FSR). Wszystko to można zmienić w menu pauzy. Na Niskiej nie ma też poświaty (bloom).
 
@@ -238,7 +277,7 @@ repozytorium, więc lepiej przebudowywać tylko zmienione gatunki. Opis całego 
 | F1 | konsola deweloperska: F2 natychmiastowe branie, F3 nieśmiertelna żyłka, F4 gatunek, F5 reset rzutu, F6 przynęty, F7 +3 godz., F8 pogoda, F9 reset postępu, F10 +1000 gr |
 | F11 | licznik wydajności (FPS, CPU, GPU, pamięć, najwolniejsze systemy) |
 | Z | wędka na podpórkę / podnieś (spławik, grunt) |
-| Shift + LPM | szybkie zwijanie przynęty (spinning) |
+| Shift + LPM | szybkie zwijanie (przynęta, spławik, koszyczek) |
 
 ## Świat
 - **Cała mapa jest do chodzenia:** brzeg, wzgórza, wioska. Wchodzić można tylko w płytką wodę (do 0,5 m), a pomost jest jednym z miejsc do łowienia. Łowić można z dowolnego miejsca na brzegu.

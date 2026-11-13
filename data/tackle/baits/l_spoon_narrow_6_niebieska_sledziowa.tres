@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Wahadłówka wąska 14 g, niebieska śledziowa"
+Kind = 3
+AffinityAs = "spoon"
+AffinityScale = 1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 40
+RequiredLevel = 2
+Description = "Smukła i ciężka: rzuca się nią najdalej, opada szybko, pracuje drobno. Na bolenia i pstrągi."
+Shape = "narrow"
+LureColor = Color(0.25, 0.45, 0.75, 1)
+AccentColor = Color(0.86, 0.87, 0.9, 1)
+Pattern = "halves"
+Metallic = true
+SizeCm = 6
+WeightG = 14
+SinkScale = 1.3
+SinkOffset = 0
+DepthScale = 1.1
+DepthOffset = 0

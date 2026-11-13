@@ -99,6 +99,47 @@ public partial class FishingRod : Node3D
     private bool _feederLoaded;
     private float _bitePull;          // the quiver tip pulled round by a bite on the bottom (0..1)
     private float _lastGroundbaitHour = float.NaN;
+    private float _lureAppeal = 1f;
+
+    // the line: a rope of points from the tip to the end tackle, as long as the line paid out
+    private readonly Core.Physics.LineRope _rope = new();
+    private float _lineLength;
+    private bool _ropeLive;
+    private bool _floatDrawn;
+
+    /// <summary>Line paid out beyond the straight distance to the end tackle (lies on the water; reeling takes it up first).</summary>
+    public float Slack => State is RodState.Waiting or RodState.Nibble or RodState.Bite ? MathF.Max(0f, _lineLength - TipDistance()) : 0f;
+
+    /// <summary>The line's points from the tip to the end (for tests and tools).</summary>
+    public Core.Physics.LineRope Rope => _rope;
+
+    private float TipDistance() => _rodTip.GlobalPosition.DistanceTo(_bobber.GlobalPosition);
+
+    /// <summary>
+    /// Reeling in <paramref name="amount"/> metres of line: the slack lying on the water is taken up first; what is
+    /// left is returned, and that much the end tackle comes in.
+    /// </summary>
+    private float TakeUpSlack(float amount)
+    {
+        float slack = _lineLength - TipDistance();
+        if (slack > 0.03f && amount > 0f)
+        {
+            // A slack line offers no resistance: the reel takes it up twice as fast.
+            float take = MathF.Min(slack - 0.02f, amount * 2f);
+            _lineLength -= take;
+            amount -= take / 2f;
+        }
+        return MathF.Max(amount, 0f);
+    }
+
+    /// <summary>After the end tackle moved: the line follows it (it never stretches).</summary>
+    private void KeepLineTight(bool tight)
+    {
+        float d = TipDistance();
+        _lineLength = tight ? d + 0.01f : MathF.Max(_lineLength, d);
+    }
+
+    private Vector3 WindVelocity => new Vector3(0.8f, 0f, 0.6f) * (World.WindTarget * 3f);
 
     /// <summary>The method the current tackle fishes with (a lure: spinning; bait on a bottom rod: bottom; else float).</summary>
     public FishingMethod Method => MethodRules.For(Loadout.Rod.Kind, Loadout.Bait.Kind);
@@ -224,13 +265,19 @@ public partial class FishingRod : Node3D
         Lake = deps.Lake;
         _waterY = deps.WaterY;
         Gear = deps.Gear;
+        _rope.WaterY = _waterY;
+        _rope.BottomY = (x, z) => Lake.HeightAt(x, z);
         ApplyTackle();
     }
 
     public override void _Ready()
     {
         _lineMesh = new ImmediateMesh();
-        _lineMaterial = new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
+        _lineMaterial = new StandardMaterial3D
+        {
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true,
+            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+        };
         AddChild(new MeshInstance3D
         {
             Mesh = _lineMesh,
@@ -263,6 +310,10 @@ public partial class FishingRod : Node3D
         _bendModel = new Core.Physics.RodBendModel(RodRig.Joints * RodRig.SegmentLength, rod.MaxLoad, rod.Action);
         // Bottom and carp rods have a bright quiver tip that shows the bites.
         _rig?.SetQuiverTip(rod.Kind is RodKind.Bottom or RodKind.Carp);
+        // The line floats (monofilament, braid) or sinks (fluorocarbon).
+        var (sink, floats) = Core.Physics.LineRope.Behaviour((int)line.Kind);
+        _rope.SinkSpeed = sink;
+        _rope.Floats = floats;
         // A snapped rod is gone: nothing left in the hand until a new one is bought or handed out.
         if (_rig != null)
             _rig.Visible = Loadout.Profile == null || Loadout.Profile.Owns(TackleSlot.Rod, rod.ItemId);
@@ -311,7 +362,7 @@ public partial class FishingRod : Node3D
     /// <summary>Rough horizontal range (m) of a full-power cast from the pier with the current rod.</summary>
     public float EstimateCastRange()
     {
-        float v = _castMax;
+        float v = _castMax * CastFactor;
         float ang = Mathf.DegToRad(CastLoftDegrees);
         const float height = 2.8f;
         float vy = v * MathF.Sin(ang);
@@ -325,8 +376,19 @@ public partial class FishingRod : Node3D
         return Lake.DepthAt(_bobber.GlobalPosition.X, _bobber.GlobalPosition.Z);
     }
 
+    /// <summary>A lure's size counts as hook sizes: a big lure draws big fish and puts small mouths off.</summary>
     public BiteContext MakeBiteContext(float depth) =>
-        new(Loadout.Bait.ItemId, Loadout.Hook.Size, depth, Lake.Location, World.Period, World.Weather);
+        new(Loadout.Bait.ItemId, Loadout.Hook.Size + (Loadout.LureOn ? MethodRules.SizeHookShift(Loadout.Bait.SizeCm) : 0f), depth,
+            Lake.Location, World.Period, World.Weather);
+
+    /// <summary>How the lure's colours suit the light and the water now (1 = neutral).</summary>
+    public float LureAppeal => Loadout.LureOn
+        ? MethodRules.ColourAppeal(Loadout.Bait.LureColor, Loadout.Bait.AccentColor, Loadout.Bait.Metallic,
+            MethodRules.LightLevel(World.Hour, World.Weather), Lake.Location.WaterClarity)
+        : 1f;
+
+    /// <summary>The share of the rod's full cast the current lure (its weight) and line (its diameter) allow.</summary>
+    public float CastFactor => MethodRules.CastFactor(Loadout.Bait.WeightG, Loadout.Line.Diameter, Loadout.LureOn);
 
     /// <summary>Weight of one species for the current setup at the current bobber depth.</summary>
     public float BiteWeight(FishSpecies sp) => BiteModel.Weight(sp, MakeBiteContext(CurrentDepth()));
@@ -512,7 +574,7 @@ public partial class FishingRod : Node3D
         if (_bobber == null)
             return;
         UpdateBend(Math.Min((float)delta, 0.05f));
-        UpdateLine();
+        UpdateLine(Math.Min((float)delta, 0.05f));
     }
 
     /// <summary>While the float is in the water, nearby fish that like this bait (at this depth and hour) swim to it.</summary>
@@ -597,6 +659,8 @@ public partial class FishingRod : Node3D
         _bitePull = 0f;
         _feederLoaded = false;
         _bobber.LureSpeed = 0f;
+        _floatDrawn = false;
+        _lineLength = 0f;
         PickUpRod();
         SetState(RodState.Idle);
     }
@@ -607,16 +671,20 @@ public partial class FishingRod : Node3D
         Twitch(-3f);   // the blank whips forward as the cast is released
         var basis = _camera.GlobalTransform.Basis;
         var aim = (-basis.Z).Rotated(basis.X.Normalized(), Mathf.DegToRad(CastLoftDegrees));
-        float speed = Mathf.Lerp(_castMin, _castMax, CastPower);
+        float speed = Mathf.Lerp(_castMin, _castMax, CastPower) * CastFactor;
         // What flies: a float, a lure, or a feeder that takes one portion of the bait as groundbait when there is some
         // to spare.
         _castMethod = Method;
-        _bobber.SetTerminal(_castMethod, MethodRules.FamilyOf(Loadout.Bait.AffinityAs));
+        _bobber.SetTerminal(_castMethod, Loadout.Bait);
         _feederLoaded = _castMethod == FishingMethod.Bottom && Loadout.BaitCount >= 2;
         if (_feederLoaded)
             Loadout.UseBait();
         _bobber.FeederLoaded = _feederLoaded;
         _bobber.Launch(_rodTip.GlobalPosition, aim * speed);
+        // The bail is open: the line pays out behind the end tackle as it flies.
+        _lineLength = 0.3f;
+        _ropeLive = false;
+        _floatDrawn = false;
         SetState(RodState.Flying);
     }
 
@@ -652,11 +720,16 @@ public partial class FishingRod : Node3D
     private void TickFlying()
     {
         _lineOutOutsideFight = FlatDistance(_bobber.GlobalPosition);
+        // The line pays out a little ahead of the end tackle's flight (it trails behind it in an arc).
+        _lineLength = MathF.Max(_lineLength, TipDistance() * 1.04f);
         if (_bobber.Submerged > 0.5f)
         {
             SoundCue?.Invoke(Core.Audio.OneShot.Splash, Math.Clamp(CastPower + 0.4f, 0.5f, 1f));
             if (_castMethod != FishingMethod.Float)
                 EnterWater();
+            // The bail closes: the line that flew out lies on the water with some slack (less behind a lure: the
+            // angler stops the line with a finger as it lands).
+            _lineLength = TipDistance() * (_castMethod == FishingMethod.Spinning ? 1.02f : 1.07f);
             NewBiteTimer();
             SetState(RodState.Waiting);
         }
@@ -693,18 +766,53 @@ public partial class FishingRod : Node3D
         _lineOutOutsideFight = FlatDistance(_bobber.GlobalPosition);
         if (Reeling)
         {
-            var to = Origin() - _bobber.GlobalPosition;
-            to.Y = 0f;
-            _bobber.DriveVelocity = to.Normalized() * _reelSpeed * 0.6f;
-            if (_lineOutOutsideFight < 2.5f)
+            // LMB: the slack is taken up first, then the float is drawn over the water towards the angler, through
+            // the shallows up to the bank (Shift: faster); it comes out of the water at the bank or under the rod.
+            float pull = TakeUpSlack(_reelSpeed * (FastReel ? 0.6f : 0.35f) * dt);
+            if (pull > 0f)
             {
-                ResetToIdle();
-                return;
+                var p = _bobber.GlobalPosition;
+                var to = Origin() - p;
+                to.Y = 0f;
+                if (to.LengthSquared() > 1e-4f)
+                    p += to.Normalized() * pull;
+                p.Y = _waterY + (_bobber.WaterHeight?.Invoke(p.X, p.Z) ?? 0f) - 0.01f;
+                _bobber.Hold(p);
+                _floatDrawn = true;
+                KeepLineTight(true);
+                if (Lake.DepthAt(p.X, p.Z) <= 0.03f || FlatDistance(p) < 1.6f)
+                {
+                    ShowBanner("Zestaw wyjęty z wody", 1.2f);
+                    ResetToIdle();
+                    return;
+                }
             }
         }
         else
         {
+            // Let go: the float rides the water by itself again.
+            if (_floatDrawn)
+            {
+                _bobber.Release();
+                _floatDrawn = false;
+            }
             _bobber.DriveVelocity = Vector3.Zero;
+            // The bail is closed: once the line is tight it holds the float (it slides no further out).
+            if (TipDistance() >= _lineLength && !_bobber.Freeze)
+            {
+                var away = _bobber.GlobalPosition - _rodTip.GlobalPosition;
+                away.Y = 0f;
+                if (away.LengthSquared() > 1e-4f)
+                {
+                    away = away.Normalized();
+                    float outward = _bobber.LinearVelocity.Dot(away);
+                    if (outward > 0f)
+                        _bobber.LinearVelocity -= away * outward;
+                }
+            }
+            // A fish pulling the float under may take a little line.
+            if (TipDistance() > _lineLength + 0.3f)
+                KeepLineTight(false);
         }
         // A lure only fishes while it moves: the clock to the next bite runs while it is reeled in (faster on a spinning
         // rod), and barely at all while it lies still.
@@ -1270,7 +1378,10 @@ public partial class FishingRod : Node3D
         _rigPos = new Vector3(_bobber.GlobalPosition.X, _waterY, _bobber.GlobalPosition.Z);
         _rigSettled = false;
         _rigDepth = 0f;
-        _lure = _castMethod == FishingMethod.Spinning ? new LureMotion(MethodRules.FamilyOf(Loadout.Bait.AffinityAs)) : null;
+        _lure = _castMethod == FishingMethod.Spinning
+            ? new LureMotion(MethodRules.FamilyOf(Loadout.Bait.AffinityAs), LureTuning.From(Loadout.Bait))
+            : null;
+        _lureAppeal = LureAppeal;
         var to = Origin() - _rigPos;
         _bobber.Heading = MathF.Atan2(to.X, to.Z);
         _bobber.Hold(_rigPos + Vector3.Down * 0.03f);
@@ -1312,31 +1423,36 @@ public partial class FishingRod : Node3D
         else
         {
             float retrieve = Reeling ? _reelSpeed * (FastReel ? 0.6f : 0.3f) : 0f;
-            lure.Step(dt, retrieve, bottom, _rng);
+            // The slack left by the cast is taken up first; only then does the lure move.
+            float pull = TakeUpSlack(retrieve * dt);
+            lure.Step(dt, pull > 0f ? pull / dt : 0f, bottom, _rng);
             if (lure.Snagged)
             {
                 ShowBanner("Zaczep! PPM - szarpnij wędką, LPM - ciągnij (linka może pęknąć)", 3.5f);
                 Twitch(1.6f);
             }
             else
-                _rigPos += dir * retrieve * dt;
+                _rigPos += dir * pull;
         }
         // Drawn in to the bank or the rod tip: out of the water.
-        if (bottom <= 0.02f || dist < 2.5f)
+        if (bottom <= 0.02f || dist < 2f)
         {
             ResetToIdle();
             return;
         }
         PlaceLure(dir);
+        KeepLineTight(Reeling && Slack < 0.05f);
         _lineOutOutsideFight = dist;
-        _biteTimer -= dt * lure.BitePace * MethodRules.LureRodMatch(Loadout.Rod.Kind) * 2f;
+        // The play, the rod, the lure's size and how its colours suit the light and the water.
+        _biteTimer -= dt * lure.BitePace * MethodRules.LureRodMatch(Loadout.Rod.Kind) * 2f
+            * MethodRules.SizePace(Loadout.Bait.SizeCm) * _lureAppeal;
         if (_biteTimer <= 0f)
             StartNibble();
     }
 
     private void PlaceLure(Vector3 towardsAngler)
     {
-        float y = _lure is { Family: LureFamily.Fly }
+        float y = _lure is { Surface: true }
             ? _waterY + 0.004f + (_bobber.WaterHeight?.Invoke(_rigPos.X, _rigPos.Z) ?? 0f)
             : _waterY - (_lure?.Depth ?? 0f);
         _bobber.Hold(new Vector3(_rigPos.X, y, _rigPos.Z));
@@ -1368,8 +1484,10 @@ public partial class FishingRod : Node3D
         }
         var to = Origin() - _rigPos;
         to.Y = 0f;
+        // A twitch on a slack line mostly takes up the slack.
+        float dart = TakeUpSlack(lure.Twitch());
         if (to.Length() > 0.01f)
-            _rigPos += to.Normalized() * lure.Twitch();
+            _rigPos += to.Normalized() * dart;
     }
 
     /// <summary>
@@ -1387,10 +1505,12 @@ public partial class FishingRod : Node3D
         if (!_rigSettled)
         {
             _rigDepth += 1.6f * dt;
+            _lineLength = MathF.Max(_lineLength, TipDistance() * 1.02f);      // the line follows the feeder down
             if (_rigDepth >= floor)
             {
                 _rigDepth = floor;
                 _rigSettled = true;
+                _lineLength = TipDistance() + 0.02f;   // the angler tightens the line to the feeder
                 Twitch(0.4f);      // the tip springs back as the feeder touches down
                 if (_feederLoaded)
                 {
@@ -1401,10 +1521,14 @@ public partial class FishingRod : Node3D
         }
         else if (Reeling)
         {
-            _rigPos += dir * _reelSpeed * 0.2f * dt;
+            // Dragged over the bottom towards the angler (Shift: faster), up the slope to the bank.
+            float pull = TakeUpSlack(_reelSpeed * (FastReel ? 0.5f : 0.25f) * dt);
+            _rigPos += dir * pull;
             _rigDepth = MathF.Max(Lake.DepthAt(_rigPos.X, _rigPos.Z) - 0.03f, 0f);
-            if (bottom <= 0.02f || dist < 2.5f)
+            KeepLineTight(true);
+            if (Lake.DepthAt(_rigPos.X, _rigPos.Z) <= 0.03f || dist < 1.6f)
             {
+                ShowBanner("Zestaw wyjęty z wody", 1.2f);
                 ResetToIdle();
                 return;
             }
@@ -1505,30 +1629,62 @@ public partial class FishingRod : Node3D
     }
 
     // ------------------------------------------------------------------ line rendering
-    private void UpdateLine()
+    /// <summary>
+    /// The line: the rope steps with the tip and the end where they are this frame, and is drawn as a thin ribbon
+    /// facing the camera, about a pixel wide and a little wider for thicker lines, in the line's colour (a multicoloured
+    /// braid in metre bands), reddening as the tension nears the breaking point.
+    /// </summary>
+    private void UpdateLine(float dt)
     {
         _lineMesh.ClearSurfaces();
         if (State is RodState.Idle or RodState.Charging or RodState.Landed or RodState.Broken)
+        {
+            _ropeLive = false;
             return;
+        }
         var a = _rodTip.GlobalPosition;
         var b = _bobber.GlobalPosition;
         float ratio = Math.Clamp(Tension / EffectiveLimit, 0f, 1f);
-        bool tight = _castMethod != FishingMethod.Float && State is RodState.Waiting or RodState.Nibble or RodState.Bite;
-        float slack = State is RodState.Fight or RodState.Close ? 1f - Math.Clamp(ratio * 2f, 0f, 1f)
-            : tight ? (Reeling || _rigSettled ? 0.04f : 0.25f) : 1f;
-        float sag = slack * Math.Clamp(a.DistanceTo(b) * 0.04f, 0f, 1.5f);
-        _lineMaterial.AlbedoColor = Colors.White.Lerp(new Color(1f, 0.2f, 0.15f), Math.Clamp((ratio - 0.5f) * 2f, 0f, 1f));
-        _lineMesh.SurfaceBegin(Mesh.PrimitiveType.LineStrip, _lineMaterial);
-        const int steps = 16;
-        for (int i = 0; i <= steps; i++)
+        if (State is RodState.Fight or RodState.Close)
+            _lineLength = a.DistanceTo(b) * (1f + 0.012f * (1f - ratio));      // a fish keeps the line tight
+        if (!_ropeLive)
         {
-            float t = (float)i / steps;
-            var p = a.Lerp(b, t);
-            p.Y -= sag * 4f * t * (1f - t);
-            // A line to a float lies on the water; to a lure or a feeder it runs down into it.
-            if (!tight)
-                p.Y = MathF.Max(p.Y, _waterY + 0.01f);
-            _lineMesh.SurfaceAddVertex(p);
+            _rope.Reset(a, b);
+            _ropeLive = true;
+        }
+        _rope.Length = MathF.Max(_lineLength, 0.05f);
+        _rope.Wind = WindVelocity;
+        _rope.Step(dt, a, b);
+
+        var line = Loadout.Line;
+        bool multi = line.ItemId.Contains("wielokolorowa");
+        var colour = line.LineColor.Lerp(new Color(1f, 0.2f, 0.15f), Math.Clamp((ratio - 0.5f) * 2f, 0f, 1f));
+        float d = line.Diameter;
+        // The ribbon faces whichever camera draws the frame.
+        var eye = (GetViewport()?.GetCamera3D() ?? _camera).GlobalPosition;
+        var pts = _rope.Positions;
+        _lineMesh.SurfaceBegin(Mesh.PrimitiveType.TriangleStrip, _lineMaterial);
+        float along = 0f;
+        for (int i = 0; i < pts.Length; i++)
+        {
+            var p = pts[i];
+            var tangent = i < pts.Length - 1 ? pts[i + 1] - p : p - pts[i - 1];
+            if (tangent.LengthSquared() < 1e-10f)
+                tangent = b - a;
+            var toEye = eye - p;
+            var side = tangent.Cross(toEye);
+            side = side.LengthSquared() > 1e-12f ? side.Normalized() : Vector3.Up;
+            float half = 0.5f * MathF.Max(d * 0.003f, toEye.Length() * 0.0008f * (0.8f + d * 2.5f));
+            var c = multi ? ((int)along % 4) switch
+            {
+                0 => new Color(0.9f, 0.25f, 0.2f), 1 => new Color(0.95f, 0.85f, 0.2f), 2 => new Color(0.25f, 0.5f, 0.9f), _ => new Color(0.3f, 0.75f, 0.3f),
+            } : colour;
+            _lineMesh.SurfaceSetColor(c);
+            _lineMesh.SurfaceAddVertex(p - side * half);
+            _lineMesh.SurfaceSetColor(c);
+            _lineMesh.SurfaceAddVertex(p + side * half);
+            if (i < pts.Length - 1)
+                along += (pts[i + 1] - p).Length();
         }
         _lineMesh.SurfaceEnd();
     }

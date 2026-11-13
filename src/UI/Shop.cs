@@ -33,7 +33,7 @@ public partial class Shop : CanvasLayer
 
     // Browsing: the category rail, sub-categories, search, sort and the "only what I can buy" switch.
     private readonly Dictionary<string, Button> _rail = new();
-    private HBoxContainer _chips = null!;
+    private HFlowContainer _chips = null!;
     private Control _filterBar = null!;
     private LineEdit _search = null!;
     private OptionButton _sort = null!;
@@ -255,8 +255,10 @@ public partial class Shop : CanvasLayer
         // Two rows: the sub-categories, then search, order and the "only what I can buy" switch.
         var rows = new VBoxContainer();
         rows.AddThemeConstantOverride("separation", 6);
-        _chips = new HBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-        _chips.AddThemeConstantOverride("separation", 4);
+        // Wraps onto a second row when a page has many sub-categories (the lures).
+        _chips = new HFlowContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        _chips.AddThemeConstantOverride("h_separation", 4);
+        _chips.AddThemeConstantOverride("v_separation", 4);
         rows.AddChild(_chips);
         var bar = new HBoxContainer();
         bar.AddThemeConstantOverride("separation", 8);
@@ -308,6 +310,9 @@ public partial class Shop : CanvasLayer
             case "line":
                 all.Add(("Żyłki", i => i is LineData { Kind: LineKind.Mono }));
                 all.Add(("Plecionki", i => i is LineData { Kind: LineKind.Braid }));
+                all.Add(("Fluorocarbon", i => i is LineData { Kind: LineKind.Fluoro }));
+                all.Add(("Cienkie (do 0,16)", i => i is LineData { Diameter: <= 0.165f }));
+                all.Add(("Grube (od 0,30)", i => i is LineData { Diameter: >= 0.295f }));
                 break;
             case "leader":
                 all.Add(("Niewidoczne", i => i is LeaderData { BiteProof: <= 0f, Visibility: > 0f }));
@@ -322,7 +327,11 @@ public partial class Shop : CanvasLayer
                 all.Add(("Naturalne", i => i is BaitData { Kind: BaitKind.Natural }));
                 all.Add(("Roślinne", i => i is BaitData { Kind: BaitKind.Plant }));
                 all.Add(("Karpiowe", i => i is BaitData { Kind: BaitKind.Carp }));
-                all.Add(("Sztuczne", i => i is BaitData { Kind: BaitKind.Lure }));
+                all.Add(("Obrotówki", i => i is BaitData { Kind: BaitKind.Lure, AffinityAs: "spinner" }));
+                all.Add(("Wahadłówki", i => i is BaitData { Kind: BaitKind.Lure, AffinityAs: "spoon" }));
+                all.Add(("Woblery", i => i is BaitData { Kind: BaitKind.Lure, AffinityAs: "wobbler" }));
+                all.Add(("Gumy", i => i is BaitData { Kind: BaitKind.Lure, AffinityAs: "softbait" }));
+                all.Add(("Muchy", i => i is BaitData { Kind: BaitKind.Lure, AffinityAs: "fly" }));
                 break;
         }
         return all;

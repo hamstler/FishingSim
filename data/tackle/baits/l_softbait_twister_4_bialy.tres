@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Twister 4 cm, główka 3 g, biały"
+Kind = 3
+AffinityAs = "softbait"
+AffinityScale = 1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 12
+RequiredLevel = 1
+Description = "Sierpowaty ogonek wije się przy najwolniejszym prowadzeniu: okonie i sandacze."
+Shape = "twister"
+LureColor = Color(0.95, 0.95, 0.93, 1)
+AccentColor = Color(0.8, 0.8, 0.8, 1)
+Pattern = "plain"
+Metallic = false
+SizeCm = 4
+WeightG = 3
+SinkScale = 0.8
+SinkOffset = 0
+DepthScale = 1
+DepthOffset = 0
