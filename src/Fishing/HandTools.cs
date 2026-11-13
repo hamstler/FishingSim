@@ -595,10 +595,16 @@ public partial class HandTools : Node3D
             f.Visible = show && i < count;
             if (!f.Visible)
                 continue;
+            // They lie about the far slope of the netting (the side facing the angler, so they are seen over the
+            // near rim) and now and then one flips up and falls back.
             float ph = i * 1.7f;
-            float jump = MathF.Max(0f, MathF.Sin(time * 7f + ph * 2.3f));
-            f.Position = new Vector3(MathF.Cos(ph) * 0.13f * (0.5f + i % 3 * 0.25f), 0.012f + jump * jump * 0.06f, MathF.Sin(ph) * 0.12f);
-            f.Rotation = new Vector3(MathF.Sin(time * 11f + ph) * 0.4f * jump, ph * 1.9f, Mathf.Pi / 2f + MathF.Sin(time * 17f + ph) * 0.9f * jump);
+            float fx = (i % 3 - 1) * 0.16f + MathF.Sin(ph) * 0.04f, fz = -0.12f - (i / 3) * 0.14f - (i % 2) * 0.05f;
+            float u = fx / CampProps.LiftHalfSide, v = fz / CampProps.LiftHalfSide;
+            float slope = CampProps.LiftSag * (1f - (1f - u * u) * (1f - v * v));
+            float jump = MathF.Pow(MathF.Max(0f, MathF.Sin(time * 3.1f + ph * 2.3f)), 3f);
+            float flap = MathF.Sin(time * 19f + ph);
+            f.Position = new Vector3(fx, slope + 0.015f + jump * 0.2f, fz);
+            f.Rotation = new Vector3(0.25f + flap * 0.25f * jump, ph * 1.9f + jump * 1.5f, Mathf.Pi / 2f + flap * (0.25f + 0.8f * jump));
         }
 
         // The eyes follow the net down to the water and back; the body bends towards it and stays put.
@@ -625,7 +631,7 @@ public partial class HandTools : Node3D
                 file = "res://data/fish/ukleja.tres";
             var sp = GD.Load<FishSpecies>(file);
             var holder = new Node3D { Visible = false };
-            var model = FishModel.Create(sp, 0.035f + _fry.Count % 3 * 0.012f);
+            var model = FishModel.Create(sp, 0.04f + _fry.Count % 3 * 0.015f);
             model.Wiggle = 2.5f;
             foreach (var n in model.FindChildren("*", "GeometryInstance3D", true, false))
                 ((GeometryInstance3D)n).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
