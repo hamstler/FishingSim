@@ -67,7 +67,7 @@ public partial class FirstPersonBody : Node3D
     /// <summary>Where one hand should be (world space): wrist, the way the fingers and the palm point, grip, elbow hint.</summary>
     /// <summary>Where a hand goes; <paramref name="Bar"/> = the handle it closes round (the fingers stop on it).</summary>
     public readonly record struct HandTarget(Vector3 Wrist, Vector3 Fingers, Vector3 Palm, float Grip, Vector3 Pole,
-        World.Props.ArmIK.Capsule? Bar = null);
+        World.Props.ArmIK.Capsule? Bar = null, float BarWeight = 1f);
 
     /// <summary>A tool in the hands (shovel, insect net): both hands go where it says instead of the rod.</summary>
     public Func<(HandTarget Right, HandTarget Left)?>? ToolPose { get; set; }
@@ -229,126 +229,245 @@ public partial class FirstPersonBody : Node3D
                 _model.GlobalTransform = bodyFrame;
             else
                 _model.Transform = _modelRest;
-
         }
+        var bodyBasis = GlobalTransform.Basis.Orthonormalized();
+        ArmShape Shape(ArmIK.Arm arm, Vector3 fallbackShoulder)
+        {
+            var len = ik.Lengths(arm) ?? (0.27f, 0.25f);
+            return new ArmShape(ik.Shoulder(arm) ?? ToGlobal(fallbackShoulder), len.Upper, len.Fore, bodyBasis.X, bodyBasis.Y);
+        }
+        var rightArm = Shape(ik.Right, new Vector3(0.17f, -0.235f, -0.05f));
+        var leftArm = Shape(ik.Left, new Vector3(-0.17f, -0.235f, -0.05f));
+
         if (ToolPose?.Invoke() is { } tool)
         {
-            foreach (var (arm, t) in new[] { (ik.Right, tool.Right), (ik.Left, tool.Left) })
+            _rodRight.Has = _rodLeft.Has = false;
+            foreach (var (arm, t, shape, state, right) in new[]
+                     {
+                         (ik.Right, tool.Right, rightArm, _toolRight, true), (ik.Left, tool.Left, leftArm, _toolLeft, false),
+                     })
             {
-                arm.Wrist = t.Wrist;
-                arm.Fingers = t.Fingers;
-                arm.Palm = t.Palm;
-                arm.Grip = t.Grip;
-                arm.Pole = t.Pole;
-                arm.Splay = 0f;
-                arm.Obstacles.Clear();
-                if (t.Bar is { } bar)
-                    arm.Obstacles.Add(bar);
+                var target = t;
+                if (t.Bar is { } bar && t.BarWeight > 0f)
+                {
+                    // The hand round the tool's handle in the most natural way it can take, blended in as it reaches it.
+                    var g = BarGrip((bar.A + bar.B) * 0.5f, bar.B - bar.A, bar.Radius, right, shape, 0f, 0.25f, 0.02f, t.Grip,
+                        0.065f, true, bar.A.DistanceTo(bar.B) * 0.5f, state, dt, t.Pole);
+                    target = Mix(t, g, t.BarWeight);
+                }
+                else
+                    state.Has = false;
+                Apply(arm, target, 0f);
+                arm.ThumbAlong = null;
             }
             return;
         }
+        _toolRight.Has = _toolLeft.Has = false;
         var rigBasis = _rig.GlobalTransform.Basis.Orthonormalized();
         var rodAxis = (rigBasis * Vector3.Up).Normalized();
-        // The right hand round the reel seat as anglers hold it: the handle slanting across the palm, the thumb along
-        // the top, the fingers round from below, the reel's stem between the middle and ring fingers; the hand turned
-        // round the seat so that it carries on the forearm's line (no bent wrist).
-        var rightShoulder = _ik.Shoulder(ik.Right) ?? ToGlobal(new Vector3(0.17f, -0.235f, -0.05f));
-        var seat = BarGrip(_rig.ToGlobal(GripHandle), rodAxis, RodRig.SeatRadius, true, rightShoulder, Mathf.DegToRad(28f), 0.92f,
-            ToGlobal(new Vector3(0.5f, -0.6f, 0.35f)), 0.068f);
-        var wrist = seat.Wrist;
+        // The right hand round the reel seat as anglers hold it: the palm on the seat's right side (the back of the hand
+        // out), the thumb along the top of the blank, the index and middle fingers round the seat in front of the reel's
+        // stem and the ring and little fingers behind it, under the seat; the elbow hanging down at the side, and of the
+        // ways the hand can lie so, the one with the least bent wrist (a little towards the little finger, as anglers'
+        // wrists are).
+        var rightPole = ToGlobal(new Vector3(0.55f, -0.65f, 0.3f));
+        var seat = BarGrip(_rig.ToGlobal(GripHandle), rodAxis, RodRig.SeatRadius, true, rightArm, Mathf.DegToRad(20f), Mathf.DegToRad(55f),
+            0.012f, 0.92f, 0.068f, false, 0.07f, _rodRight, dt, rightPole, (rigBasis * new Vector3(-1f, 0f, 0.15f)).Normalized(),
+            MathF.Cos(Mathf.DegToRad(35f)));
         if (_ik.KnuckleGap(ik.Right, seat.Fingers, seat.Palm) is Vector3 gap)
-            wrist += rodAxis * (_rig.ToGlobal(RodRig.StemAt) - (wrist + gap)).Dot(rodAxis);
-        ik.Right.Wrist = wrist;
-        ik.Right.Fingers = seat.Fingers;
-        ik.Right.Palm = seat.Palm;
-        ik.Right.Pole = seat.Pole;
-        ik.Right.Grip = seat.Grip;
-        ik.Right.Splay = 0.11f;
+        {
+            var shift = rodAxis * (_rig.ToGlobal(RodRig.StemAt) - (seat.Wrist + gap)).Dot(rodAxis);
+            seat = seat with { Wrist = seat.Wrist + shift, Pole = seat.Pole + shift };
+        }
+        Apply(ik.Right, seat, 0.11f);
+        ik.Right.ThumbAlong = (rodAxis + rigBasis * Vector3.Back * 0.15f).Normalized();
         ik.Right.Obstacles.Clear();
         foreach (var (a, b, r) in RodRig.SeatObstacles())
-            ik.Right.Obstacles.Add(new World.Props.ArmIK.Capsule(_rig.ToGlobal(a), _rig.ToGlobal(b), r));
+            ik.Right.Obstacles.Add(new ArmIK.Capsule(_rig.ToGlobal(a), _rig.ToGlobal(b), r));
 
         bool onReel = action is BodyAction.Fight || (ReelingSource?.Invoke() ?? false);
-        _leftOnReel = Mathf.MoveToward(_leftOnReel, onReel ? 1f : 0f, dt * 5f);
+        _leftOnReel = Mathf.MoveToward(_leftOnReel, onReel ? 1f : 0f, dt * 4f);
         if (ReelingSource?.Invoke() ?? false)
             _crank += dt * 9f;
         _rig.SetCrank(_crank);
-        // The crank's knob is pinched in the fingertips (thumb and fingers), the hand turned so it carries on the
-        // forearm's line.
-        var leftShoulder = _ik.Shoulder(ik.Left) ?? ToGlobal(new Vector3(-0.17f, -0.235f, -0.05f));
-        var pinch = BarGrip(_rig.ToGlobal(RodRig.KnobAt(_crank)), rigBasis * Vector3.Right, 0.0085f, false, leftShoulder, 0f, 0.62f,
-            ToGlobal(new Vector3(-0.6f, -0.55f, 0.25f)), 0.1f, eitherWay: true, barLength: 0.012f);
+        // The crank's knob is pinched in the fingertips, the hand lying the most natural way round it.
+        var pinch = BarGrip(_rig.ToGlobal(RodRig.KnobAt(_crank)), rigBasis * Vector3.Right, 0.0085f, false, leftArm, 0f, Mathf.DegToRad(20f),
+            0f, 0.62f, 0.095f, true, 0.012f, _rodLeft, dt, ToGlobal(new Vector3(-0.55f, -0.6f, 0.3f)));
         var held = HeldFishSource?.Invoke();
         _leftOnFish = Mathf.MoveToward(_leftOnFish, held != null ? 1f : 0f, dt * 6f);
         if (held is FishModel fm)
             _lastFishGrip = ToLocal(fm.ToGlobal(new Vector3(0f, -0.5f * fm.MaxHeight, 0.12f * fm.Length))) + new Vector3(0f, -0.035f, 0f);
         else if (held != null)
             _lastFishGrip = ToLocal(held.GlobalPosition) + new Vector3(0.02f, -0.04f, 0.02f);
-        // Hanging at the side; pinching the reel knob from above; flat under the fish's belly.
-        var restAt = new Vector3(-0.26f, -0.78f, 0.05f);
-        var reelAt = ToLocal(pinch.Wrist);
-        var at = restAt.Lerp(reelAt, _leftOnReel).Lerp(_lastFishGrip + new Vector3(0.03f, 0f, 0.08f), _leftOnFish);
-        var basis = GlobalTransform.Basis.Orthonormalized();
-        var restFingers = new Vector3(0.05f, -1f, -0.1f);
-        var restPalm = new Vector3(1f, 0f, 0.1f);
-        var reelFingers = basis.Inverse() * pinch.Fingers;
-        var reelPalm = basis.Inverse() * pinch.Palm;
-        var fishFingers = new Vector3(0.15f, 0.1f, -1f);
-        var fishPalm = new Vector3(0f, 1f, 0f);
-        var f = restFingers.Normalized().Lerp(reelFingers.Normalized(), _leftOnReel).Lerp(fishFingers.Normalized(), _leftOnFish);
-        var p = restPalm.Normalized().Lerp(reelPalm.Normalized(), _leftOnReel).Lerp(fishPalm, _leftOnFish);
-        ik.Left.Wrist = ToGlobal(at);
-        ik.Left.Fingers = basis * f;
-        ik.Left.Palm = basis * p;
-        ik.Left.Pole = ToGlobal(new Vector3(-0.6f, -0.55f, 0.25f));
-        ik.Left.Grip = Mathf.Lerp(Mathf.Lerp(0.35f, pinch.Grip, _leftOnReel), 0.3f, _leftOnFish);
+        // Hanging relaxed at the side; on the crank; flat under a fish's belly.
+        var rest = new HandTarget(ToGlobal(new Vector3(-0.26f, -0.78f, 0.05f)), bodyBasis * new Vector3(0.05f, -1f, -0.1f),
+            bodyBasis * new Vector3(1f, 0f, 0.1f), 0.35f, ToGlobal(new Vector3(-0.45f, -0.5f, 0.3f)));
+        var fish = new HandTarget(ToGlobal(_lastFishGrip + new Vector3(0.03f, 0f, 0.08f)), bodyBasis * new Vector3(0.15f, 0.1f, -1f),
+            bodyBasis * Vector3.Up, 0.3f, ToGlobal(new Vector3(-0.6f, -0.55f, 0.25f)));
+        float onCrank = Smooth01(_leftOnReel);
+        var left = Mix(Mix(rest, pinch, onCrank), fish, Smooth01(_leftOnFish));
+        Apply(ik.Left, left, 0f);
+        ik.Left.ThumbAlong = null;
         // On the crank the fingers close round the knob and stop on it.
-        ik.Left.Splay = 0f;
         ik.Left.Obstacles.Clear();
         if (_leftOnReel > 0.5f && _leftOnFish < 0.5f)
             foreach (var (a, b, r) in RodRig.CrankObstacles(_crank))
-                ik.Left.Obstacles.Add(new World.Props.ArmIK.Capsule(_rig.ToGlobal(a), _rig.ToGlobal(b), r));
+                ik.Left.Obstacles.Add(new ArmIK.Capsule(_rig.ToGlobal(a), _rig.ToGlobal(b), r));
     }
 
-    /// <summary>
-    /// A hand closed round a bar (all in world space): <paramref name="axis"/> is the bar's direction the index finger
-    /// lies towards, <paramref name="diagonal"/> how far the bar slants across the palm (radians; a rod's handle runs
-    /// from the base of the index finger to the heel of the hand), <paramref name="along"/> how far from the wrist the
-    /// bar lies along the fingers (about 0.065 m for a full grip, more for a fingertip pinch). Of every way the hand can
-    /// turn round the bar it takes the one in which it carries on the line of the arm from the shoulder, so the wrist is
-    /// not bent unnaturally. With <paramref name="eitherWay"/> the index finger may lie either way along the bar.
-    /// </summary>
-    public static HandTarget BarGrip(Vector3 at, Vector3 axis, float radius, bool right, Vector3 shoulder, float diagonal,
-        float grip, Vector3 pole, float along = 0.065f, bool eitherWay = false, float barLength = 0.07f)
+    private static float Smooth01(float x) => x * x * (3f - 2f * x);
+
+    private static void Apply(ArmIK.Arm arm, HandTarget t, float splay)
     {
-        HandTarget best = default;
-        float bestScore = float.MinValue;
+        arm.Wrist = t.Wrist;
+        arm.Fingers = t.Fingers;
+        arm.Palm = t.Palm;
+        arm.Grip = t.Grip;
+        arm.Pole = t.Pole;
+        arm.Splay = splay;
+        arm.Obstacles.Clear();
+        if (t.Bar is { } bar && t.BarWeight > 0.5f)
+            arm.Obstacles.Add(bar);
+    }
+
+    /// <summary>Blends two hand targets (positions, directions, grip and elbow pole).</summary>
+    private static HandTarget Mix(HandTarget a, HandTarget b, float k) => new(
+        a.Wrist.Lerp(b.Wrist, k), a.Fingers.Normalized().Lerp(b.Fingers.Normalized(), k).Normalized(),
+        a.Palm.Normalized().Lerp(b.Palm.Normalized(), k).Normalized(), Mathf.Lerp(a.Grip, b.Grip, k), a.Pole.Lerp(b.Pole, k),
+        k > 0.5f ? b.Bar ?? a.Bar : a.Bar ?? b.Bar, k > 0.5f ? b.BarWeight : a.BarWeight);
+
+    /// <summary>An arm's shoulder (world), its upper arm and forearm lengths, and the body's right and up.</summary>
+    public readonly record struct ArmShape(Vector3 Shoulder, float Upper, float Fore, Vector3 BodyRight, Vector3 BodyUp);
+
+    /// <summary>The way a hand lay round its bar last frame (eased towards the best way each frame).</summary>
+    public sealed class GripState
+    {
+        public float Phi, Delta, Slide, Sign = 1f;
+        public bool Has;
+    }
+
+    private readonly GripState _rodRight = new(), _rodLeft = new(), _toolRight = new(), _toolLeft = new();
+
+    /// <summary>
+    /// A hand closed round a bar (world space): <paramref name="axis"/> is the bar's direction, <paramref name="at"/> the
+    /// point the hand should hold. It tries every way the hand can lie round the bar (turned round it, the bar slanting
+    /// across the palm between <paramref name="deltaMin"/> and <paramref name="deltaMax"/>, slid a little along it) and
+    /// for each puts the forearm straight behind the hand: the wrist is never bent. It takes the way whose elbow the
+    /// upper arm can reach exactly, hanging down and to the side, with the forearm not twisted past what a forearm turns
+    /// (palm inwards is neutral), and close to last frame's way; then eases towards it. <paramref name="along"/> = how far
+    /// from the wrist the bar lies along the fingers (0.065 m round the palm, more for a fingertip pinch). The pole puts
+    /// the elbow where that forearm needs it.
+    /// </summary>
+    public static HandTarget BarGrip(Vector3 at, Vector3 axis, float radius, bool right, ArmShape arm, float deltaMin, float deltaMax,
+        float slideRange, float grip, float along, bool eitherWay, float barLength, GripState state, float dt, Vector3 pole,
+        Vector3? palmToward = null, float palmCone = -1f)
+    {
         var a0 = axis.Normalized();
+        var up = arm.BodyUp;
+        float bestScore = float.MaxValue, bestPhi = 0f, bestDelta = deltaMin, bestSlide = 0f, bestSign = 1f;
         foreach (float sign in eitherWay ? new[] { 1f, -1f } : new[] { 1f })
         {
             var a = a0 * sign;
-            var u = a.Cross(MathF.Abs(a.Y) < 0.9f ? Vector3.Up : Vector3.Right).Normalized();
-            var v = a.Cross(u);
+            var (u, v) = Around(a, up, arm.BodyRight);
             for (int i = 0; i < 48; i++)
             {
                 float phi = i / 48f * Mathf.Tau;
-                var p = u * MathF.Cos(phi) + v * MathF.Sin(phi);             // the palm faces the bar
-                var e2 = right ? p.Cross(a) : a.Cross(p);                    // the fingers' way with a square grip
-                var f = (a * MathF.Sin(diagonal) + e2 * MathF.Cos(diagonal)).Normalized();
-                var wrist = at - p * (radius + 0.025f) - f * along;
-                var arm = (wrist - shoulder).Normalized();
-                // The hand carries on the arm's line; a little bonus for the palm turned towards the shoulder's side
-                // of the bar (a natural, not twisted, hand).
-                float score = f.Dot(arm) + 0.15f * p.Dot((at - shoulder).Normalized());
-                if (score > bestScore)
+                for (int j = 0; j < 4; j++)
                 {
-                    bestScore = score;
-                    best = new HandTarget(wrist, f, p, grip, pole, new ArmIK.Capsule(at - a * barLength, at + a * barLength, radius));
+                    float delta = Mathf.Lerp(deltaMin, deltaMax, j / 3f);
+                    for (int k = -1; k <= 1; k++)
+                    {
+                        float slide = k * slideRange;
+                        if (palmToward is Vector3 want && (u * MathF.Cos(phi) + v * MathF.Sin(phi)).Dot(want) < palmCone)
+                            continue;   // the hand must lie the way the grip is held (e.g. a rod: palm on the seat's side)
+                        float score = Cost(at, a, u, v, phi, delta, slide, radius, along, right, arm, pole)
+                                      + (state.Has ? Change(state, phi, delta, slide, sign) : 0f);
+                        if (score < bestScore)
+                        {
+                            bestScore = score;
+                            (bestPhi, bestDelta, bestSlide, bestSign) = (phi, delta, slide, sign);
+                        }
+                    }
                 }
             }
         }
-        return best;
+        // Ease the way the hand lies towards the best one (a switch of the index finger's side is taken at once).
+        if (state.Has && state.Sign == bestSign)
+        {
+            float ease = 1f - MathF.Exp(-9f * dt);
+            state.Phi = Mathf.LerpAngle(state.Phi, bestPhi, ease);
+            state.Delta = Mathf.Lerp(state.Delta, bestDelta, ease);
+            state.Slide = Mathf.Lerp(state.Slide, bestSlide, ease);
+        }
+        else
+            (state.Phi, state.Delta, state.Slide, state.Sign) = (bestPhi, bestDelta, bestSlide, bestSign);
+        state.Has = true;
+        {
+            var a = a0 * state.Sign;
+            var (u, v) = Around(a, up, arm.BodyRight);
+            var (wrist, f, p) = Pose(at, a, u, v, state.Phi, state.Delta, state.Slide, radius, along, right);
+            return new HandTarget(wrist, f, p, grip, pole, new ArmIK.Capsule(at - a * barLength, at + a * barLength, radius));
+        }
     }
+
+    /// <summary>Two directions square to the bar, fixed to the body (so a way of lying round it keeps its meaning).</summary>
+    private static (Vector3 U, Vector3 V) Around(Vector3 a, Vector3 up, Vector3 right)
+    {
+        var u = up - a * up.Dot(a);
+        if (u.LengthSquared() < 1e-4f)
+            u = right - a * right.Dot(a);
+        u = u.Normalized();
+        return (u, a.Cross(u));
+    }
+
+    private static (Vector3 Wrist, Vector3 Fingers, Vector3 Palm) Pose(Vector3 at, Vector3 a, Vector3 u, Vector3 v, float phi, float delta,
+        float slide, float radius, float along, bool right)
+    {
+        var p = u * MathF.Cos(phi) + v * MathF.Sin(phi);                // the palm faces the bar
+        var e2 = right ? p.Cross(a) : a.Cross(p);                       // the fingers' way when the bar lies square across
+        var f = (a * MathF.Sin(delta) + e2 * MathF.Cos(delta)).Normalized();
+        var wrist = at + a * slide - p * (radius + 0.025f) - f * along;
+        return (wrist, f, p);
+    }
+
+    /// <summary>
+    /// How unnatural a way of holding is: the elbow hangs where the arm puts it (two-bone solve towards the natural
+    /// pole: down and out), and the cost is the wrist's bend between that forearm and the hand beyond what a wrist
+    /// does easily (about 30 degrees), the forearm twisted past its turn (palm towards the body's middle is neutral),
+    /// and a hand out of the arm's reach.
+    /// </summary>
+    private static float Cost(Vector3 at, Vector3 a, Vector3 u, Vector3 v, float phi, float delta, float slide, float radius, float along,
+        bool right, ArmShape arm, Vector3 pole)
+    {
+        var (wrist, f, p) = Pose(at, a, u, v, phi, delta, slide, radius, along, right);
+        var to = wrist - arm.Shoulder;
+        float d = to.Length(), max = arm.Upper + arm.Fore;
+        float outOfReach = MathF.Max(0f, d - (max - 0.01f));
+        var dir = to / MathF.Max(d, 1e-4f);
+        d = Math.Clamp(d, 0.05f, max - 0.002f);
+        float x = (arm.Upper * arm.Upper - arm.Fore * arm.Fore + d * d) / (2f * d);
+        float h = MathF.Sqrt(MathF.Max(arm.Upper * arm.Upper - x * x, 0f));
+        var bend = pole - arm.Shoulder;
+        bend = (bend - dir * bend.Dot(dir)).Normalized();
+        var elbow = arm.Shoulder + dir * x + bend * h;
+        var forearm = (arm.Shoulder + dir * d - elbow).Normalized();
+        float wristBend = MathF.Acos(Math.Clamp(forearm.Dot(f), -1f, 1f));
+        // Forearm twist: palm towards the body's middle is neutral; a forearm turns about 85 degrees each way.
+        var neutral = right ? arm.BodyUp.Cross(forearm) : forearm.Cross(arm.BodyUp);
+        float twist = 0f;
+        if (neutral.LengthSquared() > 1e-4f)
+        {
+            var pp = p - forearm * p.Dot(forearm);
+            if (pp.LengthSquared() > 1e-6f)
+                twist = MathF.Acos(Math.Clamp(pp.Normalized().Dot(neutral.Normalized()), -1f, 1f));
+        }
+        return outOfReach * 30f + MathF.Max(0f, wristBend - Mathf.DegToRad(28f)) * 2.5f + wristBend * 0.3f
+               + MathF.Max(0f, twist - Mathf.DegToRad(85f)) * 2f;
+    }
+
+    private static float Change(GripState s, float phi, float delta, float slide, float sign) =>
+        MathF.Abs(Mathf.AngleDifference(s.Phi, phi)) * 0.35f + MathF.Abs(s.Delta - delta) * 0.8f + MathF.Abs(s.Slide - slide) * 6f
+        + (s.Sign != sign ? 0.6f : 0f);
 
     /// <summary>Places a unit-height cylinder so it runs from <paramref name="a"/> to <paramref name="b"/>.</summary>
     private static void Stretch(MeshInstance3D part, Vector3 a, Vector3 b)
