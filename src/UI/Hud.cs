@@ -157,7 +157,7 @@ public partial class Hud : CanvasLayer
         // Minimap and clock in the top-right corner (they replace the time line).
         if (_minimap != null)
         {
-            Anchor(_minimap, 1f, 0f, -Minimap.MapSize - 20f, 20f, -20f, 20f + Minimap.MapSize + 80f);
+            Anchor(_minimap, 1f, 0f, -Minimap.WidgetWidth - 14f, 12f, -14f, 12f + Minimap.WidgetHeight);
             AddChild(_minimap);
             _time.Visible = false;
         }
@@ -218,7 +218,7 @@ public partial class Hud : CanvasLayer
             + "Esc - menu | F1 - dev";
 
         _dev = Text(13, Gold);
-        Anchor(_dev, 1f, 0f, -460, Minimap.MapSize + 120f, -16, Minimap.MapSize + 480f);
+        Anchor(_dev, 1f, 0f, -460, Minimap.WidgetHeight + 30f, -16, Minimap.WidgetHeight + 390f);
         _dev.HorizontalAlignment = HorizontalAlignment.Right;
     }
 
