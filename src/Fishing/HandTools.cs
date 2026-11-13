@@ -11,7 +11,7 @@ using FishingSim.World.Props;
 namespace FishingSim.Fishing;
 
 /// <summary>What the angler holds.</summary>
-public enum HandTool { Rod, Shovel, Net }
+public enum HandTool { Rod, Shovel, Net, LiftNet }
 
 /// <summary>
 /// The tools besides the rod: Q switches between the rod, the shovel and the insect net (the ones owned; the rod only
@@ -19,7 +19,10 @@ public enum HandTool { Rod, Shovel, Net }
 /// (the eyes go down to the work), levered back and lifted with a clod of soil (with the worms found wriggling on it)
 /// that is thrown aside, leaving a hole; the bait goes into the bait box (Core/Camp/Digging). Sweeping: the net is
 /// swung across in front and twisted shut; mayflies over the water at dusk, grasshoppers in a meadow by day, chafers
-/// round the trees at dusk (Core/Camp/Sweeping). Both hands hold the tool (FirstPersonBody.ToolPose -> ArmIK). The
+/// round the trees at dusk (Core/Camp/Sweeping). The lift net (podrywka): the first click lowers it from its pole into
+/// the water ahead (a slice of bread is crumbled over it when there is bread), the second lifts it, and the small fish
+/// that came over it flap in the netting before they go into the bait box as live bait (Core/Camp/LiftNetting). Both
+/// hands hold the tool (FirstPersonBody.ToolPose -> ArmIK). The
 /// animations are keyframes in the body's frame (this node is a child of the player, which only turns about Y).
 /// </summary>
 public partial class HandTools : Node3D
@@ -69,7 +72,7 @@ public partial class HandTools : Node3D
     private DigMarks? _marks;
     private readonly IRng _rng = new SystemRng();
 
-    private Node3D _shovel = null!, _net = null!, _load = null!, _bag = null!;
+    private Node3D _shovel = null!, _net = null!, _load = null!, _bag = null!, _liftPole = null!, _liftNet = null!, _liftCatch = null!;
     private readonly List<MeshInstance3D> _worms = new();
     private float _t = -1f, _ground, _blend, _bagX, _bagZ;
     private Vector3 _digAt, _lastRing;
@@ -78,8 +81,33 @@ public partial class HandTools : Node3D
 
     public HandTool Current { get; private set; } = HandTool.Rod;
 
-    /// <summary>True while a dig or a sweep is under way.</summary>
-    public bool Working => _t >= 0f;
+    /// <summary>The lift net's stage: carried up, going down, soaking in the water, coming up, showing the catch.</summary>
+    public enum LiftStage { Up, Lowering, Down, Lifting, Showing }
+
+    public LiftStage Lift { get; private set; } = LiftStage.Up;
+
+    // Lift net: seconds of each stage, the pole's pitch (radians above the horizon) carried, held up to show the catch,
+    // and the lowest it goes (from a high pier the net hangs higher).
+    private const float LowerSeconds = 1.5f, LiftSeconds = 1.1f, ShowSeconds = 2.4f, ShowHold = 1.7f;
+    private const float PitchUp = 0.87f, PitchShow = 0.3f, PitchLowest = -0.75f;
+
+    /// <summary>The body bends towards the water while the lift net is down (and the head with it).</summary>
+    private static readonly Vector3 LiftLean = new(0f, -0.22f, -0.28f);
+
+    private float _liftT, _soak, _pitchDown, _liftFrom;
+    private Vector3 _swing, _swingVel, _lastTip;
+    private bool _groundbait;
+    private Haul? _liftHaul;
+    private readonly List<Node3D> _fry = new();
+
+    /// <summary>True while a dig, a sweep or the lift net is under way (the tool cannot be put away).</summary>
+    public bool Working => _t >= 0f || Lift != LiftStage.Up;
+
+    /// <summary>The lift net's soak so far (s), for the HUD.</summary>
+    public float Soak => _soak;
+
+    /// <summary>Where the lift net's cord meets the pole's tip (the net hangs <see cref="CampProps.LiftDrop"/> below it).</summary>
+    public Vector3 LiftNetTop => _liftNet.GlobalPosition;
 
     /// <summary>Screenshots: the action stops at this point (0..1) instead of running to its end.</summary>
     public float? FreezeAt { get; set; }
@@ -106,7 +134,11 @@ public partial class HandTools : Node3D
     {
         _shovel = CampProps.Shovel(out _load);
         _net = CampProps.InsectNet(out _bag);
-        foreach (var tool in new[] { _shovel, _net })
+        _liftPole = CampProps.LiftNetPole();
+        _liftNet = CampProps.LiftNet(out _liftCatch);
+        _liftNet.TopLevel = true;
+        _liftPole.AddChild(_liftNet);
+        foreach (var tool in new[] { _shovel, _net, _liftPole })
         {
             tool.Visible = false;
             foreach (var n in tool.FindChildren("*", "GeometryInstance3D", true, false))
@@ -132,6 +164,8 @@ public partial class HandTools : Node3D
             list.Add(HandTool.Shovel);
         if (_gear.Has(AccessoryKind.InsectNet))
             list.Add(HandTool.Net);
+        if (_gear.Has(AccessoryKind.LiftNet))
+            list.Add(HandTool.LiftNet);
         return list;
     }
 
@@ -139,12 +173,18 @@ public partial class HandTools : Node3D
     {
         HandTool.Shovel => "Łopata",
         HandTool.Net => "Siatka na owady",
+        HandTool.LiftNet => "Podrywka",
         _ => "Wędka",
     };
 
     /// <summary>Takes a tool in hand. False when busy, not owned, or the rod's line is still out.</summary>
     public bool Select(HandTool tool)
     {
+        if (Lift != LiftStage.Up)
+        {
+            _rod.Notify("Najpierw podnieś podrywkę (LPM).", 2f);
+            return false;
+        }
         if (Working || tool == Current)
             return false;
         if (!Available().Contains(tool))
@@ -159,8 +199,10 @@ public partial class HandTools : Node3D
         _player.Rig.Visible = tool == HandTool.Rod;
         _shovel.Visible = tool == HandTool.Shovel;
         _net.Visible = tool == HandTool.Net;
+        _liftPole.Visible = tool == HandTool.LiftNet;
         _rod.Notify(tool switch
         {
+            HandTool.LiftNet => "Podrywka: LPM opuszcza ją do wody przed tobą, drugie LPM podrywa (żywce). Q zmienia narzędzie.",
             HandTool.Shovel => "Łopata: LPM kopie (robaki w wilgotnej ziemi). Q zmienia narzędzie.",
             HandTool.Net => "Siatka: LPM macha (jętki nad wodą o zmierzchu, koniki na łące). Q zmienia narzędzie.",
             _ => "Wędka w ręku.",
@@ -175,7 +217,7 @@ public partial class HandTools : Node3D
         var list = Available();
         if (list.Count < 2)
         {
-            _rod.Notify("Łopatę i siatkę na owady kupisz w kramie wędkarskim.", 2.5f);
+            _rod.Notify("Łopatę, siatkę na owady i podrywkę kupisz w kramie wędkarskim.", 2.5f);
             return;
         }
         int at = Math.Max(list.IndexOf(Current), 0);
@@ -204,6 +246,8 @@ public partial class HandTools : Node3D
     /// <summary>Digs or sweeps with the tool in hand. False when nothing starts (busy, nowhere to dig).</summary>
     public bool Use()
     {
+        if (Current == HandTool.LiftNet)
+            return UseLiftNet();
         if (Working || Current == HandTool.Rod)
             return false;
         if (Current == HandTool.Shovel)
@@ -255,6 +299,11 @@ public partial class HandTools : Node3D
         // The eyes go down to the work and come back up after it.
         float want = Working ? 1f : 0f;
         _blend = Mathf.MoveToward(_blend, want, dt * (want > _blend ? 2.2f : 1.6f));
+        if (Current == HandTool.LiftNet)
+        {
+            ProcessLiftNet(dt);
+            return;
+        }
         _player.WorkPitch = Current == HandTool.Shovel ? DigPitch : SweepPitch;
         _player.WorkOffset = Current == HandTool.Shovel ? DigHead : Vector3.Zero;
         _player.WorkBlend = Smooth(_blend);
@@ -346,6 +395,238 @@ public partial class HandTools : Node3D
             _rod.Cue(Core.Audio.OneShot.Click, 0.6f);
     }
 
+    // ------------------------------------------------------------------ lift net
+    private static readonly Vector3 ButtUp = new(0.11f, 0.93f, -0.09f), ButtDown = new(0.08f, 1.04f, -0.36f);
+
+    private static readonly Dictionary<string, string> FryFiles = new()
+    {
+        ["ukleja"] = "ukleja", ["płotka"] = "ploc", ["kiełb"] = "kielb", ["słonecznica"] = "slonecznica", ["okonek"] = "okon", ["wzdręga"] = "wzdrega",
+    };
+
+    /// <summary>Tests and screenshots: adds seconds to the lift net's soak.</summary>
+    public void AddSoak(float seconds) => _soak += seconds;
+
+    private bool UseLiftNet()
+    {
+        switch (Lift)
+        {
+            case LiftStage.Up:
+                return LowerLiftNet();
+            case LiftStage.Down:
+                StartLifting();
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>Where the lowered net would hang: the pole's pitch, the water's depth there and the spot.</summary>
+    private (float Pitch, float Depth, Vector3 Spot) PlanLower()
+    {
+        var feet = _player.GlobalPosition;
+        var fwd = Forward.Normalized();
+        float reach = 2.5f, pitch = -0.3f, depth = 0f;
+        var spot = feet;
+        for (int i = 0; i < 3; i++)
+        {
+            spot = feet + fwd * reach;
+            depth = -_lake.HeightAt(spot.X, spot.Z);
+            float sink = Math.Clamp(depth - 0.1f, 0.15f, 1.3f);
+            float tipY = CampProps.LiftDrop - sink - feet.Y;
+            pitch = Math.Clamp(MathF.Asin(Math.Clamp((tipY - ButtDown.Y) / CampProps.LiftPoleLength, -1f, 1f)), PitchLowest, 0.2f);
+            reach = -ButtDown.Z + CampProps.LiftPoleLength * MathF.Cos(pitch);
+        }
+        return (pitch, depth, spot);
+    }
+
+    private bool LowerLiftNet()
+    {
+        var plan = PlanLower();
+        if (plan.Depth < LiftNetting.MinDepth)
+        {
+            _rod.Notify(plan.Depth > 0f
+                ? "Za płytko na podrywkę: wejdź głębiej w wodę albo stań na końcu pomostu."
+                : "Podrywkę opuszcza się do wody: stań nad brzegiem albo na pomoście, twarzą do wody.", 3f);
+            return false;
+        }
+        _pitchDown = plan.Pitch;
+        _groundbait = _profile.BaitCounts.GetValueOrDefault("bread") > 0;
+        if (_groundbait)
+            _profile.AddBait(new Dictionary<string, int> { ["bread"] = -1 });
+        Lift = LiftStage.Lowering;
+        _liftT = 0f;
+        _soak = 0f;
+        _liftHaul = null;
+        _player.Busy = true;
+        _rod.Notify(_groundbait ? "Podrywka idzie do wody, nad nią kruszysz kromkę chleba." : "Podrywka idzie do wody.", 2.5f);
+        return true;
+    }
+
+    private void StartLifting()
+    {
+        var spot = _liftNet.GlobalPosition;
+        float depth = MathF.Max(-_lake.HeightAt(spot.X, spot.Z), 0f);
+        _liftHaul = LiftNetting.Lift(new LiftContext(_soak, depth, _world.Hour, _world.Weather,
+            Math.Clamp(_lake.Location.LilyDensity * 0.5f, 0f, 1f), _groundbait), _rng);
+        Lift = LiftStage.Lifting;
+        _liftT = 0f;
+        _rod.Cue(Core.Audio.OneShot.Swish, 0.5f);
+    }
+
+    private static float Ease(float t) => Smooth(Math.Clamp(t, 0f, 1f));
+
+    private static float EaseOut(float t)
+    {
+        t = Math.Clamp(t, 0f, 1f);
+        return 1f - (1f - t) * (1f - t);
+    }
+
+    private float LiftPitch()
+    {
+        float hold = ShowHold / ShowSeconds;
+        return Lift switch
+        {
+            LiftStage.Lowering => Mathf.Lerp(PitchUp, _pitchDown, Ease(_liftT)),
+            LiftStage.Down => _pitchDown,
+            LiftStage.Lifting => Mathf.Lerp(_pitchDown, PitchShow, EaseOut(_liftT)),
+            LiftStage.Showing => _liftT < hold ? PitchShow : Mathf.Lerp(PitchShow, PitchUp, Ease((_liftT - hold) / (1f - hold))),
+            _ => PitchUp,
+        };
+    }
+
+    private void ProcessLiftNet(float dt)
+    {
+        float before = _liftT;
+        switch (Lift)
+        {
+            case LiftStage.Lowering:
+                _liftT += dt / LowerSeconds;
+                _soak += _liftT > 0.7f ? dt : 0f;
+                if (_liftT >= 1f)
+                {
+                    Lift = LiftStage.Down;
+                    _rod.Notify("Podrywka na dnie. Odczekaj chwilę, aż drobnica wpłynie nad siatkę, i poderwij (LPM).", 3f);
+                }
+                break;
+            case LiftStage.Down:
+                _soak += dt;
+                break;
+            case LiftStage.Lifting:
+                _liftT += dt / LiftSeconds;
+                if (_liftT >= 1f)
+                {
+                    Lift = LiftStage.Showing;
+                    _liftT = 0f;
+                }
+                break;
+            case LiftStage.Showing:
+                _liftT += dt / ShowSeconds;
+                if (FreezeAt is float stop)
+                    _liftT = MathF.Min(_liftT, stop);
+                if (before < ShowHold / ShowSeconds && _liftT >= ShowHold / ShowSeconds && _liftHaul != null)
+                {
+                    // The fish go into the bait bucket.
+                    Finish(_liftHaul);
+                    _liftHaul = null;
+                    foreach (var f in _fry)
+                        f.Visible = false;
+                }
+                if (_liftT >= 1f)
+                {
+                    Lift = LiftStage.Up;
+                    _liftT = 0f;
+                }
+                break;
+        }
+
+        // The pole: the butt in the hands, pitched down to the water or up to carry.
+        float pitch = LiftPitch();
+        float k = Math.Clamp((PitchUp - pitch) / (PitchUp + 0.35f), 0f, 1f);
+        var dir = new Vector3(-0.04f, MathF.Sin(pitch), -MathF.Cos(pitch)).Normalized();
+        var x = dir.Cross(Vector3.Up).Normalized();
+        _liftPole.Transform = new Transform3D(new Basis(x, dir, x.Cross(dir)), ButtUp.Lerp(ButtDown, Smooth(k)));
+
+        // The net hangs from the tip on its cord and swings behind as the tip moves (slowly in the water).
+        var tip = _liftPole.GlobalTransform * new Vector3(0f, CampProps.LiftPoleLength, 0f);
+        var tipVel = dt > 0f ? (tip - _lastTip) / dt : Vector3.Zero;
+        if (tipVel.Length() > 20f)
+            tipVel = Vector3.Zero;   // the first frame, or a teleport
+        _lastTip = tip;
+        float bottom = tip.Y - CampProps.LiftDrop;
+        bool wet = bottom < -0.05f;
+        var lag = -new Vector3(tipVel.X, 0f, tipVel.Z) * (wet ? 0.3f : 0.12f);
+        _swingVel += ((lag - _swing) * 14f - _swingVel * (wet ? 10f : 2.2f)) * dt;
+        _swing += _swingVel * dt;
+        if (_swing.Length() > 0.6f)
+            _swing = _swing.Normalized() * 0.6f;
+        var hang = new Vector3(_swing.X, -CampProps.LiftDrop, _swing.Z).Normalized();
+        var up = -hang;
+        var side = _player.GlobalTransform.Basis.X;
+        side = (side - up * side.Dot(up)).Normalized();
+        var at = tip;
+        // The netting rests on the bottom when the cord is longer than the water is deep.
+        float bed = _lake.HeightAt(tip.X + hang.X * CampProps.LiftDrop, tip.Z + hang.Z * CampProps.LiftDrop);
+        if (bottom < bed + 0.03f)
+            at.Y += bed + 0.03f - bottom;
+        _liftNet.GlobalTransform = new Transform3D(new Basis(side, up, side.Cross(up)), at);
+
+        bool wasWet = _liftWet;
+        _liftWet = at.Y - CampProps.LiftDrop < 0f;
+        if (_liftWet != wasWet && Lift != LiftStage.Up)
+            _rod.Cue(_liftWet ? Core.Audio.OneShot.SmallSplash : Core.Audio.OneShot.Splash, _liftWet ? 0.7f : 0.45f);
+
+        // The catch flaps in the netting once it is out of the water.
+        bool show = _liftHaul is { Total: > 0 } && !_liftWet && Lift is LiftStage.Lifting or LiftStage.Showing;
+        if (show && _fry.Count == 0)
+            MakeFry();
+        int count = _liftHaul == null ? 0 : Math.Min(_liftHaul.Total, _fry.Count);
+        float time = (float)Time.GetTicksMsec() / 1000f;
+        for (int i = 0; i < _fry.Count; i++)
+        {
+            var f = _fry[i];
+            f.Visible = show && i < count;
+            if (!f.Visible)
+                continue;
+            float ph = i * 1.7f;
+            float jump = MathF.Max(0f, MathF.Sin(time * 7f + ph * 2.3f));
+            f.Position = new Vector3(MathF.Cos(ph) * 0.13f * (0.5f + i % 3 * 0.25f), 0.012f + jump * jump * 0.06f, MathF.Sin(ph) * 0.12f);
+            f.Rotation = new Vector3(MathF.Sin(time * 11f + ph) * 0.4f * jump, ph * 1.9f, Mathf.Pi / 2f + MathF.Sin(time * 17f + ph) * 0.9f * jump);
+        }
+
+        // The eyes follow the net down to the water and back; the body bends towards it and stays put.
+        var eye = _player.Camera.GlobalPosition;
+        var target = at + Vector3.Down * CampProps.LiftDrop * 0.8f;
+        var d = target - eye;
+        float look = MathF.Atan2(d.Y, new Vector2(d.X, d.Z).Length());
+        float want = Lift == LiftStage.Up ? 0f : 1f;
+        _blend = Mathf.MoveToward(_blend, want, dt * (want > _blend ? 1.8f : 1.2f));
+        _player.WorkPitch = Math.Clamp(look, -0.85f, 0.15f);
+        _player.WorkOffset = LiftLean * Smooth(k);
+        _player.WorkBlend = Smooth(_blend);
+        _player.Busy = Lift != LiftStage.Up;
+    }
+
+    private bool _liftWet;
+
+    private void MakeFry()
+    {
+        foreach (var (name, _) in LiftNetting.Fry)
+        {
+            string file = $"res://data/fish/{FryFiles.GetValueOrDefault(name, "ukleja")}.tres";
+            if (!ResourceLoader.Exists(file))
+                file = "res://data/fish/ukleja.tres";
+            var sp = GD.Load<FishSpecies>(file);
+            var holder = new Node3D { Visible = false };
+            var model = FishModel.Create(sp, 0.02f + _fry.Count % 3 * 0.008f);
+            model.Wiggle = 2.5f;
+            foreach (var n in model.FindChildren("*", "GeometryInstance3D", true, false))
+                ((GeometryInstance3D)n).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+            holder.AddChild(model);
+            _liftCatch.AddChild(holder);
+            _fry.Add(holder);
+        }
+    }
+
     private void SwingBag(float dt)
     {
         // The bag trails behind the ring as it moves.
@@ -407,6 +688,13 @@ public partial class HandTools : Node3D
             var left = Grip(tr, CampProps.ShovelShaftGrip, Vector3.Up, Vector3.Right, false, CampProps.ShovelHandleRadius, leftPole, 0.85f);
             return (right, Blend(rest, left, Smooth(_blend)));
         }
+        if (Current == HandTool.LiftNet)
+        {
+            // The right hand presses the butt down from above, the left one carries the pole from below.
+            var tl = _liftPole.GlobalTransform;
+            return (Grip(tl, CampProps.LiftButtGrip, Vector3.Up, Vector3.Forward, true, CampProps.LiftPoleRadius * 1.1f, rightPole, 0.9f),
+                Grip(tl, CampProps.LiftPoleGrip, Vector3.Up, Vector3.Back, false, CampProps.LiftPoleRadius, leftPole, 0.85f));
+        }
         var tn = _net.GlobalTransform;
         return (Grip(tn, CampProps.NetEndGrip, Vector3.Up, Vector3.Left, true, CampProps.NetPoleRadius, rightPole, 0.9f), rest);
     }
@@ -423,6 +711,8 @@ public partial class HandTools : Node3D
         // The body bends over the work further than the head goes (Player.WorkOffset); it does not take the camera's pitch.
         float k = Current == HandTool.Shovel ? _player.WorkBlend : 0f;
         var eyes = new Transform3D(Basis.Identity, _player.Camera.Position - DigHead * k + DigLean * k);
+        if (Current == HandTool.LiftNet)
+            eyes = new Transform3D(Basis.Identity, _player.Camera.Position);
         return _player.GlobalTransform * eyes * _player.Body.ModelFromEyes;
     }
 

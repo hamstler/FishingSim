@@ -182,6 +182,105 @@ public static class CampProps
         return root;
     }
 
+    // ------------------------------------------------------------------ lift net (podrywka)
+    /// <summary>Where the hands hold the lift net's pole (its own space: butt at the origin, pole up +Y).</summary>
+    public static readonly Vector3 LiftButtGrip = new(0f, 0.14f, 0f), LiftPoleGrip = new(0f, 0.78f, 0f);
+
+    /// <summary>Pole length, the cord from its tip to the hoops' crossing, half the net's side, how far the hoops
+    /// arch above the corners and how deep the netting sags below them (m).</summary>
+    public const float LiftPoleLength = 2.6f, LiftPoleRadius = 0.019f, LiftCord = 0.55f, LiftHalfSide = 0.5f, LiftArch = 0.3f, LiftSag = 0.26f;
+
+    /// <summary>From the cord's top (the pole's tip) down to the lowest point of the netting.</summary>
+    public static float LiftDrop => LiftCord + LiftArch + LiftSag;
+
+    /// <summary>Square-meshed green netting of the lift net.</summary>
+    public static Material LiftNetting => Cached("liftnet", () =>
+    {
+        var m = (StandardMaterial3D)((StandardMaterial3D)Net).Duplicate();
+        m.Uv1Scale = Vector3.One;
+        m.AlbedoColor = new Color(0.55f, 0.62f, 0.5f);
+        return m;
+    });
+
+    /// <summary>The lift net's pole: a long hazel pole, thinner to the tip, with a cord ring there.</summary>
+    public static Node3D LiftNetPole()
+    {
+        var root = new Node3D { Name = "LiftNetPole" };
+        Part(root, Rod(LiftPoleRadius * 1.15f, LiftPoleRadius * 0.6f, LiftPoleLength, 8), Wood, new Vector3(0f, LiftPoleLength / 2f, 0f));
+        Part(root, new TorusMesh { InnerRadius = 0.011f, OuterRadius = 0.018f, Rings = 10, RingSegments = 5 }, BlackIron,
+            new Vector3(0f, LiftPoleLength - 0.03f, 0f));
+        return root;
+    }
+
+    /// <summary>A round tube along a polyline.</summary>
+    private static ArrayMesh Tube(IReadOnlyList<Vector3> points, float radius, int sides = 6)
+    {
+        var st = new SurfaceTool();
+        st.Begin(Mesh.PrimitiveType.Triangles);
+        for (int i = 0; i + 1 < points.Count; i++)
+        {
+            var a = points[i];
+            var b = points[i + 1];
+            var axis = (b - a).Normalized();
+            var side = axis.Cross(MathF.Abs(axis.Y) > 0.9f ? Vector3.Right : Vector3.Up).Normalized();
+            var up = side.Cross(axis);
+            for (int k = 0; k < sides; k++)
+            {
+                float a0 = k / (float)sides * Mathf.Tau, a1 = (k + 1) / (float)sides * Mathf.Tau;
+                var o0 = (side * MathF.Cos(a0) + up * MathF.Sin(a0)) * radius;
+                var o1 = (side * MathF.Cos(a1) + up * MathF.Sin(a1)) * radius;
+                // Clockwise seen from outside (Godot's front faces).
+                foreach (var v in new[] { a + o0, b + o1, b + o0, a + o0, a + o1, b + o1 })
+                    st.AddVertex(v);
+            }
+        }
+        st.GenerateNormals();
+        return st.Commit();
+    }
+
+    /// <summary>
+    /// The net hanging from the pole (origin at the cord's top, everything below -Y): the cord, two crossed hoops arching
+    /// over a square of netting tied at their ends, the netting sagging into a bowl. <paramref name="catchHolder"/> sits
+    /// in the bowl's bottom for the caught fish.
+    /// </summary>
+    public static Node3D LiftNet(out Node3D catchHolder)
+    {
+        var root = new Node3D { Name = "LiftNet" };
+        var cord = new StandardMaterial3D { AlbedoColor = new Color(0.32f, 0.3f, 0.24f), Roughness = 0.9f };
+        Part(root, Rod(0.004f, 0.004f, LiftCord, 5), cord, new Vector3(0f, -LiftCord / 2f, 0f));
+        float h = LiftHalfSide, top = -LiftCord;
+        foreach (float d in new[] { 1f, -1f })
+        {
+            var pts = new List<Vector3>();
+            for (int i = 0; i <= 16; i++)
+            {
+                float t = i / 8f - 1f;
+                pts.Add(new Vector3(t * h, top - LiftArch * t * t, d * t * h));
+            }
+            root.AddChild(new MeshInstance3D { Mesh = Tube(pts, 0.008f), MaterialOverride = Wood });
+        }
+        var st = new SurfaceTool();
+        st.Begin(Mesh.PrimitiveType.Triangles);
+        const int n = 14;
+        Vector3 P(int i, int j)
+        {
+            float u = i / (float)n * 2f - 1f, v = j / (float)n * 2f - 1f;
+            return new Vector3(u * h, top - LiftArch - LiftSag * (1f - u * u) * (1f - v * v), v * h);
+        }
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++)
+                foreach (var (a, b) in new[] { (i, j), (i + 1, j), (i + 1, j + 1), (i, j), (i + 1, j + 1), (i, j + 1) })
+                {
+                    st.SetUV(new Vector2(a, b) / n * 3f);
+                    st.AddVertex(P(a, b));
+                }
+        st.GenerateNormals();
+        root.AddChild(new MeshInstance3D { Mesh = st.Commit(), MaterialOverride = LiftNetting, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        catchHolder = new Node3D { Name = "Catch", Position = new Vector3(0f, top - LiftArch - LiftSag + 0.035f, 0f) };
+        root.AddChild(catchHolder);
+        return root;
+    }
+
     // ------------------------------------------------------------------ cooking
     /// <summary>An iron pot on a bail (the bail's hook at the origin, the pot hanging below), with a lid of soup.</summary>
     public static Node3D Pot(out MeshInstance3D soup)

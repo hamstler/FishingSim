@@ -353,6 +353,7 @@ public static class People
         BuildingKind.Market => Role.MarketTrader,
         BuildingKind.Office => Role.GuildMaster,
         BuildingKind.BusStop => Role.Coachman,
+        BuildingKind.Smokehouse => Role.Fisherman,
         _ => Role.Shopkeeper,
     };
 }

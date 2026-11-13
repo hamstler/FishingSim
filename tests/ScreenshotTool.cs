@@ -513,6 +513,46 @@ public partial class ScreenshotTool : Node
             await ToSignal(GetTree().CreateTimer(at), SceneTreeTimer.SignalName.Timeout);
             GD.Print($"tools: {main.Tools.Current} at {stand} ground {lake.GroundKindAt(stand.X, stand.Z)} haul {main.Tools.LastHaul?.Message}");
         }
+        else if (mode == 28)
+        {
+            // The lift net from the bank: arg 0 = down in the water, 1 = lifted with the catch flapping in it,
+            // 2 = carried before lowering.
+            main.Rod.Profile.Money += 1000;
+            main.Rod.Profile.Level = Math.Max(main.Rod.Profile.Level, 5);
+            main.Gear.Buy(GearSlot.Accessory, GD.Load<TackleItem>("res://data/tackle/accessories/podrywka.tres"));
+            var lake = main.Rod.Lake;
+            var bankSpot = TestSpots.LiftNetBank(lake);
+            Vector3 stand = bankSpot?.Stand ?? Vector3.Zero, look = bankSpot?.ToWater ?? Vector3.Forward;
+            main.Player.GlobalPosition = new Vector3(stand.X, lake.HeightAt(stand.X, stand.Z) + 0.3f, stand.Z);
+            main.Player.Rotation = new Vector3(0f, MathF.Atan2(-look.X, -look.Z), 0f);
+            for (int i = 0; i < 20; i++)
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            main.Tools.Select(FishingSim.Fishing.HandTool.LiftNet);
+            for (int i = 0; i < 10; i++)
+                await NextFrame();
+            GD.Print($"lift net: tool {main.Tools.Current}, stand {stand}");
+            async System.Threading.Tasks.Task WaitFor(FishingSim.Fishing.HandTools.LiftStage stage)
+            {
+                for (int i = 0; i < 400 && main.Tools.Lift != stage; i++)
+                    await NextFrame();
+            }
+            if (arg != 2 && main.Tools.Use())
+            {
+                await WaitFor(FishingSim.Fishing.HandTools.LiftStage.Down);
+                for (int i = 0; i < 12; i++)
+                    await NextFrame();
+                if (arg == 1)
+                {
+                    main.Tools.AddSoak(40f);
+                    main.Tools.FreezeAt = 0.35f;
+                    main.Tools.Use();
+                    await WaitFor(FishingSim.Fishing.HandTools.LiftStage.Showing);
+                    for (int i = 0; i < 25; i++)
+                        await NextFrame();
+                }
+            }
+            GD.Print($"lift net at {stand} looking {look}: stage {main.Tools.Lift}, soak {main.Tools.Soak:0.0}, haul {main.Tools.LastHaul?.Message}");
+        }
         else if (mode == 26)
         {
             // The angler's camp: arg 0 = the fire lit, fish roasting on the spit; 1 = soup in the pot; 2 = the cooking

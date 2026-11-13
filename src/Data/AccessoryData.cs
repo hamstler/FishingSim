@@ -27,6 +27,8 @@ public enum AccessoryKind
     InsectNet,
     /// <summary>Garnek: cook fish soup over a campfire (Core/Camp/Cooking).</summary>
     CookingPot,
+    /// <summary>Podrywka: a hand tool (Q) lowered into the water from the bank to catch live bait (Core/Camp/LiftNetting).</summary>
+    LiftNet,
 }
 
 /// <summary>Any other accessory. Owning one is enough for it to work (they are not equipped in a slot).</summary>

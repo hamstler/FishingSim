@@ -243,6 +243,7 @@ public partial class Scenery : Node3D
         var rng = new RandomNumberGenerator { Seed = 42 };
         ScatterTrees(loc, rng);
         ScatterGroundCover(loc, rng);
+        ScatterForage(loc, rng);
         ScatterReeds(loc, rng);
         ScatterShoreline(loc, rng);
         ScatterWaterPlants(loc, rng);
@@ -254,8 +255,12 @@ public partial class Scenery : Node3D
     private void Count(string key, int n = 1) => Stats[key] = Stats.GetValueOrDefault(key) + n;
 
     // ------------------------------------------------------------------ village
+    /// <summary>True when this map's village has a smokehouse (notices may ask for smoked fish).</summary>
+    public bool HasSmokehouse { get; private set; }
+
     private void BuildVillage(LocationData loc)
     {
+        HasSmokehouse = false;
         var layout = _lake.Layout;
         BuildingFactory.Style = loc.VillageStyle;
         int variant = 0;
@@ -269,6 +274,21 @@ public partial class Scenery : Node3D
             Track(building);
             _buildings.Add(building);
             Count("building_" + spec.Kind.ToString().ToLowerInvariant());
+            if (spec.Kind == BuildingKind.Smokehouse)
+            {
+                // The smokehouse is a house, but its smoker takes fish from the keepnet.
+                var at = spec.DoorPoint(loc.PlazaCenter);
+                var smoke = new Interactable
+                {
+                    Kind = InteractKind.Smokehouse, Title = building.Title, Radius = 3.4f,
+                    Position = new Vector3(at.X, _lake.HeightAt(loc, at.X, at.Y), at.Y),
+                };
+                AddChild(smoke);
+                Track(smoke);
+                Interactables.Add(smoke);
+                Markers.Add(new MapMarker(spec.Position, building.Title, new Color(0.75f, 0.5f, 0.3f)));
+                HasSmokehouse = true;
+            }
             if (!spec.IsFunctional)
                 continue;
 
@@ -334,6 +354,53 @@ public partial class Scenery : Node3D
                     AddCampfire(loc, p, "Palenisko w wiosce", false);
                     placed = true;
                 }
+            }
+        BuildNoticeBoard(loc);
+    }
+
+    /// <summary>Where the notice board stands (for tests and screenshots), or null.</summary>
+    public Node3D? NoticeBoard { get; private set; }
+
+    /// <summary>
+    /// The notice board on the village square: a roofed board on two posts with the villagers' notes pinned to it,
+    /// a few metres off the square's middle, facing it, clear of the buildings and the hearth.
+    /// </summary>
+    private void BuildNoticeBoard(LocationData loc)
+    {
+        NoticeBoard = null;
+        var layout = _lake.Layout;
+        var plaza = loc.PlazaCenter;
+        var hearth = Campfires.FirstOrDefault(f => !f.PlayerCamp);
+        var avoid = hearth != null ? new Vector2(hearth.GlobalPosition.X, hearth.GlobalPosition.Z) : new Vector2(1e4f, 1e4f);
+        if (hearth != null && !hearth.IsInsideTree())
+            avoid = new Vector2(hearth.GetParent<Node3D>().Position.X, hearth.GetParent<Node3D>().Position.Z);
+        for (float r = 6f; r < 26f; r += 1.5f)
+            for (float a = 2.4f; a < Mathf.Tau + 2.4f; a += 0.3f)
+            {
+                var p = plaza + new Vector2(MathF.Cos(a), MathF.Sin(a)) * r;
+                float h = _lake.HeightAt(loc, p.X, p.Y);
+                if (layout.PadDistance(p.X, p.Y) < 3f || layout.PathDistance(p.X, p.Y) < 1.6f || !_lake.IsWalkable(p.X, p.Y) || h < 0.6f
+                    || p.DistanceTo(avoid) < 6f || layout.Specs.Any(sp => sp.Position.DistanceTo(p) < 3.5f))
+                    continue;
+                var board = Props.Everyday.NoticeBoard();
+                board.Position = new Vector3(p.X, h, p.Y);
+                var toPlaza = plaza - p;
+                board.Rotation = new Vector3(0f, MathF.Atan2(toPlaza.X, toPlaza.Y), 0f);
+                AddChild(board);
+                Track(board);
+                NoticeBoard = board;
+                var front = p + toPlaza.Normalized() * 1.4f;
+                var spot = new Interactable
+                {
+                    Kind = InteractKind.NoticeBoard, Title = "Tablica ogłoszeń", Radius = 2.6f,
+                    Position = new Vector3(front.X, _lake.HeightAt(loc, front.X, front.Y), front.Y),
+                };
+                AddChild(spot);
+                Track(spot);
+                Interactables.Add(spot);
+                Markers.Add(new MapMarker(p, "Tablica ogłoszeń", new Color(0.95f, 0.85f, 0.55f)));
+                Count("notice_board");
+                return;
             }
     }
 
@@ -935,6 +1002,61 @@ public partial class Scenery : Node3D
         Count("flower", flowers.Count);
         Count("tuft", tufts.Count);
         Count("fern", ferns.Count);
+    }
+
+    // ------------------------------------------------------------------ forest pickings
+    /// <summary>Mushrooms and blueberry bushes in the woods on the map (picked with E, grown back after a day).</summary>
+    public List<Props.ForagePatch> Forage { get; } = new();
+
+    /// <summary>The most patches on a map, and how far apart they keep (m).</summary>
+    private const int ForageCount = 42;
+    private const float ForageSpacing = 7f;
+
+    /// <summary>
+    /// Porcini by the trunks, chanterelles in the moss and blueberries in the undergrowth: spots round the trees inside
+    /// the playable map (not on paths or by buildings), a few metres apart.
+    /// </summary>
+    private void ScatterForage(LocationData loc, RandomNumberGenerator rng)
+    {
+        Forage.Clear();
+        var core = new Core.SystemRng((int)rng.Randi());
+        var spots = new List<Vector2>();
+        var trees = _treeSpots.Where(t => t.Kind != "willow").OrderBy(_ => rng.Randf()).ToList();
+        foreach (var (tx, tz, kind) in trees)
+        {
+            if (spots.Count >= ForageCount)
+                break;
+            float a = rng.Randf() * Mathf.Tau, d = rng.RandfRange(0.9f, 2.8f);
+            float x = tx + MathF.Cos(a) * d, z = tz + MathF.Sin(a) * d;
+            if (!_lake.IsWalkable(x, z) || _lake.PlayDistance(x, z) > -6f)
+                continue;
+            float h = _lake.HeightAt(loc, x, z);
+            if (h < 1.3f || !Clear(loc, x, z, 2f, 1.8f) || spots.Any(p => p.DistanceTo(new Vector2(x, z)) < ForageSpacing))
+                continue;
+            if (_lake.GroundKindAt(x, z) is not (Core.Camp.GroundKind.Forest or Core.Camp.GroundKind.Meadow))
+                continue;
+            float nearTree = d < 1.6f ? 1f : 0.3f, moss = kind is "spruce" or "pine" ? 0.8f : 0.2f;
+            var patchKind = Core.Camp.Foraging.KindFor(nearTree, moss, core);
+            var patch = Props.ForagePatch.Create(patchKind, spots.Count + (int)(x * 13f));
+            patch.Position = new Vector3(x, h - 0.01f, z);
+            AddChild(patch);
+            Track(patch);
+            Forage.Add(patch);
+            spots.Add(new Vector2(x, z));
+            var spot = new Interactable { Kind = InteractKind.Forage, Title = patch.Title, Radius = 1.7f, Position = patch.Position, Target = patch };
+            AddChild(spot);
+            Track(spot);
+            Interactables.Add(spot);
+            Count("forage_" + patchKind.ToString().ToLowerInvariant());
+        }
+    }
+
+    /// <summary>Grows back the picked patches whose day has passed.</summary>
+    public void RegrowForage(float now)
+    {
+        foreach (var p in Forage)
+            if (GodotObject.IsInstanceValid(p))
+                p.Update(now);
     }
 
     // ------------------------------------------------------------------ reeds and rocks

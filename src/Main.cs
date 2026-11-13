@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 using Godot;
 using FishingSim.Accounts;
@@ -37,6 +38,9 @@ public partial class Main : Node3D
     public GearCatalog Gear => _gear;
     public HandTools Tools { get; private set; } = null!;
     public CookingPanel Cooking { get; private set; } = null!;
+    public SmokehousePanel Smokehouse { get; private set; } = null!;
+    public NoticeBoardPanel Board { get; private set; } = null!;
+    private readonly Core.IRng _rng = new Core.SystemRng();
     public InsectSwarms Swarms { get; private set; } = null!;
     public DigMarks DigMarks { get; private set; } = null!;
 
@@ -161,6 +165,15 @@ public partial class Main : Node3D
                 fire.PassTime(hours);
         };
 
+        Smokehouse = new SmokehousePanel();
+        Smokehouse.Setup(Rod, species);
+        AddChild(Smokehouse);
+        Board = new NoticeBoardPanel { Notices = () => _profile.NoticesFor(_lake.LocationIndex, RequestFishHere(species), Scenery.HasSmokehouse) };
+        Board.Setup(Rod, species);
+        AddChild(Board);
+        // Picked mushrooms and berries grow back a day later.
+        _world.HoursAdvanced += _ => Scenery.RegrowForage(_profile.Clock);
+
         Interactions.Activated += spot => OnInteract(spot, shop, gameUi, Cooking);
 
         // The mood of the map (water colour, mist) follows the location; a new map also means a new start on the pier.
@@ -228,10 +241,36 @@ public partial class Main : Node3D
             ApplyGearEffects();
     }
 
-    private static void OnInteract(Interactable spot, Shop shop, GameUI gameUi, CookingPanel cooking)
+    /// <summary>The species the village notices may ask for on this map: how often each is caught here.</summary>
+    private List<Core.Camp.RequestFish> RequestFishHere(IReadOnlyList<FishSpecies> species) =>
+        species.Where(sp => _lake.AbundanceOf(sp.SpeciesName) > 0f)
+            .Select(sp => new Core.Camp.RequestFish(sp.SpeciesName, sp.LegalWeight, sp.PricePerKg, sp.Rarity * _lake.AbundanceOf(sp.SpeciesName)))
+            .ToList();
+
+    /// <summary>Picks a mushroom or blueberry patch (E): the pickings go to the pantry.</summary>
+    public Core.Camp.Haul? Pick(World.Props.ForagePatch patch)
+    {
+        float now = _profile.Clock;
+        if (!patch.Ripe)
+        {
+            Rod.Notify($"Już zebrane: odrośnie za {patch.HoursLeft(now):0} h gry.", 2f);
+            return null;
+        }
+        var haul = Core.Camp.Foraging.Pick(patch.Kind, _world.Weather == Core.Weather.Rain, _rng);
+        patch.Pick(now);
+        _profile.AddPantry(haul.Baits);
+        Rod.Notify(haul.Message + " (do spiżarni)", 2.5f);
+        Rod.Cue(Core.Audio.OneShot.Click, 0.7f);
+        return haul;
+    }
+
+    private void OnInteract(Interactable spot, Shop shop, GameUI gameUi, CookingPanel cooking)
     {
         switch (spot.Kind)
         {
+            case InteractKind.Forage when spot.Target is World.Props.ForagePatch patch: Pick(patch); break;
+            case InteractKind.Smokehouse: Smokehouse.Open(); break;
+            case InteractKind.NoticeBoard: Board.Open(); break;
             case InteractKind.Campfire when spot.Target is World.Props.Campfire fire: cooking.Open(fire); break;
             case InteractKind.Tackle: shop.OpenFor(ShopKind.Tackle); break;
             case InteractKind.Bait: shop.OpenFor(ShopKind.Bait); break;

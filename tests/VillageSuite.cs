@@ -153,11 +153,16 @@ public sealed class VillageSuite : ITestSuite
             stats[loc.DisplayName] = new Dictionary<string, int>(scenery.Stats);
             int functional = loc.BuildingSpecs().Count(s => s.IsFunctional);
             int sights = loc.Landmarks.Count(l => !l.StartsWith("platforms"));
-            int doors = scenery.Interactables.Count(x => x.Kind != InteractKind.Campfire);
+            int doors = scenery.Interactables.Count(x => x.Kind is not (InteractKind.Campfire or InteractKind.Forage or InteractKind.Smokehouse or InteractKind.NoticeBoard));
             int fires = scenery.Campfires.Count;
-            t.Check(doors == functional && fires == 2 && scenery.Interactables.Count == functional + fires
-                    && scenery.Markers.Count == functional + sights + fires,
-                $"{loc.DisplayName}: {functional} doors with a prompt, {fires} campfires (camp and hearth), map markers for them and {sights} landmarks");
+            int smokehouses = loc.BuildingSpecs().Count(s => s.Kind == BuildingKind.Smokehouse);
+            int boards = scenery.Interactables.Count(x => x.Kind == InteractKind.NoticeBoard);
+            int forage = scenery.Interactables.Count(x => x.Kind == InteractKind.Forage);
+            t.Check(doors == functional && fires == 2 && smokehouses == 1 && boards == 1 && forage == scenery.Forage.Count && forage >= 12
+                    && scenery.Interactables.Count == functional + fires + smokehouses + boards + forage
+                    && scenery.Markers.Count == functional + sights + fires + smokehouses + boards,
+                $"{loc.DisplayName}: {functional} doors with a prompt, {fires} campfires (camp and hearth), a smokehouse, a notice board, "
+                + $"{forage} forest pickings, map markers for them and {sights} landmarks");
             t.Check(loc.Landmarks.Length > 0 && scenery.Stats.Where(kv => kv.Key.StartsWith("landmark_")).Sum(kv => kv.Value) == loc.Landmarks.Length,
                 $"{loc.DisplayName}: its own landmarks are built ({string.Join(", ", loc.Landmarks.Select(l => l.Split(',')[0]))})");
             t.Check(scenery.Stats.Where(kv => kv.Key.StartsWith("building_")).Sum(kv => kv.Value) == loc.Buildings.Length, $"{loc.DisplayName}: every building was built");
@@ -281,7 +286,8 @@ public sealed class VillageSuite : ITestSuite
         lake.SetLocation(2);
         await t.NextFrame();
         t.Check(lake.LocationIndex == 2 && player.GlobalPosition.DistanceTo(Player.SpawnPoint) < 0.5f && rod.State == RodState.Idle, "a new map puts the player back on the pier");
-        t.Check(main.Scenery.Interactables.Count(x => x.Kind != InteractKind.Campfire) == lake.Location.BuildingSpecs().Count(s => s.IsFunctional)
+        t.Check(main.Scenery.Interactables.Count(x => x.Kind is not (InteractKind.Campfire or InteractKind.Forage or InteractKind.Smokehouse or InteractKind.NoticeBoard))
+                == lake.Location.BuildingSpecs().Count(s => s.IsFunctional)
                 && main.Scenery.Campfires.Count == 2, "the new map's doors and campfires replace the old ones");
 
         t.Section("night");

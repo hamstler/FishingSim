@@ -26,7 +26,7 @@ public partial class InteractionManager : Node
 
     /// <summary>The nearest interactable whose radius contains the point, or null.</summary>
     public static Interactable? Nearest(System.Collections.Generic.IEnumerable<Interactable> spots, Vector3 position) =>
-        spots.Where(s => GodotObject.IsInstanceValid(s) && s.DistanceTo(position) <= s.Radius)
+        spots.Where(s => GodotObject.IsInstanceValid(s) && s.Active && s.DistanceTo(position) <= s.Radius)
              .OrderBy(s => s.DistanceTo(position))
              .FirstOrDefault();
 

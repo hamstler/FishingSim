@@ -647,6 +647,20 @@ public static class Icons
                 c.Disc(26, 20, 4, 6, C(0.92f, 0.94f, 0.96f, 0.5f));
                 c.Disc(36, 14, 4, 6, C(0.92f, 0.94f, 0.96f, 0.4f));
                 break;
+            case AccessoryKind.LiftNet:            // a pole, a cord, crossed hoops over a green net bowl, a bleak in it
+                c.Line(4, 60, 44, 8, 3f, C(0.62f, 0.44f, 0.26f));
+                c.Line(44, 8, 40, 26, 1f, C(0.35f, 0.32f, 0.26f));
+                c.Disc(40, 46, 20, 11, C(0.5f, 0.58f, 0.46f, 0.6f), C(0.38f, 0.45f, 0.35f, 0.6f));
+                for (int k = -3; k <= 3; k++)
+                    c.Line(40 + k * 6, 36, 40 + k * 4, 56, 0.8f, C(0.36f, 0.42f, 0.33f, 0.8f));
+                c.Line(20, 40, 40, 26, 2f, C(0.55f, 0.4f, 0.24f));
+                c.Line(60, 40, 40, 26, 2f, C(0.55f, 0.4f, 0.24f));
+                c.Line(30, 44, 40, 26, 1.6f, C(0.5f, 0.36f, 0.21f));
+                c.Line(50, 44, 40, 26, 1.6f, C(0.5f, 0.36f, 0.21f));
+                c.Disc(38, 50, 8, 2.5f, C(0.85f, 0.88f, 0.92f), C(0.6f, 0.66f, 0.72f));
+                c.Line(46, 50, 50, 47, 1.5f, C(0.7f, 0.75f, 0.8f));
+                c.Line(46, 50, 50, 53, 1.5f, C(0.7f, 0.75f, 0.8f));
+                break;
             default:                                // wooden bucket
                 c.Rect(16, 22, 48, 56, C(0.6f, 0.4f, 0.22f));
                 for (int x = 20; x < 48; x += 6)
@@ -662,6 +676,55 @@ public static class Icons
     // ------------------------------------------------------------------ fish
     /// <summary>The species drawn side-on with its painted skin (FishSkin), fins and eye, in its measured outline when
     /// a real fish of the species was measured (FishReference).</summary>
+    /// <summary>Forest pickings (Core/Camp/Foraging ids), a smoked fish ("smoked") and the notice board ("notice").</summary>
+    public static ImageTexture Picking(string id) => Cached("pick:" + id, c =>
+    {
+        switch (id)
+        {
+            case "borowik":     // a fat porcini with a chestnut cap
+                c.Disc(34, 46, 10, 14, C(0.9f, 0.85f, 0.72f), C(0.74f, 0.68f, 0.55f));
+                c.Disc(32, 28, 22, 13, C(0.52f, 0.32f, 0.16f), C(0.36f, 0.2f, 0.1f));
+                c.Rect(12, 30, 52, 33, C(0.86f, 0.8f, 0.55f));
+                c.Disc(24, 23, 6, 3, C(0.66f, 0.45f, 0.25f, 0.7f));
+                break;
+            case "kurka":       // three chanterelle funnels
+                foreach (var (x, y, s) in new[] { (20f, 40f, 0.8f), (44f, 42f, 0.9f), (32f, 34f, 1.1f) })
+                {
+                    c.Line(x, y + 16 * s, x, y + 2, 5f * s, C(0.95f, 0.68f, 0.2f));
+                    c.Disc(x, y, 12 * s, 6 * s, C(1f, 0.72f, 0.2f), C(0.85f, 0.55f, 0.12f));
+                    c.Disc(x, y - 2 * s, 9 * s, 3 * s, C(0.9f, 0.6f, 0.14f));
+                }
+                break;
+            case "jagody":      // a sprig with blueberries
+                c.Line(10, 54, 52, 14, 2f, C(0.4f, 0.3f, 0.16f));
+                foreach (var (x, y) in new[] { (18f, 30f), (30f, 22f), (44f, 36f), (38f, 50f) })
+                    c.Disc(x, y, 8, 4, C(0.3f, 0.55f, 0.22f), C(0.2f, 0.42f, 0.15f));
+                foreach (var (x, y) in new[] { (24f, 44f), (32f, 40f), (28f, 34f), (40f, 28f), (20f, 52f) })
+                {
+                    c.Disc(x, y, 5, 5, C(0.22f, 0.26f, 0.5f), C(0.1f, 0.12f, 0.28f));
+                    c.Disc(x - 1.5f, y - 1.5f, 1.5f, 1.5f, C(0.6f, 0.65f, 0.85f, 0.7f));
+                }
+                break;
+            case "smoked":      // a golden smoked fish hanging by its tail
+                c.Line(32, 4, 32, 12, 1.5f, C(0.35f, 0.25f, 0.15f));
+                c.Disc(32, 36, 9, 22, C(0.86f, 0.56f, 0.2f), C(0.55f, 0.3f, 0.1f));
+                c.Line(32, 14, 26, 8, 3f, C(0.62f, 0.38f, 0.14f));
+                c.Line(32, 14, 38, 8, 3f, C(0.62f, 0.38f, 0.14f));
+                c.Disc(30, 52, 1.6f, 1.6f, C(0.15f, 0.1f, 0.05f));
+                for (int y = 22; y < 50; y += 6)
+                    c.Line(26, y, 38, y + 3, 1f, C(0.6f, 0.34f, 0.12f, 0.6f));
+                break;
+            default:            // a notice: parchment pinned to a board
+                c.Rect(10, 10, 54, 54, C(0.5f, 0.34f, 0.2f));
+                c.Rect(16, 16, 48, 50, C(0.93f, 0.87f, 0.7f));
+                for (int y = 22; y < 46; y += 5)
+                    c.Line(20, y, 44, y, 1f, C(0.45f, 0.38f, 0.3f, 0.7f));
+                c.Disc(32, 16, 3, 3, C(0.75f, 0.2f, 0.15f));
+                break;
+        }
+        return c;
+    });
+
     public static ImageTexture Fish(FishSpecies sp) => Cached("fish:" + sp.SpeciesName, c =>
     {
         var skin = FishSkin.For(sp).GetImage();

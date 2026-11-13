@@ -24,6 +24,7 @@ public static partial class BuildingFactory
         BuildingKind.Market => "Targ rybny",
         BuildingKind.Office => "Gildia wędkarzy",
         BuildingKind.BusStop => "Postój wozów",
+        BuildingKind.Smokehouse => "Wędzarnia",
         _ => "",
     };
 
@@ -102,7 +103,7 @@ public static partial class BuildingFactory
                 Fence(b, 12f);
                 break;
         }
-        if (spec.IsFunctional)
+        if (spec.IsFunctional || spec.Kind == BuildingKind.Smokehouse)
             AddKeeper(b, spec.Kind, variant);
         return b;
     }

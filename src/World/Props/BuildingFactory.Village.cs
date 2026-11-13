@@ -169,6 +169,8 @@ public static partial class BuildingFactory
             BuildingKind.Office => (new Vector3(-1.6f, 0f, 4.2f), 0f),
             BuildingKind.FishBuyer or BuildingKind.Market => (new Vector3(-0.9f, 0f, -0.8f), 0f),
             BuildingKind.BusStop => (new Vector3(-1.6f, 0f, 0.7f), 15f),
+            // The smoker stands by the drying rack beside the door.
+            BuildingKind.Smokehouse => (new Vector3(2.1f, 0f, 2.5f), -20f),
             _ => (new Vector3(1.5f, 0f, 4.4f), 0f),
         };
         var keeper = People.Create(People.KeeperOf(kind), variant);

@@ -285,5 +285,108 @@ public sealed class CoreSuite : ITestSuite
         t.Check(p.ActiveMeal == null, "the meal wears off after its hours");
         p.AddBait(new Dictionary<string, int> { ["jetka"] = 3 });
         t.Check(p.BaitCounts.GetValueOrDefault("jetka") == 3, "gathered bait goes into the bait box");
+
+        LiftNetForestSmoke(t, roach);
+    }
+
+    /// <summary>The lift net, mushrooms and berries, the smokehouse and the notice board (Core/Camp).</summary>
+    private static void LiftNetForestSmoke(TestContext t, FishSpecies roach)
+    {
+        t.Section("camp life: lift net, forest, smokehouse, notices");
+        var rng = new FishingSim.Core.SystemRng(11);
+        int Lifts(LiftContext c)
+        {
+            int n = 0;
+            for (int i = 0; i < 200; i++)
+                n += LiftNetting.Lift(c, rng).Baits.GetValueOrDefault(LiftNetting.LiveBait);
+            return n;
+        }
+        var dusk = new LiftContext(20f, 1f, 19f, Weather.Clear, 0.5f, false);
+        int good = Lifts(dusk), quick = Lifts(dusk with { SoakSeconds = 2f }), dry = Lifts(dusk with { Depth = 0.08f });
+        int night = Lifts(dusk with { Hour = 2f }), baited = Lifts(dusk with { Groundbait = true });
+        t.Check(good > 300 && quick == 0 && dry == 0, $"a soaked lift net at dusk brings live bait ({good}); lifted at once or on dry land none");
+        t.Check(night < good / 2 && baited > good, $"few fish at night ({night}), more over crumbled bread ({baited})");
+        t.Check(Enumerable.Range(0, 100).All(_ => LiftNetting.Lift(dusk with { Groundbait = true, Cover = 1f }, rng).Total <= LiftNetting.MaxFish),
+            "a lift holds a handful of fish at most");
+        t.Check(LiftNetting.Lift(dusk, rng) is { Total: > 0 } h && h.Message.Contains("żywce"), "the message names the fish and the live bait");
+
+        int porcini = 0, chant = 0, berries = 0;
+        for (int i = 0; i < 100; i++)
+        {
+            porcini += Foraging.Pick(ForageKind.Porcini, false, rng).Baits[Foraging.Porcini];
+            chant += Foraging.Pick(ForageKind.Chanterelle, false, rng).Baits[Foraging.Chanterelle];
+            berries += Foraging.Pick(ForageKind.Blueberry, false, rng).Baits[Foraging.Blueberry];
+        }
+        t.Check(porcini is >= 100 and < 200 && chant > porcini * 2 && berries > chant, $"a porcini or two ({porcini}), chanterelles in clusters ({chant}), handfuls of berries ({berries})");
+        t.Check(!Foraging.Regrown(10f, 30f) && Foraging.Regrown(10f, 34.5f), "a picked spot grows back after a day");
+        var kinds = Enumerable.Range(0, 300).Select(_ => Foraging.KindFor(0.8f, 0.2f, rng)).ToList();
+        t.Check(kinds.Count(k => k == ForageKind.Porcini) > kinds.Count(k => k == ForageKind.Chanterelle), "porcini grow by the trunks");
+
+        var pantry = new Dictionary<string, int> { [Foraging.Chanterelle] = 2 };
+        var fish = new List<Cooking.Ingredient> { new(0, 0.4f, 5, false), new(1, 0.5f, 6, false) };
+        t.Check(Cooking.Missing(Cooking.Chanterelles, fish, false, pantry) is string m && m.Contains("kurki 2/4"),
+            "a dish with chanterelles says how many are missing");
+        pantry[Foraging.Chanterelle] = 5;
+        t.Check(Cooking.Missing(Cooking.Chanterelles, fish, false, pantry) == null, "with four chanterelles the dish can be made");
+        t.Check(Cooking.Pick(Cooking.Compote, fish) is { Count: 0 } && Cooking.Missing(Cooking.Compote, fish, true, new Dictionary<string, int> { [Foraging.Blueberry] = 12 }) == null,
+            "the compote takes no fish");
+        t.Check(Cooking.MushroomSoup.Buff.XpBonus > Cooking.Soup.Buff.XpBonus && Cooking.Chanterelles.Buff.XpBonus > Cooking.Roast.Buff.XpBonus,
+            "mushroom dishes feed better than plain ones");
+
+        t.Check(Smoking.Refusal(0.5f, true, false) != null && Smoking.Refusal(0.05f, false, false) != null && Smoking.Refusal(0.5f, false, false) == null,
+            "the smokehouse refuses undersized and tiny fish");
+        t.Check(Smoking.SmokedValue(100, 1f) == 180 && Smoking.SmokedValue(100, 0f) < 100 + 1 && Smoking.Fee(0.2f) == Smoking.MinFee,
+            "a smoked fresh fish fetches 1.8x, a dead one about the raw price; a small batch pays the least fee");
+
+        var p = new Profile { Money = 100 };
+        p.Keepnet.Add(new CatchRecord("Płoć", 0.4f, 6));
+        p.Keepnet.Add(new CatchRecord("Płoć", 0.05f, 1, 1f, true));
+        p.Keepnet.Add(new CatchRecord("Karp", 2.5f, 62, 0.5f));
+        int went = p.StartSmoking(new[] { 0, 1, 2 }, out var err);
+        t.Check(went == 2 && err == null && p.Keepnet.Count == 1 && p.Keepnet[0].Undersized && p.Money == 100 - Smoking.Fee(2.9f),
+            "two fish go into the smoke, the undersized one stays, the wood is paid");
+        t.Check(p.CollectSmoked() == 0, "nothing is ready at once");
+        p.PassTime(Smoking.Hours + 0.1f);
+        t.Check(p.CollectSmoked() == 2 && p.Smoked.Sum(f => f.Value) == Smoking.SmokedValue(6, 1f) + Smoking.SmokedValue(62, 0.5f),
+            "after two hours both are smoked, priced by their condition");
+
+        var lake = new List<RequestFish> { new("Płoć", 0.1f, 8f, 3f), new("Okoń", 0.15f, 14f, 1.5f), new("Szczupak", 1f, 22f, 0.3f) };
+        var day1 = NoticeBoard.Daily(5, 0, lake, true);
+        t.Check(day1.Count == NoticeBoard.PerDay && day1[0].Kind == RequestKind.Fish && day1.Select(r => r.From).Distinct().Count() == day1.Count,
+            "three notices a day from three villagers, the first for fish");
+        t.Check(NoticeBoard.Daily(5, 0, lake, true).Select(r => r.Text).SequenceEqual(day1.Select(r => r.Text))
+                && !NoticeBoard.Daily(6, 0, lake, true).Select(r => r.Text).SequenceEqual(day1.Select(r => r.Text)),
+            "the same day gives the same notices, the next day new ones");
+        t.Check(Enumerable.Range(0, 60).SelectMany(d => NoticeBoard.Daily(d, 1, lake, false)).All(r => r.Kind != RequestKind.Smoked && r.Reward > 0 && r.Xp > 0),
+            "no smoked fish asked for without a smokehouse; every notice pays");
+
+        p.Notices = new List<VillageRequest>
+        {
+            new(RequestKind.Fish, "Płoć", "Płoć", 1, 0.2f, 40, 30, "Babcia Stasia", ""),
+            new(RequestKind.Forage, Foraging.Porcini, "borowiki", 2, 0f, 45, 22, "Leśniczy Jerzy", ""),
+            new(RequestKind.Smoked, "", "wędzona ryba", 1, 0f, 70, 40, "Rybak Edek", ""),
+        };
+        p.NoticesDay = p.Market.Day;
+        p.NoticesPlace = 0;
+        t.Check(p.NoticeMissing(p.Notices[0]) != null, "an undersized roach does not do for a dinner notice");
+        p.AddCatch(roach, 0.3f);
+        int money = p.Money;
+        t.Check(p.HandIn(0, out _) == null && p.Money == money + 40 && p.Notices[0].Done && p.Keepnet.All(f => f.Weight < 0.2f),
+            "the roach is handed in and paid for");
+        t.Check(p.HandIn(0, out _) != null, "a notice is done only once");
+        p.AddPantry(new Dictionary<string, int> { [Foraging.Porcini] = 3 });
+        t.Check(p.HandIn(1, out _) == null && p.Pantry[Foraging.Porcini] == 1, "porcini from the pantry");
+        t.Check(p.HandIn(2, out _) == null && p.Smoked.Count == 1, "a smoked fish, the cheapest one");
+        var saved = ProfileSerializer.FromJson(ProfileSerializer.ToJson(p).ToJsonString());
+        t.Check(saved.Pantry.GetValueOrDefault(Foraging.Porcini) == 1 && saved.Smoked.Count == 1 && saved.Notices.Count == 3 && saved.Notices.All(r => r.Done)
+                && saved.NoticesDay == p.NoticesDay, "pantry, smoked fish and notices survive a save");
+        p.Keepnet.Add(new CatchRecord("Okoń", 0.3f, 4));
+        p.StartSmoking(new[] { p.Keepnet.Count - 1 }, out _);
+        saved = ProfileSerializer.FromJson(ProfileSerializer.ToJson(p).ToJsonString());
+        t.Check(saved.Smokery.Count == 1 && MathF.Abs(saved.Smokery[0].StartedAt - p.Clock) < 1e-3f, "a batch in the smoke survives a save");
+        var fresh = p.NoticesFor(0, lake, true);
+        t.Check(fresh.Count == 3 && fresh.All(r => r.Done), "the same day keeps the handed-in notices");
+        p.PassTime(24f);
+        t.Check(p.NoticesFor(0, lake, true).Any(r => !r.Done), "a new day brings new notices");
     }
 }

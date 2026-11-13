@@ -68,6 +68,7 @@ public partial class Hud : CanvasLayer
     {
         HandTool.Shovel => Graphics.Icons.For(GD.Load<Data.AccessoryData>("res://data/tackle/accessories/lopata.tres")),
         HandTool.Net => Graphics.Icons.For(GD.Load<Data.AccessoryData>("res://data/tackle/accessories/siatka_na_owady.tres")),
+        HandTool.LiftNet => Graphics.Icons.For(GD.Load<Data.AccessoryData>("res://data/tackle/accessories/podrywka.tres")),
         _ => Graphics.Icons.For(_rod.Loadout.Rod),
     };
 
@@ -307,10 +308,13 @@ public partial class Hud : CanvasLayer
             Fade(_time, details, dt);
 
         UpdateToolbar();
-        SetText(_meal, pr.ActiveMeal is { } meal
+        bool soaking = Tools is { Current: HandTool.LiftNet, Lift: HandTools.LiftStage.Down };
+        SetText(_meal, soaking
+            ? $"Podrywka w wodzie: {Tools!.Soak:0} s  (LPM podrywa)"
+            : pr.ActiveMeal is { } meal
             ? $"{meal.Name}: +{meal.XpBonus * 100f:0}% XP, szybsze brania ({pr.MealHoursLeft:0.0} h)"
             : "");
-        Fade(_meal, pr.ActiveMeal != null, dt);
+        Fade(_meal, soaking || pr.ActiveMeal != null, dt);
 
         var spot = _interactions.Current;
         if (spot != null)

@@ -13,6 +13,9 @@ namespace FishingSim.Progress;
 /// <paramref name="Condition"/> (1 = fresh, 0 = dead) drops while the fish sits in the net and lowers the market price.</summary>
 public sealed record CatchRecord(string Species, float Weight, int Value, float Condition = 1f, bool Undersized = false);
 
+/// <summary>A fish hanging in the smokehouse since <paramref name="StartedAt"/> (game hours, <see cref="Profile.Clock"/>).</summary>
+public sealed record SmokingLot(CatchRecord Fish, float StartedAt);
+
 /// <summary>One line of the fishing journal.</summary>
 public sealed record JournalEntry(
     string Species,
@@ -70,6 +73,24 @@ public sealed class Profile
     /// <summary>The meal working right now, or null.</summary>
     public Core.Camp.MealBuff? ActiveMeal => Meal != null && MealHoursLeft > 0f ? Meal : null;
 
+    /// <summary>Forest pickings (Core/Camp/Foraging ids -> pieces): mushrooms and berries for cooking and notices.</summary>
+    public Dictionary<string, int> Pantry { get; set; } = new();
+
+    /// <summary>Fish hanging in the village smokehouse.</summary>
+    public List<SmokingLot> Smokery { get; set; } = new();
+
+    /// <summary>Smoked fish taken from the smokehouse; Value is what the smokehouse keeper pays for each.</summary>
+    public List<CatchRecord> Smoked { get; set; } = new();
+
+    /// <summary>The notices on the village board for <see cref="NoticesDay"/> at map <see cref="NoticesPlace"/>.</summary>
+    public List<Core.Camp.VillageRequest> Notices { get; set; } = new();
+
+    public int NoticesDay { get; set; } = -1;
+    public int NoticesPlace { get; set; } = -1;
+
+    /// <summary>Game hours since the profile began (the market's clock, advanced by <see cref="PassTime"/>).</summary>
+    public float Clock => Market.Hours;
+
     /// <summary>Keepnets, landing nets and accessories.</summary>
     public GearInventory Gear { get; set; } = new();
 
@@ -91,6 +112,11 @@ public sealed class Profile
     {
         Meal = null;
         MealHoursLeft = 0f;
+        Pantry = new();
+        Smokery = new();
+        Smoked = new();
+        Notices = new();
+        NoticesDay = NoticesPlace = -1;
         Money = StartMoney;
         Xp = 0;
         Level = 1;
@@ -382,17 +408,158 @@ public sealed class Profile
     public List<CatchRecord>? Cook(Core.Camp.Recipe recipe, bool hasPot, out string? error)
     {
         var ingredients = Ingredients();
-        error = Core.Camp.Cooking.Missing(recipe, ingredients, hasPot);
+        error = Core.Camp.Cooking.Missing(recipe, ingredients, hasPot, Pantry);
         if (error != null)
             return null;
         var picked = Core.Camp.Cooking.Pick(recipe, ingredients)!;
         var used = picked.Select(i => Keepnet[i]).ToList();
         foreach (int i in picked.OrderByDescending(i => i))
             Keepnet.RemoveAt(i);
+        if (recipe.Extras != null)
+            foreach (var (id, n) in recipe.Extras)
+                Pantry[id] = Pantry.GetValueOrDefault(id) - n;
         Meal = recipe.Buff;
         MealHoursLeft = recipe.Buff.Hours;
         Changed?.Invoke();
         return used;
+    }
+
+    // ------------------------------------------------------------------ forest, smokehouse, notices
+    /// <summary>Puts forest pickings into the pantry.</summary>
+    public void AddPantry(IReadOnlyDictionary<string, int> items)
+    {
+        if (items.Count == 0)
+            return;
+        foreach (var (id, n) in items)
+            Pantry[id] = Pantry.GetValueOrDefault(id) + n;
+        Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Hangs keepnet fish in the smokehouse (indices into the keepnet) and pays the wood fee. Returns how many went in;
+    /// 0 with <paramref name="error"/> when none could (refused fish are left in the keepnet).
+    /// </summary>
+    public int StartSmoking(IEnumerable<int> indices, out string? error)
+    {
+        error = null;
+        var chosen = indices.Distinct().Where(i => i >= 0 && i < Keepnet.Count)
+            .Where(i => Core.Camp.Smoking.Refusal(Keepnet[i].Weight, Keepnet[i].Undersized, false) == null).OrderByDescending(i => i).ToList();
+        if (chosen.Count == 0)
+        {
+            error = Keepnet.Count == 0 ? "Siatka jest pusta." : "Żadna z tych ryb nie nadaje się do wędzenia (niewymiarowe albo za małe).";
+            return 0;
+        }
+        int fee = Core.Camp.Smoking.Fee(chosen.Sum(i => Keepnet[i].Weight));
+        if (Money < fee)
+        {
+            error = $"Za mało pieniędzy na drewno ({fee} gr).";
+            return 0;
+        }
+        Money -= fee;
+        foreach (int i in chosen)
+        {
+            Smokery.Add(new SmokingLot(Keepnet[i], Clock));
+            Keepnet.RemoveAt(i);
+        }
+        Changed?.Invoke();
+        return chosen.Count;
+    }
+
+    /// <summary>The keepnet fish the smokehouse would take (indices).</summary>
+    public List<int> Smokable() =>
+        Keepnet.Select((f, i) => (f, i)).Where(x => Core.Camp.Smoking.Refusal(x.f.Weight, x.f.Undersized, false) == null).Select(x => x.i).ToList();
+
+    public int SmokeryReady => Smokery.Count(l => Core.Camp.Smoking.HoursLeft(l.StartedAt, Clock) <= 0f);
+
+    /// <summary>Takes the finished fish from the smokehouse. Returns how many.</summary>
+    public int CollectSmoked()
+    {
+        var ready = Smokery.Where(l => Core.Camp.Smoking.HoursLeft(l.StartedAt, Clock) <= 0f).ToList();
+        if (ready.Count == 0)
+            return 0;
+        foreach (var lot in ready)
+        {
+            Smokery.Remove(lot);
+            Smoked.Add(lot.Fish with { Value = Core.Camp.Smoking.SmokedValue(lot.Fish.Value, lot.Fish.Condition), Condition = 1f });
+        }
+        Changed?.Invoke();
+        return ready.Count;
+    }
+
+    public int SmokedValue => Smoked.Sum(f => f.Value);
+
+    /// <summary>Sells every smoked fish to the smokehouse keeper. Returns the money earned.</summary>
+    public int SellSmoked()
+    {
+        int paid = SmokedValue;
+        Money += paid;
+        Smoked = new();
+        Changed?.Invoke();
+        return paid;
+    }
+
+    /// <summary>The day's notices at this map, made anew when the day or the map changed.</summary>
+    public List<Core.Camp.VillageRequest> NoticesFor(int place, IReadOnlyList<Core.Camp.RequestFish> fish, bool smokehouse)
+    {
+        int day = Market.Day;
+        if (day != NoticesDay || place != NoticesPlace)
+        {
+            Notices = Core.Camp.NoticeBoard.Daily(day, place, fish, smokehouse);
+            NoticesDay = day;
+            NoticesPlace = place;
+        }
+        return Notices;
+    }
+
+    /// <summary>What is still missing to hand in a notice, or null when it can be done.</summary>
+    public string? NoticeMissing(Core.Camp.VillageRequest r)
+    {
+        if (r.Done)
+            return "Załatwione.";
+        int have = r.Kind switch
+        {
+            Core.Camp.RequestKind.Fish => Keepnet.Count(f => Core.Camp.NoticeBoard.FishFits(r, f.Species, f.Weight, f.Undersized)),
+            Core.Camp.RequestKind.Bait => BaitCounts.GetValueOrDefault(r.Item),
+            Core.Camp.RequestKind.Forage => Pantry.GetValueOrDefault(r.Item),
+            _ => Smoked.Count,
+        };
+        return have >= r.Count ? null : $"Masz {have}/{r.Count}";
+    }
+
+    /// <summary>Hands in notice <paramref name="index"/>: takes the goods, pays the reward. Null on success, else why not.</summary>
+    public string? HandIn(int index, out bool leveled)
+    {
+        leveled = false;
+        if (index < 0 || index >= Notices.Count)
+            return "Nie ma takiego ogłoszenia.";
+        var r = Notices[index];
+        if (NoticeMissing(r) is string missing)
+            return missing;
+        switch (r.Kind)
+        {
+            case Core.Camp.RequestKind.Fish:
+                // The lightest fish that do: the big ones are worth more at the market.
+                var fish = Keepnet.Select((f, i) => (f, i)).Where(x => Core.Camp.NoticeBoard.FishFits(r, x.f.Species, x.f.Weight, x.f.Undersized))
+                    .OrderBy(x => x.f.Weight).Take(r.Count).Select(x => x.i).OrderByDescending(i => i).ToList();
+                foreach (int i in fish)
+                    Keepnet.RemoveAt(i);
+                break;
+            case Core.Camp.RequestKind.Bait:
+                BaitCounts[r.Item] -= r.Count;
+                break;
+            case Core.Camp.RequestKind.Forage:
+                Pantry[r.Item] -= r.Count;
+                break;
+            default:
+                foreach (var f in Smoked.OrderBy(f => f.Value).Take(r.Count).ToList())
+                    Smoked.Remove(f);
+                break;
+        }
+        Notices[index] = r with { Done = true };
+        Money += r.Reward;
+        leveled = GainXp(r.Xp);
+        Changed?.Invoke();
+        return null;
     }
 
     /// <summary>Puts a landed fish back into the water (a little XP for sportsmanship).</summary>

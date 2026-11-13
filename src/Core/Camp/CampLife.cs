@@ -126,8 +126,10 @@ public static class Sweeping
 /// <summary>A meal's lasting effect: more XP per fish and a quicker bite, for some hours of game time.</summary>
 public sealed record MealBuff(string Name, float Hours, float XpBonus, float BiteBonus);
 
-/// <summary>A dish cooked at a campfire from fish in the keepnet.</summary>
-public sealed record Recipe(string Id, string Name, string Description, bool NeedsPot, int MinFish, float MinKg, float Seconds, MealBuff Buff);
+/// <summary>A dish cooked at a campfire from fish in the keepnet and, for some, pickings from the pantry
+/// (<paramref name="Extras"/>: pantry id -> pieces).</summary>
+public sealed record Recipe(string Id, string Name, string Description, bool NeedsPot, int MinFish, float MinKg, float Seconds, MealBuff Buff,
+    IReadOnlyDictionary<string, int>? Extras = null);
 
 /// <summary>
 /// Cooking fish over a campfire: a fish roasted on a stick (any campfire), a fish soup in a pot (the pot from the
@@ -145,16 +147,35 @@ public static class Cooking
         "Dwie ryby lub więcej w garnku, z cebulą i zielem.", true, 2, 0.6f, 12f,
         new MealBuff("Rozgrzany zupą", 5f, 0.15f, 0.12f));
 
-    public static IReadOnlyList<Recipe> All { get; } = new[] { Roast, Soup };
+    public static readonly Recipe Chanterelles = new("chanterelles", "Ryba z kurkami",
+        "Ryba pieczona w liściach łopianu, z kurkami podsmażonymi na kamieniu.", false, 1, 0.15f, 10f,
+        new MealBuff("Najedzony", 3.5f, 0.15f, 0.10f), new Dictionary<string, int> { [Foraging.Chanterelle] = 4 });
+
+    public static readonly Recipe MushroomSoup = new("mushroom_soup", "Zupa rybna z borowikami",
+        "Gęsta zupa z dwóch ryb i borowików, z czosnkiem i koperkiem.", true, 2, 0.6f, 14f,
+        new MealBuff("Rozgrzany grzybową", 7f, 0.22f, 0.18f), new Dictionary<string, int> { [Foraging.Porcini] = 2 });
+
+    public static readonly Recipe Compote = new("compote", "Kompot z jagód",
+        "Jagody gotowane w garnku z odrobiną miodu: bez ryby.", true, 0, 0f, 8f,
+        new MealBuff("Orzeźwiony", 3f, 0.05f, 0.08f), new Dictionary<string, int> { [Foraging.Blueberry] = 12 });
+
+    public static IReadOnlyList<Recipe> All { get; } = new[] { Roast, Soup, Chanterelles, MushroomSoup, Compote };
 
     /// <summary>A fish in the keepnet: index, weight, value, undersized.</summary>
     public readonly record struct Ingredient(int Index, float Weight, int Value, bool Undersized);
 
     /// <summary>Why the dish cannot be made, or null when it can.</summary>
-    public static string? Missing(Recipe r, IReadOnlyList<Ingredient> fish, bool hasPot)
+    public static string? Missing(Recipe r, IReadOnlyList<Ingredient> fish, bool hasPot, IReadOnlyDictionary<string, int>? pantry = null)
     {
         if (r.NeedsPot && !hasPot)
             return "Potrzebny garnek (kram).";
+        if (r.Extras != null)
+        {
+            var lacking = r.Extras.Where(e => (pantry?.GetValueOrDefault(e.Key) ?? 0) < e.Value)
+                .Select(e => $"{Foraging.NameOf(e.Key)} {pantry?.GetValueOrDefault(e.Key) ?? 0}/{e.Value}").ToList();
+            if (lacking.Count > 0)
+                return "Brakuje: " + string.Join(", ", lacking) + " (las).";
+        }
         if (Pick(r, fish) == null)
             return fish.Count == 0 ? "Siatka jest pusta." : r.MinFish > 1 ? $"Za mało ryb: {r.MinFish} lub więcej, razem {r.MinKg:0.0} kg." : $"Potrzebna ryba od {r.MinKg * 1000f:0} g.";
         return null;
@@ -166,6 +187,8 @@ public static class Cooking
         var order = fish.OrderByDescending(f => f.Undersized).ThenBy(f => f.Value).ThenBy(f => f.Weight).ToList();
         var chosen = new List<int>();
         float kg = 0f;
+        if (r.MinFish <= 0)
+            return chosen;
         if (r.MinFish == 1)
         {
             // One fish big enough to eat: the cheapest of those.

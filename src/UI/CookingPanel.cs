@@ -24,6 +24,7 @@ public partial class CookingPanel : Control
     private Label _title = null!, _state = null!, _footer = null!;
     private Button _light = null!;
     private VBoxContainer _recipes = null!;
+    private ScrollContainer _scroll = null!;
     private Control _card = null!;
     private float _refresh;
 
@@ -68,9 +69,11 @@ public partial class CookingPanel : Control
         UITheme.Primary(_light);
         _light.Pressed += LightFire;
         box.AddChild(_light);
-        _recipes = new VBoxContainer();
+        _scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        box.AddChild(_scroll);
+        _recipes = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         _recipes.AddThemeConstantOverride("separation", 8);
-        box.AddChild(_recipes);
+        _scroll.AddChild(_recipes);
         _footer = new Label { HorizontalAlignment = HorizontalAlignment.Center, Modulate = new Color(1f, 1f, 1f, 0.8f) };
         _footer.AddThemeFontSizeOverride("font_size", 15);
         box.AddChild(_footer);
@@ -131,7 +134,10 @@ public partial class CookingPanel : Control
                 : "Ognisko wygasło. Rozpal ogień, żeby gotować.";
         _light.Visible = !_fire.Lit;
         foreach (var c in _recipes.GetChildren())
+        {
+            _recipes.RemoveChild(c);
             c.QueueFree();
+        }
         bool hasPot = _gear.Has(AccessoryKind.CookingPot) || !_fire.PlayerCamp;
         var ingredients = profile.Ingredients();
         foreach (var recipe in Cooking.All)
@@ -143,7 +149,8 @@ public partial class CookingPanel : Control
             row.AddChild(line);
             line.AddChild(new TextureRect
             {
-                Texture = recipe.NeedsPot ? Graphics.Icons.For(GD.Load<AccessoryData>("res://data/tackle/accessories/garnek.tres")) : FishIcon(),
+                Texture = recipe.Extras is { Count: > 0 } extras ? Graphics.Icons.Picking(extras.Keys.First())
+                    : recipe.NeedsPot ? Graphics.Icons.For(GD.Load<AccessoryData>("res://data/tackle/accessories/garnek.tres")) : FishIcon(),
                 CustomMinimumSize = new Vector2(56, 56), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
                 StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
             });
@@ -156,7 +163,7 @@ public partial class CookingPanel : Control
             var buff = new Label { Text = Buff(recipe.Buff), Modulate = new Color(1f, 0.88f, 0.6f) };
             buff.AddThemeFontSizeOverride("font_size", 14);
             text.AddChild(buff);
-            string? missing = Cooking.Missing(recipe, ingredients, hasPot);
+            string? missing = Cooking.Missing(recipe, ingredients, hasPot, profile.Pantry);
             if (missing != null)
             {
                 var warn = new Label { Text = missing };
@@ -166,7 +173,10 @@ public partial class CookingPanel : Control
             }
             else if (Cooking.Pick(recipe, ingredients) is { } picked)
             {
-                var uses = new Label { Text = "Zużyje: " + string.Join(", ", picked.Select(i => $"{profile.Keepnet[i].Species} {profile.Keepnet[i].Weight:0.00} kg")) };
+                var parts = picked.Select(i => $"{profile.Keepnet[i].Species} {profile.Keepnet[i].Weight:0.00} kg").ToList();
+                if (recipe.Extras != null)
+                    parts.AddRange(recipe.Extras.Select(e => $"{Foraging.NameOf(e.Key)} ×{e.Value}"));
+                var uses = new Label { Text = "Zużyje: " + string.Join(", ", parts) };
                 uses.AddThemeFontSizeOverride("font_size", 14);
                 uses.Modulate = new Color(1f, 1f, 1f, 0.7f);
                 text.AddChild(uses);
@@ -180,7 +190,10 @@ public partial class CookingPanel : Control
             _recipes.AddChild(row);
         }
         string net = profile.KeepnetLimit is { } spec ? $"{profile.Keepnet.Count}/{spec.MaxFish}" : $"{profile.Keepnet.Count}";
-        _footer.Text = $"Siatka: {net} ryb   ·   " + (profile.ActiveMeal is { } meal ? $"{meal.Name} jeszcze {profile.MealHoursLeft:0.0} h" : "jeszcze nic nie jadłeś");
+        // Five recipes do not fit a small screen: the list scrolls.
+        _scroll.CustomMinimumSize = new Vector2(0f, MathF.Min(GetViewportRect().Size.Y * 0.52f, MathF.Max(_recipes.GetCombinedMinimumSize().Y, 100f)));
+        string pantry = Foraging.Describe(profile.Pantry);
+        _footer.Text = $"Siatka: {net} ryb   ·   spiżarnia: {(pantry.Length > 0 ? pantry : "pusto")}   ·   " + (profile.ActiveMeal is { } meal ? $"{meal.Name} jeszcze {profile.MealHoursLeft:0.0} h" : "jeszcze nic nie jadłeś");
     }
 
     private Texture2D FishIcon()
@@ -198,7 +211,7 @@ public partial class CookingPanel : Control
         var profile = _rod.Profile;
         bool hasPot = _gear.Has(AccessoryKind.CookingPot) || !_fire.PlayerCamp;
         var ingredients = profile.Ingredients();
-        if (Cooking.Missing(recipe, ingredients, hasPot) != null || Cooking.Pick(recipe, ingredients) is not { } picked)
+        if (Cooking.Missing(recipe, ingredients, hasPot, profile.Pantry) != null || Cooking.Pick(recipe, ingredients) is not { } picked)
             return false;
         var models = new List<Node3D>();
         foreach (int i in picked)
@@ -225,12 +238,13 @@ public partial class CookingPanel : Control
                 _rod.Notify(error ?? "Nie udało się ugotować.", 3f);
                 return;
             }
-            _rod.Notify($"Smacznego! {dish.Name} ({string.Join(", ", used.Select(u => u.Species.ToLowerInvariant()))}). {Buff(dish.Buff)}.", 5f);
+            string what = used.Count > 0 ? $" ({string.Join(", ", used.Select(u => u.Species.ToLowerInvariant()))})" : "";
+            _rod.Notify($"Smacznego! {dish.Name}{what}. {Buff(dish.Buff)}.", 5f);
             _rod.Cue(Core.Audio.OneShot.Catch, 0.7f);
         }
         fire.Cooked += Done;
         _rod.Cue(recipe.NeedsPot ? Core.Audio.OneShot.Bubble : Core.Audio.OneShot.Ignite, 0.7f);
-        _rod.Notify(recipe.NeedsPot ? "Zupa się gotuje..." : "Ryba piecze się nad ogniem...", 3f);
+        _rod.Notify(recipe.Id == Cooking.Compote.Id ? "Kompot się gotuje..." : recipe.NeedsPot ? "Zupa się gotuje..." : "Ryba piecze się nad ogniem...", 3f);
         Close();
         return true;
     }
