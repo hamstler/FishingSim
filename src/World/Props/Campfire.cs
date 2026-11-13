@@ -179,6 +179,15 @@ public partial class Campfire : Node3D
     private static StandardMaterial3D? _smokeMaterial;
 
     /// <summary>A soft round puff (radial gradient), billboarded, tinted by the particle colour ramp.</summary>
+    /// <summary>A thin plume of smoke rising from a chimney (the smokehouse's alder fire).</summary>
+    public static CpuParticles3D ChimneySmoke() => new()
+    {
+        Amount = 14, Lifetime = 6f, Direction = Vector3.Up, Spread = 8f,
+        InitialVelocityMin = 0.4f, InitialVelocityMax = 0.65f, Gravity = new Vector3(0.18f, 0.04f, 0.05f),
+        ScaleAmountMin = 0.6f, ScaleAmountMax = 1f, ScaleAmountCurve = Grow(), ColorRamp = Fade(new Color(0.42f, 0.42f, 0.44f, 0.2f)),
+        Mesh = new QuadMesh { Size = new Vector2(0.7f, 0.7f), Material = SmokeMaterial() },
+    };
+
     private static StandardMaterial3D SmokeMaterial()
     {
         if (_smokeMaterial != null)

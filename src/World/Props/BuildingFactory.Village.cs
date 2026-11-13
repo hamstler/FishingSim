@@ -116,6 +116,11 @@ public static partial class BuildingFactory
                 House(b, new HouseStyle(3.6f, 3f, 2.1f, 1.7f, new Color(0.6f, 0.5f, 0.4f), false, new Color(0.25f, 0.22f, 0.2f), 1, true, false, null,
                     WallKind.Logs, RoofKind.Shingles));
                 DryingRack(b, new Vector3(3.4f, 0f, 0.6f), 90f);
+                // Alder smoke from the chimney, and the smoker by the door (village pieces return before the keepers).
+                var smoke = Props.Campfire.ChimneySmoke();
+                smoke.Position = new Vector3(3.6f * 0.28f, 2.1f + 1.7f + 1.65f, -3f * 0.18f);
+                b.AddChild(smoke);
+                AddKeeper(b, spec.Kind, variant);
                 break;
             case BuildingKind.Tent:
                 Tent(b, variant);

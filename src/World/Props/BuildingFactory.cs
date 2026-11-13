@@ -103,7 +103,7 @@ public static partial class BuildingFactory
                 Fence(b, 12f);
                 break;
         }
-        if (spec.IsFunctional || spec.Kind == BuildingKind.Smokehouse)
+        if (spec.IsFunctional)
             AddKeeper(b, spec.Kind, variant);
         return b;
     }
