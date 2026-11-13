@@ -41,15 +41,15 @@ public partial class ForagePatch : Node3D
             case ForageKind.Porcini:
                 int n = 1 + rng.RandiRange(0, 1);
                 for (int i = 0; i < n; i++)
-                    patch._crop.AddChild(Porcini(rng.RandfRange(0.75f, 1.2f) * (i == 0 ? 1f : 0.7f),
-                        new Vector3(i * rng.RandfRange(0.1f, 0.16f), 0f, i * rng.RandfRange(-0.08f, 0.08f)), rng));
+                    patch._crop.AddChild(Porcini(rng.RandfRange(1.3f, 1.7f) * (i == 0 ? 1f : 0.7f),
+                        new Vector3(i * rng.RandfRange(0.14f, 0.2f), 0f, i * rng.RandfRange(-0.1f, 0.1f)), rng));
                 break;
             case ForageKind.Chanterelle:
                 int c = rng.RandiRange(5, 8);
                 for (int i = 0; i < c; i++)
                 {
                     float a = rng.Randf() * Mathf.Tau, d = rng.RandfRange(0f, 0.14f);
-                    patch._crop.AddChild(Chanterelle(rng.RandfRange(0.7f, 1.2f), new Vector3(MathF.Cos(a) * d, 0f, MathF.Sin(a) * d), rng));
+                    patch._crop.AddChild(Chanterelle(rng.RandfRange(1f, 1.5f), new Vector3(MathF.Cos(a) * d, 0f, MathF.Sin(a) * d), rng));
                 }
                 break;
             default:
@@ -140,8 +140,15 @@ public partial class ForagePatch : Node3D
         });
         root.AddChild(new MeshInstance3D
         {
-            Mesh = new SphereMesh { Radius = 0.05f * size, Height = 0.05f * size, RadialSegments = 18, Rings = 8, IsHemisphere = true },
-            MaterialOverride = PorciniCap, Position = new Vector3(0f, h - 0.004f, 0f), Scale = new Vector3(1f, 0.85f, 1f),
+            Mesh = new SphereMesh { Radius = 0.05f * size, Height = 0.05f * size, RadialSegments = 20, Rings = 8, IsHemisphere = true },
+            MaterialOverride = PorciniCap, Position = new Vector3(0f, h - 0.004f, 0f), Scale = new Vector3(1f, 0.62f, 1f),
+        });
+        // The cap's paler rim.
+        root.AddChild(new MeshInstance3D
+        {
+            Mesh = new TorusMesh { InnerRadius = 0.043f * size, OuterRadius = 0.051f * size, Rings = 20, RingSegments = 6 },
+            MaterialOverride = Mat("caprim", new Color(0.62f, 0.42f, 0.22f), 0.5f), Position = new Vector3(0f, h - 0.002f, 0f),
+            Scale = new Vector3(1f, 0.5f, 1f),
         });
         // The pale pores under the cap.
         root.AddChild(new MeshInstance3D
