@@ -228,6 +228,8 @@ public partial class Main : Node3D
         float clarity = _lake.Location.WaterClarity;
         Fish.VisibleRange = FishPopulation.BaseVisibleRange + (glasses?.Power ?? 0f);
         Fish.VisibleDepth = clarity * 0.6f + (glasses != null ? 1.2f : 0f);
+        Fish.Clarity = clarity;
+        Fish.GlareCut = glasses != null ? 1f : 0f;
         _water.SetClarity(clarity);
         _water.SetGlareCut(glasses != null ? 1f : 0f);
     }

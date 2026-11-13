@@ -473,6 +473,8 @@ public sealed class GearSuite : ITestSuite
         t.Check(main.Fish.Agents.All(a => lake.DepthAt(a.Position.X, a.Position.Y) > 0f), "every fish spawns in water");
         main.Fish.VisibleRange = 1000f;
         main.Fish.VisibleDepth = 99f;
+        main.Fish.Clarity = 1000f;      // crystal water and polarized glasses: every fish can be seen
+        main.Fish.GlareCut = 1f;
         for (int i = 0; i < 3; i++)
             await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
         t.Check(main.Fish.VisibleCount == main.Fish.Agents.Count, "fish in range are drawn under the surface");
@@ -481,6 +483,13 @@ public sealed class GearSuite : ITestSuite
         main.Fish.VisibleRange = 0f;
         await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
         t.Check(main.Fish.VisibleCount == 0, "fish out of range are hidden");
+        var eyeAt = new Vector3(0f, 1.6f, 0f);
+        t.Check(FishPopulation.Sight(eyeAt, new Vector3(0f, -0.5f, -3f), 0f, 0.5f, 2.6f, 0f) > 0.5f
+                && FishPopulation.Sight(eyeAt, new Vector3(0f, -0.5f, -40f), 0f, 0.5f, 2.6f, 0f) < FishPopulation.MinSight
+                && FishPopulation.Sight(eyeAt, new Vector3(0f, -4f, -3f), 0f, 4f, 2.6f, 0f) < FishPopulation.MinSight,
+            "a fish shows through the water close by and shallow, not far out (the surface reflects) nor deep");
+        t.Check(FishPopulation.Sight(eyeAt, new Vector3(0f, -0.5f, -12f), 0f, 0.5f, 2.6f, 1f)
+                > FishPopulation.Sight(eyeAt, new Vector3(0f, -0.5f, -12f), 0f, 0.5f, 2.6f, 0f), "polarized glasses let you see further");
 
         t.Check(main.Lantern == null, "no lantern until one is bought");
         main.Rod.Profile.Money += 100;
