@@ -155,12 +155,12 @@ public partial class ArmIK : SkeletonModifier3D
         sk.SetBonePoseRotation(arm.Hand, (lower.Inverse() * hand).GetRotationQuaternion());
         foreach (var (bone, ax, angle) in arm.Curl)
             sk.SetBonePoseRotation(bone, (sk.GetBoneRest(bone).Basis * new Basis(ax, angle * arm.Grip)).GetRotationQuaternion());
-        if (Debug && arm.Side == "r" && Engine.GetProcessFrames() % 60 == 0)
+        if (Debug && Engine.GetProcessFrames() % 60 == 0)
         {
             var g = sk.GetBoneGlobalPose(arm.Hand);
-            int mid = sk.FindBone("middle_01_r"), tip = sk.FindBone("middle_04_leaf_r");
+            int mid = sk.FindBone($"middle_01_{arm.Side}"), tip = sk.FindBone($"middle_04_leaf_{arm.Side}");
             var fingersNow = (sk.GetBoneGlobalPose(mid).Origin - g.Origin).Normalized();
-            GD.Print($"IK r: wrist {g.Origin} want {target} reach {d:F3}/{l1 + l2:F3} fingers {fingersNow} want {want.Column0} " +
+            GD.Print($"IK {arm.Side}: wrist {g.Origin} want {target} reach {d:F3}/{l1 + l2:F3} fingers {fingersNow} want {want.Column0} " +
                      $"tip {sk.GetBoneGlobalPose(tip).Origin} curl bones {arm.Curl.Count}");
         }
     }

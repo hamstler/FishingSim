@@ -16,7 +16,8 @@ namespace FishingSim.Fishing;
 /// </summary>
 public partial class FirstPersonBody : Node3D
 {
-    private static readonly Vector3 RigBasePosition = new(0.2f, -0.27f, -0.44f);
+    // The rod in front of the body, a little right of the middle, so the left hand reaches the crank on the reel's left.
+    private static readonly Vector3 RigBasePosition = new(0.12f, -0.25f, -0.36f);
     private static readonly Vector3 RigBaseRotation = new(Mathf.DegToRad(-78f), 0f, 0f);
     private static readonly Vector3 WristLocal = new(0.055f, 0.03f, -0.01f);
     private static readonly Vector3 LeftRest = new(-0.3f, -0.75f, -0.25f);
@@ -281,7 +282,7 @@ public partial class FirstPersonBody : Node3D
         ik.Left.Fingers = basis * f;
         ik.Left.Palm = basis * p;
         ik.Left.Pole = ToGlobal(new Vector3(-0.6f, -0.55f, 0.25f));
-        ik.Left.Grip = Mathf.Lerp(Mathf.Lerp(0.35f, 0.6f, _leftOnReel), 0.3f, _leftOnFish);
+        ik.Left.Grip = Mathf.Lerp(Mathf.Lerp(0.35f, 0.75f, _leftOnReel), 0.3f, _leftOnFish);
     }
 
     /// <summary>Places a unit-height cylinder so it runs from <paramref name="a"/> to <paramref name="b"/>.</summary>
