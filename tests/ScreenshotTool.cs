@@ -565,8 +565,9 @@ public partial class ScreenshotTool : Node
                 var kind = arg == 4 ? FishingSim.Core.Camp.ForageKind.Porcini : arg == 5 ? FishingSim.Core.Camp.ForageKind.Chanterelle : FishingSim.Core.Camp.ForageKind.Blueberry;
                 var patch = main.Scenery.Forage.FirstOrDefault(p => p.Kind == kind) ?? main.Scenery.Forage.First();
                 var at = patch.GlobalPosition;
-                Face(at + new Vector3(0.55f, 0f, 0.75f), at, -48f);
-                main.Player.Camera.Position = new Vector3(0f, 0.9f, 0f);
+                // Crouched beside it: under the lower boughs of a spruce too.
+                Face(at + new Vector3(0.38f, 0f, 0.52f), at, -38f);
+                main.Player.Camera.Position = new Vector3(0f, 0.5f, 0f);
             }
             else if (arg == 7)
             {
