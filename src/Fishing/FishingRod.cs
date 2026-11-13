@@ -379,7 +379,7 @@ public partial class FishingRod : Node3D
     /// <summary>A lure's size counts as hook sizes: a big lure draws big fish and puts small mouths off.</summary>
     public BiteContext MakeBiteContext(float depth) =>
         new(Loadout.Bait.ItemId, Loadout.Hook.Size + (Loadout.LureOn ? MethodRules.SizeHookShift(Loadout.Bait.SizeCm) : 0f), depth,
-            Lake.Location, World.Period, World.Weather);
+            Lake.Location, World.Period, World.Weather, BaitLayerAt(depth));
 
     /// <summary>How the lure's colours suit the light and the water now (1 = neutral).</summary>
     public float LureAppeal => Loadout.LureOn
@@ -432,6 +432,12 @@ public partial class FishingRod : Node3D
                 case MouseButton.Right when mb.Pressed:
                     TryHook();
                     break;
+                case MouseButton.WheelUp when mb.CtrlPressed:
+                    ChangeFloatDepth(0.1f);
+                    break;
+                case MouseButton.WheelDown when mb.CtrlPressed:
+                    ChangeFloatDepth(-0.1f);
+                    break;
                 case MouseButton.WheelUp:
                     DragSetting = Math.Clamp(DragSetting + 0.05f, 0f, 1f);
                     break;
@@ -452,6 +458,12 @@ public partial class FishingRod : Node3D
         {
             case Key.Space:
                 TryNet();
+                break;
+            case Key.Bracketright:
+                ChangeFloatDepth(key.ShiftPressed ? 0.5f : 0.1f);
+                break;
+            case Key.Bracketleft:
+                ChangeFloatDepth(key.ShiftPressed ? -0.5f : -0.1f);
                 break;
             case Key.Z:
                 if (OnRest)
@@ -615,6 +627,53 @@ public partial class FishingRod : Node3D
     {
         State = s;
         _stateTime = 0f;
+        // Whatever a bite did to the float ends with it.
+        if (s is not (RodState.Nibble or RodState.Bite) && _bobber != null)
+        {
+            _bobber.Tilt = 0f;
+            _bobber.DriveVelocity = Vector3.Zero;
+            if (_bobber.ExtraForce < 0f)
+                _bobber.ExtraForce = 0f;
+        }
+    }
+
+    // ------------------------------------------------------------------ the float's depth setting ("grunt")
+    /// <summary>How deep under the float the bait hangs (m). Set with [ and ] (or Ctrl + wheel) before the cast.</summary>
+    public float FloatDepth { get; private set; } = 1.2f;
+
+    public const float FloatDepthMin = 0.2f, FloatDepthMax = 6f;
+
+    public void SetFloatDepth(float metres) => FloatDepth = Math.Clamp(MathF.Round(metres * 10f) / 10f, FloatDepthMin, FloatDepthMax);
+
+    /// <summary>The float is set deeper than the water under it: the bait lies on the bottom, the float lies flat.</summary>
+    public bool OverDepth => _castMethod == FishingMethod.Float && State is RodState.Waiting or RodState.Nibble or RodState.Bite
+        && FloatDepth > CurrentDepth() + 0.15f;
+
+    /// <summary>Where the bait is in the water column over water this deep (1 = on the bottom, 0 = at the surface);
+    /// null when it cannot be told (a lure not in the water).</summary>
+    public float? BaitLayerAt(float depth)
+    {
+        bool cast = State is RodState.Waiting or RodState.Nibble or RodState.Bite;
+        switch (cast ? _castMethod : Method)
+        {
+            case FishingMethod.Bottom:
+                return 1f;
+            case FishingMethod.Spinning:
+                return cast && _lure != null ? FeedingHabits.BaitLayer(_lure.Depth, depth) : null;
+            default:
+                return FeedingHabits.BaitLayer(FloatDepth, depth);
+        }
+    }
+
+    private void ChangeFloatDepth(float by)
+    {
+        if (State != RodState.Idle)
+        {
+            ShowBanner("Grunt zmienia się przed rzutem: zwiń zestaw", 2f);
+            return;
+        }
+        SetFloatDepth(FloatDepth + by);
+        ShowBanner($"Grunt spławika: {FloatDepth:0.0} m", 1.5f);
     }
 
     /// <summary>Shows a line in the banner (camp tools, cooking).</summary>
@@ -797,6 +856,9 @@ public partial class FishingRod : Node3D
                 _floatDrawn = false;
             }
             _bobber.DriveVelocity = Vector3.Zero;
+            // The wind pushes the float along (the tight line swings it round in an arc); set too deep it lies flat.
+            _bobber.Drift = WindVelocity * 0.02f;
+            _bobber.Tilt = OverDepth ? 1f : 0f;
             // The bail is closed: once the line is tight it holds the float (it slides no further out).
             if (TipDistance() >= _lineLength && !_bobber.Freeze)
             {
@@ -917,16 +979,14 @@ public partial class FishingRod : Node3D
                     _pulseTimer = 1f;
                     break;
                 default:
-                    _pulseTimer = _rng.Range(0.3f, 0.7f);
-                    _bobber.ApplyCentralImpulse(Vector3.Down * _bobber.Mass * 1.2f);
-                    Twitch(0.6f);
+                    FloatNibble();
                     break;
             }
         }
         if (_stateTime >= _nibbleLength)
         {
             if (_castMethod == FishingMethod.Float)
-                _bobber.ExtraForce = 1.6f;
+                FloatBite();
             else if (_castMethod == FishingMethod.Bottom && Gear?.Has(AccessoryKind.RodPod) == true)
             {
                 SoundCue?.Invoke(Core.Audio.OneShot.Bell, 1f);
@@ -934,6 +994,64 @@ public partial class FishingRod : Node3D
             }
             Twitch(_castMethod == FishingMethod.Spinning ? 1.8f : 1.2f);
             SetState(RodState.Bite);
+        }
+    }
+
+    /// <summary>One sign of a fish at the bait under the float, the way its species takes: dips, quick plucks of
+    /// small fish, the float rising as a bream lifts the bait off the bottom, or sliding off with a carp or a pike.</summary>
+    private void FloatNibble()
+    {
+        var away = _bobber.GlobalPosition - Origin();
+        away.Y = 0f;
+        away = away.LengthSquared() > 1e-4f ? away.Normalized() : Vector3.Forward;
+        switch (FeedingHabits.StyleOf(CurrentSpecies?.SpeciesName ?? ""))
+        {
+            case BiteStyle.Pluck:
+                _pulseTimer = _rng.Range(0.12f, 0.3f);
+                _bobber.ApplyCentralImpulse(Vector3.Down * _bobber.Mass * 0.6f);
+                Twitch(0.3f);
+                break;
+            case BiteStyle.Lift:
+                _pulseTimer = _rng.Range(0.5f, 0.9f);
+                _bobber.ExtraForce = -0.45f;
+                _bobber.Tilt = MathF.Min(_bobber.Tilt + 0.25f, 0.6f);
+                Twitch(0.3f);
+                break;
+            case BiteStyle.Run:
+                _pulseTimer = _rng.Range(0.4f, 0.8f);
+                _bobber.DriveVelocity = away.Rotated(Vector3.Up, _rng.Range(-0.8f, 0.8f)) * 0.35f;
+                _bobber.ApplyCentralImpulse(Vector3.Down * _bobber.Mass * 0.5f);
+                Twitch(0.5f);
+                break;
+            default:
+                _pulseTimer = _rng.Range(0.3f, 0.7f);
+                _bobber.ApplyCentralImpulse(Vector3.Down * _bobber.Mass * 1.2f);
+                Twitch(0.6f);
+                break;
+        }
+    }
+
+    /// <summary>The take itself under the float: under it goes, or (a lift bite) it lies flat on the water.</summary>
+    private void FloatBite()
+    {
+        switch (FeedingHabits.StyleOf(CurrentSpecies?.SpeciesName ?? ""))
+        {
+            case BiteStyle.Lift:
+                _bobber.ExtraForce = -0.7f;
+                _bobber.Tilt = 1f;
+                break;
+            case BiteStyle.Run:
+                var away = _bobber.GlobalPosition - Origin();
+                away.Y = 0f;
+                _bobber.DriveVelocity = (away.LengthSquared() > 1e-4f ? away.Normalized() : Vector3.Forward) * 0.9f;
+                _bobber.ExtraForce = 1.3f;
+                break;
+            case BiteStyle.Pluck:
+                _bobber.ExtraForce = 1.2f;
+                break;
+            default:
+                _bobber.ExtraForce = 1.6f;
+                break;
         }
     }
 
@@ -978,7 +1096,8 @@ public partial class FishingRod : Node3D
             case RodState.Bite:
                 // A badly sized hook loses fish; a sharpened hook and a braid that does not stretch set it better.
                 float chance = (0.5f + 0.5f * BiteModel.HookFit(CurrentSpecies!, Loadout.Hook.Size))
-                    * (1f + (Loadout.Line.Kind == LineKind.Braid ? 0.1f : 0f) + (Gear?.Accessory(AccessoryKind.HookHone)?.Power ?? 0f));
+                    * (1f + (Loadout.Line.Kind == LineKind.Braid ? 0.1f : 0f) + (Gear?.Accessory(AccessoryKind.HookHone)?.Power ?? 0f))
+                    * (OverDepth ? FeedingHabits.OverDepthHookFactor : 1f);   // a float set too deep: slack between it and the hook
                 if (DevInstantBite || _rng.NextFloat() <= chance)
                 {
                     StartFight();

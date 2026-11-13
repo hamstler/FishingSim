@@ -12,13 +12,15 @@ namespace FishingSim.Core;
 /// <param name="Location">Current location (abundance per species), or null to ignore it.</param>
 /// <param name="Period">Time of day, or null to ignore time and weather.</param>
 /// <param name="Weather">Current weather (used together with <paramref name="Period"/>).</param>
+/// <param name="BaitLayer">Where the bait is in the water column (1 = on the bottom, 0 = at the surface), or null to ignore it.</param>
 public readonly record struct BiteContext(
     string BaitId,
     float HookSize,
     float Depth,
     LocationData? Location = null,
     DayPeriod? Period = null,
-    Weather Weather = Weather.Clear);
+    Weather Weather = Weather.Clear,
+    float? BaitLayer = null);
 
 /// <summary>One species' share of the bites.</summary>
 public readonly record struct BiteChance(FishSpecies Species, float Weight, float Share);
@@ -62,7 +64,8 @@ public static class BiteModel
     }
 
     public static float Weight(FishSpecies sp, BiteContext ctx) =>
-        sp.Rarity * sp.AffinityFor(ctx.BaitId) * HookFit(sp, ctx.HookSize) * Habitat(sp, ctx);
+        sp.Rarity * sp.AffinityFor(ctx.BaitId) * HookFit(sp, ctx.HookSize) * Habitat(sp, ctx)
+        * (ctx.BaitLayer is float layer ? Methods.FeedingHabits.LayerFit(sp.SpeciesName, layer, ctx.Depth) : 1f);
 
     /// <summary>Average attractiveness over all species (1 = neutral); drives how fast bites come.</summary>
     public static float Attraction(IReadOnlyList<FishSpecies> species, BiteContext ctx)

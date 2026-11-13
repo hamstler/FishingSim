@@ -50,6 +50,14 @@ public partial class Bobber : RigidBody3D
     /// <summary>Downward pull as a multiple of the bobber's weight (bites).</summary>
     public float ExtraForce { get; set; }
 
+    /// <summary>How far the float lies over (0 upright .. 1 flat on the water): a lift bite, or a float set too deep.</summary>
+    public float Tilt { get; set; }
+
+    /// <summary>The wind's push on the float (a velocity it drifts towards, m/s).</summary>
+    public Vector3 Drift { get; set; }
+
+    private float _tilt;
+
     /// <summary>0 = fully above water, 1 = fully under.</summary>
     public float Submerged { get; private set; }
 
@@ -153,7 +161,9 @@ public partial class Bobber : RigidBody3D
         Visible = false;
         Freeze = true;
         DriveVelocity = Vector3.Zero;
+        Drift = Vector3.Zero;
         ExtraForce = 0f;
+        Tilt = 0f;
         Submerged = 0f;
     }
 
@@ -181,6 +191,8 @@ public partial class Bobber : RigidBody3D
             var cam = GetViewport()?.GetCamera3D();
             float k = cam == null ? 1f : VisualScale(cam.GlobalPosition.DistanceTo(GlobalPosition));
             _float.Scale = new Vector3(k, k, k);
+            _tilt = Mathf.MoveToward(_tilt, Math.Clamp(Tilt, 0f, 1f), dt * 2.5f);
+            _float.Rotation = new Vector3(0f, Heading, _tilt * 1.4f);
         }
         else if (_lureRoot.Visible)
         {
@@ -305,10 +317,12 @@ public partial class Bobber : RigidBody3D
         ApplyCentralForce(Vector3.Up * weight * 2f * Submerged);
         if (Submerged > 0f)
         {
-            if (ExtraForce > 0f)
+            // Positive pulls under (a bite), negative lifts (a fish picking the bait up off the bottom).
+            if (ExtraForce != 0f)
                 ApplyCentralForce(Vector3.Down * weight * ExtraForce);
-            if (DriveVelocity != Vector3.Zero)
-                ApplyCentralForce(DriveVelocity * Mass * LinearDamp);
+            var push = DriveVelocity + Drift;
+            if (push != Vector3.Zero)
+                ApplyCentralForce(push * Mass * LinearDamp);
         }
         LinearDamp = Mathf.Lerp(0.05f, 6f, Submerged);
         AngularDamp = Mathf.Lerp(0.5f, 4f, Submerged);

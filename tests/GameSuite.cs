@@ -154,6 +154,31 @@ public sealed class GameSuite : ITestSuite
         rod.ReelOverride = false;
         rod.ResetToIdle();
 
+        // The float's depth setting.
+        loadout.Index[(int)TackleSlot.Rod] = rodBefore;
+        loadout.Index[(int)TackleSlot.Bait] = BaitIndex("worm");
+        loadout.BaitCounts["worm"] = 10;
+        rod.ApplyTackle();
+        rod.ResetToIdle();
+        rod._UnhandledInput(Key(Godot.Key.Bracketright));
+        float setDepth = rod.FloatDepth;
+        rod.SetFloatDepth(0.3f);
+        float bleakHigh = rod.BiteChances(3f).First(c => c.Species.SpeciesName == "Leszcz").Weight;
+        rod.SetFloatDepth(3f);
+        float breamDeep = rod.BiteChances(3f).First(c => c.Species.SpeciesName == "Leszcz").Weight;
+        t.Check(MathF.Abs(setDepth - 1.3f) < 0.01f && breamDeep > bleakHigh * 3f,
+            $"] sets the float deeper ({setDepth:0.0} m); bream want the bait on the bottom ({bleakHigh:0.000} -> {breamDeep:0.000})");
+        rod.SetFloatDepth(6f);
+        rod.DevInstantBite = false;
+        rod.CastNow(0.5f);
+        await WaitForState(t, rod, RodState.Waiting, 6);
+        await t.Seconds(0.5);
+        t.Check(rod.OverDepth && rod.Bobber.Tilt > 0.9f, $"set deeper than the water ({rod.CurrentDepth():0.0} m) the float lies flat");
+        rod._UnhandledInput(Key(Godot.Key.Bracketleft));
+        t.Check(MathF.Abs(rod.FloatDepth - 6f) < 0.01f, "the depth cannot be changed with the line out");
+        rod.ResetToIdle();
+        rod.SetFloatDepth(1.2f);
+
         // A float: LMB draws it over the water all the way in until it comes out of the water.
         loadout.Index[(int)TackleSlot.Rod] = rodBefore;
         loadout.Index[(int)TackleSlot.Bait] = BaitIndex("worm");

@@ -291,6 +291,7 @@ public sealed class CoreSuite : ITestSuite
         FishingMethods(t, Species("szczupak"), Species("leszcz"));
         TackleCatalogue(t);
         LineRopePhysics(t);
+        Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
     }
 
     /// <summary>The lift net, mushrooms and berries, the smokehouse and the notice board (Core/Camp).</summary>
@@ -603,6 +604,28 @@ public sealed class CoreSuite : ITestSuite
             air.Step(1f / 60f, tip, new Vector3(0f, 3f, -20f));
         t.Check(air.Positions[FishingSim.Core.Physics.LineRope.Points / 2].Y < 2f, "in the air the slack line hangs under the chord");
         t.Check(slack.Slack(tip, end) > 3f && taut.Length > 0, "the slack is the line paid out beyond the straight distance");
+    }
+
+    /// <summary>Feeding levels (the float's depth setting, a lure's depth) and bite styles (Core/Methods/FeedingHabits).</summary>
+    private static void Feeding(TestContext t, LocationData lake)
+    {
+        t.Section("feeding levels and bite styles");
+        var bream = Species("leszcz");
+        var bleak = Species("ukleja");
+        var onBottom = new BiteContext("maggot", 3f, 3f, lake, null, Weather.Clear, 1f);
+        var high = onBottom with { BaitLayer = 0.15f };
+        t.Check(BiteModel.Weight(bream, onBottom) > BiteModel.Weight(bream, high) * 4f, "a bream finds a bait on the bottom, hardly one hung near the surface");
+        var shallow = new BiteContext("maggot", 2f, 1.5f, lake, null, Weather.Clear, 1f);
+        t.Check(BiteModel.Weight(bleak, shallow with { BaitLayer = 0.15f }) > BiteModel.Weight(bleak, shallow) * 1.5f, "a bleak takes high in the water");
+        t.Check(BiteModel.Weight(bream, onBottom with { BaitLayer = null }) >= BiteModel.Weight(bream, onBottom), "without a level the bait's depth is not judged");
+        t.Check(FeedingHabits.BaitLayer(1f, 4f) == 0.25f && FeedingHabits.BaitLayer(5f, 2f) == 1f, "a float set deeper than the water puts the bait on the bottom");
+        t.Check(FeedingHabits.LayerFit("Leszcz", 0.6f, 0.8f) > FeedingHabits.LayerFit("Leszcz", 0.6f, 5f), "in shallow water the level matters less (it is fewer metres off)");
+        t.Check(FeedingHabits.StyleOf("Leszcz") == BiteStyle.Lift && FeedingHabits.StyleOf("Karp") == BiteStyle.Run
+                && FeedingHabits.StyleOf("Ukleja") == BiteStyle.Pluck && FeedingHabits.StyleOf("Okoń") == BiteStyle.Dive,
+            "a bream lifts the float, a carp runs with it, a bleak plucks, a perch pulls it under");
+        var names = SpeciesCatalog.Paths.Select(path => GD.Load<FishSpecies>(path).SpeciesName).ToHashSet();
+        t.Check(new[] { "Leszcz", "Lin", "Karp", "Szczupak", "Ukleja", "Płoć", "Wzdręga", "Boleń", "Sandacz" }.All(names.Contains),
+            "the habits name real species");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

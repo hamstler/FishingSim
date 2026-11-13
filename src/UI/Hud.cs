@@ -216,6 +216,7 @@ public partial class Hud : CanvasLayer
             + "PPM - podniesienie wędki: zacięcie, pompowanie, wyciągnięcie ryby\n"
             + "Spacja - kasarek (trzeba go kupić), kółko - hamulec\n"
             + "Spinning (przynęta sztuczna): LPM prowadzi (Shift szybciej), puszczona opada, PPM podszarpnięcie / zaczep\n"
+            + "Spławik: [ i ] (lub Ctrl + kółko) ustawiają grunt, czyli głębokość przynęty pod spławikiem\n"
             + "Grunt (wędka gruntowa): koszyczek nęci miejsce, brania na szczytówce; Z - wędka na podpórkę / podnieś\n"
             + "1-5 - zmiana sprzętu (Shift = wstecz), Tab - stan\n"
             + "E - wejście | I ekwipunek | M mapa | J dziennik | T turnieje\n"
@@ -271,7 +272,7 @@ public partial class Hud : CanvasLayer
         if (rod.State is RodState.Waiting or RodState.Nibble or RodState.Bite)
             state += MethodLine(rod);
         else if (rod.State == RodState.Idle)
-            state += $"  ·  {rod.Method.Title()}";
+            state += $"  ·  {rod.Method.Title()}" + (rod.Method == FishingMethod.Float ? $", grunt {rod.FloatDepth:0.0} m ([ ])" : "");
         if (rod.State == RodState.Waiting && rod.World.TimeScale > 1f)
             state += "  ·  odpoczynek na zydlu";
         if (rod.State == RodState.Fight)
@@ -378,7 +379,9 @@ public partial class Hud : CanvasLayer
                 string baited = dots > 0 ? $"  ·  nęcone miejsce {new string('●', dots)}{new string('○', 3 - dots)}" : "";
                 return $"  ·  {rig}{baited}{rest}";
             default:
-                return $"  ·  {rod.CurrentDepth():0.0} m{rest}";
+                float water = rod.CurrentDepth();
+                string hang = rod.OverDepth ? "przegruntowany: przynęta leży na dnie" : $"przynęta {System.MathF.Max(water - rod.FloatDepth, 0f):0.0} m nad dnem";
+                return $"  ·  woda {water:0.0} m, grunt {rod.FloatDepth:0.0} m ({hang}){rest}";
         }
     }
 

@@ -73,6 +73,18 @@ rozmiar oraz ikonę w kramie. Ma to znaczenie w łowieniu:
 **Ściąganie zestawu (LPM):** spławik przeciąga się po wodzie, przez płyciznę aż do brzegu, a koszyczek po dnie (z
 Shiftem szybciej). Zestaw wychodzi z wody na brzegu albo pod szczytówką.
 
+**Grunt spławika i poziom żerowania:** klawisze `[` i `]` (z Shiftem co 0,5 m, albo Ctrl + kółko) ustawiają przed
+rzutem grunt, czyli głębokość, na której przynęta wisi pod spławikiem. Każdy gatunek żeruje na swoim poziomie: leszcz,
+lin, karp czy węgorz przy dnie, płoć i okoń w toni, ukleja, wzdręga i boleń pod powierzchnią. Przynęta na złym
+poziomie bierze dużo słabiej, w płytkiej wodzie różnica jest mniejsza. Spławik ustawiony głębiej niż woda leży płasko
+(„przegruntowany”): przynęta leży na dnie, ale zacięcia częściej chybiają. To samo dotyczy spinningu (liczy się
+głębokość, na której idzie przynęta) i gruntu (przynęta zawsze na dnie). Pasek stanu pokazuje głębokość wody, grunt
+i wysokość przynęty nad dnem, a mapa (M) liczy szanse brań dla ustawionego gruntu.
+
+**Brania jak u prawdziwych ryb:** leszcz, lin i karasie podnoszą przynętę z dna, więc spławik się wynurza i kładzie;
+karp, szczupak, sandacz czy węgorz odjeżdżają ze spławikiem w bok, zanim go zatopią; drobnica (ukleja, kiełb, płoć)
+szybko podskubuje; reszta klasycznie przytapia. Wiatr powoli znosi spławik, a napięta żyłka prowadzi go po łuku.
+
 **Grafika na laptopie:** przy pierwszym uruchomieniu na zintegrowanej grafice gra sama ustawia jakość Niską, bliski
 zasięg widzenia i 3D w 70% (FSR). Wszystko to można zmienić w menu pauzy. Na Niskiej nie ma też poświaty (bloom).
 
@@ -277,6 +289,7 @@ repozytorium, więc lepiej przebudowywać tylko zmienione gatunki. Opis całego 
 | F1 | konsola deweloperska: F2 natychmiastowe branie, F3 nieśmiertelna żyłka, F4 gatunek, F5 reset rzutu, F6 przynęty, F7 +3 godz., F8 pogoda, F9 reset postępu, F10 +1000 gr |
 | F11 | licznik wydajności (FPS, CPU, GPU, pamięć, najwolniejsze systemy) |
 | Z | wędka na podpórkę / podnieś (spławik, grunt) |
+| [ / ] | grunt spławika płycej / głębiej (Shift: co 0,5 m; także Ctrl + kółko) |
 | Shift + LPM | szybkie zwijanie (przynęta, spławik, koszyczek) |
 
 ## Świat
