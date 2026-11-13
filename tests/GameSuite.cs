@@ -376,7 +376,11 @@ public sealed class GameSuite : ITestSuite
         t.Check(!tools.Select(HandTool.Rod) && tools.Current == HandTool.LiftNet, "the net must come up before the rod is taken");
         tools.AddSoak(40f);
         t.Check(tools.Use() && tools.Lift == HandTools.LiftStage.Lifting, "the second click lifts it");
-        await t.Seconds(4.2);
+        await t.Seconds(1.6);
+        var fry = tools.FryInNet;
+        t.Check(tools.Lift == HandTools.LiftStage.Showing && fry.Shown == Math.Min(fry.Caught, FishingSim.Core.Camp.LiftNetting.MaxFish),
+            $"the catch flaps in the lifted net ({fry.Shown} of {fry.Caught}, net top at {tools.LiftNetTop.Y:0.00} m)");
+        await t.Seconds(2.6);
         t.Check(tools.Lift == HandTools.LiftStage.Up && !main.Player.Busy && tools.LastHaul != null
                 && (tools.LastHaul.Message.StartsWith("Podrywka") || tools.LastHaul.Message.StartsWith("Pusto"))
                 && profile.BaitCounts.GetValueOrDefault("livebait") == liveBefore + tools.LastHaul.Total

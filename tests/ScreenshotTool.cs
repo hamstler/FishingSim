@@ -614,6 +614,7 @@ public partial class ScreenshotTool : Node
                 if (arg == 1)
                 {
                     main.Tools.AddSoak(40f);
+                    main.Tools.NextLift = new FishingSim.Core.Camp.Haul(new Dictionary<string, int> { ["livebait"] = 4 }, "Podrywka: ukleja ×2, płotka ×1, kiełb ×1 → żywce ×4");
                     main.Tools.FreezeAt = 0.35f;
                     main.Tools.Use();
                     await WaitFor(FishingSim.Fishing.HandTools.LiftStage.Showing);
@@ -621,7 +622,7 @@ public partial class ScreenshotTool : Node
                         await NextFrame();
                 }
             }
-            GD.Print($"lift net at {stand} looking {look}: stage {main.Tools.Lift}, soak {main.Tools.Soak:0.0}, haul {main.Tools.LastHaul?.Message}");
+            GD.Print($"lift net at {stand} looking {look}: stage {main.Tools.Lift}, soak {main.Tools.Soak:0.0}, fry {main.Tools.FryInNet}, haul {main.Tools.LastHaul?.Message}");
         }
         else if (mode == 26)
         {

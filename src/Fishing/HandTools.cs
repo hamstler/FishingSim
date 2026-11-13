@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using FishingSim.Core;
 using FishingSim.Core.Camp;
@@ -105,6 +106,9 @@ public partial class HandTools : Node3D
 
     /// <summary>The lift net's soak so far (s), for the HUD.</summary>
     public float Soak => _soak;
+
+    /// <summary>How many small fish flap in the lifted net now, and how many the lift caught (tests).</summary>
+    public (int Shown, int Caught) FryInNet => (_fry.Count(f => f.Visible), _liftHaul?.Total ?? 0);
 
     /// <summary>Where the lift net's cord meets the pole's tip (the net hangs <see cref="CampProps.LiftDrop"/> below it).</summary>
     public Vector3 LiftNetTop => _liftNet.GlobalPosition;
@@ -402,6 +406,9 @@ public partial class HandTools : Node3D
         ["ukleja"] = "ukleja", ["płotka"] = "ploc", ["kiełb"] = "kielb", ["słonecznica"] = "slonecznica", ["okonek"] = "okon", ["wzdręga"] = "wzdrega",
     };
 
+    /// <summary>Screenshots: what the next lift brings instead of chance.</summary>
+    public Haul? NextLift { get; set; }
+
     /// <summary>Tests and screenshots: adds seconds to the lift net's soak.</summary>
     public void AddSoak(float seconds) => _soak += seconds;
 
@@ -465,8 +472,9 @@ public partial class HandTools : Node3D
     {
         var spot = _liftNet.GlobalPosition;
         float depth = MathF.Max(-_lake.HeightAt(spot.X, spot.Z), 0f);
-        _liftHaul = LiftNetting.Lift(new LiftContext(_soak, depth, _world.Hour, _world.Weather,
+        _liftHaul = NextLift ?? LiftNetting.Lift(new LiftContext(_soak, depth, _world.Hour, _world.Weather,
             Math.Clamp(_lake.Location.LilyDensity * 0.5f, 0f, 1f), _groundbait), _rng);
+        NextLift = null;
         Lift = LiftStage.Lifting;
         _liftT = 0f;
         _rod.Cue(Core.Audio.OneShot.Swish, 0.5f);
