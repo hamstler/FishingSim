@@ -770,41 +770,6 @@ public partial class FishModel : Node3D
     /// <summary>True once a detailed fish wears its high-resolution skin.</summary>
     public bool HasDetailedSkin => _skinUpgraded;
 
-    private List<StandardMaterial3D>? _underwater;
-    private Color _underwaterColor = new(-1, -1, -1, -1);
-
-    /// <summary>
-    /// Switches the fish to its under-the-surface look: tinted by the water and drawn after the (transparent, non
-    /// depth-writing) water surface, so it shows through it while the lake bottom and the pier still hide it.
-    /// <paramref name="clarity"/> 0..1 fades it out with depth.
-    /// </summary>
-    public void SetUnderwater(Color tint, float clarity)
-    {
-        if (_underwater == null)
-        {
-            _underwater = new List<StandardMaterial3D>();
-            foreach (var mi in FindChildren("*", nameof(MeshInstance3D), true, false).OfType<MeshInstance3D>())
-            {
-                if (mi.MaterialOverride is not StandardMaterial3D src)
-                    continue;
-                var m = (StandardMaterial3D)src.Duplicate();
-                m.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
-                m.RenderPriority = 1;
-                mi.MaterialOverride = m;
-                mi.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
-                _underwater.Add(m);
-            }
-        }
-        // Quantised: touching a material uploads it to the GPU, so only do it when the look really changes.
-        float a = MathF.Round((0.25f + Math.Clamp(clarity, 0f, 1f) * 0.7f) * 20f) / 20f;
-        var c = new Color(tint.R, tint.G, tint.B, a);
-        if (c == _underwaterColor)
-            return;
-        _underwaterColor = c;
-        foreach (var m in _underwater)
-            m.AlbedoColor = c;
-    }
-
     public override void _Process(double delta)
     {
         if (!Visible)

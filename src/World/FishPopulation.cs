@@ -46,8 +46,34 @@ public partial class FishPopulation : Node3D
     /// <summary>Fish deeper than this (m) are hidden by the water.</summary>
     public float VisibleDepth { get; set; } = BaseVisibleDepth;
 
-    /// <summary>Colour the water casts on fish below the surface (set per map).</summary>
-    public Color Tint { get; set; } = new(0.72f, 0.82f, 0.8f);
+    /// <summary>How clear the lake is (metres you can see into; per map), as the water shader uses it.</summary>
+    public float Clarity { get; set; } = 2.6f;
+
+    /// <summary>0..1: polarized glasses cut the surface glare (as in the water shader).</summary>
+    public float GlareCut { get; set; }
+
+    /// <summary>
+    /// How well the angler can see a fish through the surface (0..1), as the water shows it: the surface reflects more
+    /// the flatter you look across it (Fresnel; polarized glasses cut part of that) and that glare drowns out what
+    /// shows through; the water swallows the light along the path to the fish (deeper, further, murkier = less).
+    /// From the bank a shallow fish shows to about 12 m, from the higher pier further, with polarized glasses about
+    /// twice as far.
+    /// </summary>
+    public static float Sight(Vector3 eye, Vector3 fish, float waterY, float depth, float clarity, float glareCut)
+    {
+        float h = MathF.Max(eye.Y - waterY, 0.3f);
+        float across = new Vector2(fish.X - eye.X, fish.Z - eye.Z).Length();
+        float cosI = h / MathF.Sqrt(h * h + across * across);
+        float fresnel = (0.02f + 0.98f * MathF.Pow(1f - cosI, 5f)) * (1f - 0.6f * glareCut);
+        float sinT = MathF.Sqrt(MathF.Max(0f, 1f - cosI * cosI)) / 1.33f;
+        float cosT = MathF.Sqrt(MathF.Max(0f, 1f - sinT * sinT));
+        float path = MathF.Max(depth, 0f) / MathF.Max(cosT, 0.2f);
+        // What comes through, less the sky's glare on the surface that drowns it out.
+        return MathF.Max(0f, (1f - fresnel) * MathF.Exp(-path * 1.4f / MathF.Max(clarity, 0.3f)) - 0.5f * fresnel);
+    }
+
+    /// <summary>Below this much of it seen, a fish is not drawn at all.</summary>
+    public const float MinSight = 0.08f;
 
     public IReadOnlyList<FishAgent> Agents => _model.Agents;
 
@@ -107,7 +133,6 @@ public partial class FishPopulation : Node3D
                     var view = FishModel.Create(sp, weight);
                     view.Scale = Vector3.One * ViewScale;
                     view.Visible = false;
-                    view.SetUnderwater(Tint, 0.5f);
                     AddChild(view);
                     _views[agent.Id] = view;
                 }
@@ -170,7 +195,6 @@ public partial class FishPopulation : Node3D
         var view = FishModel.Create(sp, weight);
         view.Scale = Vector3.One * ViewScale;
         view.Visible = false;
-        view.SetUnderwater(Tint, 0.5f);          // prepare its see-through materials now, not when it first swims into view
         AddChild(view);
         _views[fresh.Id] = view;
     }
@@ -257,20 +281,24 @@ public partial class FishPopulation : Node3D
             RecycleFarSchools(new System.Numerics.Vector2(w.X, w.Z));
         }
 
+        // Only the fish the angler could really see are drawn: within reach, not too deep, and seen through the surface
+        // (steep views near the bank show them, flat views further out only reflect the sky).
+        var cam = GetViewport()?.GetCamera3D();
+        var eye = cam != null ? cam.GlobalPosition : w + Vector3.Up * 1.6f;
         foreach (var a in _model.Agents)
         {
             if (!_views.TryGetValue(a.Id, out var view))
                 continue;
             float dist = new Vector2(a.Position.X - w.X, a.Position.Y - w.Z).Length();
-            bool visible = dist < VisibleRange && a.Depth < VisibleDepth;
+            var at = new Vector3(a.Position.X, _waterY - a.Depth, a.Position.Y);
+            bool visible = dist < VisibleRange && a.Depth < VisibleDepth
+                           && Sight(eye, at, _waterY, a.Depth, Clarity, GlareCut) > MinSight;
             view.Visible = visible;
             if (!visible)
                 continue;
-            view.Position = new Vector3(a.Position.X, _waterY - a.Depth, a.Position.Y);
+            view.Position = at;
             view.Rotation = new Vector3(0f, a.Heading, 0f);
             view.Wiggle = 0.4f + MathF.Min(a.Speed, 2f);
-            float clarity = (1f - a.Depth / VisibleDepth) * (1f - 0.5f * MathF.Max(dist / VisibleRange - 0.6f, 0f) / 0.4f);
-            view.SetUnderwater(Tint, clarity);
         }
     }
 }

@@ -171,6 +171,13 @@ public sealed class FishAsset
                 continue;
             string name = (string?)node["name"] ?? "";
             bool normal = name.EndsWith("normal");
+            // Down to the graphics quality's texture size (Low 1024, Medium 2048): a quarter of the memory per halving.
+            int max = Graphics.TextureStore.MaxSize;
+            if (image.GetWidth() > max || image.GetHeight() > max)
+            {
+                float k = (float)max / Math.Max(image.GetWidth(), image.GetHeight());
+                image.Resize(Math.Max(1, (int)(image.GetWidth() * k)), Math.Max(1, (int)(image.GetHeight() * k)), Image.Interpolation.Cubic);
+            }
             image.GenerateMipmaps(renormalize: normal);
             // On the GPU a 4096-texel skin with its normal map takes ~90 MB as plain pixels and about a fifth of it block
             // compressed (BC1/BC3 for colours, BC5 for the normal map). Where the engine has no compressor (an export

@@ -4,8 +4,10 @@ using Godot;
 namespace FishingSim.World;
 
 /// <summary>
-/// Animated water surface. Shape and colour come from the lake's depth map; waves grow with the wind.
-/// <see cref="HeightAt"/> mirrors the shader's wave function so floating things ride the same waves.
+/// The lake's surface (shaders/water.gdshader): wind waves and ripples, the bottom and the fish seen through it with
+/// the water's absorption and refraction, the sky and the shore reflected by Fresnel (screen-space reflections on
+/// Medium and up), sun glints, shore foam, rain rings. <see cref="HeightAt"/> mirrors the shader's swells so floating
+/// things ride the same waves.
 /// </summary>
 public partial class Water : MeshInstance3D
 {
@@ -36,9 +38,21 @@ public partial class Water : MeshInstance3D
         _material.SetShaderParameter("foam_noise", Graphics.ProceduralTextures.Noise(53, 0.005f, 1024));
         MaterialOverride = _material;
         PushParameters();
+        ApplyQuality();
+        Graphics.GraphicsQuality.Changed += ApplyQuality;
     }
 
-    public float Amplitude => Mathf.Lerp(0.012f, 0.07f, Wind);
+    /// <summary>Screen-space reflection steps by the graphics quality (Low: the sky's reflection only).</summary>
+    private void ApplyQuality() => _material.SetShaderParameter("ssr_steps", Graphics.GraphicsQuality.Level switch
+    {
+        Graphics.QualityLevel.Low => 0,
+        Graphics.QualityLevel.Medium => 12,
+        Graphics.QualityLevel.High => 20,
+        _ => 32,
+    });
+
+    /// <summary>How high the swells run: a calm lake a centimetre or two, a windy one about ten.</summary>
+    public float Amplitude => Mathf.Lerp(0.015f, 0.1f, Wind);
 
     public float HeightAt(float x, float z)
     {
@@ -64,6 +78,7 @@ public partial class Water : MeshInstance3D
         RenderingServer.GlobalShaderParameterSet("water_time", _waveTime);
         RenderingServer.GlobalShaderParameterSet("water_amp", Amplitude);
         _material.SetShaderParameter("rain", Rain);
+        _material.SetShaderParameter("wind", Wind);
     }
 
     /// <summary>0..1: how much surface glare is removed (polarized glasses make fish easier to see).</summary>
@@ -113,5 +128,6 @@ public partial class Water : MeshInstance3D
     {
         if (_bed != null)
             _bed.Rebuilt -= BuildDepthMap;
+        Graphics.GraphicsQuality.Changed -= ApplyQuality;
     }
 }

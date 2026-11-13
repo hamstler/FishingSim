@@ -44,6 +44,9 @@ public partial class ScreenshotTool : Node
         if (asked is { Length: 2 } && int.TryParse(asked[0], out int shotW) && int.TryParse(asked[1], out int shotH))
             size = new Vector2I(shotW, shotH);
         GetWindow().Size = size;
+        // FISHSIM_QUALITY=0..3 picks the graphics quality (Niska..Ultra) for this run.
+        if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_QUALITY"), out int qualitySetting))
+            FishingSim.Graphics.GraphicsQuality.Set((FishingSim.Graphics.QualityLevel)Math.Clamp(qualitySetting, 0, 3));
         // FISHSIM_VIEW=0..3 picks the view distance (Bliski..Bardzo daleki) for this run.
         if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_VIEW"), out int viewSetting))
             FishingSim.Graphics.GraphicsQuality.SetView((FishingSim.Graphics.ViewDistance)Math.Clamp(viewSetting, 0, 3));
@@ -520,6 +523,45 @@ public partial class ScreenshotTool : Node
                 System.Globalization.CultureInfo.InvariantCulture, out double w) ? w : 0.85;
             await ToSignal(GetTree().CreateTimer(at), SceneTreeTimer.SignalName.Timeout);
             GD.Print($"tools: {main.Tools.Current} at {stand} ground {lake.GroundKindAt(stand.X, stand.Z)} haul {main.Tools.LastHaul?.Message}");
+        }
+        else if (mode == 32)
+        {
+            // Memory soak: the angler is moved round the lake (a new spot every 10 frames) and the memory is printed every
+            // 40 frames: the process's resident memory, the .NET heap, Godot's static memory, objects, nodes, resources,
+            // orphan nodes and the GPU's memory. A leak shows as a steady climb.
+            var lake = main.Rod.Lake;
+            var rnd = new RandomNumberGenerator { Seed = 5 };
+            int soak = int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_SOAK_FRAMES"), out int sf) ? sf : 400;
+            for (int i = 0; i <= soak; i++)
+            {
+                if (i % 10 == 0)
+                {
+                    for (int k = 0; k < 40; k++)
+                    {
+                        float x = rnd.RandfRange(FishingSim.World.LakeBed.XMin + 20f, FishingSim.World.LakeBed.XMax - 20f);
+                        float z = rnd.RandfRange(FishingSim.World.LakeBed.ZMin + 20f, FishingSim.World.LakeBed.ZMax - 20f);
+                        float h = lake.HeightAt(x, z);
+                        if (h > 0.2f && lake.IsWalkable(x, z))
+                        {
+                            main.Player.GlobalPosition = new Vector3(x, h + 0.2f, z);
+                            main.Player.Rotation = new Vector3(0f, rnd.Randf() * Mathf.Tau, 0f);
+                            break;
+                        }
+                    }
+                }
+                await NextFrame();
+                if (i % 40 == 0)
+                {
+                    long rss = 0;
+                    foreach (var line in System.IO.File.ReadAllLines("/proc/self/status"))
+                        if (line.StartsWith("VmRSS:"))
+                            rss = long.Parse(line.Split(' ', StringSplitOptions.RemoveEmptyEntries)[1]) / 1024;
+                    GD.Print($"MEM frame={i} rss={rss}MB gc={GC.GetTotalMemory(false) / 1048576}MB static={OS.GetStaticMemoryUsage() / 1048576}MB " +
+                             $"objects={Performance.GetMonitor(Performance.Monitor.ObjectCount):0} nodes={Performance.GetMonitor(Performance.Monitor.ObjectNodeCount):0} " +
+                             $"resources={Performance.GetMonitor(Performance.Monitor.ObjectResourceCount):0} orphans={Performance.GetMonitor(Performance.Monitor.ObjectOrphanNodeCount):0} " +
+                             $"vram={Performance.GetMonitor(Performance.Monitor.RenderVideoMemUsed) / 1048576:0}MB gen0={GC.CollectionCount(0)} gen2={GC.CollectionCount(2)}");
+                }
+            }
         }
         else if (mode == 31)
         {

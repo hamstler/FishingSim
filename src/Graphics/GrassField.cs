@@ -145,18 +145,39 @@ public partial class GrassField : Node3D
             }
             yield return true;
         }
+        // One buffer for all the clumps (12 floats of transform and 4 of colour each), filled in a reused array: ten
+        // thousand single calls into the engine made a hitch at every rebuild. The capacity is rounded up (only the
+        // first n are drawn) so the same array serves rebuild after rebuild.
+        int n = transforms.Count;
+        int capacity = Math.Max(2048, (n + 2047) / 2048 * 2048);
+        if (_buffer.Length != capacity * 16)
+            _buffer = new float[capacity * 16];
         var mm = new MultiMesh
         {
             TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
             UseColors = true,
             Mesh = TreeFactory.MeadowClump(),
-            InstanceCount = transforms.Count,
+            InstanceCount = capacity,
+            VisibleInstanceCount = n,
         };
-        for (int i = 0; i < transforms.Count; i++)
+        for (int i = 0; i < n; i++)
         {
-            mm.SetInstanceTransform(i, transforms[i]);
-            mm.SetInstanceColor(i, colors[i]);
+            var t = transforms[i];
+            var b = t.Basis;
+            int o = i * 16;
+            _buffer[o] = b.X.X; _buffer[o + 1] = b.Y.X; _buffer[o + 2] = b.Z.X; _buffer[o + 3] = t.Origin.X;
+            _buffer[o + 4] = b.X.Y; _buffer[o + 5] = b.Y.Y; _buffer[o + 6] = b.Z.Y; _buffer[o + 7] = t.Origin.Y;
+            _buffer[o + 8] = b.X.Z; _buffer[o + 9] = b.Y.Z; _buffer[o + 10] = b.Z.Z; _buffer[o + 11] = t.Origin.Z;
+            var c = colors[i];
+            _buffer[o + 12] = c.R; _buffer[o + 13] = c.G; _buffer[o + 14] = c.B; _buffer[o + 15] = c.A;
         }
+        mm.Buffer = _buffer;
+        // The old field is let go at once: left to the garbage collector its GPU buffer would linger, one more for
+        // every few steps the angler takes.
+        var old = _instance.Multimesh;
         _instance.Multimesh = mm;
+        old?.Dispose();
     }
+
+    private float[] _buffer = System.Array.Empty<float>();
 }

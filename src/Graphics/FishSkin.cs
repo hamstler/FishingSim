@@ -31,7 +31,12 @@ public static class FishSkin
     public const int LightWidth = 512, LightHeight = 256;
 
     /// <summary>Size of the detailed skin for the current quality preset.</summary>
-    public static Vector2I DetailedSize => GraphicsQuality.Level >= QualityLevel.High ? new Vector2I(4096, 2048) : new Vector2I(2048, 1024);
+    public static Vector2I DetailedSize => GraphicsQuality.Level switch
+    {
+        >= QualityLevel.High => new Vector2I(4096, 2048),
+        QualityLevel.Medium => new Vector2I(2048, 1024),
+        _ => new Vector2I(1024, 512),
+    };
 
     private static readonly Dictionary<string, ImageTexture> Light = new();
     private static readonly Dictionary<string, (ImageTexture Albedo, ImageTexture Normal)> Detailed = new();
