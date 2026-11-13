@@ -7,9 +7,9 @@ using FishingSim.World;
 namespace FishingSim.UI;
 
 /// <summary>
-/// The top-right corner of the HUD: one round dial like a brass-rimmed compass. In the middle a round map (120 m
-/// across, centred on the angler and turned with him, so ahead is always up) with the village, landmarks, pier, float
-/// and the angler's arrow; buildings beyond its edge sit on the rim, so you know which way they lie. The bezel of dark
+/// The top-right corner of the HUD: one round dial like a brass-rimmed compass. In the middle a round topographic map
+/// (120 m across, centred on the angler and turned with him, so ahead is always up; no markers): the land shaded by
+/// its relief with contour lines, the lake with its depth contours, the shore, the float and the angler's arrow. The bezel of dark
 /// wood carries the compass letters (turning with the map). Round it the ring of the day: gold by day, blue by night,
 /// noon at the top, with the sun or the moon riding on it at the hour. A medallion on the lower left shows the weather
 /// (sun, moon and stars, clouds, rain) and the wind. Under the dial a plaque: the time, how long until dusk or dawn,
@@ -59,16 +59,28 @@ public partial class Minimap : Control
         MouseFilter = MouseFilterEnum.Ignore;
     }
 
-    /// <summary>The terrain picture covers the whole playable area once; the view slides over it.</summary>
+    private System.Threading.Tasks.Task<Image>? _painting;
+
+    /// <summary>The topographic picture covers the whole playable area once (painted in the background when a map
+    /// opens); the view slides over it.</summary>
     private void EnsureTerrain()
     {
         var loc = _rod.Lake.Location;
-        if (_renderedFor == loc && _terrain != null)
-            return;
-        _renderedFor = loc;
-        _area = new Rect2(LakeBed.XMin, LakeBed.ZMin, LakeBed.XMax - LakeBed.XMin, LakeBed.ZMax - LakeBed.ZMin);
-        int w = (int)(_area.Size.X * TexturePerMetre), h = (int)(_area.Size.Y * TexturePerMetre);
-        _terrain = MapPreview.Render(loc, w, h, _area);
+        if (_renderedFor != loc)
+        {
+            _renderedFor = loc;
+            _terrain = null;
+            _area = new Rect2(LakeBed.XMin, LakeBed.ZMin, LakeBed.XMax - LakeBed.XMin, LakeBed.ZMax - LakeBed.ZMin);
+            int w = (int)(_area.Size.X * TexturePerMetre), h = (int)(_area.Size.Y * TexturePerMetre);
+            var area = _area;
+            _painting = System.Threading.Tasks.Task.Run(() => MapPreview.RenderTopo(loc, w, h, area));
+        }
+        if (_terrain == null && _painting is { IsCompleted: true } done)
+        {
+            if (!done.IsFaulted)
+                _terrain = ImageTexture.CreateFromImage(done.Result);
+            _painting = null;
+        }
     }
 
     private float _redraw;
@@ -148,8 +160,8 @@ public partial class Minimap : Control
         DrawPlaque(new Vector2(0f, c.Y + DayRingRadius + 8f), font);
     }
 
-    /// <summary>The round map: the terrain picture turned and cut to the circle, the pier, the markers (those beyond the
-    /// edge sit on it), the float and its line, the angler's arrow (always up), and a soft shade round the edge.</summary>
+    /// <summary>The round map: the topographic picture turned and cut to the circle, the float and its line, the
+    /// angler's arrow (always up), and a soft shade round the edge.</summary>
     private void DrawMap(Vector2 c, Font font)
     {
         DrawCircle(c, MapRadius, new Color(0.16f, 0.22f, 0.12f));
@@ -173,25 +185,6 @@ public partial class Minimap : Control
                 colours[i] = new Color(1f, 1f, 1f, 0.97f);
             }
             DrawPolygon(points, colours, uvs, _terrain);
-        }
-
-        // Pier.
-        var pierA = OnDial(new Vector2(0f, LakeBed.PierEndZ));
-        var pierB = OnDial(new Vector2(0f, 6f));
-        if (pierA.DistanceTo(c) < MapRadius && pierB.DistanceTo(c) < MapRadius)
-            DrawLine(pierA, pierB, new Color(0.62f, 0.44f, 0.26f), 3f, true);
-
-        // Buildings and landmarks; those beyond the edge sit on it, smaller.
-        foreach (var marker in _scenery.Markers)
-        {
-            var p = OnDial(marker.Position);
-            var d = p - c;
-            bool inside = d.Length() < MapRadius - 5f;
-            if (!inside)
-                p = c + d.Normalized() * (MapRadius - 4f);
-            float r = inside ? 4f : 2.6f;
-            DrawCircle(p, r + 1.2f, new Color(0.05f, 0.03f, 0.02f, inside ? 0.85f : 0.6f));
-            DrawCircle(p, r, inside ? marker.Color : new Color(marker.Color, 0.75f));
         }
 
         // Float and line.

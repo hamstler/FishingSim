@@ -75,8 +75,9 @@ osi w świetle studyjnego reflektora (wjeżdża z lekkim obrotem i porusza płet
 doświadczenie i rekord, stan siatki, ostrzeżenie o wymiarze ochronnym albo pełnej siatce oraz wybór: do siatki (E) albo
 do wody (R).
 
-**Tarcza w prawym górnym rogu:** okrągła mapa okolicy obraca się razem z wędkarzem (przed nim jest zawsze góra), budynki
-spoza zasięgu widać na jej krawędzi, a litery kompasu kręcą się na drewnianej obręczy. Wokół biegnie pierścień doby
+**Tarcza w prawym górnym rogu:** okrągła mapa topograficzna obraca się razem z wędkarzem (przed nim jest zawsze góra):
+cieniowana rzeźba terenu z poziomicami co 2 m, a na jeziorze linie głębokości co metr (widać spady, górki i dołki),
+bez znaczników; litery kompasu kręcą się na drewnianej obręczy. Wokół biegnie pierścień doby
 (złoty dzień, niebieska noc) ze słońcem albo księżycem na aktualnej godzinie; medalion pokazuje pogodę i siłę wiatru,
 a tabliczka pod spodem godzinę, czas do zmroku lub świtu, pogodę i nazwę łowiska (okrągła tarcza zastąpiła kwadratową
 minimapę).
