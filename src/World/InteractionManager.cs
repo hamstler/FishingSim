@@ -25,10 +25,24 @@ public partial class InteractionManager : Node
     }
 
     /// <summary>The nearest interactable whose radius contains the point, or null.</summary>
-    public static Interactable? Nearest(System.Collections.Generic.IEnumerable<Interactable> spots, Vector3 position) =>
-        spots.Where(s => GodotObject.IsInstanceValid(s) && s.Active && s.DistanceTo(position) <= s.Radius)
-             .OrderBy(s => s.DistanceTo(position))
-             .FirstOrDefault();
+    public static Interactable? Nearest(System.Collections.Generic.IEnumerable<Interactable> spots, Vector3 position)
+    {
+        // A plain loop: this runs every frame over a hundred spots, and LINQ would allocate each time.
+        Interactable? best = null;
+        float bestD = float.MaxValue;
+        foreach (var s in spots)
+        {
+            if (!GodotObject.IsInstanceValid(s) || !s.Active)
+                continue;
+            float d = s.DistanceTo(position);
+            if (d <= s.Radius && d < bestD)
+            {
+                best = s;
+                bestD = d;
+            }
+        }
+        return best;
+    }
 
     public override void _Process(double delta)
     {

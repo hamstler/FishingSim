@@ -428,7 +428,15 @@ public partial class FishingRod : Node3D
             case RodState.Broken: TickResult(); break;
         }
         TickNet(dt);
-        UpdateBend(dt);
+    }
+
+    /// <summary>The blank's bend and the line are drawn every rendered frame (the tip moves with the camera each frame;
+    /// drawn only on physics ticks the line would judder on screens faster than the tick).</summary>
+    public override void _Process(double delta)
+    {
+        if (_bobber == null)
+            return;
+        UpdateBend(Math.Min((float)delta, 0.05f));
         UpdateLine();
     }
 

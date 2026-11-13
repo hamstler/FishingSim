@@ -51,10 +51,17 @@ public partial class Minimap : Control
         _terrain = MapPreview.Render(loc, w, h, _area);
     }
 
+    private float _redraw;
+
+    /// <summary>Redrawn 15 times a second: plenty for a map, a fraction of the drawing work.</summary>
     public override void _Process(double delta)
     {
         if (_rod == null)
             return;
+        _redraw -= (float)delta;
+        if (_redraw > 0f)
+            return;
+        _redraw = 1f / 15f;
         QueueRedraw();
     }
 

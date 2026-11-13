@@ -236,12 +236,16 @@ public partial class FishPopulation : Node3D
     /// <summary>Schools further than this from the angler are moved closer (out of sight).</summary>
     public const float RecycleDistance = 60f;
 
-    public override void _PhysicsProcess(double delta)
+    /// <summary>
+    /// The schools swim and their fish are placed once per rendered frame (not on physics ticks: they move smoothly at
+    /// any frame rate, and a slow frame is not made slower by catching up several ticks of fish).
+    /// </summary>
+    public override void _Process(double delta)
     {
         using var perfScope = Graphics.Perf.Scope("fish");
         if (_watcher == null || !IsInstanceValid(_watcher))
             return;
-        float dt = (float)delta;
+        float dt = MathF.Min((float)delta, 0.05f);
         var w = _watcher.GlobalPosition;
         float speed = dt > 0f ? new Vector2(w.X - _lastWatcher.X, w.Z - _lastWatcher.Z).Length() / dt : 0f;
         _lastWatcher = w;

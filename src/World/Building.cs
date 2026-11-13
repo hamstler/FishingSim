@@ -42,8 +42,18 @@ public partial class Building : Node3D
     }
 
     private float _night;
-    private float _time;
+    private float _time, _farCheck;
+    private bool _near = true;
     private readonly float _phase = GD.Randf() * 100f;
+
+    /// <summary>Flames flicker only this close to the camera (further off nobody sees it).</summary>
+    private const float FlickerRange = 70f;
+
+    public override void _Ready()
+    {
+        // Most buildings have nothing that moves or glows: they take no time each frame at all.
+        SetProcess(_spinners.Count > 0 || _glow.Count > 0 || _lights.Count > 0);
+    }
 
     public override void _Process(double delta)
     {
@@ -51,6 +61,15 @@ public partial class Building : Node3D
         foreach (var s in _spinners)
             s.RotateZ((float)delta * 0.5f);
         if (_night <= 0.02f)
+            return;
+        _farCheck -= (float)delta;
+        if (_farCheck <= 0f)
+        {
+            _farCheck = 0.5f + _phase % 0.3f;
+            var cam = GetViewport()?.GetCamera3D();
+            _near = cam == null || cam.GlobalPosition.DistanceSquaredTo(GlobalPosition) < FlickerRange * FlickerRange;
+        }
+        if (!_near)
             return;
         // Candle and lantern flames flicker.
         _time += (float)delta;

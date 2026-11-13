@@ -5,6 +5,9 @@ namespace FishingSim.Graphics;
 
 public enum QualityLevel { Low, Medium, High, Ultra }
 
+/// <summary>How far the world is drawn in detail (a separate choice from the effects' quality).</summary>
+public enum ViewDistance { Short, Medium, Long, Extreme }
+
 /// <summary>
 /// Graphics presets: post-processing (SSAO, SSIL, SSR, SDFGI, volumetric fog, bloom), anti-aliasing, shadow range and
 /// grass density. Chosen in the pause menu and remembered in user://graphics.cfg. Effects the Compatibility renderer
@@ -15,6 +18,7 @@ public static class GraphicsQuality
     private const string ConfigPath = "user://graphics.cfg";
     private static bool _loaded;
     private static QualityLevel _level = QualityLevel.High;
+    private static ViewDistance _view = ViewDistance.Long;
 
     public static event Action? Changed;
 
@@ -46,12 +50,61 @@ public static class GraphicsQuality
 
     public static void Cycle() => Set((QualityLevel)(((int)Level + 1) % 4));
 
+    public static ViewDistance View
+    {
+        get
+        {
+            if (!_loaded)
+                Load();
+            return _view;
+        }
+    }
+
+    public static string ViewTitle(ViewDistance v) => v switch
+    {
+        ViewDistance.Short => "Bliski",
+        ViewDistance.Medium => "Średni",
+        ViewDistance.Long => "Daleki",
+        _ => "Bardzo daleki",
+    };
+
+    public static void SetView(ViewDistance v)
+    {
+        if (!_loaded)
+            Load();
+        _view = v;
+        SaveConfig();
+        Changed?.Invoke();
+    }
+
+    public static void CycleView() => SetView((ViewDistance)(((int)View + 1) % 4));
+
+    /// <summary>How far (m) the distant forest is drawn; 0 = all the way to the horizon.</summary>
+    public static float ViewRange => View switch
+    {
+        ViewDistance.Short => 320f,
+        ViewDistance.Medium => 520f,
+        ViewDistance.Long => 850f,
+        _ => 0f,
+    };
+
+    /// <summary>How far the near detail reaches, as a share of its normal range: detailed trees, plants, buildings and
+    /// props, villagers (drawn and animated), sun shadows, lamp light.</summary>
+    public static float ViewFactor => View switch
+    {
+        ViewDistance.Short => 0.6f,
+        ViewDistance.Medium => 0.8f,
+        ViewDistance.Long => 1f,
+        _ => 1.3f,
+    };
+
     private static void SaveConfig()
     {
-        if (Renderer.IsHeadless)
+        if (Renderer.IsHeadless || OS.HasEnvironment("FISHSIM_NO_SAVE"))
             return;
         var cfg = new ConfigFile();
         cfg.SetValue("graphics", "quality", (int)_level);
+        cfg.SetValue("graphics", "view", (int)_view);
         cfg.Save(ConfigPath);
     }
 
@@ -62,6 +115,7 @@ public static class GraphicsQuality
         if (cfg.Load(ConfigPath) != Error.Ok)
             return;
         _level = (QualityLevel)Math.Clamp(cfg.GetValue("graphics", "quality", (int)QualityLevel.High).AsInt32(), 0, 3);
+        _view = (ViewDistance)Math.Clamp(cfg.GetValue("graphics", "view", (int)ViewDistance.Long).AsInt32(), 0, 3);
     }
 
     /// <summary>Radius (m) of the dense grass around the player; 0 = no grass blades.</summary>
@@ -71,7 +125,7 @@ public static class GraphicsQuality
         QualityLevel.Medium => 18f,
         QualityLevel.High => 28f,
         _ => 40f,
-    };
+    } * Math.Clamp(ViewFactor, 0.75f, 1.2f);
 
     /// <summary>How far the scattered plants (grass tufts, flowers, ferns, reeds, lilies) are drawn, as a share of their full range.</summary>
     public static float FoliageRange => Level switch
@@ -171,7 +225,7 @@ public static class GraphicsQuality
             QualityLevel.Medium => 80f,
             QualityLevel.High => 120f,
             _ => 200f,
-        };
+        } * Math.Clamp(ViewFactor, 0.7f, 1.2f);
         sun.ShadowBlur = 1.2f;
         sun.ShadowNormalBias = 1.2f;
         sun.LightAngularDistance = q >= QualityLevel.Ultra ? 0.5f : 0f;   // contact-hardening shadows on Ultra
