@@ -184,7 +184,7 @@ public static class CampProps
 
     // ------------------------------------------------------------------ lift net (podrywka)
     /// <summary>Where the hands hold the lift net's pole (its own space: butt at the origin, pole up +Y).</summary>
-    public static readonly Vector3 LiftButtGrip = new(0f, 0.14f, 0f), LiftPoleGrip = new(0f, 0.78f, 0f);
+    public static readonly Vector3 LiftButtGrip = new(0f, 0.14f, 0f), LiftPoleGrip = new(0f, 0.46f, 0f);
 
     /// <summary>Pole length, the cord from its tip to the hoops' crossing, half the net's side, how far the hoops
     /// arch above the corners and how deep the netting sags below them (m).</summary>

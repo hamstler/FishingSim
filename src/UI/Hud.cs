@@ -274,6 +274,8 @@ public partial class Hud : CanvasLayer
         _power.Value = rod.CastPower * 100f;
 
         SetText(_drag, $"Hamulec {Mathf.RoundToInt(rod.DragSetting * 100f)}%");
+        // The drag belongs to the rod: not shown with a tool in hand.
+        _drag.Visible = !rod.Holstered;
         SetText(_banner, rod.BannerTime > 0f ? rod.BannerText : _banner.Text);
         // While the catch panel is open it says it all.
         Fade(_banner, rod.BannerTime > 0f && !_catchPanel.Visible, dt);
