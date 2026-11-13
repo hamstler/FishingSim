@@ -104,7 +104,7 @@ public partial class CardPanel : Control
         }
         Build();
         // The body scrolls when it is taller than about half the screen.
-        _scroll.CustomMinimumSize = new Vector2(0f, MathF.Min(GetViewportRect().Size.Y * 0.56f, MathF.Max(Body.GetCombinedMinimumSize().Y, 60f)));
+        _scroll.CustomMinimumSize = new Vector2(0f, MathF.Min(GetViewportRect().Size.Y - 270f, MathF.Max(Body.GetCombinedMinimumSize().Y, 60f)));
     }
 
     protected virtual void Build()
@@ -172,6 +172,7 @@ public partial class SmokehousePanel : CardPanel
 {
     private readonly HashSet<int> _selected = new();
     private float _refresh;
+    private int _shownReady;
 
     public void Open()
     {
@@ -229,14 +230,55 @@ public partial class SmokehousePanel : CardPanel
         var p = Rod.Profile;
         TitleLabel.Text = "Wędzarnia";
         int ready = p.SmokeryReady, hanging = p.Smokery.Count - ready;
+        _shownReady = ready;
         float next = p.Smokery.Where(l => Smoking.HoursLeft(l.StartedAt, p.Clock) > 0f).Select(l => Smoking.HoursLeft(l.StartedAt, p.Clock)).DefaultIfEmpty(0f).Min();
         State.Text = p.Smokery.Count == 0
             ? $"Wędzarz uwędzi ryby z siatki nad olchowym dymem w {Smoking.Hours:0} h gry. Wędzona ryba nie traci świeżości, a wędzarz płaci za nią sporo więcej niż skup."
             : (hanging > 0 ? $"W dymie: {hanging} (najbliższe gotowe za {next:0.0} h). " : "") + (ready > 0 ? $"Gotowe do odbioru: {ready}." : "");
 
+        // What hangs in the smoke and the smoked fish first; the keepnet's (maybe long) list last.
+        if (p.Smokery.Count > 0)
+        {
+            Body.AddChild(Heading("W dymie"));
+            foreach (var lot in p.Smokery)
+            {
+                float left = Smoking.HoursLeft(lot.StartedAt, p.Clock);
+                Body.AddChild(Text($"{lot.Fish.Species} {lot.Fish.Weight:0.00} kg: " + (left > 0f ? $"jeszcze {left:0.0} h" : "gotowa"), 15, alpha: 0.85f));
+            }
+            if (ready > 0)
+            {
+                var take = new Button { Text = $"Odbierz gotowe ({ready})", CustomMinimumSize = new Vector2(260, 40), SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
+                UITheme.Primary(take);
+                take.Pressed += () => Collect();
+                Body.AddChild(take);
+            }
+        }
+        if (p.Smoked.Count > 0)
+        {
+            Body.AddChild(Heading($"Wędzonki ({p.Smoked.Count})"));
+            var (row, text, line) = Row(Graphics.Icons.Picking("smoked"));
+            text.AddChild(Text(string.Join(", ", p.Smoked.GroupBy(f => f.Species).Select(g => $"{g.Key} ×{g.Count()}")), 16));
+            text.AddChild(Text($"Wędzarz da za wszystkie {Lore.Money(p.SmokedValue)}; można je też oddać na ogłoszenie.", 14, alpha: 0.85f));
+            var sell = new Button { Text = $"Sprzedaj za {Lore.Money(p.SmokedValue)}", CustomMinimumSize = new Vector2(200, 44), SizeFlagsVertical = SizeFlags.ShrinkCenter };
+            UITheme.Primary(sell);
+            sell.Pressed += () => SellSmoked();
+            line.AddChild(sell);
+            Body.AddChild(row);
+        }
+
         Body.AddChild(Heading("Ryby z siatki"));
+        float kg = _selected.Where(i => i < p.Keepnet.Count).Sum(i => p.Keepnet[i].Weight);
+        var smoke = new Button
+        {
+            Text = _selected.Count > 0 ? $"Do wędzarni: {_selected.Count} (drewno {Lore.Money(Smoking.Fee(kg))})" : "Zaznacz ryby do wędzenia",
+            CustomMinimumSize = new Vector2(320, 44), SizeFlagsHorizontal = SizeFlags.ShrinkCenter, Disabled = _selected.Count == 0,
+        };
+        UITheme.Primary(smoke);
+        smoke.Pressed += () => SmokeSelected();
         if (p.Keepnet.Count == 0)
             Body.AddChild(Text("Siatka jest pusta: najpierw coś złów.", 15, alpha: 0.75f));
+        else
+            Body.AddChild(smoke);
         for (int i = 0; i < p.Keepnet.Count; i++)
         {
             var f = p.Keepnet[i];
@@ -262,43 +304,6 @@ public partial class SmokehousePanel : CardPanel
             }
             Body.AddChild(row);
         }
-        float kg = _selected.Where(i => i < p.Keepnet.Count).Sum(i => p.Keepnet[i].Weight);
-        var smoke = new Button
-        {
-            Text = _selected.Count > 0 ? $"Do wędzarni: {_selected.Count} (drewno {Lore.Money(Smoking.Fee(kg))})" : "Zaznacz ryby do wędzenia",
-            CustomMinimumSize = new Vector2(320, 44), SizeFlagsHorizontal = SizeFlags.ShrinkCenter, Disabled = _selected.Count == 0,
-        };
-        UITheme.Primary(smoke);
-        smoke.Pressed += () => SmokeSelected();
-        Body.AddChild(smoke);
-
-        if (p.Smokery.Count > 0)
-        {
-            Body.AddChild(Heading("W dymie"));
-            foreach (var lot in p.Smokery)
-            {
-                float left = Smoking.HoursLeft(lot.StartedAt, p.Clock);
-                Body.AddChild(Text($"{lot.Fish.Species} {lot.Fish.Weight:0.00} kg: " + (left > 0f ? $"jeszcze {left:0.0} h" : "gotowa"), 15, alpha: 0.85f));
-            }
-            var take = new Button { Text = $"Odbierz gotowe ({ready})", CustomMinimumSize = new Vector2(260, 40), SizeFlagsHorizontal = SizeFlags.ShrinkCenter, Disabled = ready == 0 };
-            take.Pressed += () => Collect();
-            Body.AddChild(take);
-        }
-
-        Body.AddChild(Heading($"Wędzonki ({p.Smoked.Count})"));
-        if (p.Smoked.Count == 0)
-            Body.AddChild(Text("Brak: uwędzone ryby trafią tutaj. Można je sprzedać albo oddać na ogłoszenie.", 15, alpha: 0.75f));
-        else
-        {
-            var (row, text, _) = Row(Graphics.Icons.Picking("smoked"));
-            text.AddChild(Text(string.Join(", ", p.Smoked.GroupBy(f => f.Species).Select(g => $"{g.Key} ×{g.Count()}")), 16));
-            text.AddChild(Text($"Wędzarz da za wszystkie {Lore.Money(p.SmokedValue)}.", 14, alpha: 0.85f));
-            Body.AddChild(row);
-            var sell = new Button { Text = $"Sprzedaj za {Lore.Money(p.SmokedValue)}", CustomMinimumSize = new Vector2(260, 44), SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
-            UITheme.Primary(sell);
-            sell.Pressed += () => SellSmoked();
-            Body.AddChild(sell);
-        }
         Footer.Text = $"Sakiewka: {Lore.Money(p.Money)}   ·   w siatce: {FishCount(p.Keepnet.Count)}";
     }
 
@@ -306,11 +311,13 @@ public partial class SmokehousePanel : CardPanel
     {
         if (!Visible || Rod.Profile.Smokery.Count == 0)
             return;
+        // Rebuilt only when a batch is done (a rebuild would lose the list's scroll position).
         _refresh -= (float)delta;
         if (_refresh <= 0f)
         {
-            _refresh = 2f;
-            Refresh();
+            _refresh = 1f;
+            if (Rod.Profile.SmokeryReady != _shownReady)
+                Refresh();
         }
     }
 }
