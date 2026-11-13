@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 using Godot;
 using FishingSim.Core;
@@ -198,7 +199,8 @@ public partial class Hud : CanvasLayer
         _drag = Text(17, Ink, HorizontalAlignment.Right);
         PlaceDrag(false);
         _purse = Text(15, new Color(Ink, 0.9f), HorizontalAlignment.Right);
-        Anchor(_purse, 1f, 1f, -460, -66, -16, -40);
+        Anchor(_purse, 1f, 1f, -560, -92, -16, -40);
+        _purse.VerticalAlignment = VerticalAlignment.Bottom;
         _tackle = Text(14, new Color(Ink, 0.85f));
         Anchor(_tackle, 0f, 1f, 16, -100, 520, -14);
 
@@ -280,6 +282,10 @@ public partial class Hud : CanvasLayer
         var pr = rod.Profile;
         string limit = pr.KeepnetLimit is { } net ? $"/{net.MaxFish}" : "";
         string purse = $"{Lore.Money(pr.Money)}  ·  siatka {pr.Keepnet.Count}{limit}  ·  poziom {pr.Level}";
+        // The pantry and the smoked fish, when there are any.
+        string pantry = Core.Camp.Foraging.Describe(pr.Pantry);
+        if (pantry.Length > 0 || pr.Smoked.Count > 0)
+            purse += "\n" + string.Join("  ·  ", new[] { pantry, pr.Smoked.Count > 0 ? $"wędzonki ×{pr.Smoked.Count}" : "" }.Where(x => x.Length > 0));
         if (purse != _lastPurse)
         {
             if (_lastPurse != "")

@@ -89,7 +89,7 @@ public partial class HandTools : Node3D
     // Lift net: seconds of each stage, the pole's pitch (radians above the horizon) carried, held up to show the catch,
     // and the lowest it goes (from a high pier the net hangs higher).
     private const float LowerSeconds = 1.5f, LiftSeconds = 1.1f, ShowSeconds = 2.4f, ShowHold = 1.7f;
-    private const float PitchUp = 0.87f, PitchShow = 0.3f, PitchLowest = -0.75f;
+    private const float PitchUp = 1.15f, PitchShow = 0.3f, PitchLowest = -0.75f;
 
     /// <summary>The body bends towards the water while the lift net is down (and the head with it).</summary>
     private static readonly Vector3 LiftLean = new(0f, -0.22f, -0.28f);
@@ -542,7 +542,8 @@ public partial class HandTools : Node3D
         // The pole: the butt in the hands, pitched down to the water or up to carry.
         float pitch = LiftPitch();
         float k = Math.Clamp((PitchUp - pitch) / (PitchUp + 0.35f), 0f, 1f);
-        var dir = new Vector3(-0.04f, MathF.Sin(pitch), -MathF.Cos(pitch)).Normalized();
+        // Carried, the pole leans up to the right so the net hangs out of the way; lowered, it points ahead.
+        var dir = new Vector3(Mathf.Lerp(0.3f, -0.04f, Smooth(k)), MathF.Sin(pitch), -MathF.Cos(pitch)).Normalized();
         var x = dir.Cross(Vector3.Up).Normalized();
         _liftPole.Transform = new Transform3D(new Basis(x, dir, x.Cross(dir)), ButtUp.Lerp(ButtDown, Smooth(k)));
 
