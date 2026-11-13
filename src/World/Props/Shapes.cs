@@ -120,4 +120,30 @@ public static class Shapes
             }
         }
     }
+
+    /// <summary>A round tube along a polyline.</summary>
+    public static ArrayMesh Tube(IReadOnlyList<Vector3> points, float radius, int sides = 6)
+    {
+        var st = new SurfaceTool();
+        st.Begin(Mesh.PrimitiveType.Triangles);
+        for (int i = 0; i + 1 < points.Count; i++)
+        {
+            var a = points[i];
+            var b = points[i + 1];
+            var axis = (b - a).Normalized();
+            var side = axis.Cross(MathF.Abs(axis.Y) > 0.9f ? Vector3.Right : Vector3.Up).Normalized();
+            var up = side.Cross(axis);
+            for (int k = 0; k < sides; k++)
+            {
+                float a0 = k / (float)sides * Mathf.Tau, a1 = (k + 1) / (float)sides * Mathf.Tau;
+                var o0 = (side * MathF.Cos(a0) + up * MathF.Sin(a0)) * radius;
+                var o1 = (side * MathF.Cos(a1) + up * MathF.Sin(a1)) * radius;
+                // Clockwise seen from outside (Godot's front faces).
+                foreach (var v in new[] { a + o0, b + o1, b + o0, a + o0, a + o1, b + o1 })
+                    st.AddVertex(v);
+            }
+        }
+        st.GenerateNormals();
+        return st.Commit();
+    }
 }

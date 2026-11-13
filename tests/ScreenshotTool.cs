@@ -513,6 +513,29 @@ public partial class ScreenshotTool : Node
             await ToSignal(GetTree().CreateTimer(at), SceneTreeTimer.SignalName.Timeout);
             GD.Print($"tools: {main.Tools.Current} at {stand} ground {lake.GroundKindAt(stand.X, stand.Z)} haul {main.Tools.LastHaul?.Message}");
         }
+        else if (mode == 31)
+        {
+            // Close-up of the rod in hand and the reel from a second camera beside it: arg 0 = from the left (the
+            // crank side), 1 = from the right front, 2 = from below.
+            for (int i = 0; i < 20; i++)
+                await NextFrame();
+            var rig = main.Player.Rig;
+            var reel = rig.ToGlobal(new Vector3(0f, 0.1f, -0.06f));
+            var offset = arg switch
+            {
+                1 => rig.GlobalTransform.Basis * new Vector3(0.28f, 0.22f, -0.05f),
+                2 => rig.GlobalTransform.Basis * new Vector3(-0.05f, 0.12f, -0.3f),
+                _ => rig.GlobalTransform.Basis * new Vector3(-0.3f, 0.05f, -0.06f),
+            };
+            var cam = new Camera3D { Fov = 38f };
+            main.AddChild(cam);
+            cam.GlobalPosition = reel + offset;
+            cam.LookAt(reel, rig.GlobalTransform.Basis * Vector3.Back);
+            cam.Current = true;
+            rig.SetCrank(0.6f);
+            for (int i = 0; i < 10; i++)
+                await NextFrame();
+        }
         else if (mode == 29)
         {
             // The village and the woods: arg 0 = the notice board, 1 = its panel, 2 = the smokehouse with its smoker,

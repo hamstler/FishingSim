@@ -212,32 +212,6 @@ public static class CampProps
         return root;
     }
 
-    /// <summary>A round tube along a polyline.</summary>
-    private static ArrayMesh Tube(IReadOnlyList<Vector3> points, float radius, int sides = 6)
-    {
-        var st = new SurfaceTool();
-        st.Begin(Mesh.PrimitiveType.Triangles);
-        for (int i = 0; i + 1 < points.Count; i++)
-        {
-            var a = points[i];
-            var b = points[i + 1];
-            var axis = (b - a).Normalized();
-            var side = axis.Cross(MathF.Abs(axis.Y) > 0.9f ? Vector3.Right : Vector3.Up).Normalized();
-            var up = side.Cross(axis);
-            for (int k = 0; k < sides; k++)
-            {
-                float a0 = k / (float)sides * Mathf.Tau, a1 = (k + 1) / (float)sides * Mathf.Tau;
-                var o0 = (side * MathF.Cos(a0) + up * MathF.Sin(a0)) * radius;
-                var o1 = (side * MathF.Cos(a1) + up * MathF.Sin(a1)) * radius;
-                // Clockwise seen from outside (Godot's front faces).
-                foreach (var v in new[] { a + o0, b + o1, b + o0, a + o0, a + o1, b + o1 })
-                    st.AddVertex(v);
-            }
-        }
-        st.GenerateNormals();
-        return st.Commit();
-    }
-
     /// <summary>
     /// The net hanging from the pole (origin at the cord's top, everything below -Y): the cord, two crossed hoops arching
     /// over a square of netting tied at their ends, the netting sagging into a bowl. <paramref name="catchHolder"/> sits
@@ -257,7 +231,7 @@ public static class CampProps
                 float t = i / 8f - 1f;
                 pts.Add(new Vector3(t * h, top - LiftArch * t * t, d * t * h));
             }
-            root.AddChild(new MeshInstance3D { Mesh = Tube(pts, 0.008f), MaterialOverride = Wood });
+            root.AddChild(new MeshInstance3D { Mesh = Shapes.Tube(pts, 0.008f), MaterialOverride = Wood });
         }
         var st = new SurfaceTool();
         st.Begin(Mesh.PrimitiveType.Triangles);

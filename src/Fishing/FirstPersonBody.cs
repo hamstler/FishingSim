@@ -16,10 +16,9 @@ namespace FishingSim.Fishing;
 /// </summary>
 public partial class FirstPersonBody : Node3D
 {
-    private static readonly Vector3 RigBasePosition = new(0.28f, -0.33f, -0.42f);
+    private static readonly Vector3 RigBasePosition = new(0.2f, -0.27f, -0.44f);
     private static readonly Vector3 RigBaseRotation = new(Mathf.DegToRad(-78f), 0f, 0f);
     private static readonly Vector3 WristLocal = new(0.055f, 0.03f, -0.01f);
-    private static readonly Vector3 CrankLocal = new(0.1f, 0.1f, -0.09f);
     private static readonly Vector3 LeftRest = new(-0.3f, -0.75f, -0.25f);
 
     private RodRig _rig = null!;
@@ -56,7 +55,7 @@ public partial class FirstPersonBody : Node3D
 
     // The right hand's grip in rod-rig space (rod along +Y, reel hanging at -Z, +X to the right): the palm faces the
     // blank from the right, the knuckles run forward and down, so the fingers wrap under the handle.
-    private static readonly Vector3 GripHandle = new(0f, 0.1f, 0f);
+    private static readonly Vector3 GripHandle = RodRig.GripPoint;
     private static readonly Vector3 GripPalm = new(-1f, 0f, 0.1f);
     private static readonly Vector3 GripFingers = new(0.05f, 0.6f, -1f);
 
@@ -196,8 +195,8 @@ public partial class FirstPersonBody : Node3D
         _leftOnReel = Mathf.MoveToward(_leftOnReel, onReel ? 1f : 0f, dt * 5f);
         if (ReelingSource?.Invoke() ?? false)
             _crank += dt * 9f;
-        var crankCentre = new Vector3(0.1f, 0.1f, -0.065f);
-        var knob = crankCentre + new Vector3(0f, MathF.Sin(_crank) * 0.03f, MathF.Cos(_crank) * 0.03f - 0.025f);
+        _rig.SetCrank(_crank);
+        var knob = RodRig.KnobAt(_crank);
         var leftAt = LeftRest.Lerp(ToLocal(_rig.ToGlobal(knob)), _leftOnReel);
         // Holding the catch: the left hand supports the fish from below, under the belly behind the head, so the
         // fish itself stays in view.
@@ -245,7 +244,8 @@ public partial class FirstPersonBody : Node3D
         var fingers = (rigBasis * GripFingers).Normalized();
         ik.Right.Palm = palm;
         ik.Right.Fingers = fingers;
-        ik.Right.Wrist = _rig.ToGlobal(GripHandle) - palm * 0.032f - fingers * 0.062f;
+        // The hand closes round the reel seat, the reel's stem between the middle and ring fingers.
+        ik.Right.Wrist = _rig.ToGlobal(GripHandle) - palm * (RodRig.SeatRadius + 0.024f) - fingers * 0.062f;
         ik.Right.Pole = ToGlobal(new Vector3(0.5f, -0.6f, 0.35f));
         ik.Right.Grip = 0.9f;
 
@@ -253,8 +253,11 @@ public partial class FirstPersonBody : Node3D
         _leftOnReel = Mathf.MoveToward(_leftOnReel, onReel ? 1f : 0f, dt * 5f);
         if (ReelingSource?.Invoke() ?? false)
             _crank += dt * 9f;
-        var crankCentre = new Vector3(0.1f, 0.1f, -0.065f);
-        var knob = crankCentre + new Vector3(0f, MathF.Sin(_crank) * 0.03f, MathF.Cos(_crank) * 0.03f - 0.025f);
+        _rig.SetCrank(_crank);
+        // The crank is on the reel's left: the hand lies over its knob, palm down, fingers forward round it.
+        var reelPalmRig = new Vector3(0.1f, 0.12f, -1f).Normalized();
+        var reelFingersRig = new Vector3(0.1f, 1f, 0.12f).Normalized();
+        var knob = RodRig.KnobAt(_crank) - reelPalmRig * 0.034f - reelFingersRig * 0.058f;
         var held = HeldFishSource?.Invoke();
         _leftOnFish = Mathf.MoveToward(_leftOnFish, held != null ? 1f : 0f, dt * 6f);
         if (held is FishModel fm)
@@ -263,13 +266,13 @@ public partial class FirstPersonBody : Node3D
             _lastFishGrip = ToLocal(held.GlobalPosition) + new Vector3(0.02f, -0.04f, 0.02f);
         // Hanging at the side; pinching the reel knob from above; flat under the fish's belly.
         var restAt = new Vector3(-0.26f, -0.78f, 0.05f);
-        var reelAt = ToLocal(_rig.ToGlobal(knob)) + ToLocal(_rig.ToGlobal(new Vector3(-0.05f, -0.03f, 0.06f))) - ToLocal(_rig.GlobalPosition);
+        var reelAt = ToLocal(_rig.ToGlobal(knob));
         var at = restAt.Lerp(reelAt, _leftOnReel).Lerp(_lastFishGrip + new Vector3(0.03f, 0f, 0.08f), _leftOnFish);
         var basis = GlobalTransform.Basis.Orthonormalized();
         var restFingers = new Vector3(0.05f, -1f, -0.1f);
         var restPalm = new Vector3(1f, 0f, 0.1f);
-        var reelFingers = basis.Inverse() * (rigBasis * new Vector3(1f, 0.35f, -0.4f));
-        var reelPalm = basis.Inverse() * (rigBasis * new Vector3(0.1f, 0f, -1f));
+        var reelFingers = basis.Inverse() * (rigBasis * reelFingersRig);
+        var reelPalm = basis.Inverse() * (rigBasis * reelPalmRig);
         var fishFingers = new Vector3(0.15f, 0.1f, -1f);
         var fishPalm = new Vector3(0f, 1f, 0f);
         var f = restFingers.Normalized().Lerp(reelFingers.Normalized(), _leftOnReel).Lerp(fishFingers.Normalized(), _leftOnFish);
@@ -277,7 +280,7 @@ public partial class FirstPersonBody : Node3D
         ik.Left.Wrist = ToGlobal(at);
         ik.Left.Fingers = basis * f;
         ik.Left.Palm = basis * p;
-        ik.Left.Pole = ToGlobal(new Vector3(-0.55f, -0.6f, 0.3f));
+        ik.Left.Pole = ToGlobal(new Vector3(-0.6f, -0.55f, 0.25f));
         ik.Left.Grip = Mathf.Lerp(Mathf.Lerp(0.35f, 0.6f, _leftOnReel), 0.3f, _leftOnFish);
     }
 
