@@ -122,6 +122,10 @@ public partial class CardPanel : Control
 
     protected static Label Heading(string text) => Text(text, 20, UITheme.Accent);
 
+    /// <summary>"1 ryba", "3 ryby", "5 ryb".</summary>
+    protected static string FishCount(int n) =>
+        n == 1 ? "1 ryba" : n % 10 is >= 2 and <= 4 && n % 100 is < 12 or > 14 ? $"{n} ryby" : $"{n} ryb";
+
     /// <summary>An inset row with an icon, a column of text and room for buttons on the right.</summary>
     protected static (PanelContainer Row, VBoxContainer Text, HBoxContainer Line) Row(Texture2D? icon)
     {
@@ -295,7 +299,7 @@ public partial class SmokehousePanel : CardPanel
             sell.Pressed += () => SellSmoked();
             Body.AddChild(sell);
         }
-        Footer.Text = $"Sakiewka: {Lore.Money(p.Money)}   ·   siatka: {p.Keepnet.Count} ryb";
+        Footer.Text = $"Sakiewka: {Lore.Money(p.Money)}   ·   w siatce: {FishCount(p.Keepnet.Count)}";
     }
 
     public override void _Process(double delta)
@@ -380,6 +384,6 @@ public partial class NoticeBoardPanel : CardPanel
             Body.AddChild(row);
         }
         string pantry = Foraging.Describe(p.Pantry);
-        Footer.Text = $"Spiżarnia: {(pantry.Length > 0 ? pantry : "pusto")}   ·   wędzonki: {p.Smoked.Count}   ·   siatka: {p.Keepnet.Count} ryb";
+        Footer.Text = $"Spiżarnia: {(pantry.Length > 0 ? pantry : "pusto")}   ·   wędzonki: {p.Smoked.Count}   ·   w siatce: {FishCount(p.Keepnet.Count)}";
     }
 }

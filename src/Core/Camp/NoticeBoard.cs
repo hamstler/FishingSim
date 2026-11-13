@@ -72,7 +72,7 @@ public static class NoticeBoard
 
     private static readonly string[] SmokedLines =
     {
-        "Na imieniny męża.", "Na wesele kuzyna: zakąska musi być.", "Do piwa na wieczór przy ognisku.",
+        "Na imieniny sąsiada.", "Na wesele kuzyna: zakąska musi być.", "Do piwa na wieczór przy ognisku.",
     };
 
     /// <summary>The day's notices at a place (<paramref name="place"/> = the map's index). Smoked fish is asked for only

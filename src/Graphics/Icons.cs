@@ -705,14 +705,16 @@ public static class Icons
                     c.Disc(x - 1.5f, y - 1.5f, 1.5f, 1.5f, C(0.6f, 0.65f, 0.85f, 0.7f));
                 }
                 break;
-            case "smoked":      // a golden smoked fish hanging by its tail
-                c.Line(32, 4, 32, 12, 1.5f, C(0.35f, 0.25f, 0.15f));
-                c.Disc(32, 36, 9, 22, C(0.86f, 0.56f, 0.2f), C(0.55f, 0.3f, 0.1f));
-                c.Line(32, 14, 26, 8, 3f, C(0.62f, 0.38f, 0.14f));
-                c.Line(32, 14, 38, 8, 3f, C(0.62f, 0.38f, 0.14f));
-                c.Disc(30, 52, 1.6f, 1.6f, C(0.15f, 0.1f, 0.05f));
-                for (int y = 22; y < 50; y += 6)
-                    c.Line(26, y, 38, y + 3, 1f, C(0.6f, 0.34f, 0.12f, 0.6f));
+            case "smoked":      // a golden-brown smoked fish lying on its side, hung on a string through the gills
+                c.Line(18, 6, 18, 24, 1.2f, C(0.35f, 0.25f, 0.15f));
+                c.Line(46, 34, 60, 22, 4f, C(0.5f, 0.28f, 0.1f));
+                c.Line(46, 34, 60, 46, 4f, C(0.5f, 0.28f, 0.1f));
+                c.Disc(30, 34, 22, 10, C(0.88f, 0.58f, 0.2f), C(0.55f, 0.3f, 0.1f));
+                c.Disc(30, 29, 18, 4, C(0.62f, 0.36f, 0.12f, 0.8f));
+                for (int x = 22; x < 44; x += 5)
+                    c.Line(x, 27, x + 2, 41, 0.8f, C(0.55f, 0.3f, 0.1f, 0.5f));
+                c.Line(20, 26, 20, 42, 1f, C(0.5f, 0.27f, 0.1f));
+                c.Disc(14, 32, 2.2f, 2.2f, C(0.12f, 0.08f, 0.04f));
                 break;
             default:            // a notice: parchment pinned to a board
                 c.Rect(10, 10, 54, 54, C(0.5f, 0.34f, 0.2f));
