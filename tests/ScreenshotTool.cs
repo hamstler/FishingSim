@@ -50,6 +50,12 @@ public partial class ScreenshotTool : Node
         // FISHSIM_VIEW=0..3 picks the view distance (Bliski..Bardzo daleki) for this run.
         if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_VIEW"), out int viewSetting))
             FishingSim.Graphics.GraphicsQuality.SetView((FishingSim.Graphics.ViewDistance)Math.Clamp(viewSetting, 0, 3));
+        // FISHSIM_SCALE=50..100 picks the 3D resolution in per cent (FSR below 100).
+        if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_SCALE"), out int scaleSetting))
+            FishingSim.Graphics.GraphicsQuality.SetRenderScale(scaleSetting);
+        // FISHSIM_PERF_OVERLAY=1 shows the F11 performance overlay in the shot.
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_PERF_OVERLAY") == "1")
+            FishingSim.UI.PerfOverlay.ShownByDefault = true;
         UserStore.Path = "/tmp/fishsim_shot_users.json";
         await NextFrame();
 

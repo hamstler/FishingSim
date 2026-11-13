@@ -45,6 +45,7 @@ public partial class FirstPersonBody : Node3D
 
     public override void _Process(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("hands");
         // The arms follow the rod every frame, whoever moves it.
         if (_ik != null && _rig != null)
             ApplyArms(_action, (float)delta);

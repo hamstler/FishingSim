@@ -434,6 +434,7 @@ public partial class FishingRod : Node3D
     /// drawn only on physics ticks the line would judder on screens faster than the tick).</summary>
     public override void _Process(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("rod-draw");
         if (_bobber == null)
             return;
         UpdateBend(Math.Min((float)delta, 0.05f));

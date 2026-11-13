@@ -459,6 +459,7 @@ public partial class Npc : Node3D
 
     public override void _Process(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("villagers");
         float dt = (float)delta;
         if (_animator != null)
         {

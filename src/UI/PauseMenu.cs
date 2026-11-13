@@ -71,6 +71,12 @@ public partial class PauseMenu : CanvasLayer
         ShowView();
         view.Pressed += () => { Graphics.GraphicsQuality.CycleView(); ShowView(); };
         box.AddChild(view);
+        // The 3D image's resolution: the biggest help when the graphics card is the bottleneck (F11 shows it).
+        var scale = new Button { CustomMinimumSize = new Vector2(0, 46) };
+        void ShowScale() => scale.Text = $"Rozdzielczość 3D: {Graphics.GraphicsQuality.RenderScaleTitle(Graphics.GraphicsQuality.RenderScale)}";
+        ShowScale();
+        scale.Pressed += () => { Graphics.GraphicsQuality.CycleRenderScale(); ShowScale(); };
+        box.AddChild(scale);
         AddButton(box, "Wyloguj", Logout);
         AddButton(box, "Wyjdź z gry", Quit);
     }

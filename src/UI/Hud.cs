@@ -104,6 +104,7 @@ public partial class Hud : CanvasLayer
     private string _lastPurse = "", _lastTackle = "";
 
     private Minimap? _minimap;
+    private PerfOverlay _perf = null!;
     private CatchPanel _catchPanel = null!;
 
     /// <summary>The keep-or-release panel shown after a landing.</summary>
@@ -215,11 +216,16 @@ public partial class Hud : CanvasLayer
             + "Spacja - kasarek (trzeba go kupić), kółko - hamulec\n"
             + "1-5 - zmiana sprzętu (Shift = wstecz), Tab - stan\n"
             + "E - wejście | I ekwipunek | M mapa | J dziennik | T turnieje\n"
-            + "Esc - menu | F1 - dev";
+            + "Esc - menu | F1 - dev | F11 - wydajność (FPS)";
 
         _dev = Text(13, Gold);
         Anchor(_dev, 1f, 0f, -460, Minimap.WidgetHeight + 30f, -16, Minimap.WidgetHeight + 390f);
         _dev.HorizontalAlignment = HorizontalAlignment.Right;
+
+        // F11: frames per second and where the frame's time goes.
+        _perf = new PerfOverlay();
+        Anchor(_perf, 0f, 0f, 12f, 12f, 12f, 12f);
+        AddChild(_perf);
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -228,6 +234,8 @@ public partial class Hud : CanvasLayer
         {
             if (key.Keycode == Key.F1)
                 _devOpen = !_devOpen;
+            else if (key.Keycode == Key.F11)
+                _perf.Toggle();
             else if (key.Keycode == Key.H)
             {
                 _helpOpen = !_helpOpen;

@@ -103,6 +103,7 @@ public partial class InsectSwarms : Node3D
     /// <summary>The swarms' state changes slowly: updated four times a second.</summary>
     public override void _Process(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("insects");
         if (_world == null)
             return;
         _tick += (float)delta;

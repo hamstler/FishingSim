@@ -46,6 +46,7 @@ public partial class InteractionManager : Node
 
     public override void _Process(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("interact");
         bool free = !_rod.InputBlocked && _rod.State == RodState.Idle;
         Current = free ? Nearest(_scenery.Interactables, _player.GlobalPosition) : null;
     }
