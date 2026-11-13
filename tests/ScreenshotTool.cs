@@ -44,6 +44,9 @@ public partial class ScreenshotTool : Node
         if (asked is { Length: 2 } && int.TryParse(asked[0], out int shotW) && int.TryParse(asked[1], out int shotH))
             size = new Vector2I(shotW, shotH);
         GetWindow().Size = size;
+        // FISHSIM_QUALITY=0..3 picks the graphics quality (Niska..Ultra) for this run.
+        if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_QUALITY"), out int qualitySetting))
+            FishingSim.Graphics.GraphicsQuality.Set((FishingSim.Graphics.QualityLevel)Math.Clamp(qualitySetting, 0, 3));
         // FISHSIM_VIEW=0..3 picks the view distance (Bliski..Bardzo daleki) for this run.
         if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_VIEW"), out int viewSetting))
             FishingSim.Graphics.GraphicsQuality.SetView((FishingSim.Graphics.ViewDistance)Math.Clamp(viewSetting, 0, 3));
