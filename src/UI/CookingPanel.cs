@@ -119,7 +119,7 @@ public partial class CookingPanel : Control
     }
 
     private static string Buff(MealBuff b) =>
-        $"{b.Name}: +{b.XpBonus * 100f:0}% XP, brania o {b.BiteBonus * 100f:0}% szybsze, przez {b.Hours:0} h gry";
+        $"{b.Name}: +{b.XpBonus * 100f:0}% XP, brania o {b.BiteBonus * 100f:0}% szybsze, przez {b.Hours:0.#} h gry";
 
     private void Refresh()
     {
@@ -191,7 +191,7 @@ public partial class CookingPanel : Control
         }
         string net = profile.KeepnetLimit is { } spec ? $"{profile.Keepnet.Count}/{spec.MaxFish}" : $"{profile.Keepnet.Count}";
         // Five recipes do not fit a small screen: the list scrolls.
-        _scroll.CustomMinimumSize = new Vector2(0f, MathF.Min(GetViewportRect().Size.Y * 0.52f, MathF.Max(_recipes.GetCombinedMinimumSize().Y, 100f)));
+        _scroll.CustomMinimumSize = new Vector2(0f, MathF.Min(GetViewportRect().Size.Y - 280f, MathF.Max(_recipes.GetCombinedMinimumSize().Y, 100f)));
         string pantry = Foraging.Describe(profile.Pantry);
         _footer.Text = $"Siatka: {net} ryb   ·   spiżarnia: {(pantry.Length > 0 ? pantry : "pusto")}   ·   " + (profile.ActiveMeal is { } meal ? $"{meal.Name} jeszcze {profile.MealHoursLeft:0.0} h" : "jeszcze nic nie jadłeś");
     }

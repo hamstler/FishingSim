@@ -87,10 +87,11 @@ public static class UITheme
         // Slim brass scroll bars.
         foreach (var bar in new[] { "VScrollBar", "HScrollBar" })
         {
-            t.SetStylebox("scroll", bar, Box(new Color(0.07f, 0.05f, 0.03f, 0.6f), new Color(0.07f, 0.05f, 0.03f, 0.6f), 4, 0));
-            t.SetStylebox("grabber", bar, Box(new Color(0.62f, 0.46f, 0.22f), new Color(0.62f, 0.46f, 0.22f), 4, 0));
-            t.SetStylebox("grabber_highlight", bar, Box(Accent, Accent, 4, 0));
-            t.SetStylebox("grabber_pressed", bar, Box(new Color(1f, 0.86f, 0.5f), new Color(1f, 0.86f, 0.5f), 4, 0));
+            // The margins give the bar its width (without them it is drawn 0 px wide and lists seem cut off).
+            t.SetStylebox("scroll", bar, Box(new Color(0.07f, 0.05f, 0.03f, 0.6f), new Color(0.07f, 0.05f, 0.03f, 0.6f), 4, 0, 4));
+            t.SetStylebox("grabber", bar, Box(new Color(0.62f, 0.46f, 0.22f), new Color(0.62f, 0.46f, 0.22f), 4, 0, 4));
+            t.SetStylebox("grabber_highlight", bar, Box(Accent, Accent, 4, 0, 4));
+            t.SetStylebox("grabber_pressed", bar, Box(new Color(1f, 0.86f, 0.5f), new Color(1f, 0.86f, 0.5f), 4, 0, 4));
         }
 
         t.SetColor("font_color", "Label", Text);
