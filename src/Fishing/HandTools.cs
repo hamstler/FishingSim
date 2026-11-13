@@ -283,8 +283,12 @@ public partial class HandTools : Node3D
         if (_player == null)
             return;
         float dt = (float)delta;
-        bool working = Working;
-        if (working)
+        if (Current == HandTool.LiftNet)
+        {
+            ProcessLiftNet(dt);
+            return;
+        }
+        if (_t >= 0f)
         {
             _t += dt / (Current == HandTool.Shovel ? DigSeconds : SweepSeconds);
             if (FreezeAt is float stop)
@@ -299,11 +303,6 @@ public partial class HandTools : Node3D
         // The eyes go down to the work and come back up after it.
         float want = Working ? 1f : 0f;
         _blend = Mathf.MoveToward(_blend, want, dt * (want > _blend ? 2.2f : 1.6f));
-        if (Current == HandTool.LiftNet)
-        {
-            ProcessLiftNet(dt);
-            return;
-        }
         _player.WorkPitch = Current == HandTool.Shovel ? DigPitch : SweepPitch;
         _player.WorkOffset = Current == HandTool.Shovel ? DigHead : Vector3.Zero;
         _player.WorkBlend = Smooth(_blend);
@@ -618,7 +617,7 @@ public partial class HandTools : Node3D
                 file = "res://data/fish/ukleja.tres";
             var sp = GD.Load<FishSpecies>(file);
             var holder = new Node3D { Visible = false };
-            var model = FishModel.Create(sp, 0.02f + _fry.Count % 3 * 0.008f);
+            var model = FishModel.Create(sp, 0.035f + _fry.Count % 3 * 0.012f);
             model.Wiggle = 2.5f;
             foreach (var n in model.FindChildren("*", "GeometryInstance3D", true, false))
                 ((GeometryInstance3D)n).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;

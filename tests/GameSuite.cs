@@ -366,6 +366,7 @@ public sealed class GameSuite : ITestSuite
         main.Player.Rotation = new Vector3(0f, MathF.Atan2(-toWater.X, -toWater.Z), 0f);
         await t.NextFrame();
         int liveBefore = profile.BaitCounts.GetValueOrDefault("livebait");
+        int baitTotal = profile.BaitCounts.Sum(b => b.Value);   // a slice of bread goes over the net
         bool selected = tools.Select(HandTool.LiftNet), lowered = selected && tools.Use();
         t.Check(shore != null && lowered && tools.Lift == HandTools.LiftStage.Lowering && main.Player.Busy,
             $"the lift net goes down from the bank; the angler stands still (at {shore}, selected {selected}, {rod.BannerText})");
@@ -377,7 +378,9 @@ public sealed class GameSuite : ITestSuite
         t.Check(tools.Use() && tools.Lift == HandTools.LiftStage.Lifting, "the second click lifts it");
         await t.Seconds(4.2);
         t.Check(tools.Lift == HandTools.LiftStage.Up && !main.Player.Busy && tools.LastHaul != null
-                && profile.BaitCounts.GetValueOrDefault("livebait") == liveBefore + tools.LastHaul.Total,
+                && (tools.LastHaul.Message.StartsWith("Podrywka") || tools.LastHaul.Message.StartsWith("Pusto"))
+                && profile.BaitCounts.GetValueOrDefault("livebait") == liveBefore + tools.LastHaul.Total
+                && profile.BaitCounts.Sum(b => b.Value) == baitTotal + tools.LastHaul.Total - 1,
             $"the small fish go into the bait box as live bait ({tools.LastHaul?.Message})");
         main.Player.GlobalPosition = main.Scenery.CampPosition + Vector3.Up * 0.1f;
         await t.NextFrame();
