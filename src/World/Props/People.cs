@@ -427,9 +427,14 @@ public partial class Npc : Node3D
             _check = 0.4f;
             var cam = GetViewport()?.GetCamera3D();
             _distance = cam == null ? 999f : GlobalPosition.DistanceTo(cam.GlobalPosition);
-            bool near = _distance < 70f;
+            // How far they move and how far they are drawn follow the view distance setting.
+            float view = Graphics.GraphicsQuality.ViewFactor;
+            bool near = _distance < 70f * view;
             if (_animator!.Active != near)
                 _animator.Active = near;
+            bool shown = _distance < 150f * view;
+            if (Visible != shown)
+                Visible = shown;
             if (_look != null)
                 _look.Active = _distance < 25f;
             // Shopkeepers nod once as the angler walks up in front of them.

@@ -49,17 +49,58 @@ public partial class Scenery : Node3D
     // Scattered plants with their full drawing range, shortened by the quality setting.
     private readonly List<(GeometryInstance3D Node, float Range)> _ranged = new();
 
+    /// <summary>
+    /// Buildings and props with the distance (m) they are drawn to at the normal view distance; scaled by the view
+    /// distance setting (beyond it they are not drawn at all).
+    /// </summary>
+    private readonly List<(Node3D Root, float Range)> _props = new();
+
+    private void Prop(Node3D root, float range) => _props.Add((root, range));
+
+    /// <summary>
+    /// Applies the quality and the view distance: how far the plants and the detailed trees reach, where the distant
+    /// forest ends (fading out), how far buildings, props and lamp light are drawn.
+    /// </summary>
     private void ApplyFoliageRange()
     {
+        float plants = GraphicsQuality.FoliageRange * GraphicsQuality.ViewFactor;
         foreach (var (node, range) in _ranged)
             if (IsInstanceValid(node))
-                node.VisibilityRangeEnd = range * GraphicsQuality.FoliageRange;
+                node.VisibilityRangeEnd = range * plants;
+        float nearTrees = TreeNearRange * GraphicsQuality.FoliageRange * GraphicsQuality.ViewFactor;
+        float horizon = GraphicsQuality.ViewRange;
         foreach (var (near, far) in _treeLods)
             if (IsInstanceValid(near) && IsInstanceValid(far))
             {
-                near.VisibilityRangeEnd = TreeNearRange * GraphicsQuality.FoliageRange;
-                far.VisibilityRangeBegin = TreeNearRange * GraphicsQuality.FoliageRange;
+                near.VisibilityRangeEnd = nearTrees;
+                far.VisibilityRangeBegin = nearTrees;
+                // The distant forest ends at the view distance, fading out over its last stretch.
+                far.VisibilityRangeEnd = horizon;
+                far.VisibilityRangeEndMargin = horizon > 0f ? horizon * 0.15f : 0f;
+                far.VisibilityRangeFadeMode = horizon > 0f ? GeometryInstance3D.VisibilityRangeFadeModeEnum.Self
+                    : GeometryInstance3D.VisibilityRangeFadeModeEnum.Disabled;
             }
+        float view = GraphicsQuality.ViewFactor;
+        foreach (var (root, range) in _props)
+        {
+            if (!IsInstanceValid(root))
+                continue;
+            foreach (var n in root.FindChildren("*", "GeometryInstance3D", true, false))
+            {
+                var g = (GeometryInstance3D)n;
+                g.VisibilityRangeEnd = range * view;
+                g.VisibilityRangeEndMargin = range * view * 0.08f;
+            }
+            // Lamps and fires: their light fades out further off (the light is costly, the glow stays).
+            foreach (var n in root.FindChildren("*", "OmniLight3D", true, false))
+            {
+                var l = (OmniLight3D)n;
+                l.DistanceFadeEnabled = true;
+                l.DistanceFadeBegin = 45f * view;
+                l.DistanceFadeLength = 15f;
+                l.DistanceFadeShadow = 25f * view;
+            }
+        }
     }
 
     private float _time;
@@ -234,6 +275,7 @@ public partial class Scenery : Node3D
         Markers.Clear();
         Stats.Clear();
         _reserved.Clear();
+        _props.Clear();
         _lastDaylight = -1f;
 
         var loc = _lake.Location;
@@ -249,6 +291,7 @@ public partial class Scenery : Node3D
         ScatterShoreline(loc, rng);
         ScatterWaterPlants(loc, rng);
         ScatterRocks(loc, rng);
+        ApplyFoliageRange();
     }
 
     private void Track(Node node) => _dynamic.Add(node);
@@ -274,6 +317,7 @@ public partial class Scenery : Node3D
             AddChild(building);
             Track(building);
             _buildings.Add(building);
+            Prop(building, spec.PadRadius > 0f ? 300f : 120f);
             Count("building_" + spec.Kind.ToString().ToLowerInvariant());
             if (spec.Kind == BuildingKind.Smokehouse)
             {
@@ -389,6 +433,7 @@ public partial class Scenery : Node3D
                 board.Rotation = new Vector3(0f, MathF.Atan2(toPlaza.X, toPlaza.Y), 0f);
                 AddChild(board);
                 Track(board);
+                Prop(board, 120f);
                 NoticeBoard = board;
                 _reserved.Add((p, 4f));
                 var front = p + toPlaza.Normalized() * 1.4f;
@@ -461,6 +506,7 @@ public partial class Scenery : Node3D
         }
         AddChild(root);
         Track(root);
+        Prop(root, 140f);
         Campfires.Add(fire);
         _reserved.Add((at, 4.5f));
         var spot = new Interactable { Kind = InteractKind.Campfire, Title = title, Radius = 3.2f, Position = root.Position, Target = fire };
@@ -562,6 +608,7 @@ public partial class Scenery : Node3D
             }
             AddChild(root);
             Track(root);
+            Prop(root, 110f);
             Count("everyday_" + kind);
         }
         // Rowboats pulled up on the beach either side of the pier, bows towards the water.
@@ -584,6 +631,7 @@ public partial class Scenery : Node3D
                     boat.Rotation = new Vector3(0.04f, boatYaw, 0.06f * side);
                     AddChild(boat);
                     Track(boat);
+                    Prop(boat, 160f);
                     boats++;
                     Count("rowboat");
                     x = 1000f;
@@ -1050,6 +1098,7 @@ public partial class Scenery : Node3D
             patch.Position = new Vector3(x, h - 0.01f, z);
             AddChild(patch);
             Track(patch);
+            Prop(patch, 60f);
             Forage.Add(patch);
             spots.Add(new Vector2(x, z));
             var spot = new Interactable { Kind = InteractKind.Forage, Title = patch.Title, Radius = 1.7f, Position = patch.Position, Target = patch };

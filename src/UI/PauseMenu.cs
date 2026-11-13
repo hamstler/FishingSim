@@ -65,6 +65,12 @@ public partial class PauseMenu : CanvasLayer
         ShowQuality();
         quality.Pressed += () => { Graphics.GraphicsQuality.Cycle(); ShowQuality(); };
         box.AddChild(quality);
+        // How far the world is drawn in detail: shorter = smoother on weaker computers.
+        var view = new Button { CustomMinimumSize = new Vector2(0, 46) };
+        void ShowView() => view.Text = $"Zasięg widzenia: {Graphics.GraphicsQuality.ViewTitle(Graphics.GraphicsQuality.View)}";
+        ShowView();
+        view.Pressed += () => { Graphics.GraphicsQuality.CycleView(); ShowView(); };
+        box.AddChild(view);
         AddButton(box, "Wyloguj", Logout);
         AddButton(box, "Wyjdź z gry", Quit);
     }

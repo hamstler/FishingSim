@@ -98,14 +98,22 @@ public partial class InsectSwarms : Node3D
         }
     }
 
+    private float _tick;
+
+    /// <summary>The swarms' state changes slowly: updated four times a second.</summary>
     public override void _Process(double delta)
     {
         if (_world == null)
             return;
+        _tick += (float)delta;
+        if (_tick < 0.25f)
+            return;
+        float step = _tick;
+        _tick = 0f;
         Activity = Sweeping.MayflyActivity(_world.Hour, _world.Weather);
         foreach (var s in _swarms)
         {
-            s.Fullness = MathF.Min(1f, s.Fullness + (float)delta / 150f);
+            s.Fullness = MathF.Min(1f, s.Fullness + step / 150f);
             if (s.View != null)
             {
                 s.View.Visible = Activity > 0.02f;

@@ -4,8 +4,9 @@ shader_type spatial;
 // flower. They nod in the wind and let the light through.
 render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
 
-uniform float wind = 0.3;
-uniform float time = 0.0;
+// Wind strength and the clock come from globals set once per frame (Scenery -> TreeFactory.SetWind).
+global uniform float foliage_wind;
+global uniform float foliage_time;
 
 vec3 srgb_to_linear(vec3 c) {
 	return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
@@ -20,8 +21,8 @@ void vertex() {
 	vec3 origin = (MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 	float h = UV.y * UV.y;
 	float phase = origin.x * 1.3 + origin.z * 0.9;
-	VERTEX.x += sin(time * 1.9 + phase) * 0.03 * h * (0.3 + wind);
-	VERTEX.z += cos(time * 1.5 + phase * 1.2) * 0.02 * h * (0.3 + wind);
+	VERTEX.x += sin(foliage_time * 1.9 + phase) * 0.03 * h * (0.3 + foliage_wind);
+	VERTEX.z += cos(foliage_time * 1.5 + phase * 1.2) * 0.02 * h * (0.3 + foliage_wind);
 }
 
 void fragment() {

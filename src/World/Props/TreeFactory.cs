@@ -246,13 +246,12 @@ public static class TreeFactory
     }
 
     /// <summary>Animates every foliage and grass material (called once per frame by the scenery).</summary>
+    /// <summary>The wind and the clock of every leaf, needle, grass blade and flower: two global shader values (no
+    /// material is touched each frame).</summary>
     public static void SetWind(float wind, float time)
     {
-        foreach (var m in new[] { _leafMaterial, _needleMaterial, _grassMaterial, _fernMaterial, _flowerMaterial })
-        {
-            m?.SetShaderParameter("wind", wind);
-            m?.SetShaderParameter("time", time);
-        }
+        RenderingServer.GlobalShaderParameterSet("foliage_wind", wind);
+        RenderingServer.GlobalShaderParameterSet("foliage_time", time);
     }
 
     // ------------------------------------------------------------------ leaf cards

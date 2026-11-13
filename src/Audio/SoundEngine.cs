@@ -19,7 +19,8 @@ public partial class SoundEngine : Node
     private AudioStreamPlayer? _player;
     private AudioStreamGeneratorPlayback? _playback;
     private float[] _buffer = Array.Empty<float>();
-    private Vector2[] _frames = Array.Empty<Vector2>();
+    private const int Chunk = 256;
+    private readonly Vector2[] _chunk = new Vector2[Chunk];
     private FishingRod _rod = null!;
     private Player _angler = null!;
     private WorldState _world = null!;
@@ -70,15 +71,19 @@ public partial class SoundEngine : Node
         int frames = _playback.GetFramesAvailable();
         if (frames <= 0)
             return;
+        // Pushed in fixed chunks of a reused array: slicing a fresh array every frame fed the garbage collector.
+        frames -= frames % Chunk;
+        if (frames <= 0)
+            return;
         if (_buffer.Length < frames)
-        {
             _buffer = new float[frames];
-            _frames = new Vector2[frames];
-        }
         _synth.Generate(_buffer.AsSpan(0, frames));
-        for (int i = 0; i < frames; i++)
-            _frames[i] = new Vector2(_buffer[i], _buffer[i]);
-        _playback.PushBuffer(frames == _frames.Length ? _frames : _frames[..frames]);
+        for (int at = 0; at < frames; at += Chunk)
+        {
+            for (int i = 0; i < Chunk; i++)
+                _chunk[i] = new Vector2(_buffer[at + i], _buffer[at + i]);
+            _playback.PushBuffer(_chunk);
+        }
     }
 
     private void UpdateLevels(float dt)

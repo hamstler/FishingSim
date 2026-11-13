@@ -724,7 +724,7 @@ public partial class HandTools : Node3D
     private static FirstPersonBody.HandTarget Blend(FirstPersonBody.HandTarget a, FirstPersonBody.HandTarget b, float k) => new(
         a.Wrist.Lerp(b.Wrist, k), a.Fingers.Normalized().Lerp(b.Fingers.Normalized(), k).Normalized(),
         a.Palm.Normalized().Lerp(b.Palm.Normalized(), k).Normalized(), Mathf.Lerp(a.Grip, b.Grip, k), a.Pole.Lerp(b.Pole, k),
-        k > 0.5f ? b.Bar : a.Bar);
+        b.Bar ?? a.Bar, b.Bar != null ? k * b.BarWeight : a.BarWeight);
 
     /// <summary>Where the arms' model stands with a tool in hand: the eyes' place in the body frame, bent over the work.</summary>
     public Transform3D? BodyFrame()

@@ -6,8 +6,9 @@ shader_type spatial;
 render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
 
 uniform sampler2D leaf_tex : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
-uniform float wind = 0.3;
-uniform float time = 0.0;
+// Wind strength and the clock come from globals set once per frame (Scenery -> TreeFactory.SetWind).
+global uniform float foliage_wind;
+global uniform float foliage_time;
 uniform vec3 translucency : source_color = vec3(0.55, 0.65, 0.25);
 
 vec3 srgb_to_linear(vec3 c) {
@@ -21,9 +22,9 @@ void vertex() {
 	vec3 origin = (MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 	float phase = origin.x * 0.31 + origin.z * 0.27;
 	float h = clamp(VERTEX.y + 2.0, 0.0, 6.0);
-	float gust = 0.6 + 0.4 * sin(time * 0.35 + phase * 0.2);
-	vec2 sway = vec2(sin(time * 1.1 + phase), cos(time * 0.9 + phase * 1.3)) * 0.025 * h * wind * gust;
-	float flutter = sin(time * 8.0 + dot(world, vec3(3.1, 4.7, 2.3))) * 0.02 * wind;
+	float gust = 0.6 + 0.4 * sin(foliage_time * 0.35 + phase * 0.2);
+	vec2 sway = vec2(sin(foliage_time * 1.1 + phase), cos(foliage_time * 0.9 + phase * 1.3)) * 0.025 * h * foliage_wind * gust;
+	float flutter = sin(foliage_time * 8.0 + dot(world, vec3(3.1, 4.7, 2.3))) * 0.02 * foliage_wind;
 	VERTEX.xz += sway + vec2(flutter);
 	VERTEX.y += flutter * 0.5;
 	shade = COLOR.a;    // the vertex alpha carries the card's depth in the crown

@@ -67,6 +67,9 @@ public partial class ForagePatch : Node3D
         return patch;
     }
 
+    /// <summary>Nothing moves until the crop is picked: no time is spent on the patch each frame.</summary>
+    public override void _Ready() => SetProcess(false);
+
     /// <summary>Takes the crop: it shrinks away. False when there was nothing to pick.</summary>
     public bool Pick(float now)
     {
@@ -75,6 +78,7 @@ public partial class ForagePatch : Node3D
         Ripe = false;
         PickedAt = now;
         _shrink = 0f;
+        SetProcess(true);
         return true;
     }
 
@@ -103,6 +107,7 @@ public partial class ForagePatch : Node3D
         {
             _crop.Visible = false;
             _shrink = -1f;
+            SetProcess(false);
         }
     }
 

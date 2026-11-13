@@ -7,8 +7,9 @@ render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
 
 uniform sampler2D gust_noise : repeat_enable, filter_linear_mipmap;
 uniform sampler2D noise_tex : repeat_enable, filter_linear_mipmap;
-uniform float wind = 0.3;
-uniform float time = 0.0;
+// Wind strength and the clock come from globals set once per frame (Scenery -> TreeFactory.SetWind).
+global uniform float foliage_wind;
+global uniform float foliage_time;
 
 vec3 srgb_to_linear(vec3 c) {
 	return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
@@ -20,9 +21,9 @@ varying vec3 origin;
 void vertex() {
 	tip = UV.y;
 	origin = (MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-	float g = texture(gust_noise, origin.xz * 0.02 + vec2(time * 0.04, time * 0.015)).r;
-	float bend = (0.15 + wind * 0.9) * (0.3 + g) * tip * tip;
-	float flutter = sin(time * 3.5 + origin.x * 1.7 + origin.z * 1.3 + VERTEX.x * 9.0) * 0.06 * tip * (0.3 + wind);
+	float g = texture(gust_noise, origin.xz * 0.02 + vec2(foliage_time * 0.04, foliage_time * 0.015)).r;
+	float bend = (0.15 + foliage_wind * 0.9) * (0.3 + g) * tip * tip;
+	float flutter = sin(foliage_time * 3.5 + origin.x * 1.7 + origin.z * 1.3 + VERTEX.x * 9.0) * 0.06 * tip * (0.3 + foliage_wind);
 	VERTEX.x += bend * 0.35 + flutter;
 	VERTEX.z += bend * 0.2;
 	VERTEX.y -= bend * 0.08;

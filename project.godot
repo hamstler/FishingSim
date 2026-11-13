@@ -19,6 +19,10 @@ window/stretch/aspect="expand"
 
 project/assembly_name="FishingSim"
 
+[physics]
+
+common/max_physics_steps_per_frame=4
+
 [rendering]
 
 environment/defaults/default_clear_color=Color(0.5, 0.7, 0.9, 1)
@@ -45,4 +49,12 @@ water_time={
 water_amp={
 "type": "float",
 "value": 0.03
+}
+foliage_wind={
+"type": "float",
+"value": 0.3
+}
+foliage_time={
+"type": "float",
+"value": 0.0
 }

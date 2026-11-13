@@ -31,6 +31,9 @@ public partial class ArmIK : SkeletonModifier3D
         public float Radius;
         public Vector3 SplayAxis;
         public float SplaySign;
+        /// <summary>The curl last shown (fractions per joint), eased towards the new one each frame.</summary>
+        public readonly float[] Shown = new float[3];
+        public bool HasShown;
     }
 
     public sealed class Arm
@@ -51,6 +54,9 @@ public partial class ArmIK : SkeletonModifier3D
 
         /// <summary>How far the middle and ring fingers spread apart (radians), e.g. round a reel's stem.</summary>
         public float Splay;
+
+        /// <summary>When set (world direction), the thumb lies along it, e.g. on top of a rod's handle.</summary>
+        public Vector3? ThumbAlong;
 
         internal int Upper = -1, Lower = -1, Hand = -1;
         internal Basis RestFrame;
@@ -170,12 +176,13 @@ public partial class ArmIK : SkeletonModifier3D
         if (!_ready)
             Prepare(sk);
         var toSkeleton = sk.GlobalTransform.AffineInverse();
+        float dt = Math.Clamp((float)GetProcessDeltaTime(), 0f, 0.1f);
         foreach (var arm in new[] { Right, Left })
             if (arm.Enabled && arm.Hand >= 0 && arm.Upper >= 0 && arm.Lower >= 0)
-                Solve(sk, arm, toSkeleton);
+                Solve(sk, arm, toSkeleton, dt);
     }
 
-    private static void Solve(Skeleton3D sk, Arm arm, Transform3D toSkeleton)
+    private static void Solve(Skeleton3D sk, Arm arm, Transform3D toSkeleton, float dt)
     {
         var target = toSkeleton * arm.Wrist;
         var pole = toSkeleton * arm.Pole;
@@ -216,7 +223,7 @@ public partial class ArmIK : SkeletonModifier3D
         sk.SetBonePoseRotation(arm.Upper, (parentG.Basis.Inverse() * upper).GetRotationQuaternion());
         sk.SetBonePoseRotation(arm.Lower, (upper.Inverse() * lower).GetRotationQuaternion());
         sk.SetBonePoseRotation(arm.Hand, (lower.Inverse() * hand).GetRotationQuaternion());
-        CloseFingers(sk, arm, toSkeleton);
+        CloseFingers(sk, arm, toSkeleton, dt);
         if (Debug && Engine.GetProcessFrames() % 60 == 0)
         {
             var g = sk.GetBoneGlobalPose(arm.Hand);
@@ -231,10 +238,12 @@ public partial class ArmIK : SkeletonModifier3D
     /// Closes the fingers: as far as Grip says, or, with obstacles, each finger until it touches one (the whole finger,
     /// then the outer two joints, then the tip, so it wraps round a handle).
     /// </summary>
-    private static void CloseFingers(Skeleton3D sk, Arm arm, Transform3D toSkeleton)
+    private static void CloseFingers(Skeleton3D sk, Arm arm, Transform3D toSkeleton, float dt)
     {
         if (arm.Chains.Count == 0 || arm.Obstacles.Count == 0)
         {
+            foreach (var chain in arm.Chains)
+                chain.HasShown = false;
             foreach (var (bone, ax, angle) in arm.Curl)
                 sk.SetBonePoseRotation(bone, (sk.GetBoneRest(bone).Basis * new Basis(ax, angle * arm.Grip)).GetRotationQuaternion());
             foreach (var chain in arm.Chains)
@@ -255,6 +264,11 @@ public partial class ArmIK : SkeletonModifier3D
         foreach (var chain in arm.Chains)
         {
             var parent = sk.GetBoneGlobalPose(sk.GetBoneParent(chain.Bones[0]));
+            if (chain.Name == "thumb" && arm.ThumbAlong is Vector3 along)
+            {
+                LayThumb(sk, chain, parent, (toSkeleton.Basis * along).Normalized());
+                continue;
+            }
             float radius = chain.Radius * scale;
             c[0] = c[1] = c[2] = 0f;
             float limit = chain.Name == "thumb" ? arm.Grip * 0.8f : arm.Grip;
@@ -278,6 +292,10 @@ public partial class ArmIK : SkeletonModifier3D
                 while (best < Steps && depth[best + 1] <= min + 1e-5f)
                     best++;
                 float good = from + (limit - from) * best / Steps;
+                // The outer joints may close only a little further than the knuckle: a finger bends evenly round a
+                // handle, never into a claw.
+                if (j0 > 0)
+                    good = MathF.Min(good, c[0] + 0.3f * j0);
                 if (best < Steps)
                 {
                     // Refine between the last good step and the one that touches.
@@ -296,9 +314,45 @@ public partial class ArmIK : SkeletonModifier3D
                 if (best == Steps)
                     break;      // nothing in the way: closed as far as the grip goes
             }
+            // Eased from frame to frame, so the fingers settle round the handle instead of flickering.
+            float ease = chain.HasShown ? 1f - MathF.Exp(-18f * dt) : 1f;
             for (int k = 0; k < 3; k++)
-                sk.SetBonePoseRotation(chain.Bones[k], Rotation(sk, chain, k, c[k], arm.Splay).GetRotationQuaternion());
+            {
+                chain.Shown[k] = Mathf.Lerp(chain.Shown[k], c[k], ease);
+                sk.SetBonePoseRotation(chain.Bones[k], Rotation(sk, chain, k, chain.Shown[k], arm.Splay).GetRotationQuaternion());
+            }
+            chain.HasShown = true;
         }
+    }
+
+    /// <summary>
+    /// The thumb laid along a direction (skeleton space): its first joint turns so the thumb points that way (as far as
+    /// a thumb can, 75 degrees from its rest), the outer joints bend a little, relaxed.
+    /// </summary>
+    private static void LayThumb(Skeleton3D sk, Chain chain, Transform3D parent, Vector3 dir)
+    {
+        int b0 = chain.Bones[0];
+        var rest = sk.GetBoneRest(b0);
+        var global = parent.Basis * rest.Basis;
+        var seg = (global * sk.GetBoneRest(chain.Bones[1]).Origin.Normalized()).Normalized();
+        var axis = seg.Cross(dir);
+        float angle = MathF.Atan2(axis.Length(), Math.Clamp(seg.Dot(dir), -1f, 1f));
+        if (axis.LengthSquared() > 1e-8f)
+            global = new Basis(axis.Normalized(), MathF.Min(angle, Mathf.DegToRad(75f))) * global;
+        sk.SetBonePoseRotation(b0, (parent.Basis.Inverse() * global).GetRotationQuaternion());
+        for (int k = 1; k < 3; k++)
+            sk.SetBonePoseRotation(chain.Bones[k], Rotation(sk, chain, k, 0.18f, 0f).GetRotationQuaternion());
+        chain.HasShown = false;
+    }
+
+    /// <summary>The upper arm's and the forearm's lengths in world units, or null until the skeleton is ready.</summary>
+    public (float Upper, float Fore)? Lengths(Arm arm)
+    {
+        var sk = GetSkeleton();
+        if (!_ready || sk == null || arm.Lower < 0 || arm.Hand < 0)
+            return null;
+        float scale = sk.GlobalTransform.Basis.Column0.Length();
+        return (sk.GetBoneRest(arm.Lower).Origin.Length() * scale, sk.GetBoneRest(arm.Hand).Origin.Length() * scale);
     }
 
     private const int Steps = 12;

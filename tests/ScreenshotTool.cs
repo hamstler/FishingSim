@@ -44,6 +44,9 @@ public partial class ScreenshotTool : Node
         if (asked is { Length: 2 } && int.TryParse(asked[0], out int shotW) && int.TryParse(asked[1], out int shotH))
             size = new Vector2I(shotW, shotH);
         GetWindow().Size = size;
+        // FISHSIM_VIEW=0..3 picks the view distance (Bliski..Bardzo daleki) for this run.
+        if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_VIEW"), out int viewSetting))
+            FishingSim.Graphics.GraphicsQuality.SetView((FishingSim.Graphics.ViewDistance)Math.Clamp(viewSetting, 0, 3));
         UserStore.Path = "/tmp/fishsim_shot_users.json";
         await NextFrame();
 
@@ -402,7 +405,12 @@ public partial class ScreenshotTool : Node
             }
             Input.ParseInputEvent(new InputEventKey { Keycode = Key.W, PhysicalKeycode = Key.W, Pressed = false });
             times.Sort();
-            GD.Print($"PERF frames={times.Count} median={times[times.Count / 2]:0.0}ms p95={times[(int)(times.Count * 0.95)]:0.0}ms max={times[^1]:0.0}ms over50={times.Count(x => x > 50)} pos={main.Player.GlobalPosition}\n{FishingSim.Graphics.Perf.Report()}");
+            // What the GPU was given to draw in the last frame (the view distance setting changes these).
+            double objects = Performance.GetMonitor(Performance.Monitor.RenderTotalObjectsInFrame);
+            double draws = Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame);
+            double prims = Performance.GetMonitor(Performance.Monitor.RenderTotalPrimitivesInFrame);
+            GD.Print($"PERF frames={times.Count} median={times[times.Count / 2]:0.0}ms p95={times[(int)(times.Count * 0.95)]:0.0}ms max={times[^1]:0.0}ms over50={times.Count(x => x > 50)} pos={main.Player.GlobalPosition}\n" +
+                     $"DRAW view={FishingSim.Graphics.GraphicsQuality.ViewTitle(FishingSim.Graphics.GraphicsQuality.View)} objects={objects:0} drawcalls={draws:0} primitives={prims / 1e6:0.00}M\n{FishingSim.Graphics.Perf.Report()}");
         }
         else if (mode == 12)
         {
