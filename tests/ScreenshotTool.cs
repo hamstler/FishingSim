@@ -778,6 +778,27 @@ public partial class ScreenshotTool : Node
 
         for (int i = 0; i < frames; i++)
             await NextFrame();
+        // FISHSIM_CLOSEUP = 0 (left, the crank side), 1 (right front), 2 (from below), 3 (over the left shoulder):
+        // a second camera beside the reel and the hands, in any mode.
+        if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_CLOSEUP"), out int close))
+        {
+            var rig = main.Player.Rig;
+            var reel = rig.ToGlobal(new Vector3(0f, 0.1f, -0.06f));
+            var offset = close switch
+            {
+                1 => rig.GlobalTransform.Basis * new Vector3(0.28f, 0.22f, -0.05f),
+                2 => rig.GlobalTransform.Basis * new Vector3(-0.05f, 0.12f, -0.3f),
+                3 => rig.GlobalTransform.Basis * new Vector3(-0.22f, -0.12f, 0.16f),
+                _ => rig.GlobalTransform.Basis * new Vector3(-0.3f, 0.05f, -0.06f),
+            };
+            var cam = new Camera3D { Fov = 40f, Near = 0.01f };
+            main.AddChild(cam);
+            cam.GlobalPosition = reel + offset;
+            cam.LookAt(reel, rig.GlobalTransform.Basis * Vector3.Back);
+            cam.Current = true;
+            for (int i = 0; i < 4; i++)
+                await NextFrame();
+        }
         await Save(output);
         GetTree().Quit();
     }

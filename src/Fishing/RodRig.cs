@@ -30,6 +30,34 @@ public partial class RodRig : Node3D
     /// <summary>The reel seat's radius (the hand wraps round it).</summary>
     public const float SeatRadius = 0.0125f;
 
+    /// <summary>Where the reel's stem leaves the foot under the seat (rig space).</summary>
+    public static readonly Vector3 StemAt = new(0f, SeatCentre - 0.004f, -SeatRadius - 0.004f);
+
+    /// <summary>
+    /// What the hand on the seat must not enter (rig space): the grips, the seat with its hoods and nut, the reel's
+    /// foot, stem and body.
+    /// </summary>
+    public static IEnumerable<(Vector3 A, Vector3 B, float Radius)> SeatObstacles()
+    {
+        yield return (new Vector3(0, -0.3f, 0), new Vector3(0, SeatCentre - 0.062f, 0), 0.0153f);
+        yield return (new Vector3(0, SeatCentre - 0.058f, 0), new Vector3(0, SeatCentre + 0.058f, 0), SeatRadius + 0.001f);
+        yield return (new Vector3(0, SeatCentre - 0.058f, 0), new Vector3(0, SeatCentre - 0.046f, 0), 0.0148f);
+        yield return (new Vector3(0, SeatCentre + 0.044f, 0), new Vector3(0, SeatCentre + 0.08f, 0), 0.016f);
+        yield return (new Vector3(0, SeatCentre + 0.08f, 0), new Vector3(0, BlankStart, 0), 0.0135f);
+        yield return (new Vector3(0, SeatCentre - 0.026f, -SeatRadius - 0.0015f), new Vector3(0, SeatCentre + 0.026f, -SeatRadius - 0.0015f), 0.0025f);
+        yield return (StemAt, new Vector3(0, StemAt.Y + 0.006f, -0.072f), 0.0042f);
+        yield return (ReelBody + new Vector3(0, -0.02f, 0), ReelBody + new Vector3(0, 0.07f, 0), 0.024f);
+    }
+
+    /// <summary>What the hand on the crank must not enter (rig space): the knob, the crank arm, the reel's body.</summary>
+    public static IEnumerable<(Vector3 A, Vector3 B, float Radius)> CrankObstacles(float angle)
+    {
+        var knob = KnobAt(angle);
+        yield return (knob + new Vector3(0.012f, 0f, 0f), knob - new Vector3(0.012f, 0f, 0f), 0.0085f);
+        yield return (CrankAxis + new Vector3(-0.008f, 0f, 0f), knob + new Vector3(0.018f, 0f, 0f), 0.0045f);
+        yield return (ReelBody + new Vector3(0, -0.02f, 0), ReelBody + new Vector3(0, 0.07f, 0), 0.024f);
+    }
+
     private const float SeatCentre = 0.1f;
 
     /// <summary>The reel's body centre below the seat (rig space) and the crank's axis point on its left side.</summary>
@@ -147,7 +175,8 @@ public partial class RodRig : Node3D
         AddChild(reel);
         // Foot clamped in the seat and the stem down to the body, leaning a little forward.
         Box(reel, new Vector3(0.011f, 0.056f, 0.0035f), new Vector3(0, SeatCentre, -SeatRadius - 0.0015f), body, 0.0015f);
-        var stem = Box(reel, new Vector3(0.0085f, 0.016f, 0.06f), new Vector3(0, SeatCentre - 0.004f, -0.045f), body, 0.004f);
+        // The stem is thin along the rod: it passes between the middle and ring fingers of the hand on the seat.
+        var stem = Box(reel, new Vector3(0.013f, 0.0065f, 0.06f), new Vector3(0, StemAt.Y, -0.045f), body, 0.0025f);
         stem.RotationDegrees = new Vector3(-8f, 0f, 0f);
         // Gearbox body: a rounded housing, a trim ring where the rotor turns, a cap at the back.
         reel.AddChild(new MeshInstance3D

@@ -17,7 +17,7 @@ namespace FishingSim.Fishing;
 public partial class FirstPersonBody : Node3D
 {
     // The rod in front of the body, a little right of the middle, so the left hand reaches the crank on the reel's left.
-    private static readonly Vector3 RigBasePosition = new(0.12f, -0.25f, -0.36f);
+    private static readonly Vector3 RigBasePosition = new(0.1f, -0.25f, -0.33f);
     private static readonly Vector3 RigBaseRotation = new(Mathf.DegToRad(-78f), 0f, 0f);
     private static readonly Vector3 WristLocal = new(0.055f, 0.03f, -0.01f);
     private static readonly Vector3 LeftRest = new(-0.3f, -0.75f, -0.25f);
@@ -52,19 +52,22 @@ public partial class FirstPersonBody : Node3D
 
     /// <summary>Where the camera sits on the model (its eyes), in the model's own space (it faces +Z).</summary>
     private static readonly Vector3 Eyes = new(0f, 1.655f, 0.075f);
-    private const float Lean = 0.15f;
+    private const float Lean = 0.2f;
 
     // The right hand's grip in rod-rig space (rod along +Y, reel hanging at -Z, +X to the right): the palm faces the
     // blank from the right, the knuckles run forward and down, so the fingers wrap under the handle.
     private static readonly Vector3 GripHandle = RodRig.GripPoint;
     private static readonly Vector3 GripPalm = new(-1f, 0f, 0.1f);
-    private static readonly Vector3 GripFingers = new(0.05f, 0.6f, -1f);
+    // Fingers straight down the side of the seat, across the rod, so they wrap round it.
+    private static readonly Vector3 GripFingers = new(0.05f, 0.18f, -1f);
 
     /// <summary>0..1 how far the rod should be raised (right mouse button); set by Main from the rod.</summary>
     public Func<float>? RaiseSource { get; set; }
 
     /// <summary>Where one hand should be (world space): wrist, the way the fingers and the palm point, grip, elbow hint.</summary>
-    public readonly record struct HandTarget(Vector3 Wrist, Vector3 Fingers, Vector3 Palm, float Grip, Vector3 Pole);
+    /// <summary>Where a hand goes; <paramref name="Bar"/> = the handle it closes round (the fingers stop on it).</summary>
+    public readonly record struct HandTarget(Vector3 Wrist, Vector3 Fingers, Vector3 Palm, float Grip, Vector3 Pole,
+        World.Props.ArmIK.Capsule? Bar = null);
 
     /// <summary>A tool in the hands (shovel, insect net): both hands go where it says instead of the rod.</summary>
     public Func<(HandTarget Right, HandTarget Left)?>? ToolPose { get; set; }
@@ -237,6 +240,10 @@ public partial class FirstPersonBody : Node3D
                 arm.Palm = t.Palm;
                 arm.Grip = t.Grip;
                 arm.Pole = t.Pole;
+                arm.Splay = 0f;
+                arm.Obstacles.Clear();
+                if (t.Bar is { } bar)
+                    arm.Obstacles.Add(bar);
             }
             return;
         }
@@ -245,8 +252,18 @@ public partial class FirstPersonBody : Node3D
         var fingers = (rigBasis * GripFingers).Normalized();
         ik.Right.Palm = palm;
         ik.Right.Fingers = fingers;
-        // The hand closes round the reel seat, the reel's stem between the middle and ring fingers.
-        ik.Right.Wrist = _rig.ToGlobal(GripHandle) - palm * (RodRig.SeatRadius + 0.024f) - fingers * 0.062f;
+        // The hand closes round the reel seat, the reel's stem between the middle and ring fingers: the hand slides
+        // along the rod until the gap between those knuckles lies over the stem, the two fingers spread a little, and
+        // every finger closes only until it touches the seat (not into it).
+        var wrist = _rig.ToGlobal(GripHandle) - palm * (RodRig.SeatRadius + 0.024f) - fingers * 0.062f;
+        var rodAxis = (rigBasis * Vector3.Up).Normalized();
+        if (_ik.KnuckleGap(ik.Right, fingers, palm) is Vector3 gap)
+            wrist += rodAxis * (_rig.ToGlobal(RodRig.StemAt) - (wrist + gap)).Dot(rodAxis);
+        ik.Right.Wrist = wrist;
+        ik.Right.Splay = 0.11f;
+        ik.Right.Obstacles.Clear();
+        foreach (var (a, b, r) in RodRig.SeatObstacles())
+            ik.Right.Obstacles.Add(new World.Props.ArmIK.Capsule(_rig.ToGlobal(a), _rig.ToGlobal(b), r));
         ik.Right.Pole = ToGlobal(new Vector3(0.5f, -0.6f, 0.35f));
         ik.Right.Grip = 0.9f;
 
@@ -283,6 +300,12 @@ public partial class FirstPersonBody : Node3D
         ik.Left.Palm = basis * p;
         ik.Left.Pole = ToGlobal(new Vector3(-0.6f, -0.55f, 0.25f));
         ik.Left.Grip = Mathf.Lerp(Mathf.Lerp(0.35f, 0.75f, _leftOnReel), 0.3f, _leftOnFish);
+        // On the crank the fingers close round the knob and stop on it.
+        ik.Left.Splay = 0f;
+        ik.Left.Obstacles.Clear();
+        if (_leftOnReel > 0.5f && _leftOnFish < 0.5f)
+            foreach (var (a, b, r) in RodRig.CrankObstacles(_crank))
+                ik.Left.Obstacles.Add(new World.Props.ArmIK.Capsule(_rig.ToGlobal(a), _rig.ToGlobal(b), r));
     }
 
     /// <summary>Places a unit-height cylinder so it runs from <paramref name="a"/> to <paramref name="b"/>.</summary>
