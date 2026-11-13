@@ -47,6 +47,25 @@ obozowisko (krąg kamieni, trójnóg, kłody, drewno, wbita łopata, wiadro), a 
 ogień (płomienie, iskry, dym, migoczące światło, trzask) i gotujesz rybę z siatki: rybę z rożna albo zupę rybną w
 garnku. Posiłek daje premię na kilka godzin gry (więcej XP, szybsze brania), widoczną na HUD.
 
+**Podrywka:** kwadratowa siatka na dwóch skrzyżowanych pałąkach, na długiej tyczce (kram, od 2. poziomu). Pierwsze LPM
+opuszcza ją do wody przed tobą (z brzegu, z płycizny albo z pomostu; jeśli masz chleb, kruszysz kromkę nad siatką),
+siatka kołysze się na lince i osiada na dnie. Po chwili drugie LPM ją podrywa: ukleje, płotki, kiełbie i okonki
+trzepoczą w oczkach siatki, a potem trafiają do przynęt jako żywce. Najwięcej drobnicy jest o świcie i zmierzchu,
+przy roślinach wodnych i nad pokruszonym chlebem; im dłużej siatka leży, tym więcej ryb nad nią wpłynie (HUD liczy
+sekundy).
+
+**Grzybobranie:** w lasach rosną borowiki (przy pniach), kurki (w mchu pod świerkami i sosnami) i krzaczki jagód. E
+zbiera je do spiżarni; zebrane miejsce odrasta po dobie gry, a po deszczu grzybów jest więcej. Ze spiżarni przy ognisku
+powstają nowe dania: ryba z kurkami, zupa rybna z borowikami (najmocniejsza premia) i kompot z jagód (bez ryby).
+
+**Wędzarnia:** w każdej wiosce stoi wędzarnia z wędzarzem. Wybierasz ryby z siatki, płacisz za olchowe drewno, a po
+dwóch godzinach gry odbierasz złociste wędzonki: nie tracą świeżości, a wędzarz płaci za nie 1,8 raza tyle co skup
+(mniej za ryby zmęczone w siatce). Niewymiarowych i bardzo małych ryb wędzarz nie przyjmie.
+
+**Tablica ogłoszeń:** na placu wioski mieszkańcy codziennie przypinają trzy zlecenia: ryby danego gatunku i wagi na
+obiad, przynęty (robaki, rosówki, jętki, żywce), grzyby lub jagody albo wędzoną rybę. Gdy masz, czego potrzebują,
+oddajesz to przyciskiem i dostajesz pieniądze oraz doświadczenie. Następnego dnia pojawiają się nowe ogłoszenia.
+
 **Codzienne życie wiosek:** przy domach schnie pranie na sznurach, drwal rąbie drewno przy pieńku z siekierą, stoją
 stojaki z widłami, grabiami i łopatą, na żerdziach suszą się sieci z pływakami, na wsiach ogrodnik podlewa grządki, a
 przy palenisku siedzą i rozmawiają mieszkańcy. Na brzegu obok pomostu leżą wyciągnięte łodzie z wiosłami.
@@ -141,9 +160,12 @@ repozytorium, więc lepiej przebudowywać tylko zmienione gatunki. Opis całego 
 | Spacja | kasarek (podbierak): wyjmuje rybę przy brzegu. Trzeba go kupić; bez kasarka Spacja nic nie robi |
 | Kółko myszy | hamulec (wartość w procentach w prawym dolnym rogu) |
 | E / R (zaraz po złowieniu) | ryba do siatki / do wody (+3 XP) |
-| Q (Shift+Q wstecz) | narzędzie w ręku: wędka, łopata, siatka na owady (łopatę i siatkę kupisz w kramie) |
+| Q (Shift+Q wstecz) | narzędzie w ręku: wędka, łopata, siatka na owady, podrywka (kupisz je w kramie) |
 | LPM z łopatą / siatką | kopanie (robaki, rosówki, pędraki) / zamach siatką (jętki, koniki polne, chrabąszcze) |
-| E przy ognisku | panel ogniska: rozpalenie i gotowanie ryb z siatki |
+| LPM z podrywką | opuszczenie do wody, drugie LPM poderwanie (żywce) |
+| E przy ognisku | panel ogniska: rozpalenie i gotowanie ryb z siatki (i grzybów ze spiżarni) |
+| E przy grzybach / jagodach | zbieranie do spiżarni |
+| E przy wędzarni / tablicy ogłoszeń | wędzenie ryb z siatki / zlecenia mieszkańców |
 | 1-6 (Shift = wstecz) | wędka, kołowrotek, żyłka, hak, przynęta, przypon (tylko przed rzutem) |
 | I / M / J / T | ekwipunek, mapa, dziennik, turnieje |
 | E | wejście do kramu, gildii, na targ lub na postój wozów (przy drzwiach budynku) |
@@ -206,7 +228,7 @@ Przy dodawaniu: nowa ryba = plik w `data/fish/`, wpis w `SpeciesCatalog.Paths` i
 - **Turnieje** (T): wpisowe, dojazd na łowisko, wynik to suma N najcięższych ryb, rywale to boty o różnych umiejętnościach. Nagrody (pieniądze i XP) według miejsca, historia w zapisie.
 
 ## Zapis gry
-`user://saves/<login>.json` (pieniądze, XP, sprzęt, przynęty, siatka, rekordy, dziennik, historia turniejów, łowisko, godzina). Zapisy z wersji w GDScript wczytują się bez zmian, a hasze w `users.json` pozostają ważne.
+`user://saves/<login>.json` (pieniądze, XP, sprzęt, przynęty, siatka, rekordy, dziennik, historia turniejów, łowisko, godzina, posiłek, spiżarnia, ryby w wędzarni i wędzonki, ogłoszenia dnia). Zapisy z wersji w GDScript wczytują się bez zmian, a hasze w `users.json` pozostają ważne.
 
 ## Testy
 ```

@@ -513,6 +513,76 @@ public partial class ScreenshotTool : Node
             await ToSignal(GetTree().CreateTimer(at), SceneTreeTimer.SignalName.Timeout);
             GD.Print($"tools: {main.Tools.Current} at {stand} ground {lake.GroundKindAt(stand.X, stand.Z)} haul {main.Tools.LastHaul?.Message}");
         }
+        else if (mode == 29)
+        {
+            // The village and the woods: arg 0 = the notice board, 1 = its panel, 2 = the smokehouse with its smoker,
+            // 3 = the smokehouse's panel, 4 = porcini, 5 = chanterelles, 6 = blueberries, 7 = the cooking panel with
+            // the mushroom dishes.
+            var profile = main.Rod.Profile;
+            profile.Money += 1000;
+            var lake = main.Rod.Lake;
+            void Face(Vector3 from, Vector3 at, float pitchDeg)
+            {
+                main.Player.GlobalPosition = new Vector3(from.X, lake.HeightAt(from.X, from.Z) + 0.3f, from.Z);
+                var d = at - from;
+                main.Player.Rotation = new Vector3(0f, MathF.Atan2(-d.X, -d.Z), 0f);
+                main.Player.Camera.RotationDegrees = new Vector3(pitchDeg, 0f, 0f);
+            }
+            var species = main.Rod.Species;
+            FishSpecies Sp(string file) => GD.Load<FishSpecies>($"res://data/fish/{file}.tres");
+            if (arg is 0 or 1 && main.Scenery.NoticeBoard is { } board)
+            {
+                var front = board.GlobalTransform * new Vector3(0.4f, 0f, 3.2f);
+                Face(front, board.GlobalPosition + Vector3.Up * 1.4f, -4f);
+                if (arg == 1)
+                {
+                    profile.Keep(Sp("ploc"), 0.4f);
+                    profile.AddPantry(new Dictionary<string, int> { ["kurka"] = 9, ["borowik"] = 3 });
+                    main.Board.Open();
+                }
+            }
+            else if (arg is 2 or 3 && main.Scenery.Interactables.FirstOrDefault(i => i.Kind == FishingSim.World.InteractKind.Smokehouse) is { } smoke)
+            {
+                var house = main.Scenery.Markers.FirstOrDefault(m => m.Label == "Wędzarnia");
+                var hp = new Vector3(house.Position.X, smoke.GlobalPosition.Y, house.Position.Y);
+                var out_ = (smoke.GlobalPosition - hp).Normalized();
+                var side = out_.Cross(Vector3.Up);
+                Face(smoke.GlobalPosition + out_ * 4.5f + side * 2.2f, hp + Vector3.Up * 1.3f, -2f);
+                if (arg == 3)
+                {
+                    profile.Keep(Sp("ploc"), 0.42f);
+                    profile.Keep(Sp("okon"), 0.36f);
+                    profile.Keep(Sp("leszcz"), 1.2f);
+                    profile.Keep(Sp("ploc"), 0.05f);
+                    profile.Keep(Sp("szczupak"), 2.4f);
+                    profile.StartSmoking(new[] { 4 }, out _);
+                    profile.Smoked.Add(new CatchRecord("Węgorz", 0.8f, 96));
+                    main.Smokehouse.Open();
+                }
+            }
+            else if (arg is 4 or 5 or 6)
+            {
+                var kind = arg == 4 ? FishingSim.Core.Camp.ForageKind.Porcini : arg == 5 ? FishingSim.Core.Camp.ForageKind.Chanterelle : FishingSim.Core.Camp.ForageKind.Blueberry;
+                var patch = main.Scenery.Forage.FirstOrDefault(p => p.Kind == kind) ?? main.Scenery.Forage.First();
+                var at = patch.GlobalPosition;
+                Face(at + new Vector3(0.55f, 0f, 0.75f), at, -48f);
+                main.Player.Camera.Position = new Vector3(0f, 0.9f, 0f);
+            }
+            else if (arg == 7)
+            {
+                main.Gear.Buy(GearSlot.Accessory, GD.Load<TackleItem>("res://data/tackle/accessories/garnek.tres"));
+                profile.Keep(Sp("ploc"), 0.35f);
+                profile.Keep(Sp("okon"), 0.42f);
+                profile.AddPantry(new Dictionary<string, int> { ["kurka"] = 6, ["borowik"] = 1, ["jagody"] = 15 });
+                var camp = main.Scenery.Campfires.First(c => c.PlayerCamp);
+                Face(main.Scenery.CampPosition + new Vector3(2.6f, 0f, 2.6f), main.Scenery.CampPosition, -18f);
+                main.Cooking.Open(camp);
+                main.Cooking.LightFire();
+            }
+            for (int i = 0; i < 40; i++)
+                await NextFrame();
+            GD.Print($"village shot {arg}: notices {profile.Notices.Count}, forage {main.Scenery.Forage.Count}");
+        }
         else if (mode == 28)
         {
             // The lift net from the bank: arg 0 = down in the water, 1 = lifted with the catch flapping in it,
