@@ -233,6 +233,7 @@ public partial class Scenery : Node3D
         Interactables.Clear();
         Markers.Clear();
         Stats.Clear();
+        _reserved.Clear();
         _lastDaylight = -1f;
 
         var loc = _lake.Location;
@@ -389,6 +390,7 @@ public partial class Scenery : Node3D
                 AddChild(board);
                 Track(board);
                 NoticeBoard = board;
+                _reserved.Add((p, 4f));
                 var front = p + toPlaza.Normalized() * 1.4f;
                 var spot = new Interactable
                 {
@@ -460,6 +462,7 @@ public partial class Scenery : Node3D
         AddChild(root);
         Track(root);
         Campfires.Add(fire);
+        _reserved.Add((at, 4.5f));
         var spot = new Interactable { Kind = InteractKind.Campfire, Title = title, Radius = 3.2f, Position = root.Position, Target = fire };
         AddChild(spot);
         Track(spot);
@@ -643,10 +646,16 @@ public partial class Scenery : Node3D
 
     // ------------------------------------------------------------------ placement helpers
     /// <summary>Keeps plants off the pier approach, building pads and paths.</summary>
+    /// <summary>Spots kept free of trees and plants (the notice board, the campfires): centre and radius.</summary>
+    private readonly List<(Vector2 At, float Radius)> _reserved = new();
+
     private bool Clear(LocationData loc, float x, float z, float padMargin = 2.5f, float pathMargin = 2.2f)
     {
         if (MathF.Abs(x) < 14f && z > -8f && z < 14f)
             return false;
+        foreach (var (at, radius) in _reserved)
+            if (new Vector2(x, z).DistanceTo(at) < radius)
+                return false;
         var layout = _lake.Layout;
         return layout.PadDistance(x, z) > padMargin && layout.PathDistance(x, z) > pathMargin;
     }
