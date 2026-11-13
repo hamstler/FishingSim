@@ -97,6 +97,7 @@ public partial class Main : Node3D
         Player.ActionSource = () => ActionFor(Rod.State);
         Player.Body.RaiseSource = () => Rod.Lifting && Rod.State is RodState.Nibble or RodState.Bite or RodState.Fight or RodState.Close or RodState.Waiting ? 1f : 0f;
         Player.Body.ReelingSource = () => Rod.Reeling && Rod.State is RodState.Waiting or RodState.Fight or RodState.Nibble or RodState.Bite;
+        Player.Body.RigOnRest = () => Rod.OnRest;
 
         // Camp life: the shovel and the insect net (Q), the holes they leave, the mayflies over the shore at dusk.
         Swarms = new InsectSwarms();
@@ -180,6 +181,7 @@ public partial class Main : Node3D
         // The mood of the map (water colour, mist) follows the location; a new map also means a new start on the pier.
         ApplyMood();
         _lake.Rebuilt += ApplyMood;
+        _lake.Rebuilt += Rod.Groundbait.Clear;
         _lake.Rebuilt += RespawnPlayer;
         _lake.Rebuilt += ReleaseLoadingGarbage;
         _profile.Changed += Save;
@@ -362,6 +364,7 @@ public partial class Main : Node3D
         _world.HoursAdvanced -= _profile.PassTime;
         _gear.GearChanged -= ApplyGearEffects;
         _lake.Rebuilt -= RespawnPlayer;
+        _lake.Rebuilt -= Rod.Groundbait.Clear;
         _lake.Rebuilt -= ReleaseLoadingGarbage;
         _lake.Rebuilt -= ApplyMood;
     }

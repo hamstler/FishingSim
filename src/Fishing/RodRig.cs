@@ -119,7 +119,9 @@ public partial class RodRig : Node3D
             float r0 = Mathf.Lerp(0.0078f, 0.0017f, MathF.Pow(t0, 0.85f)), r1 = Mathf.Lerp(0.0078f, 0.0017f, MathF.Pow(t1, 0.85f));
             var seg = new Node3D { Position = new Vector3(0, yOffset, 0) };
             parent.AddChild(seg);
-            Cyl(seg, r1, r0, SegmentLength, new Vector3(0, SegmentLength * 0.5f, 0), blank, 10);
+            var blankMesh = Cyl(seg, r1, r0, SegmentLength, new Vector3(0, SegmentLength * 0.5f, 0), blank, 10);
+            _blankMeshes.Add(blankMesh);
+            _blankMaterial = blank;
             if (guides.TryGetValue(i, out var g))
                 Guide(seg, SegmentLength * 0.55f, Mathf.Lerp(r0, r1, 0.55f), g.Ring, g.Height, chrome, whip);
             if (i == 0)
@@ -147,6 +149,27 @@ public partial class RodRig : Node3D
         parent.AddChild(top);
         Tip = new Node3D { Position = new Vector3(0, SegmentLength, 0) };
         parent.AddChild(Tip);
+    }
+
+    private readonly List<MeshInstance3D> _blankMeshes = new();
+    private Material? _blankMaterial;
+    private Material? _quiverMaterial;
+
+    /// <summary>
+    /// A bottom rod's quiver tip: the last two sections of the blank painted bright (white and signal orange, a little
+    /// self-lit) so the smallest pluck on the bait shows against the water; other rods keep the lacquered blank.
+    /// </summary>
+    public void SetQuiverTip(bool on)
+    {
+        if (_blankMeshes.Count < 2 || _blankMaterial == null)
+            return;
+        _quiverMaterial ??= BuildingFactory.Pixel(new StandardMaterial3D
+        {
+            AlbedoColor = new Color(1f, 0.45f, 0.12f), Roughness = 0.35f,
+            EmissionEnabled = true, Emission = new Color(1f, 0.4f, 0.1f), EmissionEnergyMultiplier = 0.35f,
+        });
+        for (int i = _blankMeshes.Count - 2; i < _blankMeshes.Count; i++)
+            _blankMeshes[i].MaterialOverride = on ? _quiverMaterial : _blankMaterial;
     }
 
     /// <summary>A guide under the blank: a ring standing on a two-legged frame, whipped to the blank.</summary>

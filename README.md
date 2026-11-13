@@ -6,6 +6,37 @@ Wolna gra na licencji **GNU GPL 3.0 lub nowszej**: możesz ją kopiować, zmieni
 
 **Doba:** dzień (06:00-18:00) trwa 40 minut, noc 20 minut czasu rzeczywistego (`src/Core/DayClock.cs`). W prawym górnym rogu jest minimapa (120 m wokół gracza) i zegar z tarczą dnia i nocy, pogodą i czasem do zmroku lub świtu.
 
+**Metody połowu:** metodę wyznacza zestaw.
+- **Spławik:** przynęta naturalna na wędce spławikowej.
+- **Spinning:** przynęta sztuczna na dowolnej wędce, najlepiej na spinningowej. Na linie wisi wtedy prawdziwa przynęta:
+  obrotówka z wirującym skrzydełkiem, kołysząca się wahadłówka, wobler ze sterem, guma na główce z machającym
+  ogonkiem albo mucha. Każda prowadzi się inaczej:
+  - obrotówka tonie powoli i wypływa przy szybkim zwijaniu;
+  - wahadłówka tonie szybko i chodzi głęboko;
+  - wobler unosi się, gdy stoi, a nurkuje tym głębiej, im szybciej się go zwija;
+  - guma spada prosto na dno i bierze „na opadzie” albo tuż po poderwaniu (metoda stop and go);
+  - mucha płynie po powierzchni.
+
+  LPM zwija (Shift szybciej), puszczona przynęta opada, PPM to podszarpnięcie (przynęta odskakuje i błyska). Pasek stanu
+  pokazuje rodzaj przynęty, jej głębokość nad dnem i ocenę prowadzenia (za wolno, dobre prowadzenie, za szybko, stoi,
+  opada). Od jakości prowadzenia zależy tempo brań. Drapieżnik uderzający w zwijaną przynętę często sam się zacina
+  (szczupak, boleń), a po uderzeniu na zacięcie jest mniej czasu niż przy spławiku. Przynęta wleczona po dnie może
+  złapać zaczep: PPM szarpie (co trzeci raz puszcza, czasem zrywa linkę), LPM ciągnie (po 4 s linka pęka, przynęta
+  przepada).
+- **Grunt:** przynęta naturalna na wędce gruntowej lub karpiowej. Leci koszyczek zanętowy: jeśli przynęty jest więcej
+  niż jedna sztuka, jedna idzie do koszyczka jako zanęta. Koszyczek opada na dno, linka się napina, a brania widać na
+  jaskrawej szczytówce: najpierw drgania, potem wyraźne ściągnięcie. Na zacięcie jest więcej czasu niż przy spławiku.
+  Zanęta z koszyczka nęci miejsce: kolejne rzuty w to samo miejsce (do 5 m) przyspieszają brania nawet prawie
+  trzykrotnie, a ryby zbierają się nad zanętą. Nęcone miejsce słabnie w ciągu paru godzin gry. LPM powoli przeciąga
+  zestaw po dnie.
+- **Podpórka (Z):** wędkę spławikową lub gruntową z zarzuconym zestawem odkłada się na podpórkę. Bez zakupu jest to
+  rozwidlony patyk z leszczyny, a z „Podpórką z dzwoneczkiem” metalowa podpórka z dzwonkiem, który dzwoni i kołysze
+  się przy braniu. Ręce są wtedy wolne i można się oddalić, ale zaciąć (PPM) da się tylko z bliska (do 3,5 m): wędka
+  wraca wtedy do rąk. Z przy podpórce podnosi wędkę.
+
+**Grafika na laptopie:** przy pierwszym uruchomieniu na zintegrowanej grafice gra sama ustawia jakość Niską, bliski
+zasięg widzenia i 3D w 70% (FSR). Wszystko to można zmienić w menu pauzy. Na Niskiej nie ma też poświaty (bloom).
+
 **Ryby:** 66 gatunków (rodzime i zadomowione), każdy z nazwą łacińską i opisem. Skóry są malowane w kodzie piksel po pikselu: łuski z ciemnymi krawędziami, linia boczna, pokrywa skrzelowa, plamki z obwódkami, pręgi, marmurkowanie, lustra karpia, tarczki jesiotra, plus mapa normalnych. Ryba na haku, na panelu połowu i w atlasie dostaje skórę 4096×2048 (2048×1024 na niskiej jakości), ryby w wodzie 512×256. **Atlas ryb** jest w menu głównym i w menu pauzy: obracający się model 3D, opis, wagi, cena, przynęty, głębokość, pora i łowiska, wyszukiwarka i filtr łowiska.
 
 **Hol:** ryba ma prawdziwą pozycję, kierunek i prędkość: płynie najwyżej z prędkością zrywu wynikającą z długości ciała (płoć ok. 1 m/s, duży karp czy szczupak 3 m/s), skręca z ograniczoną szybkością i kołysze się na napiętej lince jak wahadło, zamiast przeskakiwać. Linkę zabiera tylko wtedy, gdy przeciąga hamulec, a wędkarz zyskuje linkę powoli, póki ryba ciągnie. Walka zaczyna się od pierwszego odjazdu zaraz po zacięciu, wędka szarpie przy każdym zrywie, a zmęczenie zależy od tego, jak mocno ryba walczy z hamulcem. Płoć to ok. pół minuty, karp 12 kg ok. 2 minuty na sprzęcie karpiowym (na teleskopie wyciąga całą linkę). Startowy zestaw jest słaby (kij 2,4 kg, hamulec 2 kg).
@@ -206,6 +237,8 @@ repozytorium, więc lepiej przebudowywać tylko zmienione gatunki. Opis całego 
 | H | sterowanie |
 | F1 | konsola deweloperska: F2 natychmiastowe branie, F3 nieśmiertelna żyłka, F4 gatunek, F5 reset rzutu, F6 przynęty, F7 +3 godz., F8 pogoda, F9 reset postępu, F10 +1000 gr |
 | F11 | licznik wydajności (FPS, CPU, GPU, pamięć, najwolniejsze systemy) |
+| Z | wędka na podpórkę / podnieś (spławik, grunt) |
+| Shift + LPM | szybkie zwijanie przynęty (spinning) |
 
 ## Świat
 - **Cała mapa jest do chodzenia:** brzeg, wzgórza, wioska. Wchodzić można tylko w płytką wodę (do 0,5 m), a pomost jest jednym z miejsc do łowienia. Łowić można z dowolnego miejsca na brzegu.

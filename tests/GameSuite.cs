@@ -8,6 +8,7 @@ using FishingSim.Accounts;
 using FishingSim.Core;
 using FishingSim.Data;
 using FishingSim.Fishing;
+using FishingSim.Core.Methods;
 using FishingSim.Progress;
 using FishingSim.UI;
 using FishingSim.World;
@@ -85,6 +86,111 @@ public sealed class GameSuite : ITestSuite
         await t.NextFrame();
         await t.NextFrame();
         return main;
+    }
+
+    /// <summary>Spinning (a lure led, twitched, struck) and bottom fishing (feeder, groundbait, the rod rest).</summary>
+    private static async Task SpinningAndBottom(TestContext t, Main main)
+    {
+        t.Section("spinning and bottom fishing");
+        var rod = main.Rod;
+        var loadout = rod.Loadout;
+        var profile = rod.Profile;
+        int RodIndex(string id) => loadout.Items(TackleSlot.Rod).ToList().FindIndex(i => i.ItemId == id);
+        int BaitIndex(string id) => loadout.Items(TackleSlot.Bait).ToList().FindIndex(i => i.ItemId == id);
+        int rodBefore = loadout.Index[(int)TackleSlot.Rod], baitBefore = loadout.Index[(int)TackleSlot.Bait];
+        profile.Owned["rod"].Add("cisowy_spinning");
+        profile.Owned["rod"].Add("grabowy_gruntowy");
+        loadout.BaitCounts["blystka_obrotowa"] = 1;
+        loadout.Index[(int)TackleSlot.Rod] = RodIndex("cisowy_spinning");
+        loadout.Index[(int)TackleSlot.Bait] = BaitIndex("blystka_obrotowa");
+        rod.ApplyTackle();
+        rod.DevInstantBite = false;
+        rod.DevSpeciesIndex = -1;
+        t.Check(rod.Method == FishingSim.Core.Methods.FishingMethod.Spinning && loadout.Ready, "a lure on a spinning rod fishes by spinning");
+        rod.CastNow(0.9f);
+        await WaitForState(t, rod, RodState.Waiting, 6);
+        t.Check(rod.State == RodState.Waiting && rod.Lure != null && rod.CastMethod == FishingSim.Core.Methods.FishingMethod.Spinning,
+            $"the spinner lands ({rod.State})");
+        await t.Seconds(1.2);
+        float sank = rod.Lure?.Depth ?? 0f;
+        t.Check(sank > 0.25f && rod.Bobber.GlobalPosition.Y < -0.2f, $"left alone it sinks ({sank:0.00} m, y {rod.Bobber.GlobalPosition.Y:0.00})");
+        float outBefore = rod.LineOut;
+        rod.ReelOverride = true;
+        await t.Seconds(1.0);
+        var lure = rod.Lure;
+        t.Check(lure != null && rod.LineOut < outBefore - 0.3f && lure.Speed > 0f && rod.Reeling,
+            $"reeling draws it in ({outBefore:0.0} -> {rod.LineOut:0.0} m, {lure?.Judgement.Title()})");
+        rod.ReelOverride = false;
+        await t.NextFrame();
+        float beforeTwitch = rod.LineOut;
+        rod.TryHook();
+        // physics_frame is emitted before the nodes' physics step: wait for two, so one step has run.
+        await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+        await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+        t.Check(rod.State == RodState.Waiting && rod.LineOut < beforeTwitch - 0.05f, $"RMB twitches the lure: it darts towards the angler ({beforeTwitch:0.00} -> {rod.LineOut:0.00} m, {rod.Lure?.Judgement.Title()}, banner {rod.BannerText}, depth {rod.Lure?.Depth:0.00})");
+        rod.ResetToIdle();
+        t.Check(rod.Lure == null && rod.State == RodState.Idle, "reset takes the lure out");
+
+        int pikeIndex = rod.Species.ToList().FindIndex(sp => sp.SpeciesName == "Szczupak");
+        rod.DevInstantBite = true;
+        rod.DevSpeciesIndex = pikeIndex;
+        rod.CastNow(0.9f);
+        await WaitForState(t, rod, RodState.Waiting, 6);
+        rod.ReelOverride = true;
+        double waited = 0;
+        while (rod.State == RodState.Waiting && waited < 8)
+        {
+            await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+            waited += 1.0 / Engine.PhysicsTicksPerSecond;
+        }
+        t.Check(rod.State is RodState.Nibble or RodState.Bite or RodState.Fight, $"a pike hits the lure being reeled ({rod.State})");
+        if (rod.State is RodState.Nibble or RodState.Bite)
+            rod.TryHook();
+        t.Check(rod.State == RodState.Fight && !rod.Bobber.TerminalVisible, $"struck (or hooked by itself) it fights, the lure in its mouth ({rod.State})");
+        rod.ReelOverride = false;
+        rod.ResetToIdle();
+
+        // Bottom: the feeder, the baited spot, the rod rest.
+        loadout.BaitCounts["worm"] = 10;
+        loadout.Index[(int)TackleSlot.Rod] = RodIndex("grabowy_gruntowy");
+        loadout.Index[(int)TackleSlot.Bait] = BaitIndex("worm");
+        rod.ApplyTackle();
+        t.Check(rod.Method == FishingSim.Core.Methods.FishingMethod.Bottom, "bait on a bottom rod lies on the bottom");
+        rod.DevSpeciesIndex = -1;
+        rod.DevInstantBite = true;
+        rod.Groundbait.Clear();
+        int worms = loadout.BaitCount;
+        rod.CastNow(0.8f);
+        await WaitForState(t, rod, RodState.Waiting, 6);
+        t.Check(rod.State == RodState.Waiting && rod.FeederLoaded && loadout.BaitCount == worms - 1,
+            $"the feeder takes one worm as groundbait ({worms} -> {loadout.BaitCount})");
+        bool rested = rod.PutOnRest();
+        t.Check(rested && rod.OnRest && main.Player.Rig.GetParent() is RodRest && rod.NearRest,
+            $"Z lays the rod on a rest in front of the angler ({rod.BannerText})");
+        rod.ReelOverride = true;
+        await t.NextFrame();
+        await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+        t.Check(!rod.Reeling, "a rod on its rest is not reeled");
+        rod.ReelOverride = false;
+        waited = 0;
+        while (!rod.RigSettled && waited < 8)
+        {
+            await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+            waited += 1.0 / Engine.PhysicsTicksPerSecond;
+        }
+        t.Check(rod.RigSettled && rod.Bobber.GlobalPosition.Y < -0.3f && rod.GroundbaitHeat > 0.5f,
+            $"the feeder sinks to the bottom (y {rod.Bobber.GlobalPosition.Y:0.0}) and baits the spot ({rod.GroundbaitHeat:0.00})");
+        await WaitForState(t, rod, RodState.Bite, 10);
+        t.Check(rod.State == RodState.Bite && rod.OnRest, $"a bite shows on the rod lying on its rest ({rod.State})");
+        rod.TryHook();
+        t.Check(rod.State == RodState.Fight && !rod.OnRest && main.Player.Rig.GetParent() == main.Player.Camera,
+            "RMB from close by picks the rod up and strikes");
+        rod.ResetToIdle();
+        rod.DevInstantBite = false;
+        rod.DevSpeciesIndex = -1;
+        loadout.Index[(int)TackleSlot.Rod] = rodBefore;
+        loadout.Index[(int)TackleSlot.Bait] = baitBefore;
+        rod.ApplyTackle();
     }
 
     private static async Task WaitForState(TestContext t, FishingRod rod, RodState wanted, double maxSeconds = 25)
@@ -283,6 +389,8 @@ public sealed class GameSuite : ITestSuite
         t.Check(profile.Money == money0 + value && profile.Keepnet.Count == 0, "selling in the shop pays out");
         shop.Toggle();
         t.Check(!shop.Visible && !rod.InputBlocked, "closing the shop re-enables input");
+
+        await SpinningAndBottom(t, main);
 
         t.Section("broken gear and the free kit");
         rod.DevUnbreakable = false;

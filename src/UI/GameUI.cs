@@ -279,7 +279,7 @@ public partial class GameUI : CanvasLayer
         HookData h => $"Rozmiar #{Mathf.RoundToInt(h.Size)} | większy hak = większe ryby, ale gorzej bierze drobnica",
         LeaderData d when d.ItemId == TackleSlotExtensions.NoLeader => "Linka idzie prosto do haczyka (szczupak może ją przegryźć)",
         LeaderData d => $"Wytrzymałość {d.Strength:0} kg | widoczność x{d.Visibility:0.00} | odporność na zęby {d.BiteProof * 100f:0}%",
-        BaitData { Kind: BaitKind.Lure } b => $"Przynęta sztuczna, masz {_profile.BaitCounts.GetValueOrDefault(b.ItemId)} szt. Bierze tylko podczas zwijania (LPM).",
+        BaitData { Kind: BaitKind.Lure } b => $"Przynęta sztuczna, masz {_profile.BaitCounts.GetValueOrDefault(b.ItemId)} szt. Spinning: prowadź zwijając (LPM, Shift szybciej), PPM podszarpuje.",
         _ => $"Zapas: {_profile.BaitCounts.GetValueOrDefault(item.ItemId)} szt.",
     };
 

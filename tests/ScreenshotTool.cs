@@ -76,6 +76,57 @@ public partial class ScreenshotTool : Node
             return;
         }
 
+        if (mode == 33 && arg == 0)
+        {
+            // The end tackle in a studio: the five lures (spinner, spoon, wobbler, jig, fly) side on, the feeder full
+            // of groundbait and the float.
+            var root3d = new Node3D();
+            GetTree().Root.AddChild(root3d);
+            var env = new Godot.Environment
+            {
+                BackgroundMode = Godot.Environment.BGMode.Color, BackgroundColor = new Color(0.2f, 0.27f, 0.3f),
+                AmbientLightSource = Godot.Environment.AmbientSource.Color, AmbientLightColor = new Color(0.6f, 0.66f, 0.72f), AmbientLightEnergy = 0.7f,
+                TonemapMode = Godot.Environment.ToneMapper.Aces,
+            };
+            root3d.AddChild(new WorldEnvironment { Environment = env });
+            root3d.AddChild(new DirectionalLight3D { RotationDegrees = new Vector3(-40, 25, 0), LightEnergy = 1.6f, LightColor = new Color(1f, 0.96f, 0.88f) });
+            root3d.AddChild(new OmniLight3D { Position = new Vector3(0f, 0.3f, 0.4f), LightEnergy = 0.6f, OmniRange = 2f });
+            var families = Enum.GetValues<FishingSim.Core.Methods.LureFamily>();
+            var pieces = new List<FishingSim.Fishing.Bobber>();
+            for (int i = 0; i < families.Length + 2; i++)
+            {
+                var b = new FishingSim.Fishing.Bobber();
+                root3d.AddChild(b);
+                pieces.Add(b);
+            }
+            await NextFrame();
+            for (int i = 0; i < pieces.Count; i++)
+            {
+                var b = pieces[i];
+                var method = i < families.Length ? FishingSim.Core.Methods.FishingMethod.Spinning
+                    : i == families.Length ? FishingSim.Core.Methods.FishingMethod.Bottom : FishingSim.Core.Methods.FishingMethod.Float;
+                b.SetTerminal(method, i < families.Length ? families[i] : default);
+                b.FeederLoaded = true;
+                b.LureSpeed = 0.8f;
+                b.Heading = Mathf.Pi / 2f;
+                b.Visible = true;
+                // The lures in a row, the feeder and the float under them.
+                var at = i < families.Length ? new Vector3(-0.28f + i * 0.14f, 0.07f, 0f)
+                    : method == FishingSim.Core.Methods.FishingMethod.Bottom ? new Vector3(-0.12f, -0.06f, 0f) : new Vector3(0.14f, -0.16f, 0f);
+                b.Hold(at);
+            }
+            var cam = new Camera3D { Fov = 30f, Current = true, Near = 0.01f };
+            root3d.AddChild(cam);
+            cam.Position = new Vector3(0f, 0.0f, 0.95f);
+            cam.LookAt(new Vector3(0f, -0.01f, 0f));
+            for (int i = 0; i < 30; i++)
+                await NextFrame();
+            GetViewport().GetTexture().GetImage().SavePng(output);
+            GD.Print($"saved {output} (end tackle studio)");
+            GetTree().Quit();
+            return;
+        }
+
         if (mode == 23)
         {
             // Villagers in a row: arg 0 = every role as the village dresses it (variant = map index + 1),
@@ -662,6 +713,83 @@ public partial class ScreenshotTool : Node
             for (int i = 0; i < 40; i++)
                 await NextFrame();
             GD.Print($"village shot {arg}: notices {profile.Notices.Count}, forage {main.Scenery.Forage.Count}");
+        }
+        else if (mode == 33)
+        {
+            // Spinning and bottom fishing in the game: arg 1 = a wobbler led back to the pier, looked down at in the
+            // water; arg 2 = the bottom rod on its rest with the bell, the angler stepped aside to see it.
+            var lo = rod.Loadout;
+            var pr = rod.Profile;
+            pr.Money += 2000;
+            pr.Level = Math.Max(pr.Level, 5);
+            int RodIx(string id) => lo.Items(TackleSlot.Rod).ToList().FindIndex(i => i.ItemId == id);
+            int BaitIx(string id) => lo.Items(TackleSlot.Bait).ToList().FindIndex(i => i.ItemId == id);
+            if (arg == 1)
+            {
+                pr.Owned["rod"].Add("cisowy_spinning");
+                lo.BaitCounts["rybka_drewniana"] = 1;
+                lo.Index[(int)TackleSlot.Rod] = RodIx("cisowy_spinning");
+                lo.Index[(int)TackleSlot.Bait] = BaitIx("rybka_drewniana");
+                rod.ApplyTackle();
+                rod.CastNow(0.4f);
+                for (int i = 0; i < 400 && rod.State != RodState.Waiting; i++)
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                rod.ReelOverride = true;
+                for (int i = 0; i < 1200 && rod.State == RodState.Waiting && rod.LineOut > float.Parse(System.Environment.GetEnvironmentVariable("FISHSIM_LURE_AT") ?? "7", System.Globalization.CultureInfo.InvariantCulture); i++)
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                rod.ReelOverride = false;
+                GD.Print($"spinning: {rod.State}, line {rod.LineOut:0.0} m, lure {rod.Lure?.Depth:0.00} m, {rod.Lure?.Judgement}, "
+                    + $"bobber {rod.Bobber.GlobalPosition} visible {rod.Bobber.IsVisibleInTree()} method {rod.Bobber.Method} terminal {rod.Bobber.TerminalVisible}");
+                foreach (var n in rod.Bobber.FindChildren("*", "Node3D", true, false))
+                    if (n is Node3D n3 && n3.Name.ToString() is "Lure")
+                        GD.Print($"  lure node at {n3.GlobalPosition} visible {n3.IsVisibleInTree()} scale {n3.GlobalTransform.Basis.Scale}");
+                // FISHSIM_LURE_CAM=1: a camera just above the water beside the lure.
+                if (System.Environment.GetEnvironmentVariable("FISHSIM_LURE_CAM") == "1")
+                {
+                    // Hold the lure where it is, still playing as if drawn, and look at it from just above the water.
+                    rod.ProcessMode = ProcessModeEnum.Disabled;
+                    rod.Bobber.LureSpeed = 0.8f;
+                    var lp = rod.Bobber.GlobalPosition;
+                    var cam = new Camera3D { Fov = 40f, Near = 0.02f, Current = true };
+                    main.AddChild(cam);
+                    cam.GlobalPosition = new Vector3(lp.X + 0.45f, 0.55f, lp.Z + 0.55f);
+                    cam.LookAt(lp);
+                }
+            }
+            else
+            {
+                pr.Owned["rod"].Add("grabowy_gruntowy");
+                main.Gear.Buy(GearSlot.Accessory, GD.Load<TackleItem>("res://data/tackle/accessories/podporka.tres"));
+                lo.BaitCounts["worm"] = 10;
+                lo.Index[(int)TackleSlot.Rod] = RodIx("grabowy_gruntowy");
+                lo.Index[(int)TackleSlot.Bait] = BaitIx("worm");
+                rod.ApplyTackle();
+                rod.CastNow(0.5f);
+                for (int i = 0; i < 400 && rod.State != RodState.Waiting; i++)
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                rod.PutOnRest();
+                for (int i = 0; i < 300 && !rod.RigSettled; i++)
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                // Step to the side of the rod, looking at the rest and the rod across the view.
+                var restAt = rod.RestPosition ?? main.Player.GlobalPosition;
+                var basis = main.Player.GlobalTransform.Basis;
+                main.Player.GlobalPosition += basis.X * 1.9f + basis.Z * 0.2f;
+                var look = restAt + (-basis.Z) * 0.5f - main.Player.GlobalPosition;
+                main.Player.Rotation = new Vector3(0f, MathF.Atan2(-look.X, -look.Z), 0f);
+                GD.Print($"bottom: {rod.State}, rest {rod.OnRest} at {restAt}, settled {rod.RigSettled}, heat {rod.GroundbaitHeat:0.00}");
+                // A camera beside the rod on its rest, looking across at the rest, the reel and the quiver tip.
+                var butt = main.Player.Rig.GlobalPosition;
+                var tip = main.Player.Rig.Tip.GlobalPosition;
+                var along = tip - butt;
+                along.Y = 0f;
+                var side = new Vector3(-along.Z, 0f, along.X).Normalized();
+                var mid = butt.Lerp(tip, 0.45f);
+                var restCam = new Camera3D { Fov = 50f, Near = 0.02f, Current = true };
+                main.AddChild(restCam);
+                restCam.GlobalPosition = mid + side * 1.7f + Vector3.Up * 0.35f - along.Normalized() * 0.4f;
+                restCam.LookAt(mid + Vector3.Down * 0.15f);
+            }
+            frames = 40;
         }
         else if (mode == 28)
         {

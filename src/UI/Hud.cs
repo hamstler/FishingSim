@@ -5,6 +5,7 @@ using FishingSim.Core;
 using FishingSim.Fishing;
 using FishingSim.Tournaments;
 using FishingSim.World;
+using FishingSim.Core.Methods;
 
 namespace FishingSim.UI;
 
@@ -209,11 +210,13 @@ public partial class Hud : CanvasLayer
         _hint.Text = "H - sterowanie";
         Anchor(_hint, 0f, 1f, 16, -30, 300, -10);
         _help = Text(14, Ink);
-        Anchor(_help, 0f, 0.5f, 16, -90, 600, 90);
+        Anchor(_help, 0f, 0.5f, 16, -120, 720, 120);
         _help.Text = "WASD - ruch, Shift - bieg, mysz - rozglądanie\n"
             + "LPM przytrzymaj i puść - rzut, potem LPM - zwijanie linki\n"
             + "PPM - podniesienie wędki: zacięcie, pompowanie, wyciągnięcie ryby\n"
             + "Spacja - kasarek (trzeba go kupić), kółko - hamulec\n"
+            + "Spinning (przynęta sztuczna): LPM prowadzi (Shift szybciej), puszczona opada, PPM podszarpnięcie / zaczep\n"
+            + "Grunt (wędka gruntowa): koszyczek nęci miejsce, brania na szczytówce; Z - wędka na podpórkę / podnieś\n"
             + "1-5 - zmiana sprzętu (Shift = wstecz), Tab - stan\n"
             + "E - wejście | I ekwipunek | M mapa | J dziennik | T turnieje\n"
             + "Esc - menu | F1 - dev | F11 - wydajność (FPS)";
@@ -266,7 +269,9 @@ public partial class Hud : CanvasLayer
         bool fighting = rod.State is RodState.Fight or RodState.Close;
         string state = rod.StateName;
         if (rod.State is RodState.Waiting or RodState.Nibble or RodState.Bite)
-            state += $"  ·  {rod.CurrentDepth():0.0} m";
+            state += MethodLine(rod);
+        else if (rod.State == RodState.Idle)
+            state += $"  ·  {rod.Method.Title()}";
         if (rod.State == RodState.Waiting && rod.World.TimeScale > 1f)
             state += "  ·  odpoczynek na zydlu";
         if (rod.State == RodState.Fight)
@@ -353,6 +358,26 @@ public partial class Hud : CanvasLayer
         _dev.Visible = _devOpen;
         if (_devOpen)
             SetText(_dev, DevText());
+    }
+
+    /// <summary>What the line in the water is doing: the float's depth; the lure, how deep it runs over how deep a
+    /// bottom and how well it is led; the feeder sinking or on the bottom, the baited spot, the rod on its rest.</summary>
+    private static string MethodLine(FishingRod rod)
+    {
+        string rest = rod.OnRest ? "  ·  wędka na podpórce (Z)" : "";
+        switch (rod.CastMethod)
+        {
+            case Core.Methods.FishingMethod.Spinning when rod.Lure is { } lure:
+                return $"  ·  {lure.Family.Title()} {lure.Depth:0.0} m (dno {rod.CurrentDepth():0.0} m)  ·  {lure.Judgement.Title()}";
+            case Core.Methods.FishingMethod.Bottom:
+                string rig = rod.RigSettled ? $"koszyczek na dnie, {rod.CurrentDepth():0.0} m" : "koszyczek opada";
+                float heat = rod.GroundbaitHeat;
+                int dots = heat < 0.05f ? 0 : heat < 0.8f ? 1 : heat < 1.8f ? 2 : 3;
+                string baited = dots > 0 ? $"  ·  nęcone miejsce {new string('●', dots)}{new string('○', 3 - dots)}" : "";
+                return $"  ·  {rig}{baited}{rest}";
+            default:
+                return $"  ·  {rod.CurrentDepth():0.0} m{rest}";
+        }
     }
 
     private string DevText()

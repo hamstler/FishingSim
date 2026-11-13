@@ -76,6 +76,9 @@ public partial class FirstPersonBody : Node3D
     /// <summary>A fish to hold in the left hand, or null (unused since the catch panel shows the landed fish).</summary>
     public Func<Node3D?>? HeldFishSource { get; set; }
 
+    /// <summary>True while the rod lies on its rest: the rig is left where it is and the arms are put away.</summary>
+    public Func<bool>? RigOnRest { get; set; }
+
     /// <summary>True while the reel handle should turn (set by Main from the rod).</summary>
     public Func<bool>? ReelingSource { get; set; }
 
@@ -175,6 +178,11 @@ public partial class FirstPersonBody : Node3D
     {
         if (_rig == null || _rightArm == null && _ik == null)
             return;
+        if (RigOnRest?.Invoke() == true)
+        {
+            _action = action;
+            return;
+        }
 
         // The rod: raised with the right mouse button, lifted while casting/fighting, swaying a little with the gait.
         _raise = Mathf.MoveToward(_raise, Math.Clamp(RaiseSource?.Invoke() ?? 0f, 0f, 1f), dt * 4f);
@@ -223,6 +231,12 @@ public partial class FirstPersonBody : Node3D
     private void ApplyArms(BodyAction action, float dt)
     {
         var ik = _ik!;
+        // The rod on its rest: nothing in the hands, the arms out of sight.
+        bool resting = RigOnRest?.Invoke() == true && ToolPose?.Invoke() == null;
+        if (_model != null)
+            _model.Visible = !resting;
+        if (resting)
+            return;
         if (_model != null)
         {
             var frame = ToolBodyFrame?.Invoke();

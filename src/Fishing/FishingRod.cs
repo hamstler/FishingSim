@@ -4,6 +4,8 @@ using System.Linq;
 using Godot;
 using FishingSim.Core;
 using FishingSim.Core.Gear;
+using FishingSim.Core.Methods;
+using MethodRules = FishingSim.Core.Methods.Method;
 using FishingSim.Data;
 using FishingSim.Progress;
 using FishingSim.World;
@@ -87,6 +89,43 @@ public partial class FishingRod : Node3D
     private Node3D _fishNode = null!;
     private FishModel? _fishModel;
     private FishModel? _heldFish;
+
+    // methods: the lure being led (spinning) or the rig on the bottom
+    private FishingMethod _castMethod = FishingMethod.Float;
+    private LureMotion? _lure;
+    private Vector3 _rigPos;          // where the lure runs or the feeder lies (x, z; y = the surface)
+    private bool _rigSettled;
+    private float _rigDepth;
+    private bool _feederLoaded;
+    private float _bitePull;          // the quiver tip pulled round by a bite on the bottom (0..1)
+    private float _lastGroundbaitHour = float.NaN;
+
+    /// <summary>The method the current tackle fishes with (a lure: spinning; bait on a bottom rod: bottom; else float).</summary>
+    public FishingMethod Method => MethodRules.For(Loadout.Rod.Kind, Loadout.Bait.Kind);
+
+    /// <summary>The method of the cast in the water (fixed when it was cast).</summary>
+    public FishingMethod CastMethod => _castMethod;
+
+    /// <summary>The lure being led (spinning), or null.</summary>
+    public LureMotion? Lure => _lure;
+
+    /// <summary>The bottom rig has reached the bottom.</summary>
+    public bool RigSettled => _rigSettled;
+
+    /// <summary>The feeder went out full of groundbait (it empties on the bottom).</summary>
+    public bool FeederLoaded => _feederLoaded;
+
+    /// <summary>Baited spots on the bottom (fed by the feeder, fading over game hours).</summary>
+    public GroundbaitSpots Groundbait { get; } = new();
+
+    /// <summary>How much groundbait works where the rig lies.</summary>
+    public float GroundbaitHeat => Groundbait.HeatAt(_rigPos.X, _rigPos.Z);
+
+    /// <summary>Shift held while reeling: the lure is drawn fast.</summary>
+    public bool FastReel { get; private set; }
+
+    /// <summary>Tests and tools: reel fast without input.</summary>
+    public bool FastReelOverride { get; set; }
 
     public TackleLoadout Loadout { get; private set; } = null!;
     public Profile Profile { get; private set; } = null!;
@@ -222,6 +261,8 @@ public partial class FishingRod : Node3D
         _lineVisibility = leader.Visibility > 0f ? leader.Visibility : line.Visibility;
         // Rated power: the rod's own limit; it reads as fully bent near that load.
         _bendModel = new Core.Physics.RodBendModel(RodRig.Joints * RodRig.SegmentLength, rod.MaxLoad, rod.Action);
+        // Bottom and carp rods have a bright quiver tip that shows the bites.
+        _rig?.SetQuiverTip(rod.Kind is RodKind.Bottom or RodKind.Carp);
         // A snapped rod is gone: nothing left in the hand until a new one is bought or handed out.
         if (_rig != null)
             _rig.Visible = Loadout.Profile == null || Loadout.Profile.Owns(TackleSlot.Rod, rod.ItemId);
@@ -242,9 +283,18 @@ public partial class FishingRod : Node3D
         if (_bendModel == null || _rig == null)
             return;
         bool lineOut = State is RodState.Waiting or RodState.Nibble or RodState.Bite or RodState.Fight or RodState.Close;
+        _bitePull = Mathf.MoveToward(_bitePull, State == RodState.Bite && _castMethod == FishingMethod.Bottom ? 1f : 0f, dt * 3f);
         float load = State is RodState.Fight or RodState.Close ? Tension
-            : lineOut ? 0.12f + (_bobber.ExtraForce > 0f ? 0.35f : 0f)
-            : 0.04f;
+            : !lineOut ? 0.04f
+            : _castMethod switch
+            {
+                // A lure pulls the tip as it is drawn; a snag bends the rod hard while it is pulled on.
+                FishingMethod.Spinning => 0.14f + 0.3f * MathF.Min(_lure?.Speed ?? 0f, 2f)
+                    + (_lure?.Snagged == true ? (Reeling ? 0.6f : 0.25f) * EffectiveLimit : 0f),
+                // The line to the feeder is tight; a bite pulls the quiver tip round.
+                FishingMethod.Bottom => (_rigSettled ? 0.22f : 0.1f) + _bitePull * 0.9f,
+                _ => 0.12f + (_bobber.ExtraForce > 0f ? 0.35f : 0f),
+            };
         Vector3 target = lineOut ? _bobber.GlobalPosition : _rig.GlobalPosition + Vector3.Down * 10f;
         var straightTip = new Vector3(0f, RodRig.BlankStart + _bendModel.Length, 0f);
         var dir = (_rig.ToLocal(target) - straightTip).Normalized();
@@ -341,6 +391,17 @@ public partial class FishingRod : Node3D
             case Key.Space:
                 TryNet();
                 break;
+            case Key.Z:
+                if (OnRest)
+                {
+                    if (NearRest)
+                        PickUpRod();
+                    else
+                        ShowBanner("Podejdź do wędki, aby ją podnieść", 2f);
+                }
+                else
+                    PutOnRest();
+                break;
             case Key.R when State == RodState.Landed && AwaitingDecision:
                 ReleaseCatch();
                 break;
@@ -410,8 +471,21 @@ public partial class FishingRod : Node3D
             return;
         float dt = (float)delta;
         bool captured = !InputBlocked && !Holstered && Input.MouseMode == Input.MouseModeEnum.Captured;
-        Reeling = ReelOverride || (captured && Input.IsMouseButtonPressed(MouseButton.Left));
-        Lifting = LiftOverride || (captured && Input.IsMouseButtonPressed(MouseButton.Right));
+        // A rod on the rest is not in the hands: nothing is reeled or lifted.
+        Reeling = !OnRest && (ReelOverride || (captured && Input.IsMouseButtonPressed(MouseButton.Left)));
+        Lifting = !OnRest && (LiftOverride || (captured && Input.IsMouseButtonPressed(MouseButton.Right)));
+        FastReel = FastReelOverride || (captured && Input.IsKeyPressed(Key.Shift));
+        // The groundbait on the bottom is eaten up as the game's hours pass.
+        float hour = World.Hour;
+        if (!float.IsNaN(_lastGroundbaitHour))
+        {
+            float passed = hour - _lastGroundbaitHour;
+            if (passed < 0f)
+                passed += 24f;
+            if (passed > 0f && passed < 12f)
+                Groundbait.Decay(passed);
+        }
+        _lastGroundbaitHour = hour;
         BannerTime = MathF.Max(BannerTime - dt, 0f);
         UpdateBaitAttraction(dt);
         _stateTime += dt;
@@ -461,7 +535,9 @@ public partial class FishingRod : Node3D
             _interest.Clear();
             foreach (var sp in _species)
                 _interest[sp] = BiteModel.Weight(sp, ctx);
-            Population.SetBait(_bobber.GlobalPosition, sp => Math.Clamp(_interest.GetValueOrDefault(sp) * 0.8f, 0f, 1.2f));
+            // Fish gather over groundbait.
+            float baited = _castMethod == FishingMethod.Bottom ? GroundbaitSpots.PaceFor(GroundbaitHeat) : 1f;
+            Population.SetBait(_bobber.GlobalPosition, sp => Math.Clamp(_interest.GetValueOrDefault(sp) * 0.8f * baited, 0f, 1.2f));
         }
     }
 
@@ -490,7 +566,8 @@ public partial class FishingRod : Node3D
 
     private Vector3 Origin()
     {
-        var p = _camera.GlobalPosition;
+        // The line runs from the rod: in the hands, or on its rest.
+        var p = _rest?.GlobalPosition ?? _camera.GlobalPosition;
         p.Y = _waterY;
         return p;
     }
@@ -515,6 +592,12 @@ public partial class FishingRod : Node3D
         _fishNode.Visible = false;
         _fight = null;
         _lineOutOutsideFight = 0f;
+        _lure = null;
+        _rigSettled = false;
+        _bitePull = 0f;
+        _feederLoaded = false;
+        _bobber.LureSpeed = 0f;
+        PickUpRod();
         SetState(RodState.Idle);
     }
 
@@ -525,6 +608,14 @@ public partial class FishingRod : Node3D
         var basis = _camera.GlobalTransform.Basis;
         var aim = (-basis.Z).Rotated(basis.X.Normalized(), Mathf.DegToRad(CastLoftDegrees));
         float speed = Mathf.Lerp(_castMin, _castMax, CastPower);
+        // What flies: a float, a lure, or a feeder that takes one portion of the bait as groundbait when there is some
+        // to spare.
+        _castMethod = Method;
+        _bobber.SetTerminal(_castMethod, MethodRules.FamilyOf(Loadout.Bait.AffinityAs));
+        _feederLoaded = _castMethod == FishingMethod.Bottom && Loadout.BaitCount >= 2;
+        if (_feederLoaded)
+            Loadout.UseBait();
+        _bobber.FeederLoaded = _feederLoaded;
         _bobber.Launch(_rodTip.GlobalPosition, aim * speed);
         SetState(RodState.Flying);
     }
@@ -564,6 +655,8 @@ public partial class FishingRod : Node3D
         if (_bobber.Submerged > 0.5f)
         {
             SoundCue?.Invoke(Core.Audio.OneShot.Splash, Math.Clamp(CastPower + 0.4f, 0.5f, 1f));
+            if (_castMethod != FishingMethod.Float)
+                EnterWater();
             NewBiteTimer();
             SetState(RodState.Waiting);
         }
@@ -587,6 +680,16 @@ public partial class FishingRod : Node3D
 
     private void TickWaiting(float dt)
     {
+        if (_castMethod == FishingMethod.Spinning)
+        {
+            TickSpinning(dt);
+            return;
+        }
+        if (_castMethod == FishingMethod.Bottom)
+        {
+            TickBottom(dt);
+            return;
+        }
         _lineOutOutsideFight = FlatDistance(_bobber.GlobalPosition);
         if (Reeling)
         {
@@ -656,15 +759,36 @@ public partial class FishingRod : Node3D
         if (!spared)
             Loadout.UseBait();
         _bobber.DriveVelocity = Vector3.Zero;
-        _nibbleLength = _rng.Range(1f, 2.2f);
+        _bobber.LureSpeed = 0f;
+        // A float bobs for a while, a lure is hit in one knock, the quiver tip plucks a few times.
+        _nibbleLength = _castMethod switch
+        {
+            FishingMethod.Spinning => _rng.Range(0.15f, 0.4f),
+            FishingMethod.Bottom => _rng.Range(1.2f, 3f),
+            _ => _rng.Range(1f, 2.2f),
+        };
         // The bell on the rod rest rings when a fish touches the bait.
-        if (Gear?.Has(AccessoryKind.RodPod) == true)
+        if (Gear?.Has(AccessoryKind.RodPod) == true && _castMethod != FishingMethod.Spinning)
+        {
             SoundCue?.Invoke(Core.Audio.OneShot.Bell, 1f);
+            (_rest as RodRest)?.Ring();
+        }
         _pulseTimer = 0f;
         if (CurrentSpecies != null)
         {
             Graphics.FishSkin.Prewarm(CurrentSpecies);     // paint the close-up skin while the float twitches
             FishAsset.Prefetch(CurrentSpecies);            // and decode the species' model pictures
+        }
+        if (_castMethod == FishingMethod.Spinning)
+        {
+            Twitch(1f);   // the knock of the hit
+            // A predator hitting a lure that is being reeled often hooks itself on it.
+            if (CurrentSpecies != null && _rng.NextFloat() < MethodRules.SelfHookChance(CurrentSpecies.Aggression, Reeling))
+            {
+                ShowBanner("Uderzenie! Ryba sama zacięła się na prowadzonej przynęcie", 2.5f);
+                StartFight();
+                return;
+            }
         }
         SetState(RodState.Nibble);
     }
@@ -674,21 +798,40 @@ public partial class FishingRod : Node3D
         _pulseTimer -= dt;
         if (_pulseTimer <= 0f)
         {
-            _pulseTimer = _rng.Range(0.3f, 0.7f);
-            _bobber.ApplyCentralImpulse(Vector3.Down * _bobber.Mass * 1.2f);
-            Twitch(0.6f);
+            switch (_castMethod)
+            {
+                case FishingMethod.Bottom:
+                    // Plucks on the quiver tip.
+                    _pulseTimer = _rng.Range(0.35f, 0.8f);
+                    Twitch(0.45f);
+                    break;
+                case FishingMethod.Spinning:
+                    _pulseTimer = 1f;
+                    break;
+                default:
+                    _pulseTimer = _rng.Range(0.3f, 0.7f);
+                    _bobber.ApplyCentralImpulse(Vector3.Down * _bobber.Mass * 1.2f);
+                    Twitch(0.6f);
+                    break;
+            }
         }
         if (_stateTime >= _nibbleLength)
         {
-            _bobber.ExtraForce = 1.6f;
-            Twitch(1.2f);
+            if (_castMethod == FishingMethod.Float)
+                _bobber.ExtraForce = 1.6f;
+            else if (_castMethod == FishingMethod.Bottom && Gear?.Has(AccessoryKind.RodPod) == true)
+            {
+                SoundCue?.Invoke(Core.Audio.OneShot.Bell, 1f);
+                (_rest as RodRest)?.Ring();
+            }
+            Twitch(_castMethod == FishingMethod.Spinning ? 1.8f : 1.2f);
             SetState(RodState.Bite);
         }
     }
 
     private void TickBite()
     {
-        if (_stateTime < HookWindow)
+        if (_stateTime < MethodRules.HookWindow(_castMethod))
             return;
         _bobber.ExtraForce = 0f;
         LoseBiter(_bobber.GlobalPosition);
@@ -699,8 +842,24 @@ public partial class FishingRod : Node3D
 
     public void TryHook()
     {
+        // A rod on its rest has to be picked up first, and it is in reach only from close by.
+        if (OnRest && State is RodState.Nibble or RodState.Bite)
+        {
+            if (!NearRest)
+            {
+                ShowBanner("Za daleko od wędki! Podejdź do podpórki", 2f);
+                return;
+            }
+            PickUpRod();
+        }
         switch (State)
         {
+            case RodState.Waiting when _castMethod == FishingMethod.Spinning && _lure != null:
+                JerkLure();
+                break;
+            case RodState.Nibble when _castMethod == FishingMethod.Spinning:
+                // The knock of a hit on a lure is the moment to strike.
+                goto case RodState.Bite;
             case RodState.Nibble:
                 _bobber.ExtraForce = 0f;
                 LoseBiter(_bobber.GlobalPosition);
@@ -734,6 +893,10 @@ public partial class FishingRod : Node3D
         var species = CurrentSpecies!;
         _bobber.ExtraForce = 0f;
         _bobber.DriveVelocity = Vector3.Zero;
+        // The lure or the feeder goes with the fish; only a float stays in sight on the line.
+        _bobber.TerminalVisible = _castMethod == FishingMethod.Float;
+        _lure = null;
+        _bitePull = 0f;
         var to = _bobber.GlobalPosition - Origin();
         to.Y = 0f;
         var gear = new FightGear(DragMax, EffectiveLimit, _rodShock, _reelSpeed, MaxLine);
@@ -1100,6 +1263,247 @@ public partial class FishingRod : Node3D
         _heldFish = null;
     }
 
+    // ------------------------------------------------------------------ spinning and bottom
+    /// <summary>The lure or the feeder lands: from now on the rod moves it (the float keeps floating by itself).</summary>
+    private void EnterWater()
+    {
+        _rigPos = new Vector3(_bobber.GlobalPosition.X, _waterY, _bobber.GlobalPosition.Z);
+        _rigSettled = false;
+        _rigDepth = 0f;
+        _lure = _castMethod == FishingMethod.Spinning ? new LureMotion(MethodRules.FamilyOf(Loadout.Bait.AffinityAs)) : null;
+        var to = Origin() - _rigPos;
+        _bobber.Heading = MathF.Atan2(to.X, to.Z);
+        _bobber.Hold(_rigPos + Vector3.Down * 0.03f);
+    }
+
+    /// <summary>
+    /// Spinning: LMB draws the lure in (Shift: fast) and it runs at its depth; let go, it sinks (a wobbler floats up,
+    /// a fly stays on the surface). It fishes as well as it is led; dragged along the bottom it may snag.
+    /// </summary>
+    private void TickSpinning(float dt)
+    {
+        var lure = _lure;
+        if (lure == null)
+        {
+            ResetToIdle();
+            return;
+        }
+        float bottom = Lake.DepthAt(_rigPos.X, _rigPos.Z);
+        var to = Origin() - _rigPos;
+        to.Y = 0f;
+        float dist = to.Length();
+        var dir = dist > 1e-3f ? to / dist : Vector3.Zero;
+        if (lure.Snagged)
+        {
+            if (Reeling)
+            {
+                switch (lure.Pull(_rng, dt))
+                {
+                    case SnagResult.Broke:
+                        BreakLine("Zaczep nie puścił, linka pękła.", TackleSlot.Hook);
+                        return;
+                    case SnagResult.Freed:
+                        ShowBanner("Przynęta uwolniona z zaczepu", 2f);
+                        break;
+                }
+            }
+            lure.Step(dt, 0f, bottom, _rng);
+        }
+        else
+        {
+            float retrieve = Reeling ? _reelSpeed * (FastReel ? 0.6f : 0.3f) : 0f;
+            lure.Step(dt, retrieve, bottom, _rng);
+            if (lure.Snagged)
+            {
+                ShowBanner("Zaczep! PPM - szarpnij wędką, LPM - ciągnij (linka może pęknąć)", 3.5f);
+                Twitch(1.6f);
+            }
+            else
+                _rigPos += dir * retrieve * dt;
+        }
+        // Drawn in to the bank or the rod tip: out of the water.
+        if (bottom <= 0.02f || dist < 2.5f)
+        {
+            ResetToIdle();
+            return;
+        }
+        PlaceLure(dir);
+        _lineOutOutsideFight = dist;
+        _biteTimer -= dt * lure.BitePace * MethodRules.LureRodMatch(Loadout.Rod.Kind) * 2f;
+        if (_biteTimer <= 0f)
+            StartNibble();
+    }
+
+    private void PlaceLure(Vector3 towardsAngler)
+    {
+        float y = _lure is { Family: LureFamily.Fly }
+            ? _waterY + 0.004f + (_bobber.WaterHeight?.Invoke(_rigPos.X, _rigPos.Z) ?? 0f)
+            : _waterY - (_lure?.Depth ?? 0f);
+        _bobber.Hold(new Vector3(_rigPos.X, y, _rigPos.Z));
+        if (towardsAngler != Vector3.Zero)
+            _bobber.Heading = MathF.Atan2(towardsAngler.X, towardsAngler.Z);
+        _bobber.LureSpeed = _lure?.Speed ?? 0f;
+    }
+
+    /// <summary>RMB while a lure is in the water: a twitch (it darts and flashes), or a jerk to free a snag.</summary>
+    private void JerkLure()
+    {
+        var lure = _lure!;
+        Twitch(lure.Snagged ? 1.6f : 0.9f);
+        if (lure.Snagged)
+        {
+            switch (lure.Jerk(_rng))
+            {
+                case SnagResult.Broke:
+                    BreakLine("Szarpnięcie zerwało linkę na zaczepie.", TackleSlot.Hook);
+                    return;
+                case SnagResult.Freed:
+                    ShowBanner("Przynęta uwolniona z zaczepu", 2f);
+                    break;
+                default:
+                    ShowBanner("Zaczep trzyma...", 1.2f);
+                    break;
+            }
+            return;
+        }
+        var to = Origin() - _rigPos;
+        to.Y = 0f;
+        if (to.Length() > 0.01f)
+            _rigPos += to.Normalized() * lure.Twitch();
+    }
+
+    /// <summary>
+    /// Bottom: the feeder sinks to the bottom and empties its groundbait there; the line is tight and bites show on the
+    /// quiver tip. Reeling drags the rig slowly over the bottom towards the angler.
+    /// </summary>
+    private void TickBottom(float dt)
+    {
+        float bottom = Lake.DepthAt(_rigPos.X, _rigPos.Z);
+        var to = Origin() - _rigPos;
+        to.Y = 0f;
+        float dist = to.Length();
+        var dir = dist > 1e-3f ? to / dist : Vector3.Zero;
+        float floor = MathF.Max(bottom - 0.03f, 0f);
+        if (!_rigSettled)
+        {
+            _rigDepth += 1.6f * dt;
+            if (_rigDepth >= floor)
+            {
+                _rigDepth = floor;
+                _rigSettled = true;
+                Twitch(0.4f);      // the tip springs back as the feeder touches down
+                if (_feederLoaded)
+                {
+                    Groundbait.Feed(_rigPos.X, _rigPos.Z);
+                    _bobber.FeederLoaded = false;
+                }
+            }
+        }
+        else if (Reeling)
+        {
+            _rigPos += dir * _reelSpeed * 0.2f * dt;
+            _rigDepth = MathF.Max(Lake.DepthAt(_rigPos.X, _rigPos.Z) - 0.03f, 0f);
+            if (bottom <= 0.02f || dist < 2.5f)
+            {
+                ResetToIdle();
+                return;
+            }
+        }
+        _bobber.Hold(new Vector3(_rigPos.X, _waterY - _rigDepth, _rigPos.Z));
+        if (dir != Vector3.Zero)
+            _bobber.Heading = MathF.Atan2(dir.X, dir.Z);
+        _lineOutOutsideFight = dist;
+        if (!_rigSettled)
+            return;
+        float pace = GroundbaitSpots.PaceFor(GroundbaitHeat) * (Reeling ? 0.5f : 1f);
+        _biteTimer -= dt * pace;
+        if (_biteTimer <= 0f)
+            StartNibble();
+    }
+
+    // ------------------------------------------------------------------ the rod rest (Z)
+    private RodRest? _rest;
+    private Node? _rigHome;
+
+    /// <summary>How close (m) the angler must stand to pick the rod up from its rest.</summary>
+    public const float RestReach = 3.5f;
+
+    /// <summary>The rod lies on its rest (the hands are free; the line runs from the rest).</summary>
+    public bool OnRest => _rest != null;
+
+    /// <summary>The rest's foot, or null.</summary>
+    public Vector3? RestPosition => _rest?.GlobalPosition;
+
+    public bool NearRest => _rest != null
+        && new Vector2(_camera.GlobalPosition.X - _rest.GlobalPosition.X, _camera.GlobalPosition.Z - _rest.GlobalPosition.Z).Length() <= RestReach;
+
+    /// <summary>
+    /// Z with a float or a bottom rig in the water: a rest is pushed into the ground in front of the angler (a forked
+    /// hazel stick, or the bought rod rest with its bell) and the rod is laid on it, pointing at the line's end, its
+    /// butt on a short back rest. The angler's hands are free; RMB at a bite (from close by) picks it up and strikes.
+    /// </summary>
+    public bool PutOnRest()
+    {
+        if (_rest != null || _rig == null)
+            return false;
+        if (State is not (RodState.Waiting or RodState.Nibble or RodState.Bite) || _castMethod == FishingMethod.Spinning)
+        {
+            ShowBanner(_castMethod == FishingMethod.Spinning && State is RodState.Waiting
+                ? "Spinningiem łowi się z ręki: przynętę trzeba prowadzić"
+                : "Na podpórkę odkłada się wędkę z zarzuconym zestawem", 2.5f);
+            return false;
+        }
+        var eye = _camera.GlobalTransform;
+        var flat = -eye.Basis.Z;
+        flat.Y = 0f;
+        flat = flat.LengthSquared() > 1e-4f ? flat.Normalized() : Vector3.Forward;
+        var from = eye.Origin + flat * 0.8f;
+        var hit = GetWorld3D().DirectSpaceState.IntersectRay(PhysicsRayQueryParameters3D.Create(from, from + Vector3.Down * 4f, 1));
+        if (hit.Count == 0)
+        {
+            ShowBanner("Tu nie ma gdzie postawić podpórki", 2f);
+            return false;
+        }
+        var ground = (Vector3)hit["position"];
+        var toEnd = _bobber.GlobalPosition - ground;
+        toEnd.Y = 0f;
+        var dir = toEnd.LengthSquared() > 1e-4f ? toEnd.Normalized() : flat;
+        _rest = RodRest.Create(Gear?.Has(AccessoryKind.RodPod) == true);
+        AddChild(_rest);
+        _rest.GlobalPosition = ground;
+        _rest.Rotation = new Vector3(0f, MathF.Atan2(dir.X, dir.Z), 0f);
+        // The rod rises at 25 degrees towards the line's end, lying in the fork; the reel hangs under it.
+        float rise = Mathf.DegToRad(25f);
+        var rodDir = (dir * MathF.Cos(rise) + Vector3.Up * MathF.Sin(rise)).Normalized();
+        var fork = ground + Vector3.Up * RodRest.ForkHeight;
+        var up = (Vector3.Up - rodDir * rodDir.Dot(Vector3.Up)).Normalized();
+        var basis = new Basis(rodDir.Cross(up), rodDir, up);
+        _rigHome = _rig.GetParent();
+        _rig.Reparent(_rest, true);
+        _rig.GlobalTransform = new Transform3D(basis, fork - rodDir * 0.45f);
+        _rest.PlaceBackRest(fork - rodDir * 0.78f);
+        ShowBanner(_rest.HasBell
+            ? "Wędka na podpórce z dzwoneczkiem. Z - podnieś, PPM przy braniu - zacięcie"
+            : "Wędka na patyku. Z - podnieś, PPM przy braniu - zacięcie (podejdź bliżej)", 3f);
+        return true;
+    }
+
+    /// <summary>Takes the rod back into the hands (the rest is pulled out).</summary>
+    public bool PickUpRod()
+    {
+        if (_rest == null)
+            return false;
+        if (_rigHome != null && _rig != null)
+        {
+            _rig.Reparent(_rigHome, false);
+            _rig.Position = new Vector3(0.1f, -0.25f, -0.33f);
+            _rig.RotationDegrees = new Vector3(-78f, 0f, 0f);
+        }
+        _rest.QueueFree();
+        _rest = null;
+        return true;
+    }
+
     // ------------------------------------------------------------------ line rendering
     private void UpdateLine()
     {
@@ -1109,7 +1513,9 @@ public partial class FishingRod : Node3D
         var a = _rodTip.GlobalPosition;
         var b = _bobber.GlobalPosition;
         float ratio = Math.Clamp(Tension / EffectiveLimit, 0f, 1f);
-        float slack = State is RodState.Fight or RodState.Close ? 1f - Math.Clamp(ratio * 2f, 0f, 1f) : 1f;
+        bool tight = _castMethod != FishingMethod.Float && State is RodState.Waiting or RodState.Nibble or RodState.Bite;
+        float slack = State is RodState.Fight or RodState.Close ? 1f - Math.Clamp(ratio * 2f, 0f, 1f)
+            : tight ? (Reeling || _rigSettled ? 0.04f : 0.25f) : 1f;
         float sag = slack * Math.Clamp(a.DistanceTo(b) * 0.04f, 0f, 1.5f);
         _lineMaterial.AlbedoColor = Colors.White.Lerp(new Color(1f, 0.2f, 0.15f), Math.Clamp((ratio - 0.5f) * 2f, 0f, 1f));
         _lineMesh.SurfaceBegin(Mesh.PrimitiveType.LineStrip, _lineMaterial);
@@ -1119,7 +1525,9 @@ public partial class FishingRod : Node3D
             float t = (float)i / steps;
             var p = a.Lerp(b, t);
             p.Y -= sag * 4f * t * (1f - t);
-            p.Y = MathF.Max(p.Y, _waterY + 0.01f);
+            // A line to a float lies on the water; to a lure or a feeder it runs down into it.
+            if (!tight)
+                p.Y = MathF.Max(p.Y, _waterY + 0.01f);
             _lineMesh.SurfaceAddVertex(p);
         }
         _lineMesh.SurfaceEnd();

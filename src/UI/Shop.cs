@@ -951,7 +951,7 @@ public partial class Shop : CanvasLayer
     }
 
     private static string Describe(TackleItem item) => item.Description != "" && item is not AccessoryData
-        ? item.Description + (item is BaitData { Kind: BaitKind.Lure } ? "\nPrzynęta sztuczna: nie zużywa się, bierze tylko podczas zwijania (LPM)." : "")
+        ? item.Description + (item is BaitData { Kind: BaitKind.Lure } ? "\nPrzynęta sztuczna (spinning): nie zużywa się; prowadzi się ją zwijając (LPM, Shift szybciej), PPM podszarpuje, puszczona opada." : "")
         : item switch
     {
         RodData => "Wędka decyduje o zasięgu rzutu i o tym, ile ryba może pociągnąć, zanim kij pęknie.",

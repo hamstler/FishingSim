@@ -7,6 +7,7 @@ using FishingSim.Data;
 using Godot;
 using FishingSim.Core.Camp;
 using FishingSim.Progress;
+using FishingSim.Core.Methods;
 
 namespace FishingSim.Tests;
 
@@ -287,6 +288,7 @@ public sealed class CoreSuite : ITestSuite
         t.Check(p.BaitCounts.GetValueOrDefault("jetka") == 3, "gathered bait goes into the bait box");
 
         LiftNetForestSmoke(t, roach);
+        FishingMethods(t, Species("szczupak"), Species("leszcz"));
     }
 
     /// <summary>The lift net, mushrooms and berries, the smokehouse and the notice board (Core/Camp).</summary>
@@ -388,5 +390,110 @@ public sealed class CoreSuite : ITestSuite
         t.Check(fresh.Count == 3 && fresh.All(r => r.Done), "the same day keeps the handed-in notices");
         p.PassTime(24f);
         t.Check(p.NoticesFor(0, lake, true).Any(r => !r.Done), "a new day brings new notices");
+    }
+
+    /// <summary>Spinning lures and bottom groundbait (Core/Methods).</summary>
+    private static void FishingMethods(TestContext t, FishSpecies pike, FishSpecies bream)
+    {
+        t.Section("fishing methods: spinning and bottom");
+        t.Check(Method.For(RodKind.Spinning, BaitKind.Lure) == FishingMethod.Spinning && Method.For(RodKind.Float, BaitKind.Lure) == FishingMethod.Spinning
+                && Method.For(RodKind.Bottom, BaitKind.Natural) == FishingMethod.Bottom && Method.For(RodKind.Carp, BaitKind.Carp) == FishingMethod.Bottom
+                && Method.For(RodKind.Float, BaitKind.Natural) == FishingMethod.Float && Method.For(RodKind.Spinning, BaitKind.Natural) == FishingMethod.Float,
+            "a lure means spinning, bait on a bottom or carp rod lies on the bottom, otherwise the float");
+        var rng = new FishingSim.Core.SystemRng(5);
+        LureMotion Run(LureFamily f, float seconds, float retrieve, float bottom = 4f, LureMotion? lure = null)
+        {
+            lure ??= new LureMotion(f);
+            for (float s = 0f; s < seconds; s += 0.05f)
+                lure.Step(0.05f, retrieve, bottom, new FixedRng(0.99f));
+            return lure;
+        }
+        var spinner = Run(LureFamily.Spinner, 3f, 0f);
+        float sunk = spinner.Depth;
+        Run(LureFamily.Spinner, 4f, 1.6f, lure: spinner);
+        t.Check(sunk > 1.2f && spinner.Depth < 0.6f, $"a spinner sinks when the reel stands ({sunk:0.0} m) and rises on a fast retrieve ({spinner.Depth:0.0} m)");
+        var wobbler = Run(LureFamily.Wobbler, 5f, 1.8f);
+        float dived = wobbler.Depth;
+        Run(LureFamily.Wobbler, 4f, 0f, lure: wobbler);
+        t.Check(dived > 1.4f && wobbler.Depth < dived - 0.8f, $"a wobbler dives on a fast retrieve ({dived:0.0} m) and floats up when stopped ({wobbler.Depth:0.0} m)");
+        var jig = Run(LureFamily.Softbait, 4f, 0f);
+        t.Check(jig.OnBottom && jig.Depth > 3.8f, $"a jig drops to the bottom ({jig.Depth:0.0} m)");
+        t.Check(Run(LureFamily.Fly, 3f, 0.4f).Depth == 0f, "a fly rides the surface");
+        var good = Run(LureFamily.Spinner, 1f, 0.7f);
+        var fast = Run(LureFamily.Spinner, 1f, 2f);
+        var still = Run(LureFamily.Spinner, 10f, 0f);
+        t.Check(good.Judgement == RetrieveJudgement.Good && fast.Judgement == RetrieveJudgement.TooFast && good.BitePace > fast.BitePace * 2f
+                && still.BitePace < good.BitePace * 0.1f, $"a well led lure brings bites ({good.BitePace:0.00}), too fast less ({fast.BitePace:0.00}), lying still hardly ({still.BitePace:0.00})");
+        var falling = Run(LureFamily.Softbait, 0.5f, 0f);
+        t.Check(falling.Falling && falling.BitePace > 1f, $"a falling jig is taken ({falling.BitePace:0.00})");
+        var lifted = Run(LureFamily.Softbait, 4f, 0f);
+        lifted.Step(0.05f, 0.5f, 4f, new FixedRng(0.99f));
+        t.Check(lifted.BitePace > 1.5f, $"a jig lifted off the bottom after the fall is taken best ({lifted.BitePace:0.00})");
+        float before = good.BitePace;
+        good.Twitch();
+        t.Check(good.BitePace > before * 1.2f, "a twitch flashes the lure");
+
+        int Snags(LureFamily f)
+        {
+            int n = 0;
+            for (int i = 0; i < 200; i++)
+            {
+                var l = new LureMotion(f);
+                for (int k = 0; k < 120; k++)
+                    l.Step(0.05f, k < 80 ? 0f : 0.5f, 0.6f, rng);   // falls to a shallow bottom, then dragged along it
+                n += l.Snagged ? 1 : 0;
+            }
+            return n;
+        }
+        int wobblerSnags = Snags(LureFamily.Wobbler), jigSnags = Snags(LureFamily.Softbait);
+        t.Check(Snags(LureFamily.Spoon) > 20 && jigSnags < Snags(LureFamily.Spoon), $"dragged along the bottom lures catch (spoon), a jig less ({jigSnags})");
+        var snag = new LureMotion(LureFamily.Spoon);
+        for (int k = 0; k < 400 && !snag.Snagged; k++)
+            snag.Step(0.05f, k < 40 ? 0f : 0.5f, 1f, rng);
+        t.Check(snag.Snagged && snag.BitePace == 0f && snag.Judgement == RetrieveJudgement.Snagged, "a snagged lure fishes no more");
+        var pulled = new LureMotion(LureFamily.Spoon);
+        for (int k = 0; k < 400 && !pulled.Snagged; k++)
+            pulled.Step(0.05f, k < 40 ? 0f : 0.5f, 1f, rng);
+        var hold = new FixedRng(0.99f);
+        SnagResult r = SnagResult.Stuck;
+        for (int k = 0; k < 100 && r == SnagResult.Stuck; k++)
+            r = pulled.Pull(hold, 0.05f);
+        t.Check(r == SnagResult.Broke, "pulling a snag for four seconds breaks the line");
+        int freed = 0;
+        for (int i = 0; i < 300; i++)
+        {
+            var l = new LureMotion(LureFamily.Spoon);
+            for (int k = 0; k < 400 && !l.Snagged; k++)
+                l.Step(0.05f, k < 40 ? 0f : 0.5f, 1f, rng);
+            freed += l.Jerk(rng) == SnagResult.Freed ? 1 : 0;
+        }
+        t.Check(freed is > 70 and < 140, $"a jerk frees a snag about a third of the time ({freed}/300)");
+        t.Check(Method.SelfHookChance(pike.Aggression, true) > Method.SelfHookChance(bream.Aggression, true) * 3f
+                && Method.SelfHookChance(pike.Aggression, false) == 0f, "a pike hooks itself on a moving lure far more often than a bream");
+        t.Check(Method.HookWindow(FishingMethod.Bottom) > Method.HookWindow(FishingMethod.Float) && Method.HookWindow(FishingMethod.Spinning) < Method.HookWindow(FishingMethod.Float),
+            "a fish on the bottom gives more time to strike, a hit on a lure less");
+
+        var spots = new GroundbaitSpots();
+        spots.Feed(10f, -30f);
+        spots.Feed(11f, -31f);
+        spots.Feed(40f, -30f);
+        t.Check(spots.Spots.Count == 2 && spots.HeatAt(10.5f, -30.5f) > 1.5f && spots.HeatAt(25f, -30f) == 0f,
+            $"feeders emptied close together make one baited spot ({spots.HeatAt(10.5f, -30.5f):0.0}), nothing between spots");
+        for (int i = 0; i < 10; i++)
+            spots.Feed(10f, -30f);
+        t.Check(spots.HeatAt(10f, -30f) <= GroundbaitSpots.MaxStrength + 1e-3f && GroundbaitSpots.PaceFor(spots.HeatAt(10f, -30f)) > 2.5f
+                && GroundbaitSpots.PaceFor(0f) == 1f, "a well baited spot brings bites up to almost three times faster");
+        spots.Decay(1.5f);
+        float faded = spots.HeatAt(10f, -30f);
+        spots.Decay(6f);
+        t.Check(faded is > 0.9f and < 1.3f && spots.Spots.Count == 0, $"groundbait fades over game hours ({faded:0.00} after 1.5 h, gone after 7.5)");
+    }
+
+    /// <summary>Always returns the same value (deterministic checks).</summary>
+    private sealed class FixedRng : FishingSim.Core.IRng
+    {
+        private readonly float _v;
+        public FixedRng(float v) => _v = v;
+        public float NextFloat() => _v;
     }
 }
