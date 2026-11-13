@@ -82,6 +82,14 @@ bez znaczników; litery kompasu kręcą się na drewnianej obręczy. Wokół bie
 a tabliczka pod spodem godzinę, czas do zmroku lub świtu, pogodę i nazwę łowiska (okrągła tarcza zastąpiła kwadratową
 minimapę). Tarcza jest mała (ok. 120 px średnicy), a napisy rysują się ostro w docelowym rozmiarze.
 
+**Mapa łowiska (M):** duża mapa topograficzna malowana w tle zaraz po wejściu na łowisko: rzeźba terenu cieniowana od
+północnego zachodu, poziomice co 2 m (co 10 m grubsze), las ciemniejszą zielenią, ścieżki i udeptane place jasnymi
+pasami, plaże piaskiem, a na jeziorze linie głębokości co metr (co 5 m grubsze), więc widać spady, górki i rynny.
+Pomost jest brązową kładką; kramy i miejsca mają kwadraty z podpisami, które nie zachodzą na siebie (w tłoku podpis
+znika, a nazwę pokazuje kursor). W rogach są podziałka i strzałka północy. Pod kursorem: nazwa miejsca, na lądzie
+rodzaj terenu (łąka, las, ścieżka, plaża, brzeg, skały) i wysokość nad wodą, na wodzie głębokość, odległość, zasięg
+rzutu i szanse brań na obecny zestaw (lista przewija się w ramce, mapa nie zmienia rozmiaru).
+
 **Płynność:** w menu pauzy obok jakości grafiki jest **zasięg widzenia** (Bliski, Średni, Daleki, Bardzo daleki).
 Ustala, jak daleko rysuje się las aż po góry (dalekie drzewa łagodnie zanikają), szczegółowe drzewa, rośliny i trawa,
 budynki, rekwizyty i światło lamp, mieszkańcy (i do jakiej odległości się ruszają) oraz cienie słońca. Na słabszym

@@ -151,6 +151,20 @@ public sealed class GameSuite : ITestSuite
         t.Check(MathF.Abs(back.X - 12.5f) < 0.01f && MathF.Abs(back.Y + 40f) < 0.01f, "map: world -> pixel -> world round trip");
         t.Check(ui.MapArea.HasPoint(Vector2.Zero) && ui.MapArea.HasPoint(new Vector2(0, 6)), "map frames the pier");
 
+        // Hovering the water lists the fish; the long readout must not stretch the page or the map.
+        ui.Open(1);
+        for (int i = 0; i < 3; i++)
+            await t.NextFrame();
+        var mapSize = ui.MapShownSize;
+        var pageSize = ui.GetChildren().OfType<Control>().Where(c => c.Visible).Select(c => c.Size).FirstOrDefault();
+        ui.HoverMap(ui.WorldToPixel(0f, LakeBed.PierEndZ - 6f, Vector2.One));
+        for (int i = 0; i < 3; i++)
+            await t.NextFrame();
+        var pageAfter = ui.GetChildren().OfType<Control>().Where(c => c.Visible).Select(c => c.Size).FirstOrDefault();
+        t.Check(ui.MapInfoText.Contains("Na obecny zestaw") && mapSize.Y > 100f && ui.MapShownSize == mapSize && pageAfter == pageSize,
+            $"map: hovering the water lists the fish without resizing the map ({mapSize} -> {ui.MapShownSize}, page {pageSize} -> {pageAfter})");
+        ui.Close();
+
         t.Section("gear keys");
         loadout.Index[(int)TackleSlot.Rod] = 0;
         profile.Owned["rod"].Add("teleskop");

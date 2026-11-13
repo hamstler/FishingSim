@@ -830,6 +830,18 @@ public partial class ScreenshotTool : Node
             var ui = main.GetChildren().OfType<GameUI>().First();
             ui.Open(arg);
             ui.EnsureMap();
+            // The topographic map is painted in the background: wait for it on the map tab.
+            for (int i = 0; arg == 1 && i < 900 && !ui.MapReady; i++)
+                await NextFrame();
+            // FISHSIM_MAP_HOVER=x,y puts the cursor on the map (fractions of its size).
+            var hover = System.Environment.GetEnvironmentVariable("FISHSIM_MAP_HOVER")?.Split(',');
+            if (hover is { Length: 2 })
+            {
+                for (int i = 0; i < 3; i++)
+                    await NextFrame();
+                ui.HoverMap(new Vector2(float.Parse(hover[0], System.Globalization.CultureInfo.InvariantCulture),
+                    float.Parse(hover[1], System.Globalization.CultureInfo.InvariantCulture)));
+            }
         }
 
         for (int i = 0; i < frames; i++)

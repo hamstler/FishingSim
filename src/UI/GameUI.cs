@@ -46,6 +46,9 @@ public partial class GameUI : CanvasLayer
     private readonly Dictionary<int, ImageTexture> _mapCache = new();
     private int _mapLocation = -1;
     private Rect2 _mapArea;
+    private System.Threading.Tasks.Task<Image>? _mapPainting;
+    private int _mapPaintingFor = -1;
+    private readonly List<Rect2> _labelRects = new();
     private Label _journalHead = null!;
     private VBoxContainer _journalList = null!, _speciesList = null!;
 
@@ -159,6 +162,10 @@ public partial class GameUI : CanvasLayer
 
     public override void _Process(double delta)
     {
+        // Start painting a newly opened map's picture at once (in the background), not when M is first pressed.
+        if (_lake != null && _lake.LocationIndex != _mapLocation)
+            RefreshMap();
+        CollectMap();
         if (Visible && _tabs.CurrentTab == MapTab)
         {
             _mapOverlay.QueueRedraw();
@@ -322,11 +329,13 @@ public partial class GameUI : CanvasLayer
         var page = new HBoxContainer { Name = "Mapa" };
         page.AddThemeConstantOverride("separation", 16);
         _tabs.AddChild(page);
+        // The map keeps its own size (set to the map's proportions in RefreshMap): it must not stretch with the page.
         _mapRect = new TextureRect
         {
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.Scale,
             CustomMinimumSize = new Vector2(MapShownWidth, 480),
+            SizeFlagsVertical = Control.SizeFlags.ShrinkBegin,
         };
         page.AddChild(_mapRect);
         _mapOverlay = new MapOverlay { Painter = DrawMapOverlay };
@@ -339,11 +348,17 @@ public partial class GameUI : CanvasLayer
         var title = new Label { Text = "Mapa łowiska" };
         title.AddThemeFontSizeOverride("font_size", 20);
         side.AddChild(title);
-        side.AddChild(new Label
+        var legend = new Label
         {
-            Text = "Czerwona kreska: pomost\nŻółta strzałka: Ty\nBiały punkt: spławik\nKwadraty: kramy i postój wozów\nKręgi: odległość od Ciebie",
+            Text = "Poziomice co 2 m (co 10 m grubsze), linie głębokości co 1 m (co 5 m grubsze)\n"
+                + "Ciemna zieleń: las · jasne pasy: ścieżki · piasek: plaże\n"
+                + "Żółta strzałka: Ty · biały punkt: spławik · brązowa kładka: pomost\n"
+                + "Kwadraty: kramy i miejsca · kręgi: odległość od Ciebie",
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
             Modulate = new Color(1, 1, 1, 0.75f),
-        });
+        };
+        legend.AddThemeFontSizeOverride("font_size", 14);
+        side.AddChild(legend);
         var gradient = new Gradient();
         gradient.SetColor(0, new Color(0.42f, 0.78f, 0.82f));
         gradient.SetColor(1, new Color(0.03f, 0.14f, 0.3f));
@@ -362,8 +377,21 @@ public partial class GameUI : CanvasLayer
         var hover = new Label { Text = "Pod kursorem" };
         hover.AddThemeFontSizeOverride("font_size", 20);
         side.AddChild(hover);
-        _mapInfo = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart, Text = "Najedź kursorem na mapę." };
-        side.AddChild(_mapInfo);
+        // The readout under the cursor sits in a scroll box filling the rest of the column, so a long list of fish
+        // never makes the page (and the map with it) taller.
+        var infoScroll = new ScrollContainer
+        {
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+        };
+        side.AddChild(infoScroll);
+        _mapInfo = new Label
+        {
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            Text = "Najedź kursorem na mapę.",
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+        };
+        infoScroll.AddChild(_mapInfo);
     }
 
     private void RefreshMap()
@@ -374,11 +402,17 @@ public partial class GameUI : CanvasLayer
         _mapLocation = idx;
         var loc = _lake.Location;
         _mapArea = MapPreview.Bounds(loc);
-        const int w = 330;
-        int h = (int)MathF.Round(w * _mapArea.Size.Y / _mapArea.Size.X);
-        if (!_mapCache.ContainsKey(idx))
-            _mapCache[idx] = MapPreview.Render(loc, w, h, _mapArea);
-        _mapRect.Texture = _mapCache[idx];
+        // The topographic map is painted in the background as soon as a map opens (well under a second on several
+        // cores); headless runs have nothing to show it on.
+        _mapRect.Texture = _mapCache.GetValueOrDefault(idx);
+        if (_mapRect.Texture == null && _mapPaintingFor != idx && !Graphics.Renderer.IsHeadless)
+        {
+            const int w = 960;
+            int h = (int)MathF.Round(w * _mapArea.Size.Y / _mapArea.Size.X);
+            var area = _mapArea;
+            _mapPaintingFor = idx;
+            _mapPainting = System.Threading.Tasks.Task.Run(() => MapPreview.RenderTopo(loc, w, h, area));
+        }
         // Fit the whole map (lake and village) inside the tab.
         float aspect = _mapArea.Size.Y / _mapArea.Size.X;
         float shownWidth = MathF.Min(MapShownWidth, MapShownHeight / aspect);
@@ -395,46 +429,172 @@ public partial class GameUI : CanvasLayer
     public Rect2 MapArea => _mapArea;
     public void EnsureMap() => RefreshMap();
 
+    /// <summary>True once the topographic picture of the current map is on screen (screenshots wait for it).</summary>
+    public bool MapReady => _mapRect.Texture != null;
+
+    /// <summary>Takes the background painting once it is done.</summary>
+    private void CollectMap()
+    {
+        if (_mapPainting is not { IsCompleted: true } done)
+            return;
+        if (!done.IsFaulted)
+        {
+            var texture = ImageTexture.CreateFromImage(done.Result);
+            _mapCache[_mapPaintingFor] = texture;
+            if (_mapPaintingFor == _mapLocation)
+                _mapRect.Texture = texture;
+        }
+        else
+            GD.PushWarning($"Map painting failed: {done.Exception?.GetBaseException().Message}");
+        _mapPainting = null;
+        _mapPaintingFor = -1;
+    }
+
+    /// <summary>The map's on-screen size (tests: it must not change while the cursor moves over it).</summary>
+    public Vector2 MapShownSize => _mapRect.Size;
+
+    /// <summary>The readout under the cursor (tests).</summary>
+    public string MapInfoText => _mapInfo.Text;
+
+    /// <summary>Puts the cursor on the map at a fraction of its size (screenshots and tests).</summary>
+    public void HoverMap(Vector2 fraction)
+    {
+        _mapOverlay.SetHover(fraction * _mapOverlay.Size);
+        UpdateMapInfo();
+    }
+
     private void DrawMapOverlay(MapOverlay c)
     {
         if (_mapArea.Size == Vector2.Zero)
             return;
         var size = c.Size;
-        var font = ThemeDB.FallbackFont;
+        var font = c.GetThemeDefaultFont() ?? ThemeDB.FallbackFont;
+        var ink = new Color(0.05f, 0.04f, 0.03f, 0.85f);
+        if (_mapRect.Texture == null)
+        {
+            c.DrawRect(new Rect2(Vector2.Zero, size), new Color(0.16f, 0.22f, 0.12f));
+            c.DrawString(font, new Vector2(0f, size.Y / 2f), "Rysowanie mapy…", HorizontalAlignment.Center, size.X, 18, new Color(1, 1, 1, 0.8f));
+        }
         var pp = WorldToPixel(_player.GlobalPosition.X, _player.GlobalPosition.Z, size);
         float pxPerMetre = size.X / _mapArea.Size.X;
         foreach (int r in new[] { 10, 20, 30, 40, 60 })
         {
-            c.DrawArc(pp, r * pxPerMetre, 0f, Mathf.Tau, 64, new Color(1, 1, 1, 0.2f), 1f);
+            c.DrawArc(pp, r * pxPerMetre, 0f, Mathf.Tau, 64, new Color(1, 1, 1, 0.22f), 1f, true);
             if (r is 20 or 40 or 60)
-                c.DrawString(font, pp + new Vector2(r * pxPerMetre + 2f, -3f), $"{r} m", HorizontalAlignment.Left, -1, 12, new Color(1, 1, 1, 0.55f));
+                Outlined(c, font, pp + new Vector2(r * pxPerMetre + 2f, -3f), $"{r} m", 11, new Color(1, 1, 1, 0.7f));
         }
-        c.DrawLine(WorldToPixel(0f, LakeBed.PierEndZ, size), WorldToPixel(0f, 6f, size), new Color(0.95f, 0.35f, 0.25f), 4f);
+        // The pier: a wooden walk with dark edges.
+        var pierA = WorldToPixel(0f, LakeBed.PierEndZ, size);
+        var pierB = WorldToPixel(0f, 6f, size);
+        float pierWidth = MathF.Max(3f, 2.4f * pxPerMetre);
+        c.DrawLine(pierA, pierB, ink, pierWidth + 2f);
+        c.DrawLine(pierA, pierB, new Color(0.62f, 0.44f, 0.24f), pierWidth);
 
+        // Places: a square each; their names placed where they do not cover one another (beside, above or below the
+        // square), else left out (the readout names the place under the cursor).
+        _labelRects.Clear();
+        foreach (var marker in _scenery.Markers)
+        {
+            var mp = WorldToPixel(marker.Position.X, marker.Position.Y, size);
+            _labelRects.Add(new Rect2(mp - new Vector2(6, 6), new Vector2(12, 12)));
+        }
+        _labelRects.Add(new Rect2(pp - new Vector2(12, 12), new Vector2(24, 24)));
         foreach (var marker in _scenery.Markers)
         {
             var mp = WorldToPixel(marker.Position.X, marker.Position.Y, size);
             c.DrawRect(new Rect2(mp - new Vector2(5, 5), new Vector2(10, 10)), marker.Color);
-            c.DrawRect(new Rect2(mp - new Vector2(5, 5), new Vector2(10, 10)), new Color(0, 0, 0, 0.8f), false, 1.5f);
-            c.DrawString(font, mp + new Vector2(8, 4), marker.Label, HorizontalAlignment.Left, -1, 12, new Color(1, 1, 1, 0.85f));
+            c.DrawRect(new Rect2(mp - new Vector2(5, 5), new Vector2(10, 10)), ink, false, 1.5f);
+            var text = font.GetStringSize(marker.Label, HorizontalAlignment.Left, -1, 12);
+            Span<Vector2> spots = stackalloc Vector2[]
+            {
+                mp + new Vector2(9f, -text.Y / 2f),
+                mp + new Vector2(-9f - text.X, -text.Y / 2f),
+                mp + new Vector2(-text.X / 2f, -9f - text.Y),
+                mp + new Vector2(-text.X / 2f, 9f),
+            };
+            foreach (var spot in spots)
+            {
+                var rect = new Rect2(spot, text).Grow(1f);
+                if (rect.Position.X < 0f || rect.Position.Y < 0f || rect.End.X > size.X || rect.End.Y > size.Y)
+                    continue;
+                bool free = true;
+                foreach (var other in _labelRects)
+                    if (other.Intersects(rect))
+                    {
+                        free = false;
+                        break;
+                    }
+                if (!free)
+                    continue;
+                _labelRects.Add(rect);
+                Outlined(c, font, spot + new Vector2(0f, text.Y * 0.78f), marker.Label, 12, new Color(1f, 0.97f, 0.88f));
+                break;
+            }
         }
+
         var f = -_player.GlobalTransform.Basis.Z;
         var dir = new Vector2(f.X, f.Z).Normalized();
         var perp = new Vector2(-dir.Y, dir.X);
-        c.DrawColoredPolygon(new[] { pp + dir * 11f, pp - dir * 6f + perp * 6f, pp - dir * 6f - perp * 6f }, new Color(1f, 0.9f, 0.3f));
+        var arrow = new[] { pp + dir * 12f, pp - dir * 7f + perp * 7f, pp - dir * 3f, pp - dir * 7f - perp * 7f };
+        c.DrawColoredPolygon(arrow, new Color(1f, 0.9f, 0.3f));
+        c.DrawPolyline(new[] { arrow[0], arrow[1], arrow[2], arrow[3], arrow[0] }, ink, 1.5f, true);
 
         if (_rod.State is RodState.Waiting or RodState.Nibble or RodState.Bite or RodState.Fight or RodState.Close)
         {
             var bp = WorldToPixel(_rod.Bobber.GlobalPosition.X, _rod.Bobber.GlobalPosition.Z, size);
-            c.DrawLine(pp, bp, new Color(1, 1, 1, 0.5f), 1f);
+            c.DrawLine(pp, bp, new Color(1, 1, 1, 0.5f), 1f, true);
             c.DrawCircle(bp, 5f, Colors.White);
-            c.DrawArc(bp, 8f, 0f, Mathf.Tau, 20, new Color(1f, 0.4f, 0.3f), 2f);
+            c.DrawArc(bp, 8f, 0f, Mathf.Tau, 20, new Color(1f, 0.4f, 0.3f), 2f, true);
         }
+
+        DrawScaleAndNorth(c, font, size, pxPerMetre);
+
         if (c.HasHover)
         {
+            c.DrawLine(c.Hover + new Vector2(-9, 0), c.Hover + new Vector2(9, 0), ink, 3.5f);
+            c.DrawLine(c.Hover + new Vector2(0, -9), c.Hover + new Vector2(0, 9), ink, 3.5f);
             c.DrawLine(c.Hover + new Vector2(-9, 0), c.Hover + new Vector2(9, 0), Colors.White, 1.5f);
             c.DrawLine(c.Hover + new Vector2(0, -9), c.Hover + new Vector2(0, 9), Colors.White, 1.5f);
         }
+    }
+
+    /// <summary>Text with a dark outline (reads over the map's light and dark parts).</summary>
+    private static void Outlined(Control c, Font font, Vector2 at, string text, int size, Color colour)
+    {
+        c.DrawStringOutline(font, at, text, HorizontalAlignment.Left, -1, size, 4, new Color(0.05f, 0.04f, 0.03f, 0.85f));
+        c.DrawString(font, at, text, HorizontalAlignment.Left, -1, size, colour);
+    }
+
+    /// <summary>A scale bar (bottom left) and a north arrow (top right) on small dark plates.</summary>
+    private static void DrawScaleAndNorth(Control c, Font font, Vector2 size, float pxPerMetre)
+    {
+        var plate = new Color(0.05f, 0.04f, 0.03f, 0.6f);
+        var light = new Color(1f, 0.97f, 0.88f);
+        // The longest round length that fits in about a fifth of the map.
+        int metres = 100;
+        foreach (int m in new[] { 100, 50, 25, 20, 10 })
+        {
+            metres = m;
+            if (m * pxPerMetre <= size.X * 0.22f)
+                break;
+        }
+        float len = metres * pxPerMetre;
+        var origin = new Vector2(14f, size.Y - 16f);
+        c.DrawRect(new Rect2(origin + new Vector2(-8f, -24f), new Vector2(len + 16f, 32f)), plate);
+        for (int i = 0; i < 4; i++)
+        {
+            var seg = new Rect2(origin + new Vector2(len * i / 4f, -4f), new Vector2(len / 4f, 4f));
+            c.DrawRect(seg, i % 2 == 0 ? light : new Color(0.1f, 0.08f, 0.06f));
+        }
+        c.DrawRect(new Rect2(origin + new Vector2(0f, -4f), new Vector2(len, 4f)), light, false, 1f);
+        c.DrawString(font, origin + new Vector2(0f, -9f), "0", HorizontalAlignment.Left, -1, 11, light);
+        c.DrawString(font, origin + new Vector2(len - 30f, -9f), $"{metres} m", HorizontalAlignment.Right, 30f, 11, light);
+
+        var n = new Vector2(size.X - 24f, 30f);
+        c.DrawCircle(n, 17f, plate);
+        c.DrawColoredPolygon(new[] { n + new Vector2(0f, -13f), n + new Vector2(6f, 4f), n + new Vector2(0f, 0f) }, new Color(0.95f, 0.35f, 0.25f));
+        c.DrawColoredPolygon(new[] { n + new Vector2(0f, -13f), n + new Vector2(0f, 0f), n + new Vector2(-6f, 4f) }, new Color(0.7f, 0.2f, 0.14f));
+        c.DrawString(font, n + new Vector2(-17f, 15f), "N", HorizontalAlignment.Center, 34f, 12, light);
     }
 
     private void UpdateMapInfo()
@@ -447,22 +607,49 @@ public partial class GameUI : CanvasLayer
         var w = PixelToWorld(_mapOverlay.Hover, _mapOverlay.Size);
         float depth = _lake.DepthAt(w.X, w.Y);
         float dist = new Vector2(w.X - _player.GlobalPosition.X, w.Y - _player.GlobalPosition.Z).Length();
+        var sb = new StringBuilder();
+        // A place under the cursor (its name may be left off the map where the labels crowd).
+        foreach (var marker in _scenery.Markers)
+            if (WorldToPixel(marker.Position.X, marker.Position.Y, _mapOverlay.Size).DistanceTo(_mapOverlay.Hover) < 10f)
+            {
+                sb.Append(marker.Label).Append('\n');
+                break;
+            }
         if (depth <= 0f)
         {
-            _mapInfo.Text = $"Ląd. Odległość od Ciebie: {dist:0} m.";
+            string ground = _lake.GroundKindAt(w.X, w.Y) switch
+            {
+                Core.Camp.GroundKind.Forest => "las",
+                Core.Camp.GroundKind.Path => "ścieżka",
+                Core.Camp.GroundKind.Sand => "plaża",
+                Core.Camp.GroundKind.Mud => "wilgotny brzeg",
+                Core.Camp.GroundKind.Rock => "skały",
+                Core.Camp.GroundKind.Meadow => "łąka",
+                _ => "brzeg",
+            };
+            sb.Append($"Ląd: {ground}, {MathF.Max(0f, _lake.HeightAt(w.X, w.Y)):0} m nad wodą\nOdległość od Ciebie: {dist:0} m");
+            string land = sb.ToString();
+            if (_mapInfo.Text != land)
+                _mapInfo.Text = land;
             return;
         }
         float reach = _rod.EstimateCastRange();
-        var sb = new StringBuilder();
-        sb.Append($"Głębokość: {depth:0.0} m\nOdległość od Ciebie: {dist:0} m\n");
+        sb.Append($"Głębokość: {depth:0.0} m · {dist:0} m od Ciebie\n");
         sb.Append(dist <= reach ? "W zasięgu rzutu." : $"Poza zasięgiem rzutu (do ok. {reach:0} m).");
-        sb.Append("\n\nNa obecny zestaw:");
+        sb.Append("\nNa obecny zestaw: ");
+        // The fish run on as one wrapped paragraph (a name never breaks from its share: no-break spaces).
         var shown = _rod.BiteChances(depth).Where(c => c.Share >= 0.01f).ToList();
-        foreach (var c in shown)
-            sb.Append($"\n{c.Species.SpeciesName}: {Mathf.RoundToInt(c.Share * 100f)}%");
+        for (int i = 0; i < shown.Count; i++)
+        {
+            if (i > 0)
+                sb.Append("\u00A0· ");
+            sb.Append(shown[i].Species.SpeciesName.Replace(' ', '\u00A0')).Append('\u00A0').Append(Mathf.RoundToInt(shown[i].Share * 100f)).Append('%');
+        }
         if (shown.Count == 0)
-            sb.Append("\nnic tu nie weźmie");
-        _mapInfo.Text = sb.ToString();
+            sb.Append("nic tu nie weźmie");
+        string text = sb.ToString();
+        if (_mapInfo.Text != text)
+            _mapInfo.Text = text;
     }
 
     // ------------------------------------------------------------------ journal tab

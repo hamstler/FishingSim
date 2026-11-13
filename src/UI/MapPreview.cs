@@ -42,32 +42,52 @@ public static class MapPreview
     }
 
     /// <summary>
-    /// A topographic picture of a map (for the HUD's round map; safe to call on a worker thread, returns an image):
-    /// land tinted by height (meadow, olive slopes, brown hillsides, grey rock above the map's rock line, snow above its
-    /// snow line) and shaded by the relief as if lit from the north-west, contour lines every 2 m (heavier every 10 m);
+    /// A topographic picture of a map (the HUD's round map and the big map under M; safe to call on a worker thread,
+    /// returns an image; painted in parallel bands, each with its own <see cref="LakeBed"/>): land tinted by height
+    /// (meadow, olive slopes, brown hillsides, grey rock above the map's rock line, snow above its snow line), darker
+    /// where the forest stands, light earth on the paths and the trodden ground round the buildings, sand on the
+    /// beaches, all shaded by the relief as if lit from the north-west, contour lines every 2 m (heavier every 10 m);
     /// the lake from pale shallows to dark deep water with depth contours every metre (heavier every 5 m); the shore
     /// drawn as a firm line.
     /// </summary>
     public static Image RenderTopo(LocationData loc, int w, int h, Rect2 area)
     {
-        var bed = new LakeBed();
-        // Heights on the pixel grid with a one-pixel border (for the slopes and the contours at the edges).
-        var height = new float[(w + 2) * (h + 2)];
-        for (int py = -1; py <= h; py++)
+        int gw = w + 2, gh = h + 2;
+        // Heights on the pixel grid with a one-pixel border (for the slopes and the contours at the edges), and the
+        // grounds (sand, path, forest) under the land pixels.
+        var height = new float[gw * gh];
+        var ground = new Vector3[w * h];
+        int bands = Math.Clamp(System.Environment.ProcessorCount, 1, 8);
+        System.Threading.Tasks.Parallel.For(0, bands, b =>
         {
-            float z = area.Position.Y + (py + 0.5f) / h * area.Size.Y;
-            for (int px = -1; px <= w; px++)
+            var bed = new LakeBed();
+            for (int gy = b * gh / bands; gy < (b + 1) * gh / bands; gy++)
             {
-                float x = area.Position.X + (px + 0.5f) / w * area.Size.X;
-                height[(py + 1) * (w + 2) + px + 1] = bed.HeightAt(loc, x, z);
+                int py = gy - 1;
+                float z = area.Position.Y + (py + 0.5f) / h * area.Size.Y;
+                for (int gx = 0; gx < gw; gx++)
+                {
+                    int px = gx - 1;
+                    float x = area.Position.X + (px + 0.5f) / w * area.Size.X;
+                    float hc = bed.HeightAt(loc, x, z);
+                    height[gy * gw + gx] = hc;
+                    if (hc >= 0f && px >= 0 && px < w && py >= 0 && py < h)
+                    {
+                        var g = bed.GroundAt(loc, x, z, hc);
+                        ground[py * w + px] = new Vector3(g.X, g.Y, g.Z);
+                    }
+                }
             }
-        }
-        bed.Free();
-        float H(int px, int py) => height[(py + 1) * (w + 2) + px + 1];
+            bed.Free();
+        });
+        float H(int px, int py) => height[(py + 1) * gw + px + 1];
         float cellX = area.Size.X / w, cellZ = area.Size.Y / h;
         var light = new Vector3(-1f, 1.6f, -1f).Normalized();     // from the north-west, fairly high
         var data = new byte[w * h * 3];
-        for (int py = 0; py < h; py++)
+        var forestTint = new Color(0.2f, 0.36f, 0.17f);
+        var pathTint = new Color(0.8f, 0.68f, 0.47f);
+        var sandTint = new Color(0.84f, 0.77f, 0.56f);
+        System.Threading.Tasks.Parallel.For(0, h, py =>
         {
             for (int px = 0; px < w; px++)
             {
@@ -85,14 +105,19 @@ public static class MapPreview
                 }
                 else
                 {
-                    if (hc < 0.6f)
-                        c = new Color(0.8f, 0.74f, 0.54f);                                           // beach
-                    else if (hc < loc.RockLine)
+                    if (hc < loc.RockLine)
                         c = new Color(0.45f, 0.62f, 0.3f).Lerp(new Color(0.55f, 0.55f, 0.3f), Math.Clamp((hc - 0.6f) / Math.Max(loc.RockLine - 0.6f, 1f), 0f, 1f));
                     else if (hc < loc.SnowLine)
                         c = new Color(0.55f, 0.5f, 0.38f).Lerp(new Color(0.58f, 0.57f, 0.55f), Math.Clamp((hc - loc.RockLine) / Math.Max(loc.SnowLine - loc.RockLine, 1f), 0f, 1f));
                     else
                         c = new Color(0.92f, 0.94f, 0.96f);
+                    var g = ground[py * w + px];
+                    if (hc < loc.RockLine)
+                    {
+                        c = c.Lerp(sandTint, Math.Clamp(Math.Max(g.X, hc < 0.6f ? 1f : 0f), 0f, 1f));
+                        c = c.Lerp(forestTint, g.Z * 0.75f);
+                        c = c.Lerp(pathTint, Math.Clamp(g.Y * 1.1f, 0f, 1f));
+                    }
                     c = c * (0.5f + 0.75f * shade);
                 }
                 // Contours: a line where the band of height changes towards a neighbour.
@@ -105,7 +130,7 @@ public static class MapPreview
                 else if (band != bandR || band != bandD)
                 {
                     int edge = Math.Max(Math.Max(band, bandR), bandD);
-                    bool major = water ? edge % 5 == 0 : edge % 5 == 0;    // every 5 m in the lake, every 10 m on land
+                    bool major = edge % 5 == 0;    // every 5 m in the lake, every 10 m on land
                     if (water)
                         c = c.Lerp(new Color(0.88f, 0.96f, 1f), major ? 0.55f : 0.28f);
                     else
@@ -116,7 +141,7 @@ public static class MapPreview
                 data[o + 1] = (byte)(Math.Clamp(c.G, 0f, 1f) * 255f);
                 data[o + 2] = (byte)(Math.Clamp(c.B, 0f, 1f) * 255f);
             }
-        }
+        });
         var img = Image.CreateFromData(w, h, false, Image.Format.Rgb8, data);
         img.GenerateMipmaps();
         return img;
