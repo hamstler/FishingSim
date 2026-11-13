@@ -90,12 +90,15 @@ public partial class HandTools : Node3D
     // Lift net: seconds of each stage, the pole's pitch (radians above the horizon) carried, held up to show the catch,
     // and the lowest it goes (from a high pier the net hangs higher).
     private const float LowerSeconds = 1.5f, LiftSeconds = 1.1f, ShowSeconds = 2.4f, ShowHold = 1.7f;
-    private const float PitchUp = 1.15f, PitchShow = 0.3f, PitchLowest = -0.75f;
+    private const float PitchUp = 1.15f, PitchShow = 0.35f, PitchLowest = -0.75f;
 
     /// <summary>The body bends towards the water while the lift net is down (and the head with it).</summary>
     private static readonly Vector3 LiftLean = new(0f, -0.22f, -0.28f);
 
-    private float _liftT, _soak, _pitchDown, _liftFrom;
+    private float _liftT, _soak, _pitchDown, _liftFrom, _slide;
+
+    /// <summary>How far the pole slides back through the hands to bring the lifted net in (m).</summary>
+    private const float LiftSlide = 1f;
     private Vector3 _swing, _swingVel, _lastTip;
     private bool _groundbait;
     private Haul? _liftHaul;
@@ -549,10 +552,14 @@ public partial class HandTools : Node3D
         // The pole: the butt in the hands, pitched down to the water or up to carry.
         float pitch = LiftPitch();
         float k = Math.Clamp((PitchUp - pitch) / (PitchUp + 0.35f), 0f, 1f);
+        // Lifted, the pole slides back through the hands so the net with the catch comes close; stowed, it goes out again.
+        float hold = ShowHold / ShowSeconds;
+        _slide = Lift != LiftStage.Showing ? 0f
+            : LiftSlide * (_liftT < hold ? Ease(_liftT / (hold * 0.6f)) : 1f - Ease((_liftT - hold) / (1f - hold)));
         // Carried, the pole leans up to the right so the net hangs out of the way; lowered, it points ahead.
         var dir = new Vector3(Mathf.Lerp(0.3f, -0.04f, Smooth(k)), MathF.Sin(pitch), -MathF.Cos(pitch)).Normalized();
         var x = dir.Cross(Vector3.Up).Normalized();
-        _liftPole.Transform = new Transform3D(new Basis(x, dir, x.Cross(dir)), ButtUp.Lerp(ButtDown, Smooth(k)));
+        _liftPole.Transform = new Transform3D(new Basis(x, dir, x.Cross(dir)), ButtUp.Lerp(ButtDown, Smooth(k)) - dir * _slide);
 
         // The net hangs from the tip on its cord and swings behind as the tip moves (slowly in the water).
         var tip = _liftPole.GlobalTransform * new Vector3(0f, CampProps.LiftPoleLength, 0f);
@@ -706,8 +713,9 @@ public partial class HandTools : Node3D
         {
             // The right hand presses the butt down from above, the left one carries the pole from below.
             var tl = _liftPole.GlobalTransform;
-            return (Grip(tl, CampProps.LiftButtGrip, Vector3.Up, Vector3.Forward, true, CampProps.LiftPoleRadius * 1.1f, rightPole, 0.9f),
-                Grip(tl, CampProps.LiftPoleGrip, Vector3.Up, Vector3.Back, false, CampProps.LiftPoleRadius, leftPole, 0.85f));
+            var slid = Vector3.Up * _slide;
+            return (Grip(tl, CampProps.LiftButtGrip + slid, Vector3.Up, Vector3.Forward, true, CampProps.LiftPoleRadius * 1.1f, rightPole, 0.9f),
+                Grip(tl, CampProps.LiftPoleGrip + slid, Vector3.Up, Vector3.Back, false, CampProps.LiftPoleRadius, leftPole, 0.85f));
         }
         var tn = _net.GlobalTransform;
         return (Grip(tn, CampProps.NetEndGrip, Vector3.Up, Vector3.Left, true, CampProps.NetPoleRadius, rightPole, 0.9f), rest);
