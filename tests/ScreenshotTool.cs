@@ -521,6 +521,45 @@ public partial class ScreenshotTool : Node
             await ToSignal(GetTree().CreateTimer(at), SceneTreeTimer.SignalName.Timeout);
             GD.Print($"tools: {main.Tools.Current} at {stand} ground {lake.GroundKindAt(stand.X, stand.Z)} haul {main.Tools.LastHaul?.Message}");
         }
+        else if (mode == 32)
+        {
+            // Memory soak: the angler is moved round the lake (a new spot every 10 frames) and the memory is printed every
+            // 40 frames: the process's resident memory, the .NET heap, Godot's static memory, objects, nodes, resources,
+            // orphan nodes and the GPU's memory. A leak shows as a steady climb.
+            var lake = main.Rod.Lake;
+            var rnd = new RandomNumberGenerator { Seed = 5 };
+            int soak = int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_SOAK_FRAMES"), out int sf) ? sf : 400;
+            for (int i = 0; i <= soak; i++)
+            {
+                if (i % 10 == 0)
+                {
+                    for (int k = 0; k < 40; k++)
+                    {
+                        float x = rnd.RandfRange(FishingSim.World.LakeBed.XMin + 20f, FishingSim.World.LakeBed.XMax - 20f);
+                        float z = rnd.RandfRange(FishingSim.World.LakeBed.ZMin + 20f, FishingSim.World.LakeBed.ZMax - 20f);
+                        float h = lake.HeightAt(x, z);
+                        if (h > 0.2f && lake.IsWalkable(x, z))
+                        {
+                            main.Player.GlobalPosition = new Vector3(x, h + 0.2f, z);
+                            main.Player.Rotation = new Vector3(0f, rnd.Randf() * Mathf.Tau, 0f);
+                            break;
+                        }
+                    }
+                }
+                await NextFrame();
+                if (i % 40 == 0)
+                {
+                    long rss = 0;
+                    foreach (var line in System.IO.File.ReadAllLines("/proc/self/status"))
+                        if (line.StartsWith("VmRSS:"))
+                            rss = long.Parse(line.Split(' ', StringSplitOptions.RemoveEmptyEntries)[1]) / 1024;
+                    GD.Print($"MEM frame={i} rss={rss}MB gc={GC.GetTotalMemory(false) / 1048576}MB static={OS.GetStaticMemoryUsage() / 1048576}MB " +
+                             $"objects={Performance.GetMonitor(Performance.Monitor.ObjectCount):0} nodes={Performance.GetMonitor(Performance.Monitor.ObjectNodeCount):0} " +
+                             $"resources={Performance.GetMonitor(Performance.Monitor.ObjectResourceCount):0} orphans={Performance.GetMonitor(Performance.Monitor.ObjectOrphanNodeCount):0} " +
+                             $"vram={Performance.GetMonitor(Performance.Monitor.RenderVideoMemUsed) / 1048576:0}MB gen0={GC.CollectionCount(0)} gen2={GC.CollectionCount(2)}");
+                }
+            }
+        }
         else if (mode == 31)
         {
             // Close-up of the rod in hand and the reel from a second camera beside it: arg 0 = from the left (the

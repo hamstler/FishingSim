@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Collections.Generic;
 using Godot;
@@ -180,8 +181,26 @@ public partial class Main : Node3D
         ApplyMood();
         _lake.Rebuilt += ApplyMood;
         _lake.Rebuilt += RespawnPlayer;
+        _lake.Rebuilt += ReleaseLoadingGarbage;
         _profile.Changed += Save;
         Input.MouseMode = Input.MouseModeEnum.Captured;
+        ReleaseLoadingGarbage();
+    }
+
+    /// <summary>
+    /// Building a map leaves hundreds of megabytes of garbage (texture files read into arrays, painted pictures, mesh
+    /// data). Collected here, once, while the map loads (compacting the large-object heap so the memory goes back to
+    /// the system), instead of in one long pause in the middle of play.
+    /// </summary>
+    private void ReleaseLoadingGarbage()
+    {
+        Callable.From(() =>
+        {
+            System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+        }).CallDeferred();
     }
 
     private static BodyAction ActionFor(RodState state) => state switch
@@ -343,6 +362,7 @@ public partial class Main : Node3D
         _world.HoursAdvanced -= _profile.PassTime;
         _gear.GearChanged -= ApplyGearEffects;
         _lake.Rebuilt -= RespawnPlayer;
+        _lake.Rebuilt -= ReleaseLoadingGarbage;
         _lake.Rebuilt -= ApplyMood;
     }
 }
