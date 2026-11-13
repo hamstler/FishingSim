@@ -184,8 +184,8 @@ public partial class Campfire : Node3D
     {
         Amount = 14, Lifetime = 6f, Direction = Vector3.Up, Spread = 8f,
         InitialVelocityMin = 0.4f, InitialVelocityMax = 0.65f, Gravity = new Vector3(0.18f, 0.04f, 0.05f),
-        ScaleAmountMin = 0.6f, ScaleAmountMax = 1f, ScaleAmountCurve = Grow(), ColorRamp = Fade(new Color(0.42f, 0.42f, 0.44f, 0.2f)),
-        Mesh = new QuadMesh { Size = new Vector2(0.7f, 0.7f), Material = SmokeMaterial() },
+        ScaleAmountMin = 0.7f, ScaleAmountMax = 1.1f, ScaleAmountCurve = Grow(), ColorRamp = Fade(new Color(0.36f, 0.36f, 0.38f, 0.32f)),
+        Mesh = new QuadMesh { Size = new Vector2(0.9f, 0.9f), Material = SmokeMaterial() }, Preprocess = 6f,
     };
 
     private static StandardMaterial3D SmokeMaterial()
