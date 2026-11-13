@@ -216,6 +216,8 @@ public static class GraphicsQuality
     public static void ApplySun(DirectionalLight3D sun)
     {
         var q = Level;
+        // The sun's shadow map: 2048 px on Low (a quarter of the memory), 4096 px otherwise.
+        RenderingServer.DirectionalShadowAtlasSetSize(q == QualityLevel.Low ? 2048 : 4096, true);
         sun.DirectionalShadowMode = q >= QualityLevel.Ultra
             ? DirectionalLight3D.ShadowMode.Parallel4Splits
             : DirectionalLight3D.ShadowMode.Parallel2Splits;

@@ -78,7 +78,9 @@ do wody (R).
 **Płynność:** w menu pauzy obok jakości grafiki jest **zasięg widzenia** (Bliski, Średni, Daleki, Bardzo daleki).
 Ustala, jak daleko rysuje się las aż po góry (dalekie drzewa łagodnie zanikają), szczegółowe drzewa, rośliny i trawa,
 budynki, rekwizyty i światło lamp, mieszkańcy (i do jakiej odległości się ruszają) oraz cienie słońca. Na słabszym
-komputerze najlepiej zacząć od zasięgu Średniego. Gra ogranicza też nadrabianie fizyki do 4 kroków na klatkę, więc
+komputerze najlepiej zacząć od zasięgu Średniego. Jakość grafiki ustala też rozdzielczość tekstur (Niska 1024 px,
+Średnia 2048 px, Wysoka i Ultra 4096 px): na Niskiej gra zajmuje mniej więcej o połowę mniej pamięci karty, a przy
+grafice zintegrowanej także RAM-u (zmiana tekstur działa po ponownym uruchomieniu gry). Gra ogranicza też nadrabianie fizyki do 4 kroków na klatkę, więc
 chwilowe przycięcie nie zamienia się w serię zacięć.
 
 **Tekstury 4K:** tekstury świata (ziemia, kora, budynki, liście) mają 4096 px na kafel 2 m. Gra maluje je sama przy pierwszym uruchomieniu (zaczyna już w menu; na 4 rdzeniach trwa to ok. 2 minut), kompresuje własnym kompresorem blokowym (BC1/BC3/BC5, więc mieszczą się w pamięci karty także w wyeksportowanej grze) i zapisuje w `user://texcache` (ok. 250 MB). Kolejne uruchomienia tylko je wczytują. Okno startuje zmaksymalizowane, a świat renderuje się w natywnej rozdzielczości.
