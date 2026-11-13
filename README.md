@@ -75,6 +75,12 @@ osi w świetle studyjnego reflektora (wjeżdża z lekkim obrotem i porusza płet
 doświadczenie i rekord, stan siatki, ostrzeżenie o wymiarze ochronnym albo pełnej siatce oraz wybór: do siatki (E) albo
 do wody (R).
 
+**Płynność:** w menu pauzy obok jakości grafiki jest **zasięg widzenia** (Bliski, Średni, Daleki, Bardzo daleki).
+Ustala, jak daleko rysuje się las aż po góry (dalekie drzewa łagodnie zanikają), szczegółowe drzewa, rośliny i trawa,
+budynki, rekwizyty i światło lamp, mieszkańcy (i do jakiej odległości się ruszają) oraz cienie słońca. Na słabszym
+komputerze najlepiej zacząć od zasięgu Średniego. Gra ogranicza też nadrabianie fizyki do 4 kroków na klatkę, więc
+chwilowe przycięcie nie zamienia się w serię zacięć.
+
 **Tekstury 4K:** tekstury świata (ziemia, kora, budynki, liście) mają 4096 px na kafel 2 m. Gra maluje je sama przy pierwszym uruchomieniu (zaczyna już w menu; na 4 rdzeniach trwa to ok. 2 minut), kompresuje własnym kompresorem blokowym (BC1/BC3/BC5, więc mieszczą się w pamięci karty także w wyeksportowanej grze) i zapisuje w `user://texcache` (ok. 250 MB). Kolejne uruchomienia tylko je wczytują. Okno startuje zmaksymalizowane, a świat renderuje się w natywnej rozdzielczości.
 
 **Interfejs:** rzeźbione dębowe ramy z mosiężnymi ćwiekami, przyciski z desek, pergaminowe karty i złocone paski, wszystko malowane w kodzie. W kramie boczny pasek kategorii z dużymi obrazkami, podkategorie (np. wędki spławikowe, spinningowe, gruntowe, karpiowe; przynęty naturalne, roślinne, karpiowe, sztuczne), wyszukiwarka, sortowanie i filtr „Dostępne”; karty mają wstążkę jakości (zwykły, dobry, wyborny, mistrzowski), pieczęć posiadanego i gwiazdkę używanego przedmiotu, kłódkę na zablokowanych, rosną pod kursorem, a zakup kończy się deszczem monet i brzękiem. Obrazki przedmiotów są gładkie (128 px), z cieniem.
@@ -170,7 +176,7 @@ repozytorium, więc lepiej przebudowywać tylko zmienione gatunki. Opis całego 
 | I / M / J / T | ekwipunek, mapa, dziennik, turnieje |
 | E | wejście do kramu, gildii, na targ lub na postój wozów (przy drzwiach budynku) |
 | Shift | bieg |
-| Esc | menu pauzy (wznów, zmień mapę, jakość grafiki, wyloguj, wyjdź) |
+| Esc | menu pauzy (wznów, zmień mapę, jakość grafiki, zasięg widzenia, wyloguj, wyjdź) |
 | Tab (przytrzymaj) | stan: godzina, pogoda, łowisko, sakiewka, siatka, sprzęt |
 | H | sterowanie |
 | F1 | konsola deweloperska: F2 natychmiastowe branie, F3 nieśmiertelna żyłka, F4 gatunek, F5 reset rzutu, F6 przynęty, F7 +3 godz., F8 pogoda, F9 reset postępu, F10 +1000 gr |
