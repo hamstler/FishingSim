@@ -510,18 +510,20 @@ public partial class LakeBed : Node3D
         material.SetShaderParameter("dark_grass_tint", Towards(Calm(loc.DarkGrassColor), Props.GroundTextures.Grass, 1f));
     }
 
-    private float _time;
 
     /// <summary>0..1 sun light reaching the ground (caustics fade at night); set by the sky.</summary>
     public float Daylight { get; set; } = 1f;
 
+    private float _sentDaylight = -1f;
+
+    /// <summary>The terrain's daylight follows the sky (only when it changed: the caustics' clock is the global
+    /// water_time).</summary>
     public override void _Process(double delta)
     {
         using var perfScope = Graphics.Perf.Scope("lakebed");
-        _time += (float)delta;
-        if (_terrainMaterial != null)
+        if (_terrainMaterial != null && MathF.Abs(Daylight - _sentDaylight) > 0.003f)
         {
-            _terrainMaterial.SetShaderParameter("time", _time);
+            _sentDaylight = Daylight;
             _terrainMaterial.SetShaderParameter("daylight", Daylight);
         }
     }

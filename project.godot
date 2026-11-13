@@ -50,3 +50,11 @@ water_amp={
 "type": "float",
 "value": 0.03
 }
+foliage_wind={
+"type": "float",
+"value": 0.3
+}
+foliage_time={
+"type": "float",
+"value": 0.0
+}

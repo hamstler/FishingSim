@@ -16,7 +16,8 @@ uniform float layer_rough[7];
 uniform vec3 dark_grass_tint = vec3(1.0);
 uniform float tile = 2.0;
 uniform float bump = 1.0;
-uniform float time = 0.0;
+// The water's clock (set once per frame by Water as a global): the caustics drift with it.
+global uniform float water_time;
 uniform float daylight = 1.0;
 uniform float water_level = 0.0;
 uniform float snow_line = 26.0;
@@ -157,8 +158,8 @@ void fragment() {
 	// Caustics: sunlight focused by the waves, dancing on the shallow bottom.
 	if (height < -0.02) {
 		vec2 cuv = wpos.xz * 0.22;
-		float c1 = texture(caustics_tex, cuv + vec2(time * 0.03, time * 0.02)).r;
-		float c2 = texture(caustics_tex, cuv * 1.3 - vec2(time * 0.025, time * 0.035)).r;
+		float c1 = texture(caustics_tex, cuv + vec2(water_time * 0.03, water_time * 0.02)).r;
+		float c2 = texture(caustics_tex, cuv * 1.3 - vec2(water_time * 0.025, water_time * 0.035)).r;
 		float caustic = smoothstep(0.55, 0.75, min(c1, c2)) * 0.8;
 		float depth_fade = exp(height * 0.6);
 		EMISSION = vec3(0.9, 1.0, 0.95) * caustic * depth_fade * daylight * 0.35 * base;
