@@ -269,6 +269,7 @@ public partial class Campfire : Node3D
 
     public override void _Process(double delta)
     {
+        using var perfScope = Graphics.Perf.Scope("campfire");
         float dt = (float)delta;
         _time += dt;
         if (Cooking is { } dish)

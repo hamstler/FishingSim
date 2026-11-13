@@ -296,6 +296,7 @@ public partial class HeadLook : SkeletonModifier3D
 
     public override void _ProcessModification()
     {
+        using var perfScope = Graphics.Perf.Scope("head-look");
         var sk = GetSkeleton();
         if (sk == null)
             return;

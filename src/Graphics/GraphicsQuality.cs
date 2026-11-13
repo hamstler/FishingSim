@@ -19,6 +19,10 @@ public static class GraphicsQuality
     private static bool _loaded;
     private static QualityLevel _level = QualityLevel.High;
     private static ViewDistance _view = ViewDistance.Long;
+    private static int _scale = 100;
+
+    /// <summary>The 3D resolution choices (per cent of the screen's pixels; below 100 upscaled by AMD FSR).</summary>
+    public static readonly int[] RenderScales = { 100, 85, 70, 50 };
 
     public static event Action? Changed;
 
@@ -79,6 +83,35 @@ public static class GraphicsQuality
 
     public static void CycleView() => SetView((ViewDistance)(((int)View + 1) % 4));
 
+    /// <summary>The 3D image's resolution in per cent of the screen's (the interface stays sharp at full resolution).
+    /// The graphics card's work grows with the pixels: 70 % draws half of them.</summary>
+    public static int RenderScale
+    {
+        get
+        {
+            if (!_loaded)
+                Load();
+            return _scale;
+        }
+    }
+
+    public static string RenderScaleTitle(int percent) => percent >= 100 ? "100% (natywna)" : $"{percent}% (FSR)";
+
+    public static void SetRenderScale(int percent)
+    {
+        if (!_loaded)
+            Load();
+        _scale = Math.Clamp(percent, 50, 100);
+        SaveConfig();
+        Changed?.Invoke();
+    }
+
+    public static void CycleRenderScale()
+    {
+        int i = Array.IndexOf(RenderScales, RenderScale);
+        SetRenderScale(RenderScales[(i + 1) % RenderScales.Length]);
+    }
+
     /// <summary>How far (m) the distant forest is drawn; 0 = all the way to the horizon.</summary>
     public static float ViewRange => View switch
     {
@@ -105,6 +138,7 @@ public static class GraphicsQuality
         var cfg = new ConfigFile();
         cfg.SetValue("graphics", "quality", (int)_level);
         cfg.SetValue("graphics", "view", (int)_view);
+        cfg.SetValue("graphics", "scale", _scale);
         cfg.Save(ConfigPath);
     }
 
@@ -116,6 +150,7 @@ public static class GraphicsQuality
             return;
         _level = (QualityLevel)Math.Clamp(cfg.GetValue("graphics", "quality", (int)QualityLevel.High).AsInt32(), 0, 3);
         _view = (ViewDistance)Math.Clamp(cfg.GetValue("graphics", "view", (int)ViewDistance.Long).AsInt32(), 0, 3);
+        _scale = Math.Clamp(cfg.GetValue("graphics", "scale", 100).AsInt32(), 50, 100);
     }
 
     /// <summary>Radius (m) of the dense grass around the player; 0 = no grass blades.</summary>
@@ -211,6 +246,10 @@ public static class GraphicsQuality
         vp.ScreenSpaceAA = q <= QualityLevel.Medium ? Viewport.ScreenSpaceAAEnum.Fxaa : Viewport.ScreenSpaceAAEnum.Disabled;
         vp.UseDebanding = q >= QualityLevel.Medium;
         vp.PositionalShadowAtlasSize = q >= QualityLevel.High ? 4096 : 2048;
+        // A lower 3D resolution upscaled by FSR 1 (the interface is drawn at the screen's own resolution on top).
+        float scale = RenderScale / 100f;
+        vp.Scaling3DMode = scale < 0.999f ? Viewport.Scaling3DModeEnum.Fsr : Viewport.Scaling3DModeEnum.Bilinear;
+        vp.Scaling3DScale = scale;
     }
 
     public static void ApplySun(DirectionalLight3D sun)

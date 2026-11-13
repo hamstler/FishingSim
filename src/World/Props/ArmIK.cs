@@ -170,6 +170,7 @@ public partial class ArmIK : SkeletonModifier3D
 
     public override void _ProcessModification()
     {
+        using var perfScope = Graphics.Perf.Scope("arm-ik");
         var sk = GetSkeleton();
         if (sk == null)
             return;

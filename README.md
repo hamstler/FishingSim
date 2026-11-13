@@ -80,7 +80,7 @@ cieniowana rzeźba terenu z poziomicami co 2 m, a na jeziorze linie głębokośc
 bez znaczników; litery kompasu kręcą się na drewnianej obręczy. Wokół biegnie pierścień doby
 (złoty dzień, niebieska noc) ze słońcem albo księżycem na aktualnej godzinie; medalion pokazuje pogodę i siłę wiatru,
 a tabliczka pod spodem godzinę, czas do zmroku lub świtu, pogodę i nazwę łowiska (okrągła tarcza zastąpiła kwadratową
-minimapę).
+minimapę). Tarcza jest mała (ok. 120 px średnicy), a napisy rysują się ostro w docelowym rozmiarze.
 
 **Płynność:** w menu pauzy obok jakości grafiki jest **zasięg widzenia** (Bliski, Średni, Daleki, Bardzo daleki).
 Ustala, jak daleko rysuje się las aż po góry (dalekie drzewa łagodnie zanikają), szczegółowe drzewa, rośliny i trawa,
@@ -89,6 +89,14 @@ komputerze najlepiej zacząć od zasięgu Średniego. Jakość grafiki ustala te
 Średnia 2048 px, Wysoka i Ultra 4096 px): na Niskiej gra zajmuje mniej więcej o połowę mniej pamięci karty, a przy
 grafice zintegrowanej także RAM-u (zmiana tekstur działa po ponownym uruchomieniu gry). Gra ogranicza też nadrabianie fizyki do 4 kroków na klatkę, więc
 chwilowe przycięcie nie zamienia się w serię zacięć.
+
+**Rozdzielczość 3D i licznik wydajności:** w menu pauzy jest też **Rozdzielczość 3D** (100%, 85%, 70%, 50%). Poniżej
+100% świat liczy się w mniejszej rozdzielczości i jest skalowany w górę przez AMD FSR, a interfejs zostaje ostry.
+To największa pomoc, gdy hamuje karta graficzna: 70% to połowa pikseli. **F11** pokazuje licznik wydajności:
+FPS, średni czas klatki i najgorszą klatkę z ostatniej sekundy (przycięcia), czas procesora (skrypty, fizyka,
+przygotowanie obrazu) i karty graficznej (pomiar Godota) z podpowiedzią, co hamuje, liczbę rysowanych obiektów,
+wywołań i trójkątów, rozdzielczość 3D i ustawienia, pamięć (RAM, sterta .NET, VRAM), zajęte wątki w tle (np. malowanie
+tekstur po pierwszym uruchomieniu) i najwolniejsze systemy gry w milisekundach na klatkę.
 
 **Tekstury 4K:** tekstury świata (ziemia, kora, budynki, liście) mają 4096 px na kafel 2 m. Gra maluje je sama przy pierwszym uruchomieniu (zaczyna już w menu; na 4 rdzeniach trwa to ok. 2 minut), kompresuje własnym kompresorem blokowym (BC1/BC3/BC5, więc mieszczą się w pamięci karty także w wyeksportowanej grze) i zapisuje w `user://texcache` (ok. 250 MB). Kolejne uruchomienia tylko je wczytują. Okno startuje zmaksymalizowane, a świat renderuje się w natywnej rozdzielczości.
 
@@ -189,6 +197,7 @@ repozytorium, więc lepiej przebudowywać tylko zmienione gatunki. Opis całego 
 | Tab (przytrzymaj) | stan: godzina, pogoda, łowisko, sakiewka, siatka, sprzęt |
 | H | sterowanie |
 | F1 | konsola deweloperska: F2 natychmiastowe branie, F3 nieśmiertelna żyłka, F4 gatunek, F5 reset rzutu, F6 przynęty, F7 +3 godz., F8 pogoda, F9 reset postępu, F10 +1000 gr |
+| F11 | licznik wydajności (FPS, CPU, GPU, pamięć, najwolniejsze systemy) |
 
 ## Świat
 - **Cała mapa jest do chodzenia:** brzeg, wzgórza, wioska. Wchodzić można tylko w płytką wodę (do 0,5 m), a pomost jest jednym z miejsc do łowienia. Łowić można z dowolnego miejsca na brzegu.

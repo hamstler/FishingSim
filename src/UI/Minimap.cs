@@ -17,11 +17,11 @@ namespace FishingSim.UI;
 /// </summary>
 public partial class Minimap : Control
 {
-    /// <summary>The whole widget's size.</summary>
-    public const float WidgetWidth = 250f, WidgetHeight = 318f;
+    /// <summary>The dial is designed in its own units and drawn at this scale (text is drawn unscaled, so it stays sharp).</summary>
+    private const float Scale = 0.5f;
 
-    /// <summary>Kept for the HUD's layout: the dial's diameter.</summary>
-    public const float MapSize = 236f;
+    /// <summary>The whole widget's size on screen.</summary>
+    public const float WidgetWidth = 172f, WidgetHeight = 182f;
 
     /// <summary>Metres shown across the map.</summary>
     public const float ViewMetres = 120f;
@@ -29,10 +29,14 @@ public partial class Minimap : Control
     /// <summary>Resolution of the pre-rendered terrain (pixels per metre).</summary>
     private const float TexturePerMetre = 1.5f;
 
-    private const float MapRadius = 92f, BezelOuter = 106f, DayRingRadius = 112f;
+    // In the dial's design units (halved on screen).
+    private const float MapRadius = 88f, BezelOuter = 108f, DayRingRadius = 115f;
 
     /// <summary>The round map's diameter on screen (it shows <see cref="ViewMetres"/> across).</summary>
-    public const float MapDiameter = MapRadius * 2f;
+    public const float MapDiameter = MapRadius * 2f * Scale;
+
+    /// <summary>Height of the plaque under the dial (screen units).</summary>
+    private const float PlaqueHeight = 50f;
 
     private static readonly Color Ink = UITheme.Text;
     private static readonly Color Brass = new(0.86f, 0.68f, 0.34f);
@@ -49,7 +53,10 @@ public partial class Minimap : Control
     private ImageTexture? _terrain;
     private Rect2 _area;
 
-    private Vector2 Centre => new(WidgetWidth / 2f, 4f + DayRingRadius + 4f);
+    /// <summary>The dial's centre on screen, and in the design units it is drawn in.</summary>
+    private static Vector2 ScreenCentre => new(WidgetWidth / 2f, 2f + (DayRingRadius + 6f) * Scale);
+
+    private static Vector2 Centre => ScreenCentre / Scale;
 
     public void Setup(FishingRod rod, Node3D player, Scenery scenery)
     {
@@ -125,14 +132,15 @@ public partial class Minimap : Control
         _turn = -MathF.Atan2(look.X, -look.Y);
         var c = Centre;
 
+        DrawSetTransform(Vector2.Zero, 0f, new Vector2(Scale, Scale));
         DrawDayRing(c);
         // The bezel: dark wood between two brass rims, with a soft shadow outside.
-        DrawCircle(c + new Vector2(2f, 3f), BezelOuter + 2f, new Color(0f, 0f, 0f, 0.35f));
+        DrawCircle(c + new Vector2(3f, 4f), BezelOuter + 2f, new Color(0f, 0f, 0f, 0.35f));
         DrawCircle(c, BezelOuter, Wood);
-        DrawArc(c, BezelOuter - 1f, 0f, Mathf.Tau, 96, Brass, 2.2f, true);
-        DrawArc(c, BezelOuter - 4.5f, 0f, Mathf.Tau, 96, WoodLight, 3f, true);
-        DrawArc(c, MapRadius + 2.5f, 0f, Mathf.Tau, 96, Brass, 3f, true);
-        DrawArc(c, MapRadius + 4.5f, 0f, Mathf.Tau, 96, BrassDark, 1.2f, true);
+        DrawArc(c, BezelOuter - 1.5f, 0f, Mathf.Tau, 96, Brass, 3.2f, true);
+        DrawArc(c, BezelOuter - 5.5f, 0f, Mathf.Tau, 96, WoodLight, 4f, true);
+        DrawArc(c, MapRadius + 3f, 0f, Mathf.Tau, 96, Brass, 4f, true);
+        DrawArc(c, MapRadius + 5.5f, 0f, Mathf.Tau, 96, BrassDark, 2f, true);
 
         DrawMap(c, font);
 
@@ -143,21 +151,24 @@ public partial class Minimap : Control
             var dir = new Vector2(MathF.Cos(a), MathF.Sin(a));
             bool cardinal = i % 4 == 0;
             if (!cardinal)
-                DrawLine(c + dir * (MapRadius + 6f), c + dir * (MapRadius + (i % 2 == 0 ? 10f : 8f)), new Color(Brass, 0.7f), 1.2f, true);
+                DrawLine(c + dir * (MapRadius + 7f), c + dir * (MapRadius + (i % 2 == 0 ? 13f : 10f)), new Color(Brass, 0.75f), 2.2f, true);
         }
+
+        // The letters are drawn at the screen's scale (sharp).
+        DrawSetTransform(Vector2.Zero, 0f, Vector2.One);
         string[] letters = { "N", "E", "S", "W" };
         for (int i = 0; i < 4; i++)
         {
             float a = i / 4f * Mathf.Tau - Mathf.Pi / 2f + _turn;
-            var at = c + new Vector2(MathF.Cos(a), MathF.Sin(a)) * (MapRadius + 8.5f);
-            int size = i == 0 ? 13 : 11;
+            var at = (c + new Vector2(MathF.Cos(a), MathF.Sin(a)) * ((MapRadius + BezelOuter) / 2f + 1f)) * Scale;
+            int size = i == 0 ? 10 : 9;
             var tsize = font.GetStringSize(letters[i], HorizontalAlignment.Left, -1, size);
-            DrawString(font, at + new Vector2(-tsize.X / 2f, size * 0.38f), letters[i], HorizontalAlignment.Left, -1, size,
+            DrawString(font, at + new Vector2(-tsize.X / 2f, size * 0.36f), letters[i], HorizontalAlignment.Left, -1, size,
                 i == 0 ? new Color(1f, 0.45f, 0.32f) : new Color(Brass, 0.95f));
         }
 
-        DrawWeather(c + new Vector2(-0.72f, 0.72f) * (BezelOuter + 4f), font);
-        DrawPlaque(new Vector2(0f, c.Y + DayRingRadius + 8f), font);
+        DrawWeather(ScreenCentre + new Vector2(-0.72f, 0.72f) * (BezelOuter + 6f) * Scale, 0.6f);
+        DrawPlaque(new Vector2(0f, ScreenCentre.Y + (DayRingRadius + 6f) * Scale + 3f), font);
     }
 
     /// <summary>The round map: the topographic picture turned and cut to the circle, the float and its line, the
@@ -192,22 +203,22 @@ public partial class Minimap : Control
         {
             var b = OnDial(new Vector2(_rod.Bobber.GlobalPosition.X, _rod.Bobber.GlobalPosition.Z));
             var d = b - c;
-            if (d.Length() > MapRadius - 3f)
-                b = c + d.Normalized() * (MapRadius - 3f);
-            DrawLine(c, b, new Color(1, 1, 1, 0.55f), 1f, true);
-            DrawCircle(b, 3f, _rod.State is RodState.Fight or RodState.Close ? new Color(1f, 0.35f, 0.25f) : Colors.White);
+            if (d.Length() > MapRadius - 5f)
+                b = c + d.Normalized() * (MapRadius - 5f);
+            DrawLine(c, b, new Color(1, 1, 1, 0.6f), 2f, true);
+            DrawCircle(b, 5f, _rod.State is RodState.Fight or RodState.Close ? new Color(1f, 0.35f, 0.25f) : Colors.White);
         }
 
         // A soft shade round the inside of the rim (the glass sits in the bezel).
         for (int i = 0; i < 6; i++)
-            DrawArc(c, MapRadius - i * 1.6f, 0f, Mathf.Tau, 72, new Color(0f, 0f, 0f, 0.16f - i * 0.025f), 2f, true);
+            DrawArc(c, MapRadius - i * 2.2f, 0f, Mathf.Tau, 72, new Color(0f, 0f, 0f, 0.16f - i * 0.025f), 2.6f, true);
 
         // The angler, always pointing up.
         var up = Vector2.Up;
         var perp = Vector2.Right;
-        var arrow = new[] { c + up * 10f, c - up * 6f + perp * 6.5f, c - up * 2.5f, c - up * 6f - perp * 6.5f };
+        var arrow = new[] { c + up * 15f, c - up * 9f + perp * 10f, c - up * 4f, c - up * 9f - perp * 10f };
         DrawColoredPolygon(arrow, new Color(1f, 0.88f, 0.3f));
-        DrawPolyline(new[] { arrow[0], arrow[1], arrow[2], arrow[3], arrow[0] }, new Color(0.1f, 0.06f, 0.03f), 1.4f, true);
+        DrawPolyline(new[] { arrow[0], arrow[1], arrow[2], arrow[3], arrow[0] }, new Color(0.1f, 0.06f, 0.03f), 2.6f, true);
     }
 
     /// <summary>The ring of the day round the bezel: day gold, night blue, noon at the top, the sun or the moon on it.</summary>
@@ -215,10 +226,10 @@ public partial class Minimap : Control
     {
         var world = _rod.World;
         float AngleOf(float hour) => Mathf.Pi / 2f + hour / 24f * Mathf.Tau;   // midnight at the bottom, noon at the top
-        DrawCircle(c, DayRingRadius + 5f, new Color(0.06f, 0.04f, 0.02f, 0.85f));
-        DrawArc(c, DayRingRadius, AngleOf(DayClock.DayStart), AngleOf(DayClock.NightStart), 48, new Color(DayGold, 0.9f), 5f, true);
-        DrawArc(c, DayRingRadius, AngleOf(DayClock.NightStart), AngleOf(DayClock.DayStart + 24f), 48, new Color(NightBlue, 0.9f), 5f, true);
-        DrawArc(c, DayRingRadius + 4.5f, 0f, Mathf.Tau, 96, new Color(Brass, 0.8f), 1.2f, true);
+        DrawCircle(c, DayRingRadius + 6f, new Color(0.06f, 0.04f, 0.02f, 0.85f));
+        DrawArc(c, DayRingRadius, AngleOf(DayClock.DayStart), AngleOf(DayClock.NightStart), 48, new Color(DayGold, 0.9f), 7f, true);
+        DrawArc(c, DayRingRadius, AngleOf(DayClock.NightStart), AngleOf(DayClock.DayStart + 24f), 48, new Color(NightBlue, 0.9f), 7f, true);
+        DrawArc(c, DayRingRadius + 5f, 0f, Mathf.Tau, 96, new Color(Brass, 0.8f), 2f, true);
         float a = AngleOf(world.Hour);
         var at = c + new Vector2(MathF.Cos(a), MathF.Sin(a)) * DayRingRadius;
         bool day = DayClock.IsDaytime(world.Hour);
@@ -228,21 +239,24 @@ public partial class Minimap : Control
             {
                 float ra = i / 8f * Mathf.Tau;
                 var dir = new Vector2(MathF.Cos(ra), MathF.Sin(ra));
-                DrawLine(at + dir * 7.5f, at + dir * 10.5f, new Color(1f, 0.85f, 0.4f), 1.6f, true);
+                DrawLine(at + dir * 11f, at + dir * 15.5f, new Color(1f, 0.85f, 0.4f), 2.6f, true);
             }
-            DrawCircle(at, 6.5f, new Color(1f, 0.86f, 0.36f));
-            DrawCircle(at, 4.5f, new Color(1f, 0.95f, 0.65f));
+            DrawCircle(at, 9.5f, new Color(1f, 0.86f, 0.36f));
+            DrawCircle(at, 6.5f, new Color(1f, 0.95f, 0.65f));
         }
         else
         {
-            DrawCircle(at, 6.5f, new Color(0.88f, 0.9f, 1f));
-            DrawCircle(at + new Vector2(2.6f, -1.8f), 5.2f, new Color(0.06f, 0.04f, 0.02f, 0.95f));
+            DrawCircle(at, 9.5f, new Color(0.88f, 0.9f, 1f));
+            DrawCircle(at + new Vector2(3.8f, -2.6f), 7.6f, new Color(0.06f, 0.04f, 0.02f, 0.95f));
         }
     }
 
     /// <summary>The weather medallion: sun, moon and stars, clouds or rain, with the wind's strength in streaks.</summary>
-    private void DrawWeather(Vector2 at, Font font)
+    private void DrawWeather(Vector2 centre, float scale)
     {
+        // Drawn in its own units round (0, 0), placed and scaled on screen.
+        DrawSetTransform(centre, 0f, new Vector2(scale, scale));
+        var at = Vector2.Zero;
         var world = _rod.World;
         const float r = 27f;
         DrawCircle(at + new Vector2(1.5f, 2.5f), r + 1f, new Color(0f, 0f, 0f, 0.35f));
@@ -301,6 +315,15 @@ public partial class Minimap : Control
             DrawLine(p + new Vector2(i * 3f, 0f), p + new Vector2(10f + i * 3f, 0f), new Color(1f, 1f, 1f, 0.75f), 1.4f, true);
         }
         DrawArc(at, r - 3.5f, 0f, Mathf.Tau, 48, new Color(0f, 0f, 0f, 0.4f), 1.5f, true);
+        DrawSetTransform(Vector2.Zero, 0f, Vector2.One);
+    }
+
+    /// <summary>The largest font size up to <paramref name="size"/> at which the text fits the width.</summary>
+    private static int Fit(Font font, string text, float width, int size)
+    {
+        while (size > 8 && font.GetStringSize(text, HorizontalAlignment.Left, -1, size).X > width)
+            size--;
+        return size;
     }
 
     /// <summary>The plaque under the dial: time, until dusk or dawn, weather and wind, the fishery.</summary>
@@ -308,22 +331,26 @@ public partial class Minimap : Control
     {
         var world = _rod.World;
         bool day = DayClock.IsDaytime(world.Hour);
-        var box = new Rect2(at + new Vector2(18f, 0f), new Vector2(WidgetWidth - 36f, 66f));
-        DrawStyleBox(UITheme.Box(new Color(0.08f, 0.05f, 0.03f, 0.82f), new Color(Brass, 0.7f), 8, 1), box);
+        var box = new Rect2(at + new Vector2(4f, 0f), new Vector2(WidgetWidth - 8f, PlaqueHeight));
+        DrawStyleBox(UITheme.Box(new Color(0.08f, 0.05f, 0.03f, 0.82f), new Color(Brass, 0.7f), 6, 1), box);
+        float inner = box.Size.X - 10f;
         float until = DayClock.RealSecondsUntil(world.Hour, day ? DayClock.NightStart : DayClock.DayStart) / Math.Max(world.TimeScale, 1f);
         string time = world.TimeText;
-        var timeSize = font.GetStringSize(time, HorizontalAlignment.Left, -1, 24);
+        var timeSize = font.GetStringSize(time, HorizontalAlignment.Left, -1, 17);
         string next = $"{MathF.Ceiling(until / 60f):0} min {(day ? "do zmroku" : "do świtu")}";
-        var nextSize = font.GetStringSize(next, HorizontalAlignment.Left, -1, 12);
-        float rowX = box.Position.X + (box.Size.X - timeSize.X - 8f - nextSize.X) / 2f;
-        DrawString(font, new Vector2(rowX, box.Position.Y + 24f), time, HorizontalAlignment.Left, -1, 24, Ink);
-        DrawString(font, new Vector2(rowX + timeSize.X + 8f, box.Position.Y + 21f), next, HorizontalAlignment.Left, -1, 12,
+        int nextFont = Fit(font, next, inner - timeSize.X - 6f, 10);
+        var nextSize = font.GetStringSize(next, HorizontalAlignment.Left, -1, nextFont);
+        float rowX = box.Position.X + (box.Size.X - timeSize.X - 6f - nextSize.X) / 2f;
+        DrawString(font, new Vector2(rowX, box.Position.Y + 17f), time, HorizontalAlignment.Left, -1, 17, Ink);
+        DrawString(font, new Vector2(rowX + timeSize.X + 6f, box.Position.Y + 15f), next, HorizontalAlignment.Left, -1, nextFont,
             day ? new Color(1f, 0.85f, 0.5f, 0.9f) : new Color(0.75f, 0.82f, 1f, 0.9f));
         string weather = !day && world.Weather == Weather.Clear ? "Pogodnie" : world.Weather.DisplayName();
         string wind = world.WindTarget < 0.35f ? "lekki wiatr" : world.WindTarget < 0.7f ? "umiarkowany wiatr" : "silny wiatr";
-        DrawString(font, new Vector2(box.Position.X, box.Position.Y + 42f), $"{weather} · {wind}", HorizontalAlignment.Center, box.Size.X, 13,
-            new Color(Ink, 0.88f));
-        DrawString(font, new Vector2(box.Position.X, box.Position.Y + 59f), _rod.Lake.Location.DisplayName, HorizontalAlignment.Center, box.Size.X, 13,
-            new Color(Brass, 0.95f));
+        string line = $"{weather} · {wind}";
+        DrawString(font, new Vector2(box.Position.X, box.Position.Y + 31f), line, HorizontalAlignment.Center, box.Size.X,
+            Fit(font, line, inner, 11), new Color(Ink, 0.88f));
+        string place = _rod.Lake.Location.DisplayName;
+        DrawString(font, new Vector2(box.Position.X, box.Position.Y + 44f), place, HorizontalAlignment.Center, box.Size.X,
+            Fit(font, place, inner, 11), new Color(Brass, 0.95f));
     }
 }
