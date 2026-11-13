@@ -369,5 +369,14 @@ public partial class ArmIK : SkeletonModifier3D
         return (f * g.X + p * g.Y + f.Cross(p) * g.Z) * sk.GlobalTransform.Basis.Column0.Length();
     }
 
+    /// <summary>Where the arm's shoulder joint is (world space), or null until the skeleton is ready.</summary>
+    public Vector3? Shoulder(Arm arm)
+    {
+        var sk = GetSkeleton();
+        if (!_ready || sk == null || arm.Upper < 0)
+            return null;
+        return sk.GlobalTransform * sk.GetBoneGlobalPose(arm.Upper).Origin;
+    }
+
     private static readonly bool Debug = System.Environment.GetEnvironmentVariable("FISHSIM_IK_DEBUG") == "1";
 }

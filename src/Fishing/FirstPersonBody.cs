@@ -248,34 +248,36 @@ public partial class FirstPersonBody : Node3D
             return;
         }
         var rigBasis = _rig.GlobalTransform.Basis.Orthonormalized();
-        var palm = (rigBasis * GripPalm).Normalized();
-        var fingers = (rigBasis * GripFingers).Normalized();
-        ik.Right.Palm = palm;
-        ik.Right.Fingers = fingers;
-        // The hand closes round the reel seat, the reel's stem between the middle and ring fingers: the hand slides
-        // along the rod until the gap between those knuckles lies over the stem, the two fingers spread a little, and
-        // every finger closes only until it touches the seat (not into it).
-        var wrist = _rig.ToGlobal(GripHandle) - palm * (RodRig.SeatRadius + 0.024f) - fingers * 0.062f;
         var rodAxis = (rigBasis * Vector3.Up).Normalized();
-        if (_ik.KnuckleGap(ik.Right, fingers, palm) is Vector3 gap)
+        // The right hand round the reel seat as anglers hold it: the handle slanting across the palm, the thumb along
+        // the top, the fingers round from below, the reel's stem between the middle and ring fingers; the hand turned
+        // round the seat so that it carries on the forearm's line (no bent wrist).
+        var rightShoulder = _ik.Shoulder(ik.Right) ?? ToGlobal(new Vector3(0.17f, -0.235f, -0.05f));
+        var seat = BarGrip(_rig.ToGlobal(GripHandle), rodAxis, RodRig.SeatRadius, true, rightShoulder, Mathf.DegToRad(28f), 0.92f,
+            ToGlobal(new Vector3(0.5f, -0.6f, 0.35f)), 0.068f);
+        var wrist = seat.Wrist;
+        if (_ik.KnuckleGap(ik.Right, seat.Fingers, seat.Palm) is Vector3 gap)
             wrist += rodAxis * (_rig.ToGlobal(RodRig.StemAt) - (wrist + gap)).Dot(rodAxis);
         ik.Right.Wrist = wrist;
+        ik.Right.Fingers = seat.Fingers;
+        ik.Right.Palm = seat.Palm;
+        ik.Right.Pole = seat.Pole;
+        ik.Right.Grip = seat.Grip;
         ik.Right.Splay = 0.11f;
         ik.Right.Obstacles.Clear();
         foreach (var (a, b, r) in RodRig.SeatObstacles())
             ik.Right.Obstacles.Add(new World.Props.ArmIK.Capsule(_rig.ToGlobal(a), _rig.ToGlobal(b), r));
-        ik.Right.Pole = ToGlobal(new Vector3(0.5f, -0.6f, 0.35f));
-        ik.Right.Grip = 0.9f;
 
         bool onReel = action is BodyAction.Fight || (ReelingSource?.Invoke() ?? false);
         _leftOnReel = Mathf.MoveToward(_leftOnReel, onReel ? 1f : 0f, dt * 5f);
         if (ReelingSource?.Invoke() ?? false)
             _crank += dt * 9f;
         _rig.SetCrank(_crank);
-        // The crank is on the reel's left: the hand lies over its knob, palm down, fingers forward round it.
-        var reelPalmRig = new Vector3(0.1f, 0.12f, -1f).Normalized();
-        var reelFingersRig = new Vector3(0.1f, 1f, 0.12f).Normalized();
-        var knob = RodRig.KnobAt(_crank) - reelPalmRig * 0.034f - reelFingersRig * 0.058f;
+        // The crank's knob is pinched in the fingertips (thumb and fingers), the hand turned so it carries on the
+        // forearm's line.
+        var leftShoulder = _ik.Shoulder(ik.Left) ?? ToGlobal(new Vector3(-0.17f, -0.235f, -0.05f));
+        var pinch = BarGrip(_rig.ToGlobal(RodRig.KnobAt(_crank)), rigBasis * Vector3.Right, 0.0085f, false, leftShoulder, 0f, 0.62f,
+            ToGlobal(new Vector3(-0.6f, -0.55f, 0.25f)), 0.1f, eitherWay: true, barLength: 0.012f);
         var held = HeldFishSource?.Invoke();
         _leftOnFish = Mathf.MoveToward(_leftOnFish, held != null ? 1f : 0f, dt * 6f);
         if (held is FishModel fm)
@@ -284,13 +286,13 @@ public partial class FirstPersonBody : Node3D
             _lastFishGrip = ToLocal(held.GlobalPosition) + new Vector3(0.02f, -0.04f, 0.02f);
         // Hanging at the side; pinching the reel knob from above; flat under the fish's belly.
         var restAt = new Vector3(-0.26f, -0.78f, 0.05f);
-        var reelAt = ToLocal(_rig.ToGlobal(knob));
+        var reelAt = ToLocal(pinch.Wrist);
         var at = restAt.Lerp(reelAt, _leftOnReel).Lerp(_lastFishGrip + new Vector3(0.03f, 0f, 0.08f), _leftOnFish);
         var basis = GlobalTransform.Basis.Orthonormalized();
         var restFingers = new Vector3(0.05f, -1f, -0.1f);
         var restPalm = new Vector3(1f, 0f, 0.1f);
-        var reelFingers = basis.Inverse() * (rigBasis * reelFingersRig);
-        var reelPalm = basis.Inverse() * (rigBasis * reelPalmRig);
+        var reelFingers = basis.Inverse() * pinch.Fingers;
+        var reelPalm = basis.Inverse() * pinch.Palm;
         var fishFingers = new Vector3(0.15f, 0.1f, -1f);
         var fishPalm = new Vector3(0f, 1f, 0f);
         var f = restFingers.Normalized().Lerp(reelFingers.Normalized(), _leftOnReel).Lerp(fishFingers.Normalized(), _leftOnFish);
@@ -299,13 +301,53 @@ public partial class FirstPersonBody : Node3D
         ik.Left.Fingers = basis * f;
         ik.Left.Palm = basis * p;
         ik.Left.Pole = ToGlobal(new Vector3(-0.6f, -0.55f, 0.25f));
-        ik.Left.Grip = Mathf.Lerp(Mathf.Lerp(0.35f, 0.75f, _leftOnReel), 0.3f, _leftOnFish);
+        ik.Left.Grip = Mathf.Lerp(Mathf.Lerp(0.35f, pinch.Grip, _leftOnReel), 0.3f, _leftOnFish);
         // On the crank the fingers close round the knob and stop on it.
         ik.Left.Splay = 0f;
         ik.Left.Obstacles.Clear();
         if (_leftOnReel > 0.5f && _leftOnFish < 0.5f)
             foreach (var (a, b, r) in RodRig.CrankObstacles(_crank))
                 ik.Left.Obstacles.Add(new World.Props.ArmIK.Capsule(_rig.ToGlobal(a), _rig.ToGlobal(b), r));
+    }
+
+    /// <summary>
+    /// A hand closed round a bar (all in world space): <paramref name="axis"/> is the bar's direction the index finger
+    /// lies towards, <paramref name="diagonal"/> how far the bar slants across the palm (radians; a rod's handle runs
+    /// from the base of the index finger to the heel of the hand), <paramref name="along"/> how far from the wrist the
+    /// bar lies along the fingers (about 0.065 m for a full grip, more for a fingertip pinch). Of every way the hand can
+    /// turn round the bar it takes the one in which it carries on the line of the arm from the shoulder, so the wrist is
+    /// not bent unnaturally. With <paramref name="eitherWay"/> the index finger may lie either way along the bar.
+    /// </summary>
+    public static HandTarget BarGrip(Vector3 at, Vector3 axis, float radius, bool right, Vector3 shoulder, float diagonal,
+        float grip, Vector3 pole, float along = 0.065f, bool eitherWay = false, float barLength = 0.07f)
+    {
+        HandTarget best = default;
+        float bestScore = float.MinValue;
+        var a0 = axis.Normalized();
+        foreach (float sign in eitherWay ? new[] { 1f, -1f } : new[] { 1f })
+        {
+            var a = a0 * sign;
+            var u = a.Cross(MathF.Abs(a.Y) < 0.9f ? Vector3.Up : Vector3.Right).Normalized();
+            var v = a.Cross(u);
+            for (int i = 0; i < 48; i++)
+            {
+                float phi = i / 48f * Mathf.Tau;
+                var p = u * MathF.Cos(phi) + v * MathF.Sin(phi);             // the palm faces the bar
+                var e2 = right ? p.Cross(a) : a.Cross(p);                    // the fingers' way with a square grip
+                var f = (a * MathF.Sin(diagonal) + e2 * MathF.Cos(diagonal)).Normalized();
+                var wrist = at - p * (radius + 0.025f) - f * along;
+                var arm = (wrist - shoulder).Normalized();
+                // The hand carries on the arm's line; a little bonus for the palm turned towards the shoulder's side
+                // of the bar (a natural, not twisted, hand).
+                float score = f.Dot(arm) + 0.15f * p.Dot((at - shoulder).Normalized());
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    best = new HandTarget(wrist, f, p, grip, pole, new ArmIK.Capsule(at - a * barLength, at + a * barLength, radius));
+                }
+            }
+        }
+        return best;
     }
 
     /// <summary>Places a unit-height cylinder so it runs from <paramref name="a"/> to <paramref name="b"/>.</summary>
