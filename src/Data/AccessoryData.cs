@@ -31,6 +31,8 @@ public enum AccessoryKind
     LiftNet,
     /// <summary>Świetlik: a glowing tip for the float and the quiver tip, so bites show after dark.</summary>
     GlowTip,
+    /// <summary>Krętlik z agrafką: a swivel ahead of the lure takes most of the line twist (Core/Methods/LineTwist).</summary>
+    Swivel,
 }
 
 /// <summary>Any other accessory. Owning one is enough for it to work (they are not equipped in a slot).</summary>

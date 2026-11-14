@@ -769,6 +769,14 @@ public static class Icons
                 c.Line(22, 44, 42, 20, 7f, C(0.45f, 1f, 0.5f));
                 c.Line(24, 41, 40, 23, 3f, C(0.85f, 1f, 0.85f));
                 break;
+            case AccessoryKind.Swivel:             // a barrel swivel with a snap
+                c.Ring(32, 12, 6, 2.5f, C(0.62f, 0.64f, 0.68f));
+                c.Disc(32, 28, 6, 10, C(0.72f, 0.74f, 0.78f), C(0.45f, 0.47f, 0.5f));
+                c.Ring(32, 42, 5, 2.5f, C(0.62f, 0.64f, 0.68f));
+                c.Line(28, 46, 26, 58, 2.5f, C(0.62f, 0.64f, 0.68f));
+                c.Line(36, 46, 38, 56, 2.5f, C(0.62f, 0.64f, 0.68f));
+                c.Line(26, 58, 38, 56, 2.5f, C(0.62f, 0.64f, 0.68f));
+                break;
             case AccessoryKind.Headlamp:           // tallow lantern
                 c.Rect(20, 18, 44, 52, C(0.25f, 0.24f, 0.24f));
                 c.Rect(23, 22, 41, 48, C(1f, 0.85f, 0.45f));

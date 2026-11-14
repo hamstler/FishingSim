@@ -480,6 +480,12 @@ public partial class FishingRod : Node3D
     /// <summary>How worn the line on the spool is (0 new .. 0.6).</summary>
     public float LineWearNow => Profile?.LineWear.GetValueOrDefault(Loadout.Line.ItemId) ?? 0f;
 
+    /// <summary>The line in use's twist in turns (Core/Methods/LineTwist).</summary>
+    public float LineTwistNow => Profile?.LineTwist.GetValueOrDefault(Loadout.Line.ItemId) ?? 0f;
+
+    /// <summary>The last cast ended in a bird's nest (for tests).</summary>
+    public bool LastCastTangled { get; private set; }
+
     /// <summary>The map's water plant patches (set by Main from the scenery).</summary>
     public IReadOnlyList<WeedBed> WeedBeds { get; set; } = Array.Empty<WeedBed>();
 
@@ -878,6 +884,18 @@ public partial class FishingRod : Node3D
         var (stray, speedFactor) = Casting.Scatter(CastPower, _rng);
         aim = aim.Rotated(Vector3.Up, Mathf.DegToRad(stray));
         float speed = Mathf.Lerp(_castMin, _castMax, CastPower) * CastFactor * speedFactor;
+        // A twisted line springs off the spool in loops: sometimes they catch and the cast dies in a bird's nest,
+        // which is cut out (half the twist and a bit of line go with it).
+        LastCastTangled = false;
+        if (Profile != null && _rng.NextFloat() < LineTwist.TangleChance(LineTwistNow, (int)Loadout.Line.Kind))
+        {
+            LastCastTangled = true;
+            speed *= 0.3f;
+            string id = Loadout.Line.ItemId;
+            Profile.AddLineTwist(id, LineTwist.AfterTangle(LineTwistNow) - LineTwistNow);
+            Profile.AddLineWear(id, 0.03f);
+            ShowBanner("Broda na żyłce! Skręcona żyłka splątała się przy rzucie. Kup krętlik albo nawiń nową żyłkę.", 4f);
+        }
         // What flies: a float, a lure, or a feeder that takes one portion of the bait as groundbait when there is some
         // to spare.
         _castMethod = Method;
@@ -1563,6 +1581,8 @@ public partial class FishingRod : Node3D
         // Counts, journal, records and XP now; the keepnet only when the angler chooses (catch panel: E / R).
         var result = Profile.AddCatch(species, CurrentWeight, context, toKeepnet: false);
         Profile.AddLineWear(Loadout.Line.ItemId, Core.Methods.LineWear.PerFish);
+        if (_fight != null)
+            Profile.AddLineTwist(Loadout.Line.ItemId, -LineTwist.FightRelief(_fight.Elapsed));
         LastCatch = result;
         AwaitingDecision = true;
         if (_biter != null)
@@ -1780,7 +1800,13 @@ public partial class FishingRod : Node3D
                 Twitch(1.6f);
             }
             else
+            {
                 _rigPos += dir * pull;
+                // A spinning blade or a rolling spoon turns the line as it comes in (a swivel takes most of it).
+                if (pull > 0f && Profile != null)
+                    Profile.AddLineTwist(Loadout.Line.ItemId,
+                        pull * LineTwist.PerMetre(lure.Family, Gear?.Has(AccessoryKind.Swivel) == true));
+            }
         }
         // Drawn in to the bank or the rod tip: out of the water.
         if (bottom <= 0.02f || dist < 2f)

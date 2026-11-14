@@ -295,6 +295,7 @@ public sealed class CoreSuite : ITestSuite
         ThrownHooks(t);
         Wear(t);
         Fraying(t);
+        Twisting(t);
         Casts(t);
         Spells(t);
         Shores(t);
@@ -752,6 +753,29 @@ public sealed class CoreSuite : ITestSuite
             "new line on the spool makes a worn line whole");
         t.Check(p.Buy(TackleSlot.Line, "zylka016", 10, 1) == "Już to masz", "a whole line is not bought twice");
         t.Check(LineWear.Word(0.3f) == "przetarta" && LineWear.Word(0.01f) == "", "the HUD names the wear");
+    }
+
+    /// <summary>Line twist (Core/Methods/LineTwist) and new line on the spool (Profile).</summary>
+    private static void Twisting(TestContext t)
+    {
+        t.Section("line twist");
+        t.Check(LineTwist.PerMetre(LureFamily.Spinner, false) > LineTwist.PerMetre(LureFamily.Spoon, false)
+                && LineTwist.PerMetre(LureFamily.Spoon, false) > LineTwist.PerMetre(LureFamily.Wobbler, false)
+                && LineTwist.PerMetre(LureFamily.Fly, false) == 0f, "a spinner twists the line most, a spoon less, a wobbler hardly");
+        t.Check(LineTwist.PerMetre(LureFamily.Spinner, true) < 0.2f * LineTwist.PerMetre(LureFamily.Spinner, false), "a swivel takes most of the twist");
+        t.Check(LineTwist.TangleChance(20f, 0) == 0f && LineTwist.TangleChance(200f, 0) > 0.5f, "a little twist is harmless, a lot ends casts in bird's nests");
+        t.Check(LineTwist.TangleChance(150f, 1) < LineTwist.TangleChance(150f, 0) && LineTwist.TangleChance(150f, 2) > LineTwist.TangleChance(150f, 0),
+            "a braid hardly loops, a stiff fluorocarbon most");
+        var p = new Profile { Money = 100 };
+        p.Owned["line"].Add("zylka016");
+        p.AddLineTwist("zylka016", 120f);
+        var saved = ProfileSerializer.FromJson(ProfileSerializer.ToJson(p).ToJsonString());
+        t.Check(MathF.Abs(saved.LineTwist.GetValueOrDefault("zylka016") - 120f) < 1e-3f, "the twist survives a save");
+        p.AddLineTwist("zylka016", -LineTwist.FightRelief(30f));
+        t.Check(p.LineTwist["zylka016"] < 120f, "a fight untwists the line a little");
+        t.Check(p.Buy(TackleSlot.Line, "zylka016", 10, 1) == null && !p.LineTwist.ContainsKey("zylka016") && p.Money == 90,
+            "new line on the spool takes the twist away");
+        t.Check(LineTwist.Word(60f) == "skręcona" && LineTwist.Word(5f) == "", "the HUD names a twisted line");
     }
 
     /// <summary>Cast scatter and wind in flight (Core/Methods/Casting).</summary>

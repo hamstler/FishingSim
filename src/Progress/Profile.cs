@@ -87,6 +87,23 @@ public sealed class Profile
         LineWear[lineId] = MathF.Min(LineWear.GetValueOrDefault(lineId) + amount, Core.Methods.LineWear.Max);
     }
 
+    /// <summary>Line id -> twist in turns (Core/Methods/LineTwist); new line on the spool clears it.</summary>
+    public Dictionary<string, float> LineTwist { get; set; } = new();
+
+    /// <summary>Twists (or untwists, with a negative amount) a line.</summary>
+    public void AddLineTwist(string lineId, float turns)
+    {
+        float t = Math.Clamp(LineTwist.GetValueOrDefault(lineId) + turns, 0f, Core.Methods.LineTwist.Max);
+        if (t <= 0f)
+            LineTwist.Remove(lineId);
+        else
+            LineTwist[lineId] = t;
+    }
+
+    /// <summary>The line on the spool is worn or twisted enough to be worth respooling.</summary>
+    public bool NeedsRespool(string lineId) => Core.Methods.LineWear.Worn(LineWear.GetValueOrDefault(lineId))
+        || LineTwist.GetValueOrDefault(lineId) >= Core.Methods.LineTwist.Loops;
+
     /// <summary>Fish hanging in the village smokehouse.</summary>
     public List<SmokingLot> Smokery { get; set; } = new();
 
@@ -125,6 +142,7 @@ public sealed class Profile
         MealHoursLeft = 0f;
         Pantry = new();
         LineWear = new();
+        LineTwist = new();
         Smokery = new();
         Smoked = new();
         Notices = new();
@@ -309,12 +327,13 @@ public sealed class Profile
         if (Level < requiredLevel)
             return $"Wymagany poziom {requiredLevel}";
         // New line on the spool for a worn line of the same kind.
-        if (slot == TackleSlot.Line && Owns(slot, id) && Core.Methods.LineWear.Worn(LineWear.GetValueOrDefault(id)))
+        if (slot == TackleSlot.Line && Owns(slot, id) && NeedsRespool(id))
         {
             if (Money < price)
                 return "Za mało pieniędzy";
             Money -= price;
             LineWear.Remove(id);
+            LineTwist.Remove(id);
             Changed?.Invoke();
             return null;
         }
@@ -355,7 +374,10 @@ public sealed class Profile
             || !Owned.TryGetValue(slot.Key(), out var ids) || !ids.Remove(id))
             return false;
         if (slot == TackleSlot.Line)
+        {
             LineWear.Remove(id);
+            LineTwist.Remove(id);
+        }
         if (Equipped.GetValueOrDefault(slot.Key()) == id)
             Equipped[slot.Key()] = slot == TackleSlot.Leader ? TackleSlotExtensions.NoLeader : ids.Count > 0 ? ids[0] : "";
         Changed?.Invoke();

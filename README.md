@@ -396,6 +396,7 @@ Przy dodawaniu: nowa ryba = plik w `data/fish/`, wpis w `SpeciesCatalog.Paths` i
 - **Branie** (`BiteModel`): szansa gatunku = rzadkość x przynęta x dopasowanie haka x liczebność na łowisku x głębokość x pora dnia x pogoda. Ekran ekwipunku (I) pokazuje te szanse dla każdej głębokości.
 - **Noc i świetlik**: po zmroku spławik, szczytówka i sygnalizator brania gasną razem ze światłem dnia, więc w nocy trudno je dostrzec. Świetlik z akcesoriów (25 monet) zakłada zielone światełko na antenę spławika i na szczytówkę wędki gruntowej.
 - **Nawietrzny brzeg**: wiatr spycha ciepłą wodę powierzchniową, owady i pokarm na brzeg, na który wieje, a ryby idą za nim. Przynęta do 40 m przed takim brzegiem dostaje szybsze brania (do +35% przy silnym wietrze); przy lekkim wietrze różnica jest niewielka.
+- **Skręcanie żyłki**: obrotówka (i słabiej wahadłówka) skręca żyłkę z każdym zwiniętym metrem. Skręcona żyłka przy rzucie wyskakuje ze szpuli pętlami i czasem kończy rzut „brodą”: rzut jest krótki, brodę trzeba wyciąć. Krętlik z agrafką (8 monet) zabiera prawie cały skręt, hol ryby trochę go zdejmuje, a nowa żyłka w kramie usuwa go całkiem. Plecionka prawie nie robi pętli, sztywny fluorocarbon najczęściej. HUD dopisuje przy żyłce „skręcona”.
 - **Turnieje** (T): wpisowe, dojazd na łowisko, wynik to suma N najcięższych ryb, rywale to boty o różnych umiejętnościach. Nagrody (pieniądze i XP) według miejsca, historia w zapisie.
 
 ## Zapis gry

@@ -330,6 +330,24 @@ public sealed class GameSuite : ITestSuite
         rod.World.Hour = 12f;
         rod._Process(0.016);
 
+        t.Section("line twist");
+        string lineId = rod.Loadout.Line.ItemId;
+        profile.LineTwist[lineId] = LineTwist.Max;
+        bool tangled = false;
+        for (int i = 0; i < 12 && !tangled; i++)
+        {
+            rod.ResetToIdle();
+            rod.CastNow(0.8f);
+            tangled = rod.LastCastTangled;
+        }
+        t.Check(tangled && profile.LineTwist.GetValueOrDefault(lineId) <= LineTwist.Max * 0.5f + 0.01f,
+            "a badly twisted line ends a cast in a bird's nest, cut out with half the twist");
+        profile.LineTwist.Remove(lineId);
+        rod.ResetToIdle();
+        rod.CastNow(0.8f);
+        t.Check(!rod.LastCastTangled, "an untwisted line casts cleanly");
+        rod.ResetToIdle();
+
         t.Section("pause menu");
         pause.Open();
         t.Check(t.Host.GetTree().Paused && rod.InputBlocked && pause.Visible, "Esc menu pauses the game and blocks fishing");

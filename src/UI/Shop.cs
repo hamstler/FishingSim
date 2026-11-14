@@ -997,11 +997,14 @@ public partial class Shop : CanvasLayer
             action = () => Buy(slot, index);
         }
         else if (slot == TackleSlot.Line && _profile.Owns(slot, item.ItemId) && _loadout.Index[(int)slot] == index
-                 && Core.Methods.LineWear.Worn(_profile.LineWear.GetValueOrDefault(item.ItemId)))
+                 && _profile.NeedsRespool(item.ItemId))
         {
-            // A frayed line in use: new line can be put on the spool.
+            // A frayed or twisted line in use: new line can be put on the spool.
             float wear = _profile.LineWear.GetValueOrDefault(item.ItemId);
-            state = $"Tego używasz. Żyłka {Core.Methods.LineWear.Word(wear)}: wytrzymuje o {wear * 100f:0}% mniej.";
+            string twist = Core.Methods.LineTwist.Word(_profile.LineTwist.GetValueOrDefault(item.ItemId));
+            state = Core.Methods.LineWear.Worn(wear)
+                ? $"Tego używasz. Żyłka {Core.Methods.LineWear.Word(wear)}: wytrzymuje o {wear * 100f:0}% mniej."
+                : $"Tego używasz. Żyłka {twist}: przy rzutach robi brody.";
             button = $"Nawiń nową za {Lore.Money(item.Price)}";
             enabled = _profile.Money >= item.Price;
             action = () =>

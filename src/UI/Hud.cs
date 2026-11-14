@@ -315,6 +315,9 @@ public partial class Hud : CanvasLayer
         var lo = rod.Loadout;
         string leader = lo.Leader.ItemId == Progress.TackleSlotExtensions.NoLeader ? "" : $", {lo.Leader.DisplayName}";
         string fray = Core.Methods.LineWear.Word(rod.LineWearNow);
+        string twist = Core.Methods.LineTwist.Word(rod.LineTwistNow);
+        if (twist.Length > 0)
+            fray = fray.Length > 0 ? fray + ", " + twist : twist;
         string tackle = $"{lo.Rod.DisplayName}, {lo.Reel.DisplayName}\n{lo.Line.DisplayName}{(fray.Length > 0 ? $" ({fray})" : "")}{leader}, {lo.Hook.DisplayName}\n{lo.Bait.DisplayName} ×{lo.BaitCount}";
         if (tackle != _lastTackle)
         {
