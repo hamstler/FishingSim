@@ -650,6 +650,8 @@ public sealed class CoreSuite : ITestSuite
         t.Check(spoon > fly * 4f && Disturbance.Splash(FishingMethod.Bottom, 0f, 0.8f) > Disturbance.Splash(FishingMethod.Bottom, 0f, 5f) * 2f
                 && Disturbance.Splash(FishingMethod.Float, 0f, 2f) < 0.2f,
             $"a heavy lure splashes louder than a fly ({spoon:0.00} vs {fly:0.00}), a feeder louder in shallow water, a float hardly");
+        t.Check(Disturbance.Masking(Weather.Clear, 0f) == 1f && Disturbance.Masking(Weather.Rain, 0.85f) < 0.5f
+                && Disturbance.Masking(Weather.Cloudy, 0.5f) < 1f, "rain on the water and wind waves mask the angler's noise");
         var d = new Disturbance();
         d.Add(0.9f);
         t.Check(d.Spooked && d.Pace < 0.4f, $"spooked fish bite slower (x{d.Pace:0.00})");

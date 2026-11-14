@@ -106,6 +106,9 @@ public partial class FishingRod : Node3D
     /// <summary>How disturbed the fish at the swim are (splashes, steps, a fight); slows the bites while it lasts.</summary>
     public Disturbance Disturbance { get; } = new();
 
+    /// <summary>How much of the angler's noise reaches the fish (rain and wind mask it).</summary>
+    private float NoiseMasking => Disturbance.Masking(World.Weather, World.WindTarget);
+
     /// <summary>The noise scared the fish: bites come slower for a while.</summary>
     public bool Spooked => Disturbance.Spooked && State is RodState.Waiting or RodState.Nibble or RodState.Bite;
 
@@ -121,7 +124,7 @@ public partial class FishingRod : Node3D
         {
             var bait = _bobber.GlobalPosition;
             float dist = new Vector2(at.X - bait.X, at.Z - bait.Z).Length();
-            Disturbance.Add(Disturbance.Steps(speed, dist, Lake.DepthAt(at.X, at.Z) > 0.05f, dt));
+            Disturbance.Add(Disturbance.Steps(speed, dist, Lake.DepthAt(at.X, at.Z) > 0.05f, dt) * NoiseMasking);
             _shoreCheck -= dt;
             if (_shoreCheck <= 0f)
             {
@@ -974,7 +977,7 @@ public partial class FishingRod : Node3D
             SoundCue?.Invoke(Core.Audio.OneShot.Splash, Math.Clamp(CastPower + 0.4f, 0.5f, 1f));
             _bobber.ShowHook = _castMethod != FishingMethod.Spinning;
             // The splash puts the fish off: a heavy lure or a feeder into shallow water most of all.
-            float splash = Disturbance.Splash(_castMethod, Loadout.Bait.WeightG, CurrentDepth());
+            float splash = Disturbance.Splash(_castMethod, Loadout.Bait.WeightG, CurrentDepth()) * NoiseMasking;
             Disturbance.Add(splash);
             if (splash > 0.2f)
                 Population?.Scare(_bobber.GlobalPosition, 3f + splash * 6f, 2f + splash * 4f);

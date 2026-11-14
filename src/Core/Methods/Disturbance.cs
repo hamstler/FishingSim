@@ -21,6 +21,13 @@ public sealed class Disturbance
 
     public void Clear() => Level = 0f;
 
+    /// <summary>
+    /// How much of a noise reaches the fish (1 calm and clear .. 0.45 in rain and a strong wind): rain drumming on the
+    /// water and wind waves mask the angler's steps and the splash of the tackle.
+    /// </summary>
+    public static float Masking(Weather weather, float wind) =>
+        (weather == Weather.Rain ? 0.6f : 1f) * (1f - 0.25f * Math.Clamp(wind, 0f, 1f));
+
     /// <summary>The bite clock's speed (1 = undisturbed, 0.25 at worst).</summary>
     public float Pace => 1f - 0.75f * Math.Clamp(Level, 0f, 1f);
 
