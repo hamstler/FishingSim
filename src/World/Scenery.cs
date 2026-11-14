@@ -38,10 +38,14 @@ public partial class Scenery : Node3D
     /// <summary>How many of each thing was placed on the current map (for tests and tuning).</summary>
     public Dictionary<string, int> Stats { get; } = new();
 
+    /// <summary>Collision for the trees, boulders and props that have no body of their own.</summary>
+    public Solids Solids { get; } = new();
+
     public void Build(LakeBed lake, WorldState? world = null)
     {
         _lake = lake;
         _world = world;
+        AddChild(Solids);
         BuildPier();
         lake.Rebuilt += Rebuild;
         GraphicsQuality.Changed += ApplyFoliageRange;
@@ -274,6 +278,7 @@ public partial class Scenery : Node3D
     // ------------------------------------------------------------------ rebuild
     private void Rebuild()
     {
+        Solids.Clear();
         foreach (var n in _dynamic)
             n.QueueFree();
         _dynamic.Clear();
@@ -449,6 +454,7 @@ public partial class Scenery : Node3D
                 AddChild(board);
                 Track(board);
                 Prop(board, 120f);
+                Solids.BoxIn(board.Transform, new Vector3(0f, 1.1f, 0f), new Vector3(1.9f, 2.2f, 0.35f));
                 NoticeBoard = board;
                 _reserved.Add((p, 4f));
                 var front = p + toPlaza.Normalized() * 1.4f;
@@ -476,16 +482,22 @@ public partial class Scenery : Node3D
         for (int i = 0; i < (playerCamp ? 2 : 3); i++)
         {
             float a = (playerCamp ? 0.6f + i * 2.2f : 0.4f + i * 2.1f);
-            var log = Props.CampProps.SeatLog(1.3f, i + (playerCamp ? 0 : 5), playerCamp ? 0.17f : 0.21f);
+            Props.Npc? sitter = !playerCamp && i < 2
+                ? Props.People.Create(i == 0 ? Props.Role.Elder : Props.Role.Woman, 40 + i,
+                    i == 0 ? "Sitting_Idle_Loop" : "Sitting_Talking_Loop", Array.Empty<string>())
+                : null;
+            // A log as thick as the sitter's seat is high, so whoever sits on it touches it.
+            float radius = sitter?.SeatLogRadius ?? (playerCamp ? 0.2f : 0.23f);
+            var log = Props.CampProps.SeatLog(1.3f, i + (playerCamp ? 0 : 5), radius, even: sitter != null);
+            log.Name = $"SeatLog{i}";
             log.Position = new Vector3(MathF.Cos(a) * 1.7f, 0f, MathF.Sin(a) * 1.7f);
             log.Rotation = new Vector3(0f, -a + Mathf.Pi / 2f, 0f);
             root.AddChild(log);
-            if (!playerCamp && i < 2)
+            if (sitter != null)
             {
-                var sitter = Props.People.Create(i == 0 ? Props.Role.Elder : Props.Role.Woman, 40 + i,
-                    i == 0 ? "Sitting_Idle_Loop" : "Sitting_Talking_Loop", Array.Empty<string>());
-                // Facing the fire, seated on the log.
-                sitter.Position = new Vector3(MathF.Cos(a) * 1.78f, 0f, MathF.Sin(a) * 1.78f);
+                // Facing the fire, the hips right over the log's axis.
+                float back = sitter.Seat.Back;
+                sitter.Position = new Vector3(MathF.Cos(a) * (1.7f - back), 0f, MathF.Sin(a) * (1.7f - back));
                 sitter.Rotation = new Vector3(0f, MathF.Atan2(-MathF.Cos(a), -MathF.Sin(a)), 0f);
                 root.AddChild(sitter);
                 Count("villager_sitting");
@@ -497,6 +509,7 @@ public partial class Scenery : Node3D
             for (int i = 0; i < 6; i++)
             {
                 var piece = Props.CampProps.SeatLog(0.6f, i + 20);
+                piece.Name = $"Firewood{i}";
                 piece.Scale = new Vector3(1f, 0.45f, 0.45f);
                 piece.Position = new Vector3(-2.4f + (i % 3) * 0.02f, 0.02f + (i / 3) * 0.14f, 1.1f + (i % 3) * 0.16f);
                 piece.Rotation = new Vector3(0f, 0.2f, 0f);
@@ -523,6 +536,11 @@ public partial class Scenery : Node3D
         Track(root);
         Prop(root, 140f);
         Campfires.Add(fire);
+        // The stone ring is solid (the angler walks round the fire), and so are the logs round it.
+        Solids.Cylinder(root.Position - new Vector3(0f, 0.2f, 0f), 0.7f, 1.2f);
+        foreach (var child in root.GetChildren())
+            if (child is Node3D { Name: var n } seat && n.ToString().StartsWith("SeatLog"))
+                Solids.BoxIn(root.Transform * seat.Transform, new Vector3(0f, 0.2f, 0f), new Vector3(1.3f, 0.4f, 0.42f));
         _reserved.Add((at, 4.5f));
         var spot = new Interactable { Kind = InteractKind.Campfire, Title = title, Radius = 3.2f, Position = root.Position, Target = fire };
         AddChild(spot);
@@ -625,6 +643,25 @@ public partial class Scenery : Node3D
             Track(root);
             Prop(root, 110f);
             Count("everyday_" + kind);
+            var frame = root.Transform;
+            foreach (var child in root.GetChildren())
+                switch (child.Name.ToString())
+                {
+                    case "Laundry":
+                        foreach (float x in new[] { -1.4f, 1.4f })
+                            Solids.CylinderIn(frame, new Vector3(x, 0f, 0f), 0.08f, 1.9f);
+                        break;
+                    case "ChoppingBlock":
+                        Solids.CylinderIn(frame, new Vector3(-1.4f, 0f, 0f), 0.36f, 0.55f);
+                        Solids.CylinderIn(frame, new Vector3(0.9f, 0f, 0f), 0.26f, 1.5f);
+                        break;
+                    case "NetRack":
+                        foreach (float x in new[] { -1.6f, 1.6f })
+                            Solids.CylinderIn(frame, new Vector3(x, 0f, 0f), 0.08f, 1.8f);
+                        break;
+                }
+            if (kind == 2)
+                Solids.BoxIn(frame, new Vector3(0f, 0.6f, -0.1f), new Vector3(1.9f, 1.2f, 0.6f));
         }
         // Rowboats pulled up on the beach either side of the pier, bows towards the water.
         int boats = 0;
@@ -647,6 +684,7 @@ public partial class Scenery : Node3D
                     AddChild(boat);
                     Track(boat);
                     Prop(boat, 160f);
+                    Solids.BoxIn(boat.Transform, new Vector3(0f, 0.25f, 0f), new Vector3(1.4f, 0.6f, 3.6f));
                     boats++;
                     Count("rowboat");
                     x = 1000f;
@@ -692,6 +730,16 @@ public partial class Scenery : Node3D
             Track(building);
             _buildings.Add(building);
             Count("landmark_" + kind);
+            // Keep trees, plants and the local anglers off the landmark: a long dike gets a row of circles.
+            if (kind == "dike")
+            {
+                float length = MathF.Max(size, 20f);
+                var along = new Vector2(MathF.Cos(yaw), -MathF.Sin(yaw));
+                for (float t = -length / 2f; t <= length / 2f; t += 4f)
+                    _reserved.Add((new Vector2(x, z) + along * t, 6f));
+            }
+            else if (kind is not ("platforms" or "rocks" or "stilthouse"))
+                _reserved.Add((new Vector2(x, z), 8f));
             if (building.Title != "" && kind != "platforms")
                 Markers.Add(new MapMarker(new Vector2(x, z), building.Title, new Color(0.8f, 0.78f, 0.7f)));
         }
@@ -809,6 +857,12 @@ public partial class Scenery : Node3D
     private readonly List<(float X, float Z, string Kind)> _treeSpots = new();
     private readonly List<(float X, float Z)> _allTrees = new();
 
+    /// <summary>The trunk's radius at the foot for a kind of tree at scale 1 (TreeFactory.Get's trunks).</summary>
+    private static float TrunkRadius(string kind) => kind switch
+    {
+        "spruce" => 0.17f, "oak" => 0.2f, "birch" => 0.1f, "pine" => 0.18f, "willow" => 0.24f, _ => 0.15f,
+    };
+
     private void ScatterTrees(LocationData loc, RandomNumberGenerator rng)
     {
         string[] kinds = { "spruce", "oak", "birch", "pine", "willow" };
@@ -831,6 +885,9 @@ public partial class Scenery : Node3D
             if (understorey)
                 _treeSpots.Add((x, z, kind));
             _allTrees.Add((x, z));
+            // The trunk is solid where the angler can walk (beyond the edge nobody reaches it).
+            if (_lake.PlayDistance(x, z) < 2f)
+                Solids.Cylinder(new Vector3(x, h - 0.3f, z), TrunkRadius(kind) * s * 1.1f, 3f);
             Count("tree_" + kind);
         }
 
@@ -1264,6 +1321,21 @@ public partial class Scenery : Node3D
     /// hazel rod rest, the rod pointing out over the water, its float lying 9-13 m out. They fish the water in front of
     /// them (Main lets them catch now and then, which leaves that swim fished: FishingRod.Swim).
     /// </summary>
+    /// <summary>The ground within <paramref name="radius"/> of (x, z) stays within <paramref name="tolerance"/> m of its
+    /// height there (checked over a ring and halfway in).</summary>
+    private bool Level(LocationData loc, float x, float z, float radius, float tolerance)
+    {
+        float h = _lake.HeightAt(loc, x, z);
+        for (int k = 0; k < 8; k++)
+        {
+            float a = k * Mathf.Tau / 8f;
+            foreach (float r in new[] { radius * 0.5f, radius })
+                if (MathF.Abs(_lake.HeightAt(loc, x + MathF.Cos(a) * r, z + MathF.Sin(a) * r) - h) > tolerance)
+                    return false;
+        }
+        return true;
+    }
+
     private readonly List<(Props.Npc Angler, MeshInstance3D Float)> _anglerParts = new();
 
     /// <summary>
@@ -1303,19 +1375,29 @@ public partial class Scenery : Node3D
                 continue;
             // Walk out from the water to the bank.
             var dir = new Vector2(MathF.Cos(angle) * main.Rx, MathF.Sin(angle) * main.Rz).Normalized();
-            Vector2? bank = null;
+            Vector2? edge = null;
             for (float d = 0f; d < 60f; d += 0.5f)
             {
                 float x = wx + dir.X * d, z = wz + dir.Y * d;
                 if (_lake.DepthAt(loc, x, z) <= 0f)
                 {
-                    bank = new Vector2(x, z) + dir * 2.2f;
+                    edge = new Vector2(x, z);
                     break;
                 }
             }
-            if (bank is not Vector2 seat || MathF.Abs(seat.X) < 40f && seat.Y > -40f)
+            if (edge is not Vector2 waterline || MathF.Abs(waterline.X) < 40f && waterline.Y > -40f)
                 continue;
-            if (!_lake.IsWalkable(seat.X, seat.Y) || !Clear(loc, seat.X, seat.Y, 3f, 2.5f) || _lake.HeightAt(loc, seat.X, seat.Y) > 2.5f)
+            // The first level, walkable spot 1.5-7 m up the bank: the terrain mesh (a 2.5 m grid) cuts corners on a
+            // steep bank, which would bury the angler's legs or leave his log hanging.
+            Vector2? found = null;
+            for (float back = 1.5f; back <= 7f && found == null; back += 0.5f)
+            {
+                var p = waterline + dir * back;
+                if (_lake.IsWalkable(p.X, p.Y) && Clear(loc, p.X, p.Y, 3f, 2.5f) && _lake.HeightAt(loc, p.X, p.Y) <= 2.5f
+                    && Level(loc, p.X, p.Y, 2.5f, 0.3f))
+                    found = p;
+            }
+            if (found is not Vector2 seat)
                 continue;
             bool crowded = false;
             foreach (var (s, _) in Anglers)
@@ -1325,17 +1407,17 @@ public partial class Scenery : Node3D
                 continue;
             var toWater = -dir;
             float reach = rng.RandfRange(9f, 13f);
-            var floatAt = seat + toWater * (2.2f + reach);
+            var floatAt = seat + toWater * (seat.DistanceTo(waterline) + reach);
             if (_lake.DepthAt(loc, floatAt.X, floatAt.Y) < 0.8f)
                 continue;
             float h = _lake.HeightAt(loc, seat.X, seat.Y);
             var root = new Node3D { Name = "Angler", Position = new Vector3(seat.X, h, seat.Y) };
             root.Rotation = new Vector3(0f, MathF.Atan2(toWater.X, toWater.Y), 0f);
-            var log = Props.CampProps.SeatLog(1.1f, Anglers.Count + 11, 0.16f);
-            log.RotationDegrees = new Vector3(0f, 90f, 0f);
-            root.AddChild(log);
             var angler = Props.People.Create(Props.Role.Fisherman, 60 + Anglers.Count, "Sitting_Idle_Loop", new[] { "Sitting_Talking_Loop" });
-            angler.Position = new Vector3(0f, 0f, 0.08f);
+            // The log lies across, as thick as his seat is high; he sits with his hips over its axis, facing the water.
+            var log = Props.CampProps.SeatLog(1.1f, Anglers.Count + 11, angler.SeatLogRadius, even: true);
+            root.AddChild(log);
+            angler.Position = new Vector3(0f, 0f, angler.Seat.Back);
             root.AddChild(angler);
             // The rod on a forked stick in front, its tip out over the water.
             var rest = Fishing.RodRest.Create(false);
@@ -1366,6 +1448,7 @@ public partial class Scenery : Node3D
             Track(root);
             Prop(root, 160f);
             _anglerParts.Add((angler, bob));
+            Solids.BoxIn(root.Transform, new Vector3(0f, 0.25f, 0f), new Vector3(1.1f, 0.5f, 0.5f));
             _reserved.Add((seat, 3.5f));
             Anglers.Add((root.Position, new Vector3(floatAt.X, 0f, floatAt.Y)));
             Count("angler");
@@ -1528,6 +1611,8 @@ public partial class Scenery : Node3D
             var scale = new Vector3(rng.RandfRange(0.3f, 1.1f), rng.RandfRange(0.2f, 0.6f), rng.RandfRange(0.3f, 1f)) * size;
             var b = new Basis(Vector3.Up, rng.Randf() * Mathf.Tau).Scaled(scale);
             rocks.Add(new Transform3D(b, new Vector3(x, h, z)));
+            // A boulder of unit radius scaled: the angler walks round it (or steps onto a low one).
+            Solids.Cylinder(new Vector3(x, h - scale.Y, z), (scale.X + scale.Z) * 0.5f * 0.85f, scale.Y * 2f);
             float gr = rng.RandfRange(0.38f, 0.55f);
             colors.Add(new Color(gr, gr * 0.98f, gr * 0.93f));
         }

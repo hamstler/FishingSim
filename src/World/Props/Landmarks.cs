@@ -173,6 +173,11 @@ public static partial class BuildingFactory
             Cyl(b, 0f, 0.95f, h * 0.5f, new Vector3(x, 3.2f + h * 0.55f + h * 0.2f, -0.9f), i % 2 == 0 ? crownLight : crown, 7);
         }
         Collider(b, new Vector3(1.6f, 3.6f, 1.6f), new Vector3(0, 0.4f, 4.2f));
+        // The bank itself is solid: the crown to walk along (the cart track's top at 1.05 m) and the sloping sides to
+        // walk up, as the boxes above are drawn.
+        Collider(b, new Vector3(length, 1.45f, 3.2f), new Vector3(0, 0.325f, 0));
+        foreach (float sz in new[] { -1f, 1f })
+            Collider(b, new Vector3(length, 0.5f, 2.6f), new Vector3(0, 0.25f, sz * 2.4f), new Vector3(sz * 18f, 0, 0));
     }
 
     /// <summary>Small wooden angling platforms along the straight banks of the fish pond.</summary>

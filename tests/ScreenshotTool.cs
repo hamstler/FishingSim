@@ -404,11 +404,14 @@ public partial class ScreenshotTool : Node
             var (seat, fl) = main.Scenery.Anglers[0];
             var outward = new Vector3(fl.X - seat.X, 0f, fl.Z - seat.Z).Normalized();
             var side = outward.Cross(Vector3.Up);
-            var stand = seat - outward * 1.5f + side * 5f;
+            // FISHSIM_SHOT_DIST sets how far to the side (default 5 m), so the seated angler can be seen close up.
+            float sideDist = float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_DIST"), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float sd) ? sd : 5f;
+            var stand = seat - outward * (sideDist < 4f ? 0f : 1.5f) + side * sideDist;
             main.Player.GlobalPosition = new Vector3(stand.X, bed.HeightAt(stand.X, stand.Z) + 0.3f, stand.Z);
             for (int i = 0; i < 20; i++)
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-            var look = (seat + outward * 4f) - stand;
+            var look = (seat + outward * (sideDist < 4f ? 0.3f : 4f)) - stand;
             yaw = Mathf.RadToDeg(MathF.Atan2(-look.X, -look.Z));
         }
         // FISHSIM_LOOK_WOOD=1: stand on the bank nearest the closest sunken tree and look at it.
@@ -1102,6 +1105,31 @@ public partial class ScreenshotTool : Node
 
         for (int i = 0; i < frames; i++)
             await NextFrame();
+        // FISHSIM_SIT_PROBE=1: print where each seated villager's hips and thighs are against the ground under them.
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_SIT_PROBE") == "1")
+        {
+            var bedProbe = main.GetChildren().OfType<LakeBed>().First();
+            foreach (var npc in main.Scenery.FindChildren("*", "Node3D", true, false).OfType<FishingSim.World.Props.Npc>())
+            {
+                var sk = FishingSim.World.Props.CharacterAsset.SkeletonOf(npc);
+                if (sk == null)
+                    continue;
+                string Bone(string name)
+                {
+                    int b = sk.FindBone(name);
+                    if (b < 0)
+                        return name + " ?";
+                    var g = sk.GlobalTransform * sk.GetBoneGlobalPose(b).Origin;
+                    var local = npc.ToLocal(g);
+                    return $"{name} y={local.Y:0.000} z={local.Z:0.000}";
+                }
+                var anim = FishingSim.World.Props.CharacterAsset.PlayerOf(npc)?.CurrentAnimation ?? "";
+                if (!anim.ToString().StartsWith("Sitting"))
+                    continue;
+                GD.Print($"SIT {npc.Name} at {npc.GlobalPosition} scale {sk.GlobalTransform.Basis.Scale.X:0.000}: "
+                    + $"{Bone("pelvis")}, {Bone("thigh_l")}, {Bone("calf_l")}, {Bone("foot_l")}, {Bone("ball_l")}");
+            }
+        }
         // FISHSIM_CLOSEUP = 0 (left, the crank side), 1 (right front), 2 (from below), 3 (over the left shoulder):
         // a second camera beside the reel and the hands, in any mode.
         if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_CLOSEUP"), out int close))

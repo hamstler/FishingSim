@@ -334,6 +334,43 @@ public sealed class GameSuite : ITestSuite
         t.Check(main.Scenery.SunkenWood.Count > 3 && ReferenceEquals(rod.SunkenWood, main.Scenery.SunkenWood)
                 && main.Scenery.SunkenWood.All(w => rod.Lake.DepthAt(w.X, w.Z) > 0.3f),
             $"trees lie sunk off the wooded banks, in the water ({main.Scenery.SunkenWood.Count})");
+
+        t.Section("collisions on the map");
+        var space = main.Player.GetWorld3D().DirectSpaceState;
+        int solidCount = main.Scenery.Solids.Count;
+        t.Check(solidCount > 200, $"tree trunks, boulders, fires and props are solid ({solidCount} shapes)");
+        // A capsule as big as the angler, standing where something solid is, must touch it.
+        var probe = new CapsuleShape3D { Radius = 0.3f, Height = 1.8f };
+        bool Blocked(Vector3 foot)
+        {
+            var q = new PhysicsShapeQueryParameters3D { Shape = probe, CollisionMask = 1, Transform = new Transform3D(Basis.Identity, foot + new Vector3(0f, 1.0f, 0f)) };
+            foreach (var hit in space.IntersectShape(q, 8))
+                if (hit["collider"].AsGodotObject() == main.Scenery.Solids)
+                    return true;
+            return false;
+        }
+        var shapes = main.Scenery.Solids.GetChildren().OfType<CollisionShape3D>().ToList();
+        var trunk = shapes.First(c => c.Shape is CylinderShape3D cy && cy.Height >= 3f);
+        var trunkFoot = trunk.Position - new Vector3(0f, 1.5f, 0f) + new Vector3(0f, 0.3f, 0f);
+        t.Check(Blocked(trunkFoot), $"the angler cannot stand inside a tree trunk ({trunkFoot})");
+        t.Check(Blocked(main.Scenery.Campfires[0].GlobalPosition), "nor in a campfire");
+        // Sitting villagers touch their logs: the log's top lies just above their seat.
+        foreach (var npc in main.Scenery.FindChildren("*", "Node3D", true, false).OfType<Npc>())
+        {
+            var parent = npc.GetParent();
+            var hipsAt = npc.Position + npc.Basis * new Vector3(0f, 0f, -npc.Seat.Back);
+            // The log the villager sits on: the one nearest the hips.
+            var log = parent?.GetChildren().OfType<Node3D>().Where(c => c.Name.ToString().Contains("SeatLog"))
+                .OrderBy(c => new Vector2(c.Position.X - hipsAt.X, c.Position.Z - hipsAt.Z).Length()).FirstOrDefault();
+            if (log == null || npc.Seat.Height <= 0f)
+                continue;
+            var mesh = log.GetChildren().OfType<MeshInstance3D>().First().Mesh.GetAabb();
+            float top = log.Position.Y + mesh.End.Y * log.Scale.Y;
+            float gap = top - npc.Seat.Height;
+            var hips = log.Transform.AffineInverse() * (npc.Position + npc.Basis * new Vector3(0f, 0f, -npc.Seat.Back));
+            t.Check(gap > 0f && gap < 0.05f && MathF.Abs(hips.Z) < 0.05f && MathF.Abs(hips.X) < mesh.Size.X / 2f,
+                $"{npc.Name} sits on the log, not above it (log top {top:0.000} m, seat {npc.Seat.Height:0.000} m, hips {hips.Z:0.00} m off its axis)");
+        }
         t.Check(main.Scenery.Anglers.Count >= 2 && ReferenceEquals(rod.OtherAnglers, main.Scenery.Anglers)
                 && main.Scenery.Anglers.All(a => rod.Lake.DepthAt(a.Seat.X, a.Seat.Z) <= 0f && rod.Lake.DepthAt(a.Float.X, a.Float.Z) > 0.5f),
             $"local anglers sit on the bank with their floats in the water ({main.Scenery.Anglers.Count})");
