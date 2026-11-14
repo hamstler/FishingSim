@@ -300,6 +300,7 @@ public sealed class CoreSuite : ITestSuite
         Spells(t);
         Shores(t);
         Moonlight(t);
+        Pressure(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -865,6 +866,29 @@ public sealed class CoreSuite : ITestSuite
             var bright = dark with { MoonLight = 1f };
             t.Check(BiteModel.Weight(sum, dark) > BiteModel.Weight(sum, bright) * 1.5f, "the bite model weighs the moonlight");
         }
+    }
+
+    /// <summary>A swim fished hard (Core/Methods/SwimPressure).</summary>
+    private static void Pressure(TestContext t)
+    {
+        t.Section("swim pressure");
+        var swim = new SwimPressure();
+        t.Check(SwimPressure.Pace(swim.Load(0f, 0f, 10f)) == 1f, "an unfished spot bites as usual");
+        for (int i = 0; i < 6; i++)
+            swim.Add(0f, 0f, 10f + i * 0.2f);
+        float here = SwimPressure.Pace(swim.Load(0f, 0f, 11.2f));
+        float near = SwimPressure.Pace(swim.Load(8f, 0f, 11.2f));
+        float away = SwimPressure.Pace(swim.Load(30f, 0f, 11.2f));
+        t.Check(here < 0.55f && near > here && away == 1f, $"six fish from one spot slow it down ({here:0.00}), less 8 m off ({near:0.00}), not 30 m away");
+        t.Check(SwimPressure.FishedOut(swim.Load(0f, 0f, 11.2f)), "the HUD tells the angler to move");
+        float later = SwimPressure.Pace(swim.Load(0f, 0f, 11.2f + 12f));
+        t.Check(later > 0.85f, $"the swim recovers over game hours ({later:0.00} after 12 h)");
+        var released = new SwimPressure();
+        released.Add(0f, 0f, 0f);
+        released.Add(0f, 0f, 0f, SwimPressure.Released - 1f);
+        t.Check(MathF.Abs(released.Load(0f, 0f, 0f) - SwimPressure.Released) < 1e-4f, "a released fish weighs half");
+        swim.Clear();
+        t.Check(swim.Load(0f, 0f, 11.2f) == 0f, "a new map starts fresh");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

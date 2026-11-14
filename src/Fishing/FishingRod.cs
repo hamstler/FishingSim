@@ -128,16 +128,28 @@ public partial class FishingRod : Node3D
                 _shoreCheck = 1f;
                 var wind = WindVelocity;
                 WindShoreExposure = WindShore.Exposure(Lake.DepthAt, bait.X, bait.Z, wind.X, wind.Z);
+                SwimLoad = Profile != null ? Swim.Load(bait.X, bait.Z, Profile.Clock) : 0f;
             }
         }
         else
         {
             WindShoreExposure = 0f;
+            SwimLoad = 0f;
             _shoreCheck = 0f;
         }
     }
 
     private float _shoreCheck;
+    private Vector3 _hookedAt;
+
+    /// <summary>Recent catches round the lake: a spot fished hard bites slower (cleared on a new map).</summary>
+    public SwimPressure Swim { get; } = new();
+
+    /// <summary>How hard the spot at the bait has been fished (read once a second while fishing).</summary>
+    public float SwimLoad { get; private set; }
+
+    /// <summary>The bait lies where many fish were taken lately: worth moving.</summary>
+    public bool FishedOut => SwimPressure.FishedOut(SwimLoad) && State is RodState.Waiting or RodState.Nibble or RodState.Bite;
 
     /// <summary>How near the bait lies to the shore the wind blows onto (0 .. 1, read once a second while fishing).</summary>
     public float WindShoreExposure { get; private set; }
@@ -521,7 +533,8 @@ public partial class FishingRod : Node3D
     public float WaterTemp => WaterTemperature.At(Lake.Location.WaterTemperature, World.Hour, World.Weather);
 
     /// <summary>What slows or quickens every bite clock: frightened fish and the air pressure's trend.</summary>
-    private float ConditionPace => Disturbance.Pace * World.Barometer.Pace * FeedingSpells.Pace(Profile.Clock, Lake.LocationIndex) * WindShorePace;
+    private float ConditionPace => Disturbance.Pace * World.Barometer.Pace * FeedingSpells.Pace(Profile.Clock, Lake.LocationIndex) * WindShorePace
+        * SwimPressure.Pace(SwimLoad);
 
     /// <summary>How the lure's colours suit the light and the water now (1 = neutral).</summary>
     public float LureAppeal => Loadout.LureOn
@@ -1332,6 +1345,7 @@ public partial class FishingRod : Node3D
     private void StartFight()
     {
         var species = CurrentSpecies!;
+        _hookedAt = _bobber.GlobalPosition;
         _bobber.ExtraForce = 0f;
         _bobber.DriveVelocity = Vector3.Zero;
         // The lure or the feeder goes with the fish; only a float stays in sight on the line.
@@ -1582,6 +1596,8 @@ public partial class FishingRod : Node3D
         // Counts, journal, records and XP now; the keepnet only when the angler chooses (catch panel: E / R).
         var result = Profile.AddCatch(species, CurrentWeight, context, toKeepnet: false);
         Profile.AddLineWear(Loadout.Line.ItemId, Core.Methods.LineWear.PerFish);
+        // One fish fewer (or one more wary) at the spot where it bit.
+        Swim.Add(_hookedAt.X, _hookedAt.Z, Profile.Clock);
         if (_fight != null)
             Profile.AddLineTwist(Loadout.Line.ItemId, -LineTwist.FightRelief(_fight.Elapsed));
         LastCatch = result;
@@ -1715,6 +1731,8 @@ public partial class FishingRod : Node3D
         if (!AwaitingDecision || CurrentSpecies == null)
             return;
         Profile.Release();
+        // A released fish goes back: the spot loses less than for a kept one.
+        Swim.Add(_hookedAt.X, _hookedAt.Z, Profile.Clock, SwimPressure.Released - 1f);
         Decided();
         SoundCue?.Invoke(Core.Audio.OneShot.SmallSplash, 0.8f);
         ShowBanner($"Wypuszczono: {CurrentSpecies.SpeciesName} {CurrentWeight:0.00} kg (+{Profile.ReleaseXp} XP)", 2.5f);

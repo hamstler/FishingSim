@@ -371,6 +371,7 @@ public partial class Hud : CanvasLayer
     {
         string rest = (rod.OnRest ? "  ·  wędka na podpórce (Z)" : "") + (rod.Slack > 0.3f ? $"  ·  luz {rod.Slack:0.0} m" : "")
             + (rod.Spooked ? "  ·  ryby spłoszone" : "")
+            + (rod.FishedOut ? "  ·  miejsce wyłowione" : "")
             + (BaitWear.Word(rod.BaitOnHook, rod.BaitFreshness) is { Length: > 0 } baitWord && rod.CastMethod != FishingMethod.Spinning ? "  ·  " + baitWord : "");
         switch (rod.CastMethod)
         {
