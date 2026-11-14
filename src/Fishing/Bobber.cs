@@ -149,6 +149,10 @@ public partial class Bobber : RigidBody3D
     /// <summary>How far the float lies over (0 upright .. 1 flat on the water): a lift bite, or a float set too deep.</summary>
     public float Tilt { get; set; }
 
+    /// <summary>The wind in flight (m/s) and how strongly it carries this end tackle (1/s; Casting.WindCatch).</summary>
+    public Vector3 AirWind { get; set; }
+    public float WindCatch { get; set; }
+
     /// <summary>The wind's push on the float (a velocity it drifts towards, m/s).</summary>
     public Vector3 Drift { get; set; }
 
@@ -434,6 +438,12 @@ public partial class Bobber : RigidBody3D
             var push = DriveVelocity + Drift;
             if (push != Vector3.Zero)
                 ApplyCentralForce(push * Mass * LinearDamp);
+        }
+        // In the air the wind carries it sideways (a light float or fly most).
+        if (Submerged <= 0f && WindCatch > 0f && AirWind != Vector3.Zero)
+        {
+            var flat = new Vector3(LinearVelocity.X, 0f, LinearVelocity.Z);
+            ApplyCentralForce((AirWind - flat) * Mass * WindCatch * 0.35f);
         }
         LinearDamp = Mathf.Lerp(0.05f, 6f, Submerged);
         AngularDamp = Mathf.Lerp(0.5f, 4f, Submerged);

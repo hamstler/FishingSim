@@ -824,7 +824,10 @@ public partial class FishingRod : Node3D
         Twitch(-3f);   // the blank whips forward as the cast is released
         var basis = _camera.GlobalTransform.Basis;
         var aim = (-basis.Z).Rotated(basis.X.Normalized(), Mathf.DegToRad(CastLoftDegrees));
-        float speed = Mathf.Lerp(_castMin, _castMax, CastPower) * CastFactor;
+        // No cast flies exactly where it is aimed: the harder the swing, the wider it strays.
+        var (stray, speedFactor) = Casting.Scatter(CastPower, _rng);
+        aim = aim.Rotated(Vector3.Up, Mathf.DegToRad(stray));
+        float speed = Mathf.Lerp(_castMin, _castMax, CastPower) * CastFactor * speedFactor;
         // What flies: a float, a lure, or a feeder that takes one portion of the bait as groundbait when there is some
         // to spare.
         _castMethod = Method;
@@ -840,6 +843,8 @@ public partial class FishingRod : Node3D
         if (_feederLoaded)
             Loadout.UseBait();
         _bobber.FeederLoaded = _feederLoaded;
+        _bobber.AirWind = WindVelocity;
+        _bobber.WindCatch = Casting.WindCatch(_castMethod, Loadout.Bait.WeightG);
         _bobber.Launch(_rodTip.GlobalPosition, aim * speed);
         // The bail is open: the line pays out behind the end tackle as it flies.
         _lineLength = 0.3f;

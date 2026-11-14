@@ -123,6 +123,10 @@ szarpanie i ciągnięcie zaczepu oraz każda wyholowana ryba. Przetarta żyłka 
 jest zapisywane, widać je w opisie sprzętu (Tab) i na karcie w kramie. W kramie przy przetartej żyłce w użyciu jest
 przycisk „Nawiń nową”, który za cenę żyłki przywraca jej pełną wytrzymałość.
 
+**Rzut:** zestaw nie leci idealnie tam, gdzie celujesz: im mocniejszy zamach, tym większy rozrzut na boki (do kilku
+stopni) i zmienność odległości. W locie wiatr znosi zestaw na bok: lekki spławik i mucha mocno, lekka obrotówka
+średnio, ciężka wahadłówka i koszyczek prawie wcale.
+
 **Grafika na laptopie:** przy pierwszym uruchomieniu na zintegrowanej grafice gra sama ustawia jakość Niską, bliski
 zasięg widzenia i 3D w 70% (FSR). Wszystko to można zmienić w menu pauzy. Na Niskiej nie ma też poświaty (bloom).
 

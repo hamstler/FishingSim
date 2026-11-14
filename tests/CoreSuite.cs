@@ -295,6 +295,7 @@ public sealed class CoreSuite : ITestSuite
         ThrownHooks(t);
         Wear(t);
         Fraying(t);
+        Casts(t);
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
     }
@@ -748,6 +749,21 @@ public sealed class CoreSuite : ITestSuite
             "new line on the spool makes a worn line whole");
         t.Check(p.Buy(TackleSlot.Line, "zylka016", 10, 1) == "Już to masz", "a whole line is not bought twice");
         t.Check(LineWear.Word(0.3f) == "przetarta" && LineWear.Word(0.01f) == "", "the HUD names the wear");
+    }
+
+    /// <summary>Cast scatter and wind in flight (Core/Methods/Casting).</summary>
+    private static void Casts(TestContext t)
+    {
+        t.Section("casting: scatter and wind");
+        var rng = new FishingSim.Core.SystemRng(9);
+        float Spread(float power) => Enumerable.Range(0, 400).Select(_ => MathF.Abs(Casting.Scatter(power, rng).Degrees)).Average();
+        float soft = Spread(0.2f), full = Spread(1f);
+        t.Check(full > soft * 1.8f && full < 4f && soft > 0.3f, $"a full swing strays wider ({full:0.0} deg) than a gentle one ({soft:0.0} deg)");
+        var speeds = Enumerable.Range(0, 400).Select(_ => Casting.Scatter(1f, rng).Speed).ToList();
+        t.Check(speeds.Min() > 0.9f && speeds.Max() < 1.1f && speeds.Max() - speeds.Min() > 0.05f, "and its distance varies a little");
+        t.Check(Casting.WindCatch(FishingMethod.Float, 0f) > Casting.WindCatch(FishingMethod.Spinning, 25f) * 3f
+                && Casting.WindCatch(FishingMethod.Spinning, 2f) > Casting.WindCatch(FishingMethod.Spinning, 25f)
+                && Casting.WindCatch(FishingMethod.Bottom, 0f) < 0.2f, "the wind carries a float far more than a heavy spoon, a feeder hardly");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>
