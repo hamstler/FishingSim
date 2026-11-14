@@ -310,6 +310,7 @@ public sealed class CoreSuite : ITestSuite
         Migration(t);
         Swallowed(t);
         Wood(t);
+        Layers(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -1027,6 +1028,17 @@ public sealed class CoreSuite : ITestSuite
             if (open.Snagged) snagOpen++;
         }
         t.Check(snagWood >= snagOpen, $"the lure's snag rate follows the bottom ({snagWood} vs {snagOpen} steps snagged)");
+    }
+
+    /// <summary>Temperature layers (Core/Methods/Conditions).</summary>
+    private static void Layers(TestContext t)
+    {
+        t.Section("temperature layers");
+        t.Check(WaterTemperature.AtDepth(21f, 1f) == 21f && WaterTemperature.AtDepth(21f, 6f) < 18f && WaterTemperature.AtDepth(21f, 40f) >= 6f,
+            "the top is mixed, the deep water colder, never below 6 degrees");
+        float troutDeep = WaterTemperature.Fit("Pstrąg tęczowy", WaterTemperature.AtDepth(21.5f, 10f));
+        float troutTop = WaterTemperature.Fit("Pstrąg tęczowy", WaterTemperature.AtDepth(21.5f, 0.5f));
+        t.Check(troutDeep > troutTop, $"in a warm lake trout feed better deep ({troutTop:0.00} at the top, {troutDeep:0.00} at 10 m)");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

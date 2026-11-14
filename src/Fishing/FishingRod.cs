@@ -642,7 +642,8 @@ public partial class FishingRod : Node3D
     {
         var (cover, edge) = StructureAt(at.X, at.Y);
         return new(Loadout.Bait.ItemId, Loadout.Hook.Size + (Loadout.LureOn ? MethodRules.SizeHookShift(Loadout.Bait.SizeCm) : 0f), depth,
-            Lake.Location, World.Period, World.Weather, BaitLayerAt(depth), WaterTemp, cover, edge,
+            Lake.Location, World.Period, World.Weather, BaitLayerAt(depth),
+            WaterTemperature.AtDepth(WaterTemp, depth * (BaitLayerAt(depth) ?? 1f)), cover, edge,
             World.Daylight < 0.5f ? World.MoonLight : null,
             (Shoal.Any && Profile != null) || _rises.Count > 0 ? ShoalAt(at.X, at.Y) : null,
             MethodRules.LightLevel(World.Hour, World.Weather));

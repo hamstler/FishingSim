@@ -411,6 +411,7 @@ Przy dodawaniu: nowa ryba = plik w `data/fish/`, wpis w `SpeciesCatalog.Paths` i
 - **Dobowa wędrówka**: o świcie, o zmierzchu, nocą i pod grubymi chmurami ryby wchodzą na płyciznę (do ok. 4 m) i tam lepiej biorą. W jasne południe schodzą głębiej, więc wtedy opłaca się łowić na spadach i w głębszej wodzie.
 - **Połknięty haczyk**: przy spławiku i gruncie spóźnione zacięcie daje rybie czas, żeby połknęła przynętę. Haczyk siedzi wtedy głęboko: trzyma w holu, ale wyjmowanie trwa długo (ryba jest bez wody) i rani rybę. Wypychacz (6 monet) robi to szybko i delikatnie. Przynęty sztuczne rzadko są połykane.
 - **Zatopione drzewa**: przy brzegach, zwłaszcza zalesionych, leżą w wodzie zwalone drzewa, a ich szare gałęzie wystają nad powierzchnię. Kryją się przy nich szczupaki, okonie, liny i karpie, ale przynęta prowadzona przy dnie łapie tam zaczep kilka razy częściej. Ryba wpuszczona w gałęzie owija żyłkę szybciej niż w zielsku („W GAŁĘZIACH!”: podnieś wędkę). Koszyczek ciągnięty po dnie (LPM) przez gałęzie też potrafi w nich utknąć i urwać przypon. Mapa (M) podpisuje takie miejsca.
+- **Warstwy temperatury**: wierzchnie 1,5 m wody jest wymieszane, a głębiej woda chłodnieje o około 0,9°C na metr. Liczy się temperatura tam, gdzie jest przynęta. W ciepłym jeziorze pstrągi i sieje biorą na głębokości, a karpie i liny bliżej powierzchni.
 - **Turnieje** (T): wpisowe, dojazd na łowisko, wynik to suma N najcięższych ryb, rywale to boty o różnych umiejętnościach. Nagrody (pieniądze i XP) według miejsca, historia w zapisie.
 
 ## Zapis gry

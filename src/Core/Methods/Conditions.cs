@@ -78,6 +78,13 @@ public static class WaterTemperature
         lakeTemperature + 1.5f * MathF.Cos((hour - 16f) / 24f * MathF.Tau)
         - weather switch { Weather.Rain => 0.8f, Weather.Cloudy => 0.3f, _ => 0f };
 
+    /// <summary>
+    /// The temperature at a depth (m) under a surface this warm: the top 1.5 m is mixed by the wind and sun, below it
+    /// the water cools by about 0.9 degrees a metre, never under 6 degrees nor warmer than the surface.
+    /// </summary>
+    public static float AtDepth(float surface, float depth) =>
+        MathF.Min(surface, MathF.Max(6f, surface - 0.9f * Math.Clamp(depth - 1.5f, 0f, 12f)));
+
     /// <summary>The temperature a species feeds best at, and how many degrees off it still feeds well.</summary>
     public static (float Optimum, float Tolerance) Preference(string species) =>
         Cold.Contains(species) ? (11f, 5f) : Warm.Contains(species) ? (22f, 6f) : (17f, 7f);
