@@ -100,6 +100,30 @@ public partial class FishingRod : Node3D
     private float _bitePull;          // the quiver tip pulled round by a bite on the bottom (0..1)
     private float _lastGroundbaitHour = float.NaN;
     private float _lureAppeal = 1f;
+    private Vector3 _lastAnglerAt;
+    private bool _anglerSeen;
+
+    /// <summary>How disturbed the fish at the swim are (splashes, steps, a fight); slows the bites while it lasts.</summary>
+    public Disturbance Disturbance { get; } = new();
+
+    /// <summary>The noise scared the fish: bites come slower for a while.</summary>
+    public bool Spooked => Disturbance.Spooked && State is RodState.Waiting or RodState.Nibble or RodState.Bite;
+
+    /// <summary>The angler's steps near the bait (running, wading) and the calm coming back with time.</summary>
+    private void TickDisturbance(float dt)
+    {
+        Disturbance.Decay(dt);
+        var at = _camera.GlobalPosition;
+        float speed = _anglerSeen && dt > 0f ? new Vector2(at.X - _lastAnglerAt.X, at.Z - _lastAnglerAt.Z).Length() / dt : 0f;
+        _lastAnglerAt = at;
+        _anglerSeen = true;
+        if (State is RodState.Waiting or RodState.Nibble or RodState.Bite && speed < 12f)
+        {
+            var bait = _bobber.GlobalPosition;
+            float dist = new Vector2(at.X - bait.X, at.Z - bait.Z).Length();
+            Disturbance.Add(Disturbance.Steps(speed, dist, Lake.DepthAt(at.X, at.Z) > 0.05f, dt));
+        }
+    }
 
     // the line: a rope of points from the tip to the end tackle, as long as the line paid out
     private readonly Core.Physics.LineRope _rope = new();
@@ -562,6 +586,7 @@ public partial class FishingRod : Node3D
         _lastGroundbaitHour = hour;
         BannerTime = MathF.Max(BannerTime - dt, 0f);
         UpdateBaitAttraction(dt);
+        TickDisturbance(dt);
         _stateTime += dt;
         switch (State)
         {
@@ -784,6 +809,11 @@ public partial class FishingRod : Node3D
         if (_bobber.Submerged > 0.5f)
         {
             SoundCue?.Invoke(Core.Audio.OneShot.Splash, Math.Clamp(CastPower + 0.4f, 0.5f, 1f));
+            // The splash puts the fish off: a heavy lure or a feeder into shallow water most of all.
+            float splash = Disturbance.Splash(_castMethod, Loadout.Bait.WeightG, CurrentDepth());
+            Disturbance.Add(splash);
+            if (splash > 0.2f)
+                Population?.Scare(_bobber.GlobalPosition, 3f + splash * 6f, 2f + splash * 4f);
             if (_castMethod != FishingMethod.Float)
                 EnterWater();
             // The bail closes: the line that flew out lies on the water with some slack (less behind a lure: the
@@ -881,7 +911,7 @@ public partial class FishingRod : Node3D
         float pace = 1f;
         if (Loadout.LureOn)
             pace = Reeling ? (Loadout.Rod.Kind == RodKind.Spinning ? 3.2f : 2.4f) : 0.1f;
-        _biteTimer -= dt * pace;
+        _biteTimer -= dt * pace * Disturbance.Pace;
         if (_biteTimer <= 0f)
             StartNibble();
     }
@@ -1132,6 +1162,7 @@ public partial class FishingRod : Node3D
             Unbreakable = DevUnbreakable,
         };
         SoundCue?.Invoke(Core.Audio.OneShot.Strike, 1f);
+        Disturbance.Add(0.3f);     // a hooked fish thrashing disturbs the swim
         Twitch(2.5f);
         if (_biter != null)
             Population?.Hook(_biter);
@@ -1564,7 +1595,7 @@ public partial class FishingRod : Node3D
         _lineOutOutsideFight = dist;
         // The play, the rod, the lure's size and how its colours suit the light and the water.
         _biteTimer -= dt * lure.BitePace * MethodRules.LureRodMatch(Loadout.Rod.Kind) * 2f
-            * MethodRules.SizePace(Loadout.Bait.SizeCm) * _lureAppeal;
+            * MethodRules.SizePace(Loadout.Bait.SizeCm) * _lureAppeal * Disturbance.Pace;
         if (_biteTimer <= 0f)
             StartNibble();
     }
@@ -1659,7 +1690,7 @@ public partial class FishingRod : Node3D
         if (!_rigSettled)
             return;
         float pace = GroundbaitSpots.PaceFor(GroundbaitHeat) * (Reeling ? 0.5f : 1f);
-        _biteTimer -= dt * pace;
+        _biteTimer -= dt * pace * Disturbance.Pace;
         if (_biteTimer <= 0f)
             StartNibble();
     }

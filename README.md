@@ -85,6 +85,11 @@ i wysokość przynęty nad dnem, a mapa (M) liczy szanse brań dla ustawionego g
 karp, szczupak, sandacz czy węgorz odjeżdżają ze spławikiem w bok, zanim go zatopią; drobnica (ukleja, kiełb, płoć)
 szybko podskubuje; reszta klasycznie przytapia. Wiatr powoli znosi spławik, a napięta żyłka prowadzi go po łuku.
 
+**Płoszenie ryb:** hałas przy łowisku odstrasza ryby i na jakiś czas spowalnia brania (spokój wraca po około minucie).
+Płoszy chlupnięcie zestawu (spławik prawie wcale, pełny koszyczek mocno, przynęta tym bardziej, im cięższa; na
+płyciźnie wszystko słychać dalej), bieganie po brzegu i pomoście blisko przynęty, brodzenie w wodzie oraz hol ryby.
+Ryby widoczne w wodzie rozpierzchają się od głośnego chlupnięcia, a pasek stanu pokazuje „ryby spłoszone”.
+
 **Grafika na laptopie:** przy pierwszym uruchomieniu na zintegrowanej grafice gra sama ustawia jakość Niską, bliski
 zasięg widzenia i 3D w 70% (FSR). Wszystko to można zmienić w menu pauzy. Na Niskiej nie ma też poświaty (bloom).
 

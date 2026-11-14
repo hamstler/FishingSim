@@ -291,6 +291,7 @@ public sealed class CoreSuite : ITestSuite
         FishingMethods(t, Species("szczupak"), Species("leszcz"));
         TackleCatalogue(t);
         LineRopePhysics(t);
+        Noise(t);
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
     }
 
@@ -626,6 +627,30 @@ public sealed class CoreSuite : ITestSuite
         var names = SpeciesCatalog.Paths.Select(path => GD.Load<FishSpecies>(path).SpeciesName).ToHashSet();
         t.Check(new[] { "Leszcz", "Lin", "Karp", "Szczupak", "Ukleja", "Płoć", "Wzdręga", "Boleń", "Sandacz" }.All(names.Contains),
             "the habits name real species");
+    }
+
+    /// <summary>Noise at the swim (Core/Methods/Disturbance).</summary>
+    private static void Noise(TestContext t)
+    {
+        t.Section("disturbing the fish");
+        float fly = Disturbance.Splash(FishingMethod.Spinning, 0.3f, 2f), spoon = Disturbance.Splash(FishingMethod.Spinning, 25f, 2f);
+        t.Check(spoon > fly * 4f && Disturbance.Splash(FishingMethod.Bottom, 0f, 0.8f) > Disturbance.Splash(FishingMethod.Bottom, 0f, 5f) * 2f
+                && Disturbance.Splash(FishingMethod.Float, 0f, 2f) < 0.2f,
+            $"a heavy lure splashes louder than a fly ({spoon:0.00} vs {fly:0.00}), a feeder louder in shallow water, a float hardly");
+        var d = new Disturbance();
+        d.Add(0.9f);
+        t.Check(d.Spooked && d.Pace < 0.4f, $"spooked fish bite slower (x{d.Pace:0.00})");
+        d.Decay(Disturbance.HalfLife);
+        float half = d.Level;
+        d.Decay(Disturbance.HalfLife * 5f);
+        t.Check(MathF.Abs(half - 0.45f) < 0.01f && d.Level < 0.03f && d.Pace > 0.97f, "the water calms down with time");
+        t.Check(Disturbance.Steps(5.8f, 3f, false, 1f) > Disturbance.Steps(2.5f, 3f, false, 1f) * 4f
+                && Disturbance.Steps(2.5f, 3f, true, 1f) > Disturbance.Steps(2.5f, 3f, false, 1f) * 2f
+                && Disturbance.Steps(5.8f, 20f, false, 1f) == 0f && Disturbance.Steps(0f, 1f, true, 1f) == 0f,
+            "running near the bait scares more than walking, wading more still; far away or standing still nothing");
+        for (int i = 0; i < 50; i++)
+            d.Add(1f);
+        t.Check(d.Level <= Disturbance.MaxLevel && d.Pace >= 0.25f, "bites never stop altogether");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

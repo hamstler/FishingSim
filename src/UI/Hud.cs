@@ -365,7 +365,8 @@ public partial class Hud : CanvasLayer
     /// bottom and how well it is led; the feeder sinking or on the bottom, the baited spot, the rod on its rest.</summary>
     private static string MethodLine(FishingRod rod)
     {
-        string rest = (rod.OnRest ? "  ·  wędka na podpórce (Z)" : "") + (rod.Slack > 0.3f ? $"  ·  luz {rod.Slack:0.0} m" : "");
+        string rest = (rod.OnRest ? "  ·  wędka na podpórce (Z)" : "") + (rod.Slack > 0.3f ? $"  ·  luz {rod.Slack:0.0} m" : "")
+            + (rod.Spooked ? "  ·  ryby spłoszone" : "");
         switch (rod.CastMethod)
         {
             case Core.Methods.FishingMethod.Spinning when rod.Lure is { } lure:

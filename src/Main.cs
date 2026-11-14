@@ -182,6 +182,7 @@ public partial class Main : Node3D
         ApplyMood();
         _lake.Rebuilt += ApplyMood;
         _lake.Rebuilt += Rod.Groundbait.Clear;
+        _lake.Rebuilt += Rod.Disturbance.Clear;
         _lake.Rebuilt += RespawnPlayer;
         _lake.Rebuilt += ReleaseLoadingGarbage;
         _profile.Changed += Save;
@@ -365,6 +366,7 @@ public partial class Main : Node3D
         _gear.GearChanged -= ApplyGearEffects;
         _lake.Rebuilt -= RespawnPlayer;
         _lake.Rebuilt -= Rod.Groundbait.Clear;
+        _lake.Rebuilt -= Rod.Disturbance.Clear;
         _lake.Rebuilt -= ReleaseLoadingGarbage;
         _lake.Rebuilt -= ApplyMood;
     }
