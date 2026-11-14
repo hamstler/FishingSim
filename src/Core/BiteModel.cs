@@ -13,6 +13,7 @@ namespace FishingSim.Core;
 /// <param name="Period">Time of day, or null to ignore time and weather.</param>
 /// <param name="Weather">Current weather (used together with <paramref name="Period"/>).</param>
 /// <param name="WaterTemp">The water's temperature in degrees Celsius, or null to ignore it.</param>
+/// <param name="Light">Daylight on the water (0 night .. 1 bright midday) for the shallow/deep daily move, or null.</param>
 /// <param name="Shoal">The shoal multiplier per species name at the bait (Core/Methods/Shoals), or null for none.</param>
 /// <param name="MoonLight">Moonlight on the water at night (0 dark .. 1 clear full moon), or null by day.</param>
 /// <param name="BaitLayer">Where the bait is in the water column (1 = on the bottom, 0 = at the surface), or null to ignore it.</param>
@@ -28,7 +29,8 @@ public readonly record struct BiteContext(
     float? Cover = null,
     float Edge = 0f,
     float? MoonLight = null,
-    Func<string, float>? Shoal = null);
+    Func<string, float>? Shoal = null,
+    float? Light = null);
 
 /// <summary>One species' share of the bites.</summary>
 public readonly record struct BiteChance(FishSpecies Species, float Weight, float Share);
@@ -77,7 +79,8 @@ public static class BiteModel
         * (ctx.WaterTemp is float temp ? Methods.WaterTemperature.Fit(sp.SpeciesName, temp) : 1f)
         * (ctx.Cover is float cover ? Methods.Structure.Fit(sp.SpeciesName, cover, ctx.Edge) : 1f)
         * (ctx.MoonLight is float moon ? Methods.Moon.Fit(sp.SpeciesName, moon) : 1f)
-        * (ctx.Shoal?.Invoke(sp.SpeciesName) ?? 1f);
+        * (ctx.Shoal?.Invoke(sp.SpeciesName) ?? 1f)
+        * (ctx.Light is float light ? Methods.DailyMigration.Fit(ctx.Depth, light) : 1f);
 
     /// <summary>Average attractiveness over all species (1 = neutral); drives how fast bites come.</summary>
     public static float Attraction(IReadOnlyList<FishSpecies> species, BiteContext ctx)

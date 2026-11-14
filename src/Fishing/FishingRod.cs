@@ -640,7 +640,8 @@ public partial class FishingRod : Node3D
         return new(Loadout.Bait.ItemId, Loadout.Hook.Size + (Loadout.LureOn ? MethodRules.SizeHookShift(Loadout.Bait.SizeCm) : 0f), depth,
             Lake.Location, World.Period, World.Weather, BaitLayerAt(depth), WaterTemp, cover, edge,
             World.Daylight < 0.5f ? World.MoonLight : null,
-            (Shoal.Any && Profile != null) || _rises.Count > 0 ? ShoalAt(at.X, at.Y) : null);
+            (Shoal.Any && Profile != null) || _rises.Count > 0 ? ShoalAt(at.X, at.Y) : null,
+            MethodRules.LightLevel(World.Hour, World.Weather));
     }
 
     /// <summary>Share of bites per species for the current setup at a point of the lake.</summary>

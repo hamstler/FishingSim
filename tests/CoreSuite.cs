@@ -307,6 +307,7 @@ public sealed class CoreSuite : ITestSuite
         Points(t);
         Shoaling(t);
         Rising(t);
+        Migration(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -982,6 +983,15 @@ public sealed class CoreSuite : ITestSuite
         t.Check(Rises.Riser(FeedingHabits.LayerOf("Ukleja")) && !Rises.Riser(FeedingHabits.LayerOf("Leszcz")), "bleak rise, bream stay on the bottom");
         t.Check(Rises.Boost(1f, 5f) > 1.8f && Rises.Boost(1f, 50f) < 1.3f && Rises.Boost(8f, 1f) == 1f,
             "a bait cast right to a fresh rise tempts that fish; an old or distant ring does little");
+    }
+
+    /// <summary>The daily move between shallow and deep water (Core/Methods/DailyMigration).</summary>
+    private static void Migration(TestContext t)
+    {
+        t.Section("daily migration");
+        t.Check(DailyMigration.Fit(1f, 0.1f) > 1.2f && DailyMigration.Fit(1f, 1f) < 0.8f, "the shallows fish well in low light, poorly in bright sun");
+        t.Check(DailyMigration.Fit(7f, 1f) > DailyMigration.Fit(7f, 0.1f), "at noon the deep water pays");
+        t.Check(MathF.Abs(DailyMigration.Fit(3.5f, 0.5f) - 1f) < 0.1f, "middling depths hardly change");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>
