@@ -494,7 +494,7 @@ public partial class FishingRod : Node3D
     public float WaterTemp => WaterTemperature.At(Lake.Location.WaterTemperature, World.Hour, World.Weather);
 
     /// <summary>What slows or quickens every bite clock: frightened fish and the air pressure's trend.</summary>
-    private float ConditionPace => Disturbance.Pace * World.Barometer.Pace;
+    private float ConditionPace => Disturbance.Pace * World.Barometer.Pace * FeedingSpells.Pace(Profile.Clock, Lake.LocationIndex);
 
     /// <summary>How the lure's colours suit the light and the water now (1 = neutral).</summary>
     public float LureAppeal => Loadout.LureOn

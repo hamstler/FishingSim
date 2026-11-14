@@ -133,6 +133,10 @@ Mapa (M) podpowiada pod kursorem, gdzie są rośliny i spady, i liczy szanse bra
 wpłynie w zielsko, po 2,5 s zaplącze żyłkę i urwie zestaw, chyba że podniesiesz wędkę (PPM) i wyciągniesz ją z roślin;
 pasek stanu ostrzega „W ZIELSKU!”.
 
+**Żerowanie falami:** ryby nie biorą równo przez cały dzień: przez kilka godzin gry brania przychodzą falami
+(chwila wzmożonego żerowania, potem cisza, tempo od mniej więcej połowy do półtora raza). Fale są inne każdego dnia
+i na każdym łowisku, a gra ich nie zdradza: trzeba to wyczuć samemu.
+
 **Grafika na laptopie:** przy pierwszym uruchomieniu na zintegrowanej grafice gra sama ustawia jakość Niską, bliski
 zasięg widzenia i 3D w 70% (FSR). Wszystko to można zmienić w menu pauzy. Na Niskiej nie ma też poświaty (bloom).
 

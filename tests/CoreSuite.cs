@@ -296,6 +296,7 @@ public sealed class CoreSuite : ITestSuite
         Wear(t);
         Fraying(t);
         Casts(t);
+        Spells(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -782,6 +783,19 @@ public sealed class CoreSuite : ITestSuite
         t.Check(BiteModel.Weight(zander, open with { Edge = 1f }) > BiteModel.Weight(zander, open) * 1.4f, "a zander on a drop-off");
         t.Check(BiteModel.Weight(roach, open with { Cover = 1f, Edge = 1f }) == BiteModel.Weight(roach, open), "a roach does not care");
         t.Check(Structure.EdgeFrom(0.6f) == 1f && Structure.EdgeFrom(0.05f) < 0.2f, "a steep bottom is a drop-off, a gentle one is not");
+    }
+
+    /// <summary>Feeding in spells (Core/Methods/FeedingSpells).</summary>
+    private static void Spells(TestContext t)
+    {
+        t.Section("feeding spells");
+        var day = Enumerable.Range(0, 24 * 12).Select(i => FeedingSpells.Pace(100f + i / 12f, 0)).ToList();
+        t.Check(day.Max() > 1.3f && day.Min() < 0.7f && MathF.Abs(day.Average() - 1f) < 0.12f,
+            $"bites come in waves over a day ({day.Min():0.00}..{day.Max():0.00}, mean {day.Average():0.00})");
+        t.Check(FeedingSpells.Pace(10.3f, 0) == FeedingSpells.Pace(10.3f, 0) && FeedingSpells.Pace(10.3f, 0) != FeedingSpells.Pace(34.3f, 0)
+                && FeedingSpells.Pace(10.3f, 0) != FeedingSpells.Pace(10.3f, 1), "the same hour is the same, another day or lake differs");
+        float step = Enumerable.Range(0, 200).Max(i => MathF.Abs(FeedingSpells.Pace(i * 0.05f + 0.05f, 2) - FeedingSpells.Pace(i * 0.05f, 2)));
+        t.Check(step < 0.25f, "the waves change gradually, not from minute to minute");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>
