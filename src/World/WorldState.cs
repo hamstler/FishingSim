@@ -35,6 +35,9 @@ public partial class WorldState : Node
     /// <summary>The air pressure and its trend (the fish feel it).</summary>
     public Core.Methods.Barometer Barometer { get; } = new();
 
+    /// <summary>How muddy the water is after rain (0 clear .. 1; Core/Methods/Turbidity).</summary>
+    public float Murk { get; set; }
+
     /// <summary>The moon's phase (0 new, 0.5 full; Core/Methods/Moon), set from the profile's clock.</summary>
     public float MoonPhase { get; set; } = 0.5f;
 
@@ -45,6 +48,7 @@ public partial class WorldState : Node
     {
         Hour = Mathf.PosMod(Hour + hours, 24f);
         Barometer.Step(hours, Weather);
+        Murk = Core.Methods.Turbidity.Step(Murk, hours, Weather);
         HoursAdvanced?.Invoke(hours);
         _weatherTimer -= hours;
         if (_weatherTimer <= 0f)

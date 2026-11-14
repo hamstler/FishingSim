@@ -312,6 +312,7 @@ public sealed class CoreSuite : ITestSuite
         Wood(t);
         Layers(t);
         BaitSizes(t);
+        Murk(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -1068,6 +1069,18 @@ public sealed class CoreSuite : ITestSuite
     {
         private int _i;
         public float NextFloat() => ((_i++ * 0.6180339f) % 1f);
+    }
+
+    /// <summary>Rain and murky water (Core/Methods/Turbidity).</summary>
+    private static void Murk(TestContext t)
+    {
+        t.Section("turbidity");
+        float m = Turbidity.Step(0f, 4f, Weather.Rain);
+        t.Check(m > 0.6f && Turbidity.ClarityFactor(m) < 0.7f && Turbidity.Word(m) == "mętna", $"four hours of rain muddy the water ({m:0.00})");
+        float later = Turbidity.Step(m, 8f, Weather.Clear);
+        t.Check(MathF.Abs(later - m / 2f) < 1e-3f && Turbidity.Step(m, 48f, Weather.Clear) < 0.05f, "it clears over the next day");
+        t.Check(LineShyness.Effective(0.65f, 6f * Turbidity.ClarityFactor(1f), 1f) > LineShyness.Effective(0.65f, 6f, 1f),
+            "in muddied water a fine leader matters less");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

@@ -651,6 +651,9 @@ public partial class FishingRod : Node3D
         }
     }
 
+    /// <summary>How far one sees into the water now (m): the lake's own clarity, less after rain stirred up the silt.</summary>
+    public float ClarityNow => Lake.Location.WaterClarity * Turbidity.ClarityFactor(World.Murk);
+
     /// <summary>The map's sunken trees (set by Main from the scenery).</summary>
     public IReadOnlyList<SunkenWood> SunkenWood { get; set; } = Array.Empty<SunkenWood>();
 
@@ -699,7 +702,7 @@ public partial class FishingRod : Node3D
     /// <summary>How the lure's colours suit the light and the water now (1 = neutral).</summary>
     public float LureAppeal => Loadout.LureOn
         ? MethodRules.ColourAppeal(Loadout.Bait.LureColor, Loadout.Bait.AccentColor, Loadout.Bait.Metallic,
-            MethodRules.LightLevel(World.Hour, World.Weather), Lake.Location.WaterClarity)
+            MethodRules.LightLevel(World.Hour, World.Weather), ClarityNow)
         : 1f;
 
     /// <summary>The share of the rod's full cast the current lure (its weight) and line (its diameter) allow.</summary>
@@ -1085,7 +1088,7 @@ public partial class FishingRod : Node3D
         _baitFresh = 1f;
         _baitOn = true;
         // What the angler can see into the water.
-        _bobber.Clarity = Lake.Location.WaterClarity;
+        _bobber.Clarity = ClarityNow;
         _bobber.GlareCut = Population?.GlareCut ?? 0f;
         _feederLoaded = _castMethod == FishingMethod.Bottom && Loadout.BaitCount >= 2;
         if (_feederLoaded)
@@ -1169,7 +1172,7 @@ public partial class FishingRod : Node3D
     }
 
     /// <summary>The line's visibility as the fish see it now (clear water and daylight show it, murk and night hide it).</summary>
-    public float LineShynessNow => LineShyness.Effective(_lineVisibility, Lake.Location.WaterClarity,
+    public float LineShynessNow => LineShyness.Effective(_lineVisibility, ClarityNow,
         MethodRules.LightLevel(World.Hour, World.Weather));
 
     // ------------------------------------------------------------------ waiting / bite

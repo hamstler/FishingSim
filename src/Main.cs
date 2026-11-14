@@ -26,6 +26,7 @@ public partial class Main : Node3D
     private Water _water = null!;
     private SkyController _sky = null!;
     private WorldState _world = null!;
+    private float _appliedMurk;
     private LakeBed _lake = null!;
     private TackleLoadout _loadout = null!;
     private GearCatalog _gear = null!;
@@ -131,6 +132,12 @@ public partial class Main : Node3D
         Rod.WeedBeds = Scenery.WeedBeds;
         Rod.SunkenWood = Scenery.SunkenWood;
         Rod.OtherAnglers = Scenery.Anglers;
+        // Rain muddies the water: refresh the water and the fish's visibility when the murk has changed noticeably.
+        _world.HoursAdvanced += _ =>
+        {
+            if (MathF.Abs(_world.Murk - _appliedMurk) > 0.05f)
+                ApplyGearEffects();
+        };
         // The other anglers catch a fish now and then: the water in front of them gets fished.
         var anglerLuck = new Random(77);
         _world.HoursAdvanced += hours =>
@@ -271,7 +278,8 @@ public partial class Main : Node3D
         if (Rod.State == RodState.Idle)
             Rod.ApplyTackle();     // reel grease and the like change the tackle's numbers
         var glasses = _gear.Accessory(AccessoryKind.PolarizedGlasses);
-        float clarity = _lake.Location.WaterClarity;
+        float clarity = Rod.ClarityNow;
+        _appliedMurk = _world.Murk;
         Fish.VisibleRange = FishPopulation.BaseVisibleRange + (glasses?.Power ?? 0f);
         Fish.VisibleDepth = clarity * 0.6f + (glasses != null ? 1.2f : 0f);
         Fish.Clarity = clarity;

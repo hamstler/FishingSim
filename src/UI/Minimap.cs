@@ -352,7 +352,8 @@ public partial class Minimap : Control
             Fit(font, line, inner, 11), new Color(Ink, 0.88f));
         // The barometer and the water: what the fish feel.
         var baro = world.Barometer;
-        string air = $"{baro.Pressure:0} hPa, {baro.TrendWord} · woda {_rod.WaterTemp:0}°C";
+        string murk = Core.Methods.Turbidity.Word(world.Murk);
+        string air = $"{baro.Pressure:0} hPa, {baro.TrendWord} · woda {_rod.WaterTemp:0}°C{(murk.Length > 0 ? ", " + murk : "")}";
         DrawString(font, new Vector2(box.Position.X, box.Position.Y + 57f), air, HorizontalAlignment.Center, box.Size.X,
             Fit(font, air, inner, 11), baro.Pace > 1.05f ? new Color(0.6f, 0.95f, 0.6f) : baro.Pace < 0.95f ? new Color(1f, 0.65f, 0.5f) : new Color(Ink, 0.8f));
         string place = _rod.Lake.Location.DisplayName;
