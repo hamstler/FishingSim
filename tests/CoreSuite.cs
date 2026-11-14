@@ -292,6 +292,7 @@ public sealed class CoreSuite : ITestSuite
         TackleCatalogue(t);
         LineRopePhysics(t);
         Noise(t);
+        ThrownHooks(t);
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
     }
@@ -684,6 +685,37 @@ public sealed class CoreSuite : ITestSuite
         var cold = new BiteContext("worm", 5f, 2f, lake, null, Weather.Clear, null, 10f);
         t.Check(BiteModel.Weight(carp, cold) < BiteModel.Weight(carp, cold with { WaterTemp = 22f }) * 0.4f
                 && BiteModel.Weight(carp, cold with { WaterTemp = null }) > BiteModel.Weight(carp, cold), "the bite model weighs the species by the water's temperature");
+    }
+
+    /// <summary>A fish given slack shakes the hook out (FightModel.HookThrown).</summary>
+    private static void ThrownHooks(TestContext t)
+    {
+        t.Section("fish throwing the hook on a slack line");
+        var perch = Species("okon");
+        int Thrown(bool reeling, float hold)
+        {
+            int n = 0;
+            for (int i = 0; i < 120; i++)
+            {
+                var rng = new FishingSim.Core.SystemRng(i * 31 + 7);
+                var fight = new FightModel(FishProfile.From(perch, 0.6f), new FightGear(3f, 6f, 0.2f, 1.6f, 100f), rng, 15f, 0f, 0.5f) { HookHold = hold };
+                for (float s = 0f; s < 90f; s += 0.05f)
+                {
+                    var o = fight.Step(0.05f, 0.5f, reeling);
+                    if (o == FightOutcome.HookThrown)
+                    {
+                        n++;
+                        break;
+                    }
+                    if (o != FightOutcome.Ongoing)
+                        break;
+                }
+            }
+            return n;
+        }
+        int idle = Thrown(false, 0.5f), wound = Thrown(true, 0.5f), wellSet = Thrown(false, 1f);
+        t.Check(idle > wound * 2 && idle > 15, $"a fish left on a slack line throws the hook ({idle}/120), one kept tight rarely ({wound}/120)");
+        t.Check(wellSet < idle / 2, $"a well set hook holds better ({wellSet}/120)");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

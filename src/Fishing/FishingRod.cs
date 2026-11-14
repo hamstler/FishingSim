@@ -286,6 +286,10 @@ public partial class FishingRod : Node3D
         || (FeedingHabits.StyleOf(CurrentSpecies?.SpeciesName ?? "") == BiteStyle.Lift ? _bobber.VisualTilt >= 0.85f : _bobber.Submerged >= 0.95f));
 
     private float _readyAt = float.NaN;
+    private float _hookHold = 0.8f;
+
+    /// <summary>The fish on the line has slack (the angler is not keeping it tight): it may throw the hook.</summary>
+    public bool FightSlack => State == RodState.Fight && (_fight?.LineSlack ?? false);
     private float _pluck;
 
     public void Setup(RodDependencies deps)
@@ -1017,6 +1021,7 @@ public partial class FishingRod : Node3D
             if (CurrentSpecies != null && _rng.NextFloat() < MethodRules.SelfHookChance(CurrentSpecies.Aggression, Reeling))
             {
                 ShowBanner("Uderzenie! Ryba sama zacięła się na prowadzonej przynęcie", 2.5f);
+                _hookHold = 0.55f;      // hooked by itself: held, but not deeply
                 StartFight();
                 return;
             }
@@ -1187,6 +1192,10 @@ public partial class FishingRod : Node3D
                     * (OverDepth ? FeedingHabits.OverDepthHookFactor : 1f);   // a float set too deep: slack between it and the hook
                 if (DevInstantBite || _rng.NextFloat() <= chance)
                 {
+                    // How well it is set: the fit of the hook, the tackle, and a strike at once rather than late.
+                    float window = MethodRules.HookWindow(_castMethod);
+                    float late = float.IsNaN(_readyAt) ? _stateTime : _stateTime - _readyAt;
+                    _hookHold = Math.Clamp(chance * (1f - 0.4f * Math.Clamp(late / window, 0f, 1f)), 0.2f, 1f);
                     StartFight();
                 }
                 else
@@ -1218,6 +1227,7 @@ public partial class FishingRod : Node3D
         _fight = new FightModel(FishProfile.From(species, CurrentWeight), gear, _rng, to.Length(), MathF.Atan2(to.X, to.Z), DragSetting)
         {
             Unbreakable = DevUnbreakable,
+            HookHold = DevInstantBite ? 1f : _hookHold,
         };
         SoundCue?.Invoke(Core.Audio.OneShot.Strike, 1f);
         Disturbance.Add(0.3f);     // a hooked fish thrashing disturbs the swim
@@ -1249,6 +1259,9 @@ public partial class FishingRod : Node3D
                 return;
             case FightOutcome.SpooledOut:
                 BreakLine("Ryba wyciągnęła całą linkę! Żyłka przepadła.", TackleSlot.Line);
+                return;
+            case FightOutcome.HookThrown:
+                LoseFish("Ryba się spięła: dostała luz i wypluła haczyk. Trzymaj ją na napiętej żyłce!");
                 return;
             case FightOutcome.Landed:
                 EnterClose();
@@ -1492,6 +1505,19 @@ public partial class FishingRod : Node3D
         }
         ShowBanner(text, 3.5f);
         SoundCue?.Invoke(Core.Audio.OneShot.LineSnap, 1f);
+        LoseBiter(_fishNode.Visible ? _fishNode.GlobalPosition : null);
+        _fight = null;
+        _lineOutOutsideFight = 0f;
+        _bobber.Stow();
+        _fishNode.Visible = false;
+        SetState(RodState.Broken);
+    }
+
+    /// <summary>The fish got away with the tackle intact (it threw the hook).</summary>
+    private void LoseFish(string text)
+    {
+        ShowBanner(text, 3.5f);
+        SoundCue?.Invoke(Core.Audio.OneShot.SmallSplash, 0.9f);
         LoseBiter(_fishNode.Visible ? _fishNode.GlobalPosition : null);
         _fight = null;
         _lineOutOutsideFight = 0f;

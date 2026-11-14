@@ -4,7 +4,8 @@ using Godot;
 
 namespace FishingSim.Core;
 
-public enum FightOutcome { Ongoing, Landed, LineBroke, SpooledOut }
+/// <summary>HookThrown: the fish shook the hook out on a slack line.</summary>
+public enum FightOutcome { Ongoing, Landed, LineBroke, SpooledOut, HookThrown }
 
 /// <summary>Per-fish constants of a fight, derived from the species and the individual's weight.</summary>
 /// <param name="PeakPull">Strongest sustained pull (kg-force) of a fresh fish.</param>
@@ -88,6 +89,10 @@ public sealed class FightModel
     private float _side;            // which way the current run angles: -1 left, +1 right
     private float _runOffset;       // angle between "straight away" and the run's course
     private Vector2 _velocity;
+    private float _chargeLeft;      // seconds of a short dash at the angler (the line goes slack unless wound in fast)
+
+    /// <summary>The fish is dashing at the angler: wind in fast or it gets slack.</summary>
+    public bool Charging => _chargeLeft > 0f;
 
     public float Tension { get; private set; }
 
@@ -119,6 +124,18 @@ public sealed class FightModel
     public float FishAngle => MathF.Atan2(Position.X, Position.Y);
 
     public float Distance => Position.Length();
+
+    /// <summary>
+    /// How well the hook is set (0..1): a hook that fits the mouth, a strike at the right moment, a braid and a
+    /// sharpened point hold better. A fish given slack shakes a poorly set hook out sooner.
+    /// </summary>
+    public float HookHold { get; init; } = 0.8f;
+
+    /// <summary>Seconds the line has been slack (the fish is not held): shaking its head it may throw the hook.</summary>
+    public float SlackSeconds { get; private set; }
+
+    /// <summary>The line is slack right now.</summary>
+    public bool LineSlack => SlackSeconds > 0.25f;
 
     /// <summary>Dev flag: the line never breaks.</summary>
     public bool Unbreakable { get; set; }
@@ -166,11 +183,14 @@ public sealed class FightModel
             if (_rng.NextFloat() < 0.55f)
                 _side = -_side;
             _runOffset = _rng.Range(0.15f, 1.05f);
+            // Now and then a fish turns and races straight at the angler.
+            _chargeLeft = _rng.NextFloat() < 0.05f + 0.15f * _fish.Aggression ? _rng.Range(0.7f, 1.4f) : 0f;
         }
         else
         {
             _phaseTimer = _rng.Range(1f, 2.5f) * Mathf.Lerp(1.2f, 0.8f, _fish.SizeRatio);
             _runOffset = _rng.Range(1.1f, 1.7f);       // between runs it bores across the line, still pulling
+            _chargeLeft = 0f;
         }
     }
 
@@ -223,6 +243,11 @@ public sealed class FightModel
         // --- steering: turn towards the course at a limited rate ---
         float bearing = FishAngle;
         float course = bearing + _side * _runOffset;
+        if (_chargeLeft > 0f)
+        {
+            _chargeLeft -= dt;
+            course = bearing + MathF.PI + _side * 0.35f;             // a dash in towards the angler
+        }
         if (Stamina < 0.12f)
             course = bearing + _side * 1.4f;                         // spent: it only rolls along the line
         float turn = Mathf.Wrap(course - Heading, -MathF.PI, MathF.PI);
@@ -286,6 +311,17 @@ public sealed class FightModel
         }
         if (slack > 0.3f)
             Motion = _velocity;
+
+        // --- slack line: a fish that is not held shakes its head and may throw the hook ---
+        bool loose = slack > 0.3f || Tension < 0.06f * _fish.PeakPull;
+        SlackSeconds = loose ? SlackSeconds + dt : MathF.Max(0f, SlackSeconds - 2f * dt);
+        if (SlackSeconds > 0.5f && !Unbreakable && Stamina > 0.05f)
+        {
+            float shaking = 0.25f + (surging ? 0.7f : 0f) + 0.3f * _fish.Aggression;
+            float poorlySet = MathF.Pow(1.05f - Math.Clamp(HookHold, 0f, 1f), 1.5f);
+            if (_rng.NextFloat() < shaking * poorlySet * dt)
+                return FightOutcome.HookThrown;
+        }
 
         // --- line stress ---
         float ratio = Tension / _gear.EffectiveLimit;

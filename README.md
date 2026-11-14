@@ -107,6 +107,11 @@ wcześniej wyrywa przynętę rybie („Za wcześnie!”), a okno na zacięcie li
 gdzie widać by było rybę (płytko, blisko, w czystej wodzie, mniej pod odblaskiem; więcej w okularach
 polaryzacyjnych), a haczyka pod spławikiem z brzegu nie widać wcale.
 
+**Spinanie się ryby:** ryba na luźnej żyłce potrząsa łbem i może wypluć haczyk. Czasem w czasie holu robi krótki
+zryw prosto do wędkarza; wtedy trzeba szybko zwijać, bo pasek stanu krzyczy „LUZ! zwijaj”. Im lepiej wbity haczyk
+(rozmiar dobrany do pyska, zacięcie od razu, a nie pod koniec chwili na zacięcie, plecionka, naostrzony grot), tym
+dłużej trzyma; ryba, która zacięła się sama na przynęcie, trzyma się płycej. Spięta ryba ucieka, ale sprzęt zostaje.
+
 **Grafika na laptopie:** przy pierwszym uruchomieniu na zintegrowanej grafice gra sama ustawia jakość Niską, bliski
 zasięg widzenia i 3D w 70% (FSR). Wszystko to można zmienić w menu pauzy. Na Niskiej nie ma też poświaty (bloom).
 
