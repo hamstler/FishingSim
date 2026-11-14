@@ -313,6 +313,7 @@ public sealed class CoreSuite : ITestSuite
         Layers(t);
         BaitSizes(t);
         Murk(t);
+        Bag(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -1081,6 +1082,22 @@ public sealed class CoreSuite : ITestSuite
         t.Check(MathF.Abs(later - m / 2f) < 1e-3f && Turbidity.Step(m, 48f, Weather.Clear) < 0.05f, "it clears over the next day");
         t.Check(LineShyness.Effective(0.65f, 6f * Turbidity.ClarityFactor(1f), 1f) > LineShyness.Effective(0.65f, 6f, 1f),
             "in muddied water a fine leader matters less");
+    }
+
+    /// <summary>Daily bag limits (Core/Methods/BagLimits, Profile.Keep).</summary>
+    private static void Bag(TestContext t)
+    {
+        t.Section("bag limits");
+        t.Check(BagLimits.LimitOf("Szczupak") == 2 && BagLimits.LimitOf("Płoć") == null && BagLimits.MayKeep("Płoć", 99), "pike are limited, roach are not");
+        var pike = SpeciesCatalog.Paths.Select(path => GD.Load<FishSpecies>(path)).First(s => s.SpeciesName == "Szczupak");
+        var p = new Profile();
+        float w = pike.LegalWeight + 0.5f;
+        t.Check(p.Keep(pike, w) == null && p.Keep(pike, w) == null && p.Keep(pike, w) is string error && error.StartsWith("Limit dzienny"),
+            "a third pike in a day goes back");
+        var saved = ProfileSerializer.FromJson(ProfileSerializer.ToJson(p).ToJsonString());
+        t.Check(saved.OverBagLimit("Szczupak"), "the day's count survives a save");
+        p.PassTime(24f);
+        t.Check(p.Keep(pike, w) == null, "the next day the limit starts over");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

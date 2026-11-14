@@ -158,6 +158,8 @@ public sealed class Profile
         LineWear = new();
         LineTwist = new();
         HookDull = new();
+        KeptToday = new();
+        KeptDay = -1;
         Smokery = new();
         Smoked = new();
         Notices = new();
@@ -455,13 +457,33 @@ public sealed class Profile
     public const int ReleaseXp = 3;
 
     /// <summary>Puts a landed fish into the keepnet. Null on success, otherwise why not (a full keepnet).</summary>
+    /// <summary>Fish kept today per species (bag limits; Core/Methods/BagLimits), for <see cref="KeptDay"/>.</summary>
+    public Dictionary<string, int> KeptToday { get; set; } = new();
+
+    /// <summary>The market day <see cref="KeptToday"/> counts.</summary>
+    public int KeptDay { get; set; } = -1;
+
+    /// <summary>How many of a species were kept today.</summary>
+    public int KeptTodayOf(string species) => KeptDay == Market.Day ? KeptToday.GetValueOrDefault(species) : 0;
+
+    /// <summary>The daily bag limit for this species is reached.</summary>
+    public bool OverBagLimit(string species) => !Core.Methods.BagLimits.MayKeep(species, KeptTodayOf(species));
+
     public string? Keep(FishSpecies species, float weight, float condition = 1f)
     {
+        if (OverBagLimit(species.SpeciesName))
+            return $"Limit dzienny: {species.SpeciesName} - wolno zatrzymać {Core.Methods.BagLimits.LimitOf(species.SpeciesName)} szt. na dzień. Wypuść ją.";
         if (!KeepnetFits(weight))
             return KeepnetLimit is { } net && Keepnet.Count >= net.MaxFish
                 ? "Siatka pełna: wypuść rybę albo sprzedaj połów"
                 : "Ryba nie zmieści się w siatce: jest za ciężka na tę siatkę";
         Keepnet.Add(new CatchRecord(species.SpeciesName, weight, Progression.FishValue(species, weight), Math.Clamp(condition, 0f, 1f), weight < species.LegalWeight));
+        if (KeptDay != Market.Day)
+        {
+            KeptDay = Market.Day;
+            KeptToday.Clear();
+        }
+        KeptToday[species.SpeciesName] = KeptToday.GetValueOrDefault(species.SpeciesName) + 1;
         Changed?.Invoke();
         return null;
     }

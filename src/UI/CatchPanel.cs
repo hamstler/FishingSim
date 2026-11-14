@@ -288,8 +288,11 @@ public partial class CatchPanel : Control
         string net = profile.KeepnetLimit is { } spec ? $"siatka {profile.Keepnet.Count}/{spec.MaxFish}" : $"siatka {profile.Keepnet.Count}";
         _status.Text = $"{record}   ·   {net}";
         bool undersized = w < sp.LegalWeight;
-        bool fits = profile.KeepnetFits(w);
-        _warning.Text = !fits
+        bool overLimit = profile.OverBagLimit(sp.SpeciesName);
+        bool fits = profile.KeepnetFits(w) && !overLimit;
+        _warning.Text = overLimit
+            ? $"Limit dzienny: {sp.SpeciesName} - wolno zatrzymać {Core.Methods.BagLimits.LimitOf(sp.SpeciesName)} szt. na dzień. Możesz ją tylko wypuścić."
+            : !fits
             ? "Siatka pełna albo za słaba na tę rybę: możesz ją tylko wypuścić."
             : undersized
                 ? $"Niewymiarowa (wymiar ochronny {sp.LegalWeight:0.00} kg): zatrzymanie grozi karą strażnika."

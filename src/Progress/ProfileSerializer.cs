@@ -115,6 +115,8 @@ public static class ProfileSerializer
             ["line_wear"] = FromMap(p.LineWear, v => v),
             ["line_twist"] = FromMap(p.LineTwist, v => v),
             ["hook_dull"] = FromMap(p.HookDull, v => v),
+            ["kept_today"] = FromMap(p.KeptToday, v => v),
+            ["kept_day"] = p.KeptDay,
             ["smoked"] = smoked,
             ["smokery"] = smokery,
             ["notices"] = new JsonObject { ["day"] = p.NoticesDay, ["place"] = p.NoticesPlace, ["list"] = notices },
@@ -199,6 +201,8 @@ public static class ProfileSerializer
         ReadMap(d["line_wear"], p.LineWear, n => Float(n, 0f));
         ReadMap(d["line_twist"], p.LineTwist, n => Float(n, 0f));
         ReadMap(d["hook_dull"], p.HookDull, n => Float(n, 0f));
+        ReadMap(d["kept_today"], p.KeptToday, n => Int(n, 0));
+        p.KeptDay = Int(d["kept_day"], -1);
         if (d["notices"] is JsonObject board && board["list"] is JsonArray noticeList)
         {
             p.NoticesDay = Int(board["day"], -1);
