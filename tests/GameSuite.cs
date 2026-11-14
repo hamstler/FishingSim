@@ -335,9 +335,14 @@ public sealed class GameSuite : ITestSuite
             $"local anglers sit on the bank with their floats in the water ({main.Scenery.Anglers.Count})");
         var theirs = main.Scenery.Anglers[0].Float;
         float loadBefore = rod.Swim.Load(theirs.X, theirs.Z, profile.Clock);
+        int landedByThem = 0;
+        Action<int> counter = _ => landedByThem++;
+        main.Scenery.AnglerCaught += counter;
         for (int i = 0; i < 6; i++)
             rod.World.Advance(1f);
-        t.Check(rod.Swim.Load(theirs.X, theirs.Z, profile.Clock) > loadBefore, "they catch fish: their swim gets fished");
+        main.Scenery.AnglerCaught -= counter;
+        t.Check(rod.Swim.Load(theirs.X, theirs.Z, profile.Clock) > loadBefore && landedByThem >= 6,
+            $"they catch fish ({landedByThem} in 6 h): their swim gets fished");
 
         rod.World.Hour = 23f;
         rod._Process(0.016);

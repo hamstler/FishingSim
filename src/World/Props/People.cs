@@ -404,6 +404,9 @@ public partial class Npc : Node3D
             };
     }
 
+    /// <summary>Plays a one-off animation now (a local angler landing a fish).</summary>
+    public void PlayGesture(string name) => Gesture(name);
+
     private void Gesture(string name)
     {
         if (_animator == null || !_animator.HasAnimation(name))

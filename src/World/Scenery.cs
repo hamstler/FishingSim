@@ -285,6 +285,7 @@ public partial class Scenery : Node3D
         WeedBeds.Clear();
         SunkenWood.Clear();
         Anglers.Clear();
+        _anglerParts.Clear();
         Stats.Clear();
         _reserved.Clear();
         _props.Clear();
@@ -1263,6 +1264,31 @@ public partial class Scenery : Node3D
     /// hazel rod rest, the rod pointing out over the water, its float lying 9-13 m out. They fish the water in front of
     /// them (Main lets them catch now and then, which leaves that swim fished: FishingRod.Swim).
     /// </summary>
+    private readonly List<(Props.Npc Angler, MeshInstance3D Float)> _anglerParts = new();
+
+    /// <summary>
+    /// A local angler gets a bite and lands a fish: the float goes under, the angler gets up to land it, and a little
+    /// later the float is back out on the water.
+    /// </summary>
+    public void AnglerCatches(int index)
+    {
+        if (index < 0 || index >= _anglerParts.Count)
+            return;
+        var (angler, bob) = _anglerParts[index];
+        if (!IsInstanceValid(angler) || !IsInstanceValid(bob))
+            return;
+        var rest = bob.Position;
+        var tween = bob.CreateTween();
+        tween.TweenProperty(bob, "position", rest + new Vector3(0f, -0.25f, 0f), 0.35f);
+        tween.TweenCallback(Callable.From(() => { bob.Visible = false; angler.PlayGesture("Interact"); }));
+        tween.TweenInterval(6f);
+        tween.TweenCallback(Callable.From(() => { bob.Position = rest; bob.Visible = true; }));
+        AnglerCaught?.Invoke(index);
+    }
+
+    /// <summary>A local angler landed a fish (for the sound and tests).</summary>
+    public event Action<int>? AnglerCaught;
+
     private void BuildAnglers(LocationData loc)
     {
         var rng = new RandomNumberGenerator { Seed = (ulong)(loc.DisplayName.Length * 7919 + 17) };
@@ -1339,6 +1365,7 @@ public partial class Scenery : Node3D
             AddChild(root);
             Track(root);
             Prop(root, 160f);
+            _anglerParts.Add((angler, bob));
             _reserved.Add((seat, 3.5f));
             Anglers.Add((root.Position, new Vector3(floatAt.X, 0f, floatAt.Y)));
             Count("angler");

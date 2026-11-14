@@ -142,9 +142,13 @@ public partial class Main : Node3D
         var anglerLuck = new Random(77);
         _world.HoursAdvanced += hours =>
         {
-            foreach (var (_, at) in Scenery.Anglers)
+            for (int i = 0; i < Scenery.Anglers.Count; i++)
                 if (anglerLuck.NextDouble() < Core.Methods.OtherAnglers.CatchesPerHour * hours)
+                {
+                    var at = Scenery.Anglers[i].Float;
                     Rod.Swim.Add(at.X, at.Z, _profile.Clock);
+                    Scenery.AnglerCatches(i);
+                }
         };
         AddChild(new Graphics.Gulls { Daylight = () => _world.Daylight });
 
