@@ -766,6 +766,7 @@ public partial class FishingRod : Node3D
         // to spare.
         _castMethod = Method;
         _bobber.SetTerminal(_castMethod, Loadout.Bait);
+        _bobber.SetBait(Loadout.Bait.ItemId);
         _feederLoaded = _castMethod == FishingMethod.Bottom && Loadout.BaitCount >= 2;
         if (_feederLoaded)
             Loadout.UseBait();
@@ -815,6 +816,7 @@ public partial class FishingRod : Node3D
         if (_bobber.Submerged > 0.5f)
         {
             SoundCue?.Invoke(Core.Audio.OneShot.Splash, Math.Clamp(CastPower + 0.4f, 0.5f, 1f));
+            _bobber.ShowHook = _castMethod != FishingMethod.Spinning;
             // The splash puts the fish off: a heavy lure or a feeder into shallow water most of all.
             float splash = Disturbance.Splash(_castMethod, Loadout.Bait.WeightG, CurrentDepth());
             Disturbance.Add(splash);
@@ -859,6 +861,8 @@ public partial class FishingRod : Node3D
             return;
         }
         _lineOutOutsideFight = FlatDistance(_bobber.GlobalPosition);
+        // The hook hangs at the depth setting, or lies on the bottom when the water is shallower.
+        _bobber.HangDepth = MathF.Max(0.05f, MathF.Min(FloatDepth, CurrentDepth() - 0.02f));
         if (Reeling)
         {
             // LMB: the slack is taken up first, then the float is drawn over the water towards the angler, through
@@ -1158,6 +1162,7 @@ public partial class FishingRod : Node3D
         _bobber.DriveVelocity = Vector3.Zero;
         // The lure or the feeder goes with the fish; only a float stays in sight on the line.
         _bobber.TerminalVisible = _castMethod == FishingMethod.Float;
+        _bobber.ShowHook = false;      // the hook is in the fish's mouth
         _lure = null;
         _bitePull = 0f;
         var to = _bobber.GlobalPosition - Origin();

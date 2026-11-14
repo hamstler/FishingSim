@@ -97,6 +97,10 @@ zatoka 19°C, staw 21°C), cieplejszą po południu i chłodniejszą w deszczu. 
 miętus) żerują najlepiej koło 11°C, ciepłolubne (karp, lin, karasie, sum) koło 22°C, reszta koło 17°C. Tabliczka pod
 tarczą pokazuje ciśnienie z trendem (na zielono, gdy sprzyja, na czerwono, gdy szkodzi) i temperaturę wody.
 
+**Haczyk z przynętą:** pod spławikiem widać żyłkę ze śrucinami i haczyk z założoną przynętą (robak, kukurydza, chleb,
+białe robaki, żywiec i inne mają własny kolor i kształt). Haczyk wisi na ustawionym gruncie albo leży na dnie, gdy
+woda jest płytsza. Przy koszyczku na dnie leży przypon z przynętą. W czystej wodzie przy brzegu widać to z pomostu.
+
 **Grafika na laptopie:** przy pierwszym uruchomieniu na zintegrowanej grafice gra sama ustawia jakość Niską, bliski
 zasięg widzenia i 3D w 70% (FSR). Wszystko to można zmienić w menu pauzy. Na Niskiej nie ma też poświaty (bloom).
 

@@ -740,7 +740,26 @@ public partial class ScreenshotTool : Node
             pr.Level = Math.Max(pr.Level, 5);
             int RodIx(string id) => lo.Items(TackleSlot.Rod).ToList().FindIndex(i => i.ItemId == id);
             int BaitIx(string id) => lo.Items(TackleSlot.Bait).ToList().FindIndex(i => i.ItemId == id);
-            if (arg == 4)
+            if (arg == 5)
+            {
+                // The baited hook under the float, seen from under the water beside it.
+                lo.Index[(int)TackleSlot.Bait] = BaitIx(System.Environment.GetEnvironmentVariable("FISHSIM_BAIT") ?? "worm");
+                lo.BaitCounts[lo.Bait.ItemId] = 10;
+                rod.ApplyTackle();
+                rod.SetFloatDepth(0.8f);
+                rod.CastNow(0.3f);
+                for (int i = 0; i < 400 && rod.State != RodState.Waiting; i++)
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                for (int i = 0; i < 90; i++)
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                var fp = rod.Bobber.GlobalPosition;
+                var hookCam = new Camera3D { Fov = 40f, Near = 0.02f, Current = true };
+                main.AddChild(hookCam);
+                hookCam.GlobalPosition = fp + new Vector3(0.35f, -0.68f, 0.2f);
+                hookCam.LookAt(fp + Vector3.Down * 0.74f);
+                GD.Print($"hook: {rod.State}, hang {rod.Bobber.HangDepth:0.00} m, water {rod.CurrentDepth():0.0} m, show {rod.Bobber.ShowHook}");
+            }
+            else if (arg == 4)
             {
                 // The line after a float cast: a fluorescent yellow monofilament (FISHSIM_LINE = another line id)
                 // lying on the water with its slack, bowed by the wind.

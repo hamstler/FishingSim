@@ -50,6 +50,80 @@ public partial class Bobber : RigidBody3D
     /// <summary>Downward pull as a multiple of the bobber's weight (bites).</summary>
     public float ExtraForce { get; set; }
 
+    /// <summary>How deep under the float the hook hangs (m): the depth setting, or the water's depth when that is less.</summary>
+    public float HangDepth { get; set; } = 1f;
+
+    /// <summary>The hook and its bait are in the water (not during the cast's flight or once a fish has them).</summary>
+    public bool ShowHook { get; set; }
+
+    private Node3D _hookRig = null!, _hook = null!, _shot = null!, _feederHook = null!;
+    private MeshInstance3D _hookLine = null!, _bait = null!, _feederBaitOnHook = null!;
+    private StandardMaterial3D _baitMaterial = null!;
+
+    /// <summary>What a natural bait looks like on the hook: its colour and whether it is long (a worm, a small fish).</summary>
+    public static (Color Colour, bool Long) BaitLook(string id) => id switch
+    {
+        "worm" or "rosowka" => (new Color(0.72f, 0.36f, 0.34f), true),
+        "ochotka" => (new Color(0.75f, 0.1f, 0.1f), true),
+        "maggot" or "pedrak" => (new Color(0.95f, 0.9f, 0.76f), false),
+        "corn" or "kasza" => (new Color(0.98f, 0.82f, 0.2f), false),
+        "bread" or "ciasto" or "kulka_czosnkowa" => (new Color(0.95f, 0.92f, 0.82f), false),
+        "groch" => (new Color(0.55f, 0.7f, 0.3f), false),
+        "konopie" => (new Color(0.3f, 0.25f, 0.18f), false),
+        "boilie" => (new Color(0.6f, 0.25f, 0.16f), false),
+        "kulka_plywajaca" => (new Color(0.95f, 0.55f, 0.2f), false),
+        "livebait" or "martwa_rybka" => (new Color(0.75f, 0.8f, 0.84f), true),
+        "insect" or "chrabaszcz" => (new Color(0.35f, 0.42f, 0.15f), false),
+        "jetka" => (new Color(0.85f, 0.8f, 0.55f), true),
+        _ => (new Color(0.8f, 0.7f, 0.5f), false),
+    };
+
+    /// <summary>The bait on the hook for the next cast.</summary>
+    public void SetBait(string id)
+    {
+        var (colour, isLong) = BaitLook(id);
+        _baitMaterial.AlbedoColor = colour;
+        var size = isLong ? new Vector3(0.008f, 0.03f, 0.008f) : new Vector3(0.012f, 0.012f, 0.012f);
+        _bait.Scale = size;
+        _feederBaitOnHook.Scale = size;
+    }
+
+    /// <summary>The rig under the float: the line down to the hook, a split shot, the hook with its bait; and the
+    /// feeder's hook link lying on the bottom behind it. Drawn at 1.6 times life size so it can be seen in the water.</summary>
+    private void BuildHookRig()
+    {
+        _baitMaterial = new StandardMaterial3D { AlbedoColor = new Color(0.72f, 0.36f, 0.34f), Roughness = 0.6f };
+        var steel = Metal(new Color(0.3f, 0.3f, 0.32f), 0.35f);
+        var lineMat = new StandardMaterial3D { AlbedoColor = new Color(0.85f, 0.88f, 0.85f, 0.5f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
+        Node3D Hook(out MeshInstance3D bait)
+        {
+            var hook = new Node3D { Scale = new Vector3(1.6f, 1.6f, 1.6f) };
+            Part(hook, new CylinderMesh { TopRadius = 0.0006f, BottomRadius = 0.0006f, Height = 0.014f, RadialSegments = 4 }, steel, new Vector3(0f, -0.007f, 0f));
+            Part(hook, new TorusMesh { InnerRadius = 0.0034f, OuterRadius = 0.0046f, Rings = 12, RingSegments = 4 }, steel,
+                new Vector3(0.004f, -0.014f, 0f), new Vector3(Mathf.Pi / 2f, 0f, 0f));
+            bait = Part(hook, new SphereMesh { Radius = 0.5f, Height = 1f, RadialSegments = 10, Rings = 6 }, _baitMaterial, new Vector3(0.004f, -0.02f, 0f));
+            return hook;
+        }
+        _hookRig = new Node3D { Visible = false };
+        _visual.AddChild(_hookRig);
+        _hookLine = Part(_hookRig, new CylinderMesh { TopRadius = 0.0006f, BottomRadius = 0.0006f, Height = 1f, RadialSegments = 4 }, lineMat, Vector3.Zero);
+        _shot = new Node3D();
+        _hookRig.AddChild(_shot);
+        foreach (float y in new[] { 0f, 0.012f })
+            Part(_shot, new SphereMesh { Radius = 0.004f, Height = 0.008f, RadialSegments = 8, Rings = 4 }, Metal(new Color(0.4f, 0.4f, 0.42f), 0.6f), new Vector3(0f, y, 0f));
+        _hook = Hook(out _bait);
+        _hookRig.AddChild(_hook);
+        // The feeder's hook link: 30 cm of line on the bottom, the baited hook at its end.
+        _feederHook = new Node3D();
+        _feeder.AddChild(_feederHook);
+        Part(_feederHook, new CylinderMesh { TopRadius = 0.0006f, BottomRadius = 0.0006f, Height = 0.23f, RadialSegments = 4 }, lineMat,
+            new Vector3(0f, 0.004f, -0.135f), new Vector3(Mathf.Pi / 2f, 0f, 0f));
+        var lying = Hook(out _feederBaitOnHook);
+        lying.Position = new Vector3(0f, 0.012f, -0.25f);
+        lying.Rotation = new Vector3(-Mathf.Pi / 2f, 0f, 0f);
+        _feederHook.AddChild(lying);
+    }
+
     /// <summary>How far the float lies over (0 upright .. 1 flat on the water): a lift bite, or a float set too deep.</summary>
     public float Tilt { get; set; }
 
@@ -85,6 +159,7 @@ public partial class Bobber : RigidBody3D
         _feeder = BuildFeeder();
         _feeder.Visible = false;
         _visual.AddChild(_feeder);
+        BuildHookRig();
         // Slightly self-lit colours so the float still reads at dusk and against glare.
         var red = Glowing(new Color(0.95f, 0.1f, 0.06f), 0.35f);
         var white = Glowing(new Color(0.96f, 0.96f, 0.92f), 0.2f);
@@ -164,6 +239,7 @@ public partial class Bobber : RigidBody3D
         Drift = Vector3.Zero;
         ExtraForce = 0f;
         Tilt = 0f;
+        ShowHook = false;
         Submerged = 0f;
     }
 
@@ -186,6 +262,17 @@ public partial class Bobber : RigidBody3D
         _float.Visible = _method == FishingMethod.Float;
         _lureRoot.Visible = _method == FishingMethod.Spinning && TerminalVisible;
         _feeder.Visible = _method == FishingMethod.Bottom && TerminalVisible;
+        _feederHook.Visible = ShowHook;
+        _hookRig.Visible = _method == FishingMethod.Float && ShowHook && Visible;
+        if (_hookRig.Visible)
+        {
+            float hang = MathF.Max(HangDepth, 0.05f);
+            _hookLine.Scale = new Vector3(1f, hang, 1f);
+            _hookLine.Position = new Vector3(0f, -hang / 2f, 0f);
+            _shot.Position = new Vector3(0f, -hang * 0.7f, 0f);
+            // The bait sways a little in the water.
+            _hook.Position = new Vector3(MathF.Sin(_time * 0.9f) * 0.01f, -hang, MathF.Cos(_time * 0.7f) * 0.01f);
+        }
         if (_float.Visible)
         {
             var cam = GetViewport()?.GetCamera3D();

@@ -174,6 +174,8 @@ public sealed class GameSuite : ITestSuite
         await WaitForState(t, rod, RodState.Waiting, 6);
         await t.Seconds(0.5);
         t.Check(rod.OverDepth && rod.Bobber.Tilt > 0.9f, $"set deeper than the water ({rod.CurrentDepth():0.0} m) the float lies flat");
+        t.Check(rod.Bobber.ShowHook && MathF.Abs(rod.Bobber.HangDepth - (rod.CurrentDepth() - 0.02f)) < 0.05f,
+            $"the baited hook lies on the bottom under it ({rod.Bobber.HangDepth:0.0} m down)");
         rod._UnhandledInput(Key(Godot.Key.Bracketleft));
         t.Check(MathF.Abs(rod.FloatDepth - 6f) < 0.01f, "the depth cannot be changed with the line out");
         rod.ResetToIdle();
