@@ -187,6 +187,9 @@ public sealed class LureMotion
     public bool Falling { get; private set; }
     public bool Snagged { get; private set; }
 
+    /// <summary>How snaggy the bottom under the lure is (1 open; more among sunken wood, Structure.SnagFactor).</summary>
+    public float SnagFactor { get; set; } = 1f;
+
     /// <summary>0..0.9: the flash after a twitch, fading in under two seconds.</summary>
     public float Flash { get; private set; }
 
@@ -251,7 +254,7 @@ public sealed class LureMotion
         if (!reeled && Depth > before)
             _fell += Depth - before;
         // Dragged along the bottom it may catch on a root, a stone or a sunken branch.
-        if (OnBottom && reeled && rng.NextFloat() < Spec.SnagRate * dt)
+        if (OnBottom && reeled && rng.NextFloat() < Spec.SnagRate * SnagFactor * dt)
         {
             Snagged = true;
             _pulled = 0f;

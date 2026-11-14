@@ -6,6 +6,9 @@ namespace FishingSim.Core.Methods;
 /// <summary>A patch of water plants (lilies or underwater weed) on the lake: its middle and radius (m).</summary>
 public readonly record struct WeedBed(float X, float Z, float Radius);
 
+/// <summary>A sunken tree or branch off a wooded bank: its middle and radius (m). It hides fish and snags lures.</summary>
+public readonly record struct SunkenWood(float X, float Z, float Radius);
+
 /// <summary>
 /// Where the fish hold (pure): pike, tench, perch, crucians, rudd and the like lurk in and by the plants; zander,
 /// wels, burbot, ruffe and perch hunt along the drop-offs where the bottom falls away. A bait in such a place draws
@@ -39,6 +42,24 @@ public static class Structure
         }
         return best;
     }
+
+    /// <summary>How close to sunken wood a point is: 1 among the branches, fading to 0 three metres beyond them.</summary>
+    public static float WoodAt(IReadOnlyList<SunkenWood> wood, float x, float z)
+    {
+        float best = 0f;
+        for (int i = 0; i < wood.Count; i++)
+        {
+            var w = wood[i];
+            float d = MathF.Sqrt((w.X - x) * (w.X - x) + (w.Z - z) * (w.Z - z)) - w.Radius;
+            float c = d <= 0f ? 1f : MathF.Max(0f, 1f - d / 3f);
+            if (c > best)
+                best = c;
+        }
+        return best;
+    }
+
+    /// <summary>How much more often a lure dragged here snags (1 open bottom .. 7 among the branches).</summary>
+    public static float SnagFactor(float wood) => 1f + 6f * Math.Clamp(wood, 0f, 1f);
 
     /// <summary>How steep the bottom is (0 flat .. 1 a steep drop-off) from the depth's change per metre.</summary>
     public static float EdgeFrom(float depthChangePerMetre) => Math.Clamp(MathF.Abs(depthChangePerMetre) / 0.45f, 0f, 1f);

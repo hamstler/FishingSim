@@ -129,6 +129,7 @@ public partial class Main : Node3D
         AddChild(Rises);
         Rises.Risen += Rod.NoteRise;
         Rod.WeedBeds = Scenery.WeedBeds;
+        Rod.SunkenWood = Scenery.SunkenWood;
         AddChild(new Graphics.Gulls { Daylight = () => _world.Daylight });
 
         var sound = new Audio.SoundEngine();

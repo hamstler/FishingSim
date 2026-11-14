@@ -622,13 +622,17 @@ public partial class FishingRod : Node3D
     /// <summary>The map's water plant patches (set by Main from the scenery).</summary>
     public IReadOnlyList<WeedBed> WeedBeds { get; set; } = Array.Empty<WeedBed>();
 
-    /// <summary>Plant cover (0..1) and how steep the bottom is (0..1) at a point of the lake.</summary>
+    /// <summary>The map's sunken trees (set by Main from the scenery).</summary>
+    public IReadOnlyList<SunkenWood> SunkenWood { get; set; } = Array.Empty<SunkenWood>();
+
+    /// <summary>Cover (plants or sunken wood, 0..1) and how steep the bottom is (0..1) at a point of the lake.</summary>
     public (float Cover, float Edge) StructureAt(float x, float z)
     {
         const float d = 1.5f;
         float gx = (Lake.DepthAt(x + d, z) - Lake.DepthAt(x - d, z)) / (2f * d);
         float gz = (Lake.DepthAt(x, z + d) - Lake.DepthAt(x, z - d)) / (2f * d);
-        return (Structure.CoverAt(WeedBeds, x, z), Structure.EdgeFrom(MathF.Sqrt(gx * gx + gz * gz)));
+        float cover = MathF.Max(Structure.CoverAt(WeedBeds, x, z), Structure.WoodAt(SunkenWood, x, z));
+        return (cover, Structure.EdgeFrom(MathF.Sqrt(gx * gx + gz * gz)));
     }
 
     public BiteContext MakeBiteContext(float depth) => MakeBiteContext(depth, new Vector2(_bobber.GlobalPosition.X, _bobber.GlobalPosition.Z));
@@ -651,6 +655,9 @@ public partial class FishingRod : Node3D
 
     /// <summary>The hooked fish is in a weed bed: lift the rod (RMB) to drag it out before it tangles the line.</summary>
     public bool FishInWeeds => State == RodState.Fight && _weedTime > 0.2f;
+
+    /// <summary>The hooked fish is among sunken branches (worse than weed).</summary>
+    public bool FishInWood { get; private set; }
 
     /// <summary>The water's temperature now (degrees Celsius).</summary>
     public float WaterTemp => WaterTemperature.At(Lake.Location.WaterTemperature, World.Hour, World.Weather);
@@ -1554,12 +1561,18 @@ public partial class FishingRod : Node3D
 
         // Into the weeds: a fish in a bed tangles the line unless it is lifted out with the rod up.
         var fishAt = new Vector2(Origin().X + _fight.Position.X, Origin().Z + _fight.Position.Y);
-        bool inBed = Structure.CoverAt(WeedBeds, fishAt.X, fishAt.Y) >= 1f;
+        bool inWood = Structure.WoodAt(SunkenWood, fishAt.X, fishAt.Y) >= 1f;
+        bool inBed = inWood || Structure.CoverAt(WeedBeds, fishAt.X, fishAt.Y) >= 1f;
+        // Branches wrap the line faster than soft weed.
+        float tangle = inWood ? Structure.TangleSeconds * 0.6f : Structure.TangleSeconds;
         _weedTime = inBed && !Lifting ? _weedTime + dt : MathF.Max(0f, _weedTime - (Lifting ? 1.5f : 0.5f) * dt);
-        if (_weedTime > Structure.TangleSeconds && !DevUnbreakable)
+        FishInWood = inWood;
+        if (_weedTime > tangle && !DevUnbreakable)
         {
             _weedTime = 0f;
-            BreakLine("Ryba wpłynęła w zielsko i zaplątała żyłkę. Podnoś wędkę (PPM), gdy ryba idzie w rośliny!", TackleSlot.Hook);
+            BreakLine(inWood
+                ? "Ryba weszła w zatopione gałęzie i owinęła żyłkę. Nie daj jej dojść do zaczepów: podnoś wędkę (PPM)!"
+                : "Ryba wpłynęła w zielsko i zaplątała żyłkę. Podnoś wędkę (PPM), gdy ryba idzie w rośliny!", TackleSlot.Hook);
             return;
         }
 
@@ -1992,6 +2005,7 @@ public partial class FishingRod : Node3D
             float retrieve = Reeling ? _reelSpeed * (FastReel ? 0.6f : 0.3f) : 0f;
             // The slack left by the cast is taken up first; only then does the lure move.
             float pull = TakeUpSlack(retrieve * dt);
+            lure.SnagFactor = Structure.SnagFactor(Structure.WoodAt(SunkenWood, _rigPos.X, _rigPos.Z));
             lure.Step(dt, pull > 0f ? pull / dt : 0f, bottom, _rng);
             if (lure.Snagged)
             {

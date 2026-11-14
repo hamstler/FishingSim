@@ -327,6 +327,9 @@ public sealed class GameSuite : ITestSuite
         t.Check(main.Scenery.WeedBeds.Count > 5 && ReferenceEquals(rod.WeedBeds, main.Scenery.WeedBeds)
                 && main.Scenery.WeedBeds.Any(b => rod.StructureAt(b.X, b.Z).Cover == 1f),
             $"the lake's plant beds are known to the rod ({main.Scenery.WeedBeds.Count})");
+        t.Check(main.Scenery.SunkenWood.Count > 3 && ReferenceEquals(rod.SunkenWood, main.Scenery.SunkenWood)
+                && main.Scenery.SunkenWood.All(w => rod.Lake.DepthAt(w.X, w.Z) > 0.3f),
+            $"trees lie sunk off the wooded banks, in the water ({main.Scenery.SunkenWood.Count})");
 
         rod.World.Hour = 23f;
         rod._Process(0.016);

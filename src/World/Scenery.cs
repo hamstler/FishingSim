@@ -29,6 +29,9 @@ public partial class Scenery : Node3D
     /// <summary>The water plant patches (lilies and underwater weed) of this map: where cover-loving fish hold.</summary>
     public List<Core.Methods.WeedBed> WeedBeds { get; } = new();
 
+    /// <summary>Sunken trees off the wooded banks (ScatterSunkenWood; cleared on rebuild).</summary>
+    public List<Core.Methods.SunkenWood> SunkenWood { get; } = new();
+
     /// <summary>How many of each thing was placed on the current map (for tests and tuning).</summary>
     public Dictionary<string, int> Stats { get; } = new();
 
@@ -277,6 +280,7 @@ public partial class Scenery : Node3D
         Interactables.Clear();
         Markers.Clear();
         WeedBeds.Clear();
+        SunkenWood.Clear();
         Stats.Clear();
         _reserved.Clear();
         _props.Clear();
@@ -294,6 +298,7 @@ public partial class Scenery : Node3D
         ScatterReeds(loc, rng);
         ScatterShoreline(loc, rng);
         ScatterWaterPlants(loc, rng);
+        ScatterSunkenWood(loc, rng);
         ScatterRocks(loc, rng);
         ApplyFoliageRange();
     }
@@ -796,6 +801,7 @@ public partial class Scenery : Node3D
     };
 
     private readonly List<(float X, float Z, string Kind)> _treeSpots = new();
+    private readonly List<(float X, float Z)> _allTrees = new();
 
     private void ScatterTrees(LocationData loc, RandomNumberGenerator rng)
     {
@@ -805,6 +811,7 @@ public partial class Scenery : Node3D
         var crowns = kinds.ToDictionary(k => k, _ => new List<Transform3D>());
         var crownColors = kinds.ToDictionary(k => k, _ => new List<Color>());
         _treeSpots.Clear();
+        _allTrees.Clear();
 
         void Plant(string kind, float x, float z, float h, float s, float yaw, float tint, bool understorey)
         {
@@ -817,6 +824,7 @@ public partial class Scenery : Node3D
             crownColors[kind].Add(Tint(CrownColor(kind), tint));
             if (understorey)
                 _treeSpots.Add((x, z, kind));
+            _allTrees.Add((x, z));
             Count("tree_" + kind);
         }
 
@@ -1240,6 +1248,66 @@ public partial class Scenery : Node3D
     }
 
     // ------------------------------------------------------------------ on the water: lilies and pondweed
+    /// <summary>
+    /// Trees fallen from the wooded banks into the water: from tree spots near the shore, a few metres out into water
+    /// 0.6-3 m deep, at least 12 m apart and away from the pier. A grey, weathered branch or two pokes out of the water
+    /// over each, so the angler can see where the snags are.
+    /// </summary>
+    private void ScatterSunkenWood(LocationData loc, RandomNumberGenerator rng)
+    {
+        var stems = new List<Transform3D>();
+        var colors = new List<Color>();
+        var shores = Shores(loc);
+        for (int tries = 0; SunkenWood.Count < 16 && tries < 4000; tries++)
+        {
+            var shore = shores.Count == 1 || rng.Randf() < 0.45f ? shores[0] : shores[rng.RandiRange(1, shores.Count - 1)];
+            float angle = rng.Randf() * Mathf.Tau;
+            float shrink = shore.Island ? rng.RandfRange(1.05f, 1.5f) : rng.RandfRange(0.8f, 0.97f);
+            float cx = shore.X + shore.Rx * shrink * MathF.Cos(angle);
+            float cz = shore.Z + shore.Rz * shrink * MathF.Sin(angle);
+            float depth = _lake.DepthAt(loc, cx, cz);
+            if (depth < 0.6f || depth > 3f || NearPier(cx, cz))
+                continue;
+            bool crowded = false;
+            foreach (var w in SunkenWood)
+                if ((w.X - cx) * (w.X - cx) + (w.Z - cz) * (w.Z - cz) < 196f)
+                    crowded = true;
+            if (crowded)
+                continue;
+            // Mostly where trees stand on the bank nearby; now and then a drifted trunk elsewhere.
+            float nearest = float.MaxValue;
+            foreach (var (tx, tz) in _allTrees)
+                nearest = MathF.Min(nearest, (tx - cx) * (tx - cx) + (tz - cz) * (tz - cz));
+            if (nearest > 30f * 30f && rng.Randf() > 0.15f)
+                continue;
+            SunkenWood.Add(new Core.Methods.SunkenWood(cx, cz, rng.RandfRange(1.5f, 2.8f)));
+            // Grey, weathered branches sticking out of the water at a slant.
+            int branches = rng.RandiRange(1, 3);
+            for (int b = 0; b < branches; b++)
+            {
+                float lean = rng.RandfRange(0.35f, 0.9f);
+                float yaw = rng.Randf() * Mathf.Tau;
+                float len = (depth + rng.RandfRange(0.6f, 1.6f)) / MathF.Cos(lean);
+                var basis = (new Basis(Vector3.Up, yaw) * new Basis(Vector3.Right, lean)).Scaled(new Vector3(1f, len, 1f));
+                var foot = new Vector3(cx + rng.RandfRange(-1f, 1f), -depth, cz + rng.RandfRange(-1f, 1f));
+                stems.Add(new Transform3D(basis, foot + basis.Y * 0.5f));
+                float g = rng.RandfRange(0.32f, 0.46f);
+                var colour = new Color(g, g * 0.93f, g * 0.84f);
+                colors.Add(colour);
+                // A side twig forking off high up.
+                float twig = len * rng.RandfRange(0.3f, 0.45f);
+                var tb = (new Basis(Vector3.Up, yaw + rng.RandfRange(-1.2f, 1.2f)) * new Basis(Vector3.Right, lean + rng.RandfRange(0.5f, 0.9f)))
+                    .Scaled(new Vector3(0.55f, twig, 0.55f));
+                var fork = foot + basis.Y * rng.RandfRange(0.65f, 0.85f);
+                stems.Add(new Transform3D(tb, fork + tb.Y * 0.5f));
+                colors.Add(colour);
+            }
+        }
+        if (stems.Count > 0)
+            AddMultiMesh(new CylinderMesh { TopRadius = 0.03f, BottomRadius = 0.11f, Height = 1f, RadialSegments = 7, Rings = 1 },
+                stems, colors);
+    }
+
     private void ScatterWaterPlants(LocationData loc, RandomNumberGenerator rng)
     {
         var pads = new List<Transform3D>(); var padColors = new List<Color>();

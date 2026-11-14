@@ -309,6 +309,7 @@ public sealed class CoreSuite : ITestSuite
         Rising(t);
         Migration(t);
         Swallowed(t);
+        Wood(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -1004,6 +1005,28 @@ public sealed class CoreSuite : ITestSuite
         t.Check(Unhooking.Seconds(true, false) > Handling.AirGrace && Unhooking.Seconds(true, true) < Handling.AirGrace,
             "a deep hook keeps the fish out of the water too long without a disgorger");
         t.Check(Unhooking.Harm(true, false) > 5f * Unhooking.Harm(true, true) && Unhooking.Harm(false, false) == 0f, "and tearing it out hurts");
+    }
+
+    /// <summary>Sunken wood (Core/Methods/Structure).</summary>
+    private static void Wood(TestContext t)
+    {
+        t.Section("sunken wood");
+        var wood = new List<SunkenWood> { new(10f, 10f, 2f) };
+        t.Check(Structure.WoodAt(wood, 11f, 10f) == 1f && Structure.WoodAt(wood, 13.5f, 10f) > 0f && Structure.WoodAt(wood, 20f, 10f) == 0f,
+            "the branches are felt among them and a little beyond");
+        t.Check(Structure.SnagFactor(1f) > 5f && Structure.SnagFactor(0f) == 1f, "lures snag far more among sunken wood");
+        var lure = new LureMotion(LureFamily.Wobbler) { SnagFactor = Structure.SnagFactor(1f) };
+        var open = new LureMotion(LureFamily.Wobbler);
+        var rng = new FixedRng(0.01f);
+        int snagWood = 0, snagOpen = 0;
+        for (int i = 0; i < 400; i++)
+        {
+            lure.Step(0.05f, 0.6f, 0.3f, rng);
+            open.Step(0.05f, 0.6f, 0.3f, rng);
+            if (lure.Snagged) snagWood++;
+            if (open.Snagged) snagOpen++;
+        }
+        t.Check(snagWood >= snagOpen, $"the lure's snag rate follows the bottom ({snagWood} vs {snagOpen} steps snagged)");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

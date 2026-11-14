@@ -397,6 +397,31 @@ public partial class ScreenshotTool : Node
             for (int i = 0; i < 20; i++)
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         }
+        // FISHSIM_LOOK_WOOD=1: stand on the bank nearest the closest sunken tree and look at it.
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_LOOK_WOOD") == "1" && main.Scenery.SunkenWood.Count > 0)
+        {
+            var bed = main.GetChildren().OfType<LakeBed>().First();
+            var w = main.Scenery.SunkenWood.OrderBy(v => v.X * v.X + v.Z * v.Z).First();
+            Vector3 stand = new(w.X, 0f, w.Z);
+            for (int k = 0; k < 16; k++)
+            {
+                float ang = k * Mathf.Tau / 16f;
+                for (float d = 6f; d < 30f; d += 1f)
+                {
+                    float sx = w.X + MathF.Cos(ang) * d, sz = w.Z + MathF.Sin(ang) * d;
+                    if (bed.DepthAt(sx, sz) <= 0f)
+                    {
+                        if (d < new Vector2(stand.X - w.X, stand.Z - w.Z).Length() || stand.X == w.X)
+                            stand = new Vector3(sx, 0f, sz);
+                        break;
+                    }
+                }
+            }
+            main.Player.GlobalPosition = new Vector3(stand.X, bed.HeightAt(stand.X, stand.Z) + 0.3f, stand.Z);
+            for (int i = 0; i < 20; i++)
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            yaw = Mathf.RadToDeg(MathF.Atan2(-(w.X - stand.X), -(w.Z - stand.Z)));
+        }
         main.Player.RotationDegrees = new Vector3(0, yaw, 0);
         main.Player.Camera.RotationDegrees = new Vector3(pitch, 0, 0);
         var rod = main.Rod;
