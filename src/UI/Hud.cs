@@ -217,6 +217,7 @@ public partial class Hud : CanvasLayer
             + "Spacja - kasarek (trzeba go kupić), kółko - hamulec\n"
             + "Spinning (przynęta sztuczna): LPM prowadzi (Shift szybciej), puszczona opada, PPM podszarpnięcie / zaczep\n"
             + "Spławik: [ i ] (lub Ctrl + kółko) ustawiają grunt, czyli głębokość przynęty pod spławikiem; G - garść zanęty z ręki\n"
+            + "K - naostrz haczyk osełką (gdy zestaw jest wyjęty z wody)\n"
             + "Grunt (wędka gruntowa): koszyczek nęci miejsce, brania na szczytówce; Z - wędka na podpórkę / podnieś\n"
             + "1-5 - zmiana sprzętu (Shift = wstecz), Tab - stan\n"
             + "E - wejście | I ekwipunek | M mapa | J dziennik | T turnieje\n"
@@ -318,7 +319,7 @@ public partial class Hud : CanvasLayer
         string twist = Core.Methods.LineTwist.Word(rod.LineTwistNow);
         if (twist.Length > 0)
             fray = fray.Length > 0 ? fray + ", " + twist : twist;
-        string tackle = $"{lo.Rod.DisplayName}, {lo.Reel.DisplayName}\n{lo.Line.DisplayName}{(fray.Length > 0 ? $" ({fray})" : "")}{leader}, {lo.Hook.DisplayName}\n{lo.Bait.DisplayName} ×{lo.BaitCount}";
+        string tackle = $"{lo.Rod.DisplayName}, {lo.Reel.DisplayName}\n{lo.Line.DisplayName}{(fray.Length > 0 ? $" ({fray})" : "")}{leader}, {lo.Hook.DisplayName}{(HookWear.Word(rod.HookDullNow) is { Length: > 0 } dull ? $" ({dull}, K - osełka)" : "")}\n{lo.Bait.DisplayName} ×{lo.BaitCount}";
         if (tackle != _lastTackle)
         {
             if (_lastTackle != "")

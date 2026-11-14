@@ -304,6 +304,7 @@ public sealed class CoreSuite : ITestSuite
         LineSight(t);
         Handled(t);
         Leaps(t);
+        Points(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -927,6 +928,25 @@ public sealed class CoreSuite : ITestSuite
         t.Check(Jumps.ThrowChance(true, 0.6f, 1f) > 4f * Jumps.ThrowChance(false, 0.6f, 1f), "a rod held high lets a leaping fish throw the hook; bowing to it saves most");
         t.Check(Jumps.ThrowChance(true, 1f, 1f) < Jumps.ThrowChance(true, 0.3f, 1f) && Jumps.ThrowChance(true, 0.6f, 0.2f) < Jumps.ThrowChance(true, 0.6f, 1f),
             "a deeply set hook and a softer line hold better");
+    }
+
+    /// <summary>Hook points (Core/Methods/HookWear) and new hooks (Profile).</summary>
+    private static void Points(TestContext t)
+    {
+        t.Section("hook wear");
+        t.Check(HookWear.PerFish(4f) > HookWear.PerFish(0.2f) && HookWear.PerSnag > HookWear.PerFish(1f), "big fish and snags blunt the point most");
+        t.Check(HookWear.SetFactor(0f) == 1f && HookWear.SetFactor(HookWear.Max) < 0.7f, "a blunt hook sets far worse");
+        var p = new Profile { Money = 100 };
+        p.Owned["hook"].Add("hak6");
+        for (int i = 0; i < 3; i++)
+            p.AddHookDull("hak6", HookWear.PerSnag);
+        var saved = ProfileSerializer.FromJson(ProfileSerializer.ToJson(p).ToJsonString());
+        t.Check(MathF.Abs(saved.HookDull.GetValueOrDefault("hak6") - 0.3f) < 1e-4f && HookWear.Word(0.3f) == "stępiony", "the dulling survives a save and the HUD names it");
+        t.Check(p.Buy(TackleSlot.Hook, "hak6", 5, 1) == null && !p.HookDull.ContainsKey("hak6") && p.Money == 95, "a new hook replaces a blunt one");
+        t.Check(p.Buy(TackleSlot.Hook, "hak6", 5, 1) == "Już to masz", "a sharp hook is not bought twice");
+        p.AddHookDull("hak6", 0.5f);
+        p.Sharpen("hak6");
+        t.Check(!p.HookDull.ContainsKey("hak6"), "a hone puts the point back");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

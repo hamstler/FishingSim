@@ -536,6 +536,32 @@ public partial class FishingRod : Node3D
     /// <summary>How worn the line on the spool is (0 new .. 0.6).</summary>
     public float LineWearNow => Profile?.LineWear.GetValueOrDefault(Loadout.Line.ItemId) ?? 0f;
 
+    /// <summary>How blunt the hook in use is (Core/Methods/HookWear).</summary>
+    public float HookDullNow => Profile?.HookDull.GetValueOrDefault(Loadout.Hook.ItemId) ?? 0f;
+
+    /// <summary>K with the hone owned and the line out of the water: puts the point back on the hook.</summary>
+    public bool SharpenHook()
+    {
+        if (Gear?.Has(AccessoryKind.HookHone) != true)
+        {
+            ShowBanner("Do ostrzenia haczyka potrzebna jest osełka (kram wędkarski)", 2.5f);
+            return false;
+        }
+        if (State != RodState.Idle)
+        {
+            ShowBanner("Haczyk ostrzy się po wyjęciu zestawu z wody", 2f);
+            return false;
+        }
+        if (HookDullNow <= 0.001f)
+        {
+            ShowBanner("Haczyk jest ostry", 1.5f);
+            return false;
+        }
+        Profile.Sharpen(Loadout.Hook.ItemId);
+        ShowBanner("Haczyk naostrzony", 1.5f);
+        return true;
+    }
+
     /// <summary>The line in use's twist in turns (Core/Methods/LineTwist).</summary>
     public float LineTwistNow => Profile?.LineTwist.GetValueOrDefault(Loadout.Line.ItemId) ?? 0f;
 
@@ -719,6 +745,9 @@ public partial class FishingRod : Node3D
             case Key.F10:
                 Profile.Money += 1000;
                 Profile.NotifyChanged();
+                break;
+            case Key.K:
+                SharpenHook();
                 break;
             case Key.L when State == RodState.Idle:
                 if (Lake.CycleLocation(Profile.Level))
@@ -1373,7 +1402,8 @@ public partial class FishingRod : Node3D
                 // A badly sized hook loses fish; a sharpened hook and a braid that does not stretch set it better.
                 float chance = (0.5f + 0.5f * BiteModel.HookFit(CurrentSpecies!, Loadout.Hook.Size))
                     * (1f + (Loadout.Line.Kind == LineKind.Braid ? 0.1f : 0f) + (Gear?.Accessory(AccessoryKind.HookHone)?.Power ?? 0f))
-                    * (OverDepth ? FeedingHabits.OverDepthHookFactor : 1f);   // a float set too deep: slack between it and the hook
+                    * (OverDepth ? FeedingHabits.OverDepthHookFactor : 1f)    // a float set too deep: slack between it and the hook
+                    * HookWear.SetFactor(HookDullNow);                         // a blunt point slides over the lip
                 if (DevInstantBite || _rng.NextFloat() <= chance)
                 {
                     // How well it is set: the fit of the hook, the tackle, and a strike at once rather than late.
@@ -1667,6 +1697,7 @@ public partial class FishingRod : Node3D
         // Counts, journal, records and XP now; the keepnet only when the angler chooses (catch panel: E / R).
         var result = Profile.AddCatch(species, CurrentWeight, context, toKeepnet: false);
         Profile.AddLineWear(Loadout.Line.ItemId, Core.Methods.LineWear.PerFish);
+        Profile.AddHookDull(Loadout.Hook.ItemId, HookWear.PerFish(CurrentWeight));
         // One fish fewer (or one more wary) at the spot where it bit.
         Swim.Add(_hookedAt.X, _hookedAt.Z, Profile.Clock);
         _lastFightSeconds = _fight?.Elapsed ?? 0f;
@@ -1894,6 +1925,7 @@ public partial class FishingRod : Node3D
             lure.Step(dt, pull > 0f ? pull / dt : 0f, bottom, _rng);
             if (lure.Snagged)
             {
+                Profile.AddHookDull(Loadout.Hook.ItemId, HookWear.PerSnag);   // the point grates on stone and wood
                 ShowBanner("Zaczep! PPM - szarpnij wędką, LPM - ciągnij (linka może pęknąć)", 3.5f);
                 Twitch(1.6f);
             }

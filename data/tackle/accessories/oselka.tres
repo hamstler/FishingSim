@@ -7,6 +7,6 @@ script = ExtResource("1")
 DisplayName = "Osełka do haczyków"
 Kind = 6
 Power = 0.15
-Description = "Ostry haczyk lepiej zacina: więcej brań kończy się holem."
+Description = "Ostry haczyk lepiej zacina: więcej brań kończy się holem. K - naostrz haczyk stępiony przez ryby i zaczepy."
 Price = 25
 RequiredLevel = 1

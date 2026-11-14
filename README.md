@@ -405,6 +405,7 @@ Przy dodawaniu: nowa ryba = plik w `data/fish/`, wpis w `SpeciesCatalog.Paths` i
 - **Deszcz i fale tłumią hałas**: bębnienie deszczu i fale od wiatru zagłuszają kroki wędkarza i plusk zestawu. W deszczu przy silnym wietrze ryby płoszą się o ponad połowę słabiej niż w ciszy.
 - **Nęcenie z ręki** (G): przy spławiku można wrzucać garści drobnej przynęty (białe robaki, kukurydza, kasza, konopie, groch, chleb, ochotka), po 3 sztuki na garść. Garść ląduje w pobliżu spławika, im dalej, tym większy rozrzut. Ryby schodzą się na nęcone miejsce jak przy koszyczku, a HUD pokazuje jego siłę kropkami.
 - **Skoki ryby**: szczupak, boleń, pstrąg i łosoś wyskakują w holu i w powietrzu potrząsają łbem. Jeśli w tym momencie trzymasz wędkę w górze (PPM) na napiętej żyłce, często wyrywają haczyk. Gdy HUD pokazuje „SKOK! opuść wędkę”, puść PPM. Dobrze wbity haczyk trzyma lepiej.
+- **Tępienie haczyka**: każda wyholowana ryba (większa bardziej) i każdy zaczep tępią grot, a tępy haczyk gorzej zacina, nawet o jedną trzecią. HUD dopisuje przy haczyku „stępiony” albo „tępy”. Z osełką klawisz K ostrzy haczyk, gdy zestaw jest wyjęty z wody. W kramie można też kupić nowy haczyk tego samego rodzaju.
 - **Turnieje** (T): wpisowe, dojazd na łowisko, wynik to suma N najcięższych ryb, rywale to boty o różnych umiejętnościach. Nagrody (pieniądze i XP) według miejsca, historia w zapisie.
 
 ## Zapis gry

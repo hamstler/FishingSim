@@ -357,6 +357,18 @@ public sealed class GameSuite : ITestSuite
         t.Check(!rod.LastCastTangled, "an untwisted line casts cleanly");
         rod.ResetToIdle();
 
+        t.Section("hook point");
+        string hookId = rod.Loadout.Hook.ItemId;
+        profile.AddHookDull(hookId, 0.4f);
+        rod.ResetToIdle();
+        bool hadHone = rod.Gear!.Has(AccessoryKind.HookHone);
+        t.Check(hadHone || !rod.SharpenHook(), "no sharpening without a hone");
+        var hone = rod.Gear.Items(GearSlot.Accessory).First(i => i.ItemId == "oselka");
+        profile.Money += 100;
+        if (!hadHone)
+            rod.Gear.Buy(GearSlot.Accessory, hone);
+        t.Check(rod.HookDullNow > 0.3f && rod.SharpenHook() && rod.HookDullNow == 0f, "K with a hone sharpens a blunt hook");
+
         t.Section("pause menu");
         pause.Open();
         t.Check(t.Host.GetTree().Paused && rod.InputBlocked && pause.Visible, "Esc menu pauses the game and blocks fishing");

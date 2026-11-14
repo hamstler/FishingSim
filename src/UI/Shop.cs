@@ -1018,6 +1018,21 @@ public partial class Shop : CanvasLayer
                 }
             };
         }
+        else if (slot == TackleSlot.Hook && _profile.Owns(slot, item.ItemId)
+                 && Core.Methods.HookWear.Blunt(_profile.HookDull.GetValueOrDefault(item.ItemId)))
+        {
+            // A blunt hook: a new one of the same kind (or sharpen it with a hone, K).
+            state = $"Masz go. Haczyk {Core.Methods.HookWear.Word(_profile.HookDull.GetValueOrDefault(item.ItemId))}: gorzej zacina (osełka: K).";
+            button = $"Nowy haczyk za {Lore.Money(item.Price)}";
+            enabled = _profile.Money >= item.Price;
+            action = () =>
+            {
+                string? error = _profile.Buy(slot, item.ItemId, item.Price, item.RequiredLevel);
+                _message.Text = error ?? $"Nowy haczyk: {item.DisplayName}";
+                if (error == null)
+                    PurchaseEffect();
+            };
+        }
         else if (_profile.Owns(slot, item.ItemId))
         {
             bool worn = _loadout.Index[(int)slot] == index;

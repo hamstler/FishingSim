@@ -100,6 +100,20 @@ public sealed class Profile
             LineTwist[lineId] = t;
     }
 
+    /// <summary>Hook id -> how blunt its point is (0 sharp .. 0.6; Core/Methods/HookWear).</summary>
+    public Dictionary<string, float> HookDull { get; set; } = new();
+
+    /// <summary>Blunts a hook a little more.</summary>
+    public void AddHookDull(string hookId, float amount)
+    {
+        if (amount <= 0f)
+            return;
+        HookDull[hookId] = MathF.Min(HookDull.GetValueOrDefault(hookId) + amount, Core.Methods.HookWear.Max);
+    }
+
+    /// <summary>The hone puts the point back on a hook.</summary>
+    public void Sharpen(string hookId) => HookDull.Remove(hookId);
+
     /// <summary>The line on the spool is worn or twisted enough to be worth respooling.</summary>
     public bool NeedsRespool(string lineId) => Core.Methods.LineWear.Worn(LineWear.GetValueOrDefault(lineId))
         || LineTwist.GetValueOrDefault(lineId) >= Core.Methods.LineTwist.Loops;
@@ -143,6 +157,7 @@ public sealed class Profile
         Pantry = new();
         LineWear = new();
         LineTwist = new();
+        HookDull = new();
         Smokery = new();
         Smoked = new();
         Notices = new();
@@ -343,6 +358,16 @@ public sealed class Profile
             Changed?.Invoke();
             return null;
         }
+        // A new hook for a blunt one of the same kind.
+        if (slot == TackleSlot.Hook && Owns(slot, id) && Core.Methods.HookWear.Blunt(HookDull.GetValueOrDefault(id)))
+        {
+            if (Money < price)
+                return "Za mało pieniędzy";
+            Money -= price;
+            HookDull.Remove(id);
+            Changed?.Invoke();
+            return null;
+        }
         if (slot != TackleSlot.Bait && Owns(slot, id))
             return "Już to masz";
         if (slot != TackleSlot.Bait && !Owned.ContainsKey(slot.Key()))
@@ -384,6 +409,8 @@ public sealed class Profile
             LineWear.Remove(id);
             LineTwist.Remove(id);
         }
+        if (slot == TackleSlot.Hook)
+            HookDull.Remove(id);
         if (Equipped.GetValueOrDefault(slot.Key()) == id)
             Equipped[slot.Key()] = slot == TackleSlot.Leader ? TackleSlotExtensions.NoLeader : ids.Count > 0 ? ids[0] : "";
         Changed?.Invoke();
