@@ -276,7 +276,7 @@ public partial class Hud : CanvasLayer
         if (rod.State == RodState.Waiting && rod.World.TimeScale > 1f)
             state += "  ·  odpoczynek na zydlu";
         if (rod.State == RodState.Fight)
-            state += $"  ·  {rod.LineOut:0} m{(rod.Lifting ? "  ·  pompowanie" : "")}{(rod.FightSlack ? "  ·  LUZ! zwijaj" : "")}{(rod.FishInWeeds ? "  ·  W ZIELSKU! podnieś wędkę (PPM)" : "")}";
+            state += $"  ·  {rod.LineOut:0} m{(rod.Lifting ? "  ·  pompowanie" : "")}{(rod.FightSlack ? "  ·  LUZ! zwijaj" : "")}{(rod.FishInWeeds ? "  ·  W ZIELSKU! podnieś wędkę (PPM)" : "")}{(rod.FishJumping ? "  ·  SKOK! opuść wędkę" : "")}";
         if (rod.State == RodState.Close && rod.HasNet)
             state += ", Spacja - kasarek";
         SetText(_status, state);

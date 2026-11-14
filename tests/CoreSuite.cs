@@ -303,6 +303,7 @@ public sealed class CoreSuite : ITestSuite
         Pressure(t);
         LineSight(t);
         Handled(t);
+        Leaps(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -917,6 +918,15 @@ public sealed class CoreSuite : ITestSuite
         var roach = GD.Load<FishSpecies>(SpeciesCatalog.Paths[0]);
         p.Keep(roach, roach.LegalWeight + 0.1f, 0.7f);
         t.Check(MathF.Abs(p.Keepnet[^1].Condition - 0.7f) < 1e-5f, "the keepnet takes the fish in the condition it was handled to");
+    }
+
+    /// <summary>Jumping fish (Core/Methods/Jumps).</summary>
+    private static void Leaps(TestContext t)
+    {
+        t.Section("jumping fish");
+        t.Check(Jumps.ThrowChance(true, 0.6f, 1f) > 4f * Jumps.ThrowChance(false, 0.6f, 1f), "a rod held high lets a leaping fish throw the hook; bowing to it saves most");
+        t.Check(Jumps.ThrowChance(true, 1f, 1f) < Jumps.ThrowChance(true, 0.3f, 1f) && Jumps.ThrowChance(true, 0.6f, 0.2f) < Jumps.ThrowChance(true, 0.6f, 1f),
+            "a deeply set hook and a softer line hold better");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

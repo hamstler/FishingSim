@@ -1425,6 +1425,7 @@ public partial class FishingRod : Node3D
         _fishNode.Visible = true;
         _fishDepth = 0.3f;
         _jump = 0f;
+        _jumpThrew = false;
         _weedTime = 0f;
         _fishYaw = _fight.Heading;
         SetState(RodState.Fight);
@@ -1434,6 +1435,14 @@ public partial class FishingRod : Node3D
     {
         if (_fight == null)
             return;
+        if (_jumpThrew)
+        {
+            _jumpThrew = false;
+            LoseFish(Lifting
+                ? "Ryba wyskoczyła i wypluła haczyk. Gdy ryba skacze, opuść wędkę (puść PPM)!"
+                : "Ryba wyskoczyła i wypluła haczyk.");
+            return;
+        }
         var outcome = _fight.Step(dt, DragSetting, Reeling, Lifting);
         Profile.AddLineWear(Loadout.Line.ItemId, Core.Methods.LineWear.FromLoad(_fight.Tension, Loadout.Line.Strength, dt));
         switch (outcome)
@@ -1496,7 +1505,12 @@ public partial class FishingRod : Node3D
         float pitch = 0f;
         if (_jump > 0f)
         {
+            float before = _jump;
             _jump += dt / 0.9f;
+            // At the top of the leap it shakes its head: a rod held high on a tight line lets it tear the hook out.
+            if (before < 0.5f && _jump >= 0.5f && !DevUnbreakable
+                && _rng.NextFloat() < Jumps.ThrowChance(Lifting, _fight.HookHold, _fight.Tension / MathF.Max(_fight.PeakPull, 0.01f)))
+                _jumpThrew = true;
             float leap = MathF.Sin(MathF.Min(_jump, 1f) * MathF.PI);
             fishY = Mathf.Lerp(fishY, _waterY + 0.5f + 0.5f * Math.Clamp(CurrentWeight / 6f, 0f, 1f), leap);
             pitch = Mathf.Lerp(-0.9f, 0.9f, MathF.Min(_jump, 1f));
@@ -1523,6 +1537,10 @@ public partial class FishingRod : Node3D
     private float _fishDepth = 0.3f;
     private float _fishYaw;
     private float _jump;
+    private bool _jumpThrew;
+
+    /// <summary>The hooked fish is in the air: drop the rod (let go of RMB) so it cannot tear the hook out.</summary>
+    public bool FishJumping => State == RodState.Fight && _jump > 0f;
 
     // ------------------------------------------------------------------ fish at the surface: lift or net
     private void EnterClose()

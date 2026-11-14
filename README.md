@@ -404,6 +404,7 @@ Przy dodawaniu: nowa ryba = plik w `data/fish/`, wpis w `SpeciesCatalog.Paths` i
 - **Zmęczenie ryby**: długi hol (ponad 20 s) i trzymanie ryby na powietrzu ponad 20 s obniżają jej kondycję. Taka ryba trafia do siatki słabsza i jest tańsza na targu. Panel połowu ostrzega, gdy ryba jest za długo bez wody.
 - **Deszcz i fale tłumią hałas**: bębnienie deszczu i fale od wiatru zagłuszają kroki wędkarza i plusk zestawu. W deszczu przy silnym wietrze ryby płoszą się o ponad połowę słabiej niż w ciszy.
 - **Nęcenie z ręki** (G): przy spławiku można wrzucać garści drobnej przynęty (białe robaki, kukurydza, kasza, konopie, groch, chleb, ochotka), po 3 sztuki na garść. Garść ląduje w pobliżu spławika, im dalej, tym większy rozrzut. Ryby schodzą się na nęcone miejsce jak przy koszyczku, a HUD pokazuje jego siłę kropkami.
+- **Skoki ryby**: szczupak, boleń, pstrąg i łosoś wyskakują w holu i w powietrzu potrząsają łbem. Jeśli w tym momencie trzymasz wędkę w górze (PPM) na napiętej żyłce, często wyrywają haczyk. Gdy HUD pokazuje „SKOK! opuść wędkę”, puść PPM. Dobrze wbity haczyk trzyma lepiej.
 - **Turnieje** (T): wpisowe, dojazd na łowisko, wynik to suma N najcięższych ryb, rywale to boty o różnych umiejętnościach. Nagrody (pieniądze i XP) według miejsca, historia w zapisie.
 
 ## Zapis gry
