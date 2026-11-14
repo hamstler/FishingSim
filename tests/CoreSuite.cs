@@ -314,6 +314,7 @@ public sealed class CoreSuite : ITestSuite
         BaitSizes(t);
         Murk(t);
         Bag(t);
+        Strikes(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -1098,6 +1099,16 @@ public sealed class CoreSuite : ITestSuite
         t.Check(saved.OverBagLimit("Szczupak"), "the day's count survives a save");
         p.PassTime(24f);
         t.Check(p.Keep(pike, w) == null, "the next day the limit starts over");
+    }
+
+    /// <summary>Strike efficiency (Core/Methods/Strike).</summary>
+    private static void Strikes(TestContext t)
+    {
+        t.Section("strike over distance");
+        t.Check(Strike.Efficiency(10f, 0.55f, 0f) == 1f, "a short line sets the hook fully");
+        float mono = Strike.Efficiency(60f, 0.55f, 0f), braid = Strike.Efficiency(60f, 0.05f, 0f);
+        t.Check(mono < 0.8f && braid > 0.95f, $"at 60 m a stretchy mono loses the strike ({mono:0.00}), a braid hardly ({braid:0.00})");
+        t.Check(Strike.Efficiency(10f, 0.05f, 2f) < 0.7f, "slack on the water eats the strike");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

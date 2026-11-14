@@ -654,6 +654,9 @@ public partial class FishingRod : Node3D
     /// <summary>How far one sees into the water now (m): the lake's own clarity, less after rain stirred up the silt.</summary>
     public float ClarityNow => Lake.Location.WaterClarity * Turbidity.ClarityFactor(World.Murk);
 
+    /// <summary>How much of a strike now would reach the hook (Core/Methods/Strike): line out, its stretch, the slack.</summary>
+    public float StrikeEfficiency => Strike.Efficiency(TipDistance(), Loadout.Line.Stretch, Slack);
+
     /// <summary>The map's sunken trees (set by Main from the scenery).</summary>
     public IReadOnlyList<SunkenWood> SunkenWood { get; set; } = Array.Empty<SunkenWood>();
 
@@ -1504,7 +1507,8 @@ public partial class FishingRod : Node3D
                 float chance = (0.5f + 0.5f * BiteModel.HookFit(CurrentSpecies!, Loadout.Hook.Size))
                     * (1f + (Loadout.Line.Kind == LineKind.Braid ? 0.1f : 0f) + (Gear?.Accessory(AccessoryKind.HookHone)?.Power ?? 0f))
                     * (OverDepth ? FeedingHabits.OverDepthHookFactor : 1f)    // a float set too deep: slack between it and the hook
-                    * HookWear.SetFactor(HookDullNow);                         // a blunt point slides over the lip
+                    * HookWear.SetFactor(HookDullNow)                          // a blunt point slides over the lip
+                    * StrikeEfficiency;                                        // stretch over distance and slack eat the strike
                 if (DevInstantBite || _rng.NextFloat() <= chance)
                 {
                     // How well it is set: the fit of the hook, the tackle, and a strike at once rather than late.
