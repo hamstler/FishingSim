@@ -669,7 +669,8 @@ public partial class FishingRod : Node3D
     public float ClarityNow => Lake.Location.WaterClarity * Turbidity.ClarityFactor(World.Murk);
 
     /// <summary>How much of a strike now would reach the hook (Core/Methods/Strike): line out, its stretch, the slack.</summary>
-    public float StrikeEfficiency => Strike.Efficiency(TipDistance(), Loadout.Line.Stretch, Slack);
+    public float StrikeEfficiency => Strike.Efficiency(TipDistance(), Loadout.Line.Stretch, Slack)
+        * Strike.DragFactor(DragSetting * DragMax);
 
     /// <summary>The map's sunken trees (set by Main from the scenery).</summary>
     public IReadOnlyList<SunkenWood> SunkenWood { get; set; } = Array.Empty<SunkenWood>();

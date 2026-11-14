@@ -9,6 +9,10 @@ namespace FishingSim.Core.Methods;
 /// </summary>
 public static class Strike
 {
+    /// <summary>The share of the strike left when the drag is set this loose (kg): under about a kilogram the spool
+    /// gives line on the sweep and the hook barely moves (0.55 at no drag, 1 from 0.9 kg).</summary>
+    public static float DragFactor(float dragKg) => Math.Clamp(0.55f + 0.5f * dragKg, 0.55f, 1f);
+
     /// <summary>The share of the strike that sets the hook (0.45 .. 1).</summary>
     /// <param name="distance">Line out to the end tackle (m).</param>
     /// <param name="stretch">The line's stretch (LineData.Stretch: braid ~0.05, mono ~0.55).</param>

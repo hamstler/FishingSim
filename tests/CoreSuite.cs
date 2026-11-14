@@ -1111,6 +1111,7 @@ public sealed class CoreSuite : ITestSuite
         float mono = Strike.Efficiency(60f, 0.55f, 0f), braid = Strike.Efficiency(60f, 0.05f, 0f);
         t.Check(mono < 0.8f && braid > 0.95f, $"at 60 m a stretchy mono loses the strike ({mono:0.00}), a braid hardly ({braid:0.00})");
         t.Check(Strike.Efficiency(10f, 0.05f, 2f) < 0.7f, "slack on the water eats the strike");
+        t.Check(Strike.DragFactor(0.2f) < 0.7f && Strike.DragFactor(1.5f) == 1f, "a drag set too loose slips on the strike");
     }
 
     /// <summary>Bait kinds and water temperature (Core/Methods/BaitSeason).</summary>
