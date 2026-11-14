@@ -36,6 +36,9 @@ public partial class Main : Node3D
     public Scenery Scenery { get; private set; } = null!;
     public InteractionManager Interactions { get; private set; } = null!;
     public FishPopulation Fish { get; private set; } = null!;
+
+    /// <summary>Rings of fish rising to the surface.</summary>
+    public RiseRings Rises { get; private set; } = null!;
     public GearCatalog Gear => _gear;
     public HandTools Tools { get; private set; } = null!;
     public CookingPanel Cooking { get; private set; } = null!;
@@ -121,6 +124,9 @@ public partial class Main : Node3D
         Fish.Setup(_lake, Player, species, WaterY);
         AddChild(Fish);
         Rod.Population = Fish;
+        Rises = new RiseRings();
+        Rises.Setup(Fish, _world, Player, WaterY);
+        AddChild(Rises);
         Rod.WeedBeds = Scenery.WeedBeds;
         AddChild(new Graphics.Gulls { Daylight = () => _world.Daylight });
 

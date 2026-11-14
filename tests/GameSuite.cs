@@ -357,6 +357,13 @@ public sealed class GameSuite : ITestSuite
         t.Check(!rod.LastCastTangled, "an untwisted line casts cleanly");
         rod.ResetToIdle();
 
+        t.Section("rising fish");
+        int risen = 0;
+        for (int i = 0; i < 40; i++)
+            if (main.Rises.Spawn())
+                risen++;
+        t.Check(risen > 0 && main.Rises.Count >= risen, $"surface feeders leave rings on the water ({risen} of 40 tries)");
+
         t.Section("hook point");
         string hookId = rod.Loadout.Hook.ItemId;
         profile.AddHookDull(hookId, 0.4f);

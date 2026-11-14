@@ -306,6 +306,7 @@ public sealed class CoreSuite : ITestSuite
         Leaps(t);
         Points(t);
         Shoaling(t);
+        Rising(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -969,6 +970,16 @@ public sealed class CoreSuite : ITestSuite
         var plain = new BiteContext("maggot", 6f, 2f);
         var shoal = plain with { Shoal = name => name == "Płoć" ? 2f : 1f };
         t.Check(MathF.Abs(BiteModel.Weight(roach, shoal) - 2f * BiteModel.Weight(roach, plain)) < 1e-4f, "the bite model weighs the shoal");
+    }
+
+    /// <summary>Fish rising (Core/Methods/Rises).</summary>
+    private static void Rising(TestContext t)
+    {
+        t.Section("rises");
+        float dusk = Rises.PerMinute(19.5f, Weather.Clear, 0.25f), noon = Rises.PerMinute(13f, Weather.Clear, 0.25f);
+        t.Check(dusk > 3f * noon, $"fish rise most in the evening ({dusk:0.0}/min vs {noon:0.0} at noon)");
+        t.Check(Rises.PerMinute(19.5f, Weather.Rain, 0.85f) < 0.3f * dusk, "rain and wind put the rises down");
+        t.Check(Rises.Riser(FeedingHabits.LayerOf("Ukleja")) && !Rises.Riser(FeedingHabits.LayerOf("Leszcz")), "bleak rise, bream stay on the bottom");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

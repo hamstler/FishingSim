@@ -407,6 +407,7 @@ Przy dodawaniu: nowa ryba = plik w `data/fish/`, wpis w `SpeciesCatalog.Paths` i
 - **Skoki ryby**: szczupak, boleń, pstrąg i łosoś wyskakują w holu i w powietrzu potrząsają łbem. Jeśli w tym momencie trzymasz wędkę w górze (PPM) na napiętej żyłce, często wyrywają haczyk. Gdy HUD pokazuje „SKOK! opuść wędkę”, puść PPM. Dobrze wbity haczyk trzyma lepiej.
 - **Tępienie haczyka**: każda wyholowana ryba (większa bardziej) i każdy zaczep tępią grot, a tępy haczyk gorzej zacina, nawet o jedną trzecią. HUD dopisuje przy haczyku „stępiony” albo „tępy”. Z osełką klawisz K ostrzy haczyk, gdy zestaw jest wyjęty z wody. W kramie można też kupić nowy haczyk tego samego rodzaju.
 - **Ławice**: płoć, leszcz, krąp, ukleja, wzdręga, okoń, karasie, jaź, kleń i inne ryby ławicowe pływają stadami. Po złowieniu jednej przez mniej więcej godzinę gry w promieniu 12 m częściej biorą ryby tego samego gatunku, a HUD pokazuje „ławica w pobliżu”. Samotnicy, jak szczupak, sum czy karp, tego nie robią. Ławica i wyławianie miejsca działają razem: najpierw kilka szybkich ryb, potem brania słabną.
+- **Kręgi na wodzie**: ryby żerujące przy powierzchni (ukleja, wzdręga, boleń, kleń, pstrągi i inne) zbierają owady i zostawiają rozchodzące się kręgi. Najwięcej ich rano i wieczorem przy spokojnej wodzie, mało w południe, w deszczu i przy wietrze. Kręgi pokazują, gdzie ryby żerują wysoko.
 - **Turnieje** (T): wpisowe, dojazd na łowisko, wynik to suma N najcięższych ryb, rywale to boty o różnych umiejętnościach. Nagrody (pieniądze i XP) według miejsca, historia w zapisie.
 
 ## Zapis gry

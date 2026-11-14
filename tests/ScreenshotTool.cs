@@ -404,6 +404,28 @@ public partial class ScreenshotTool : Node
         if (a.Length > 11 && a[11] == "1")
             main.GetChildren().OfType<Hud>().First().Visible = false;
 
+        // FISHSIM_RISES=N: N rise rings spread over the last second before the shot (any mode).
+        // FISHSIM_RISES_NEAR=1: three rings of different ages a few metres ahead of the camera.
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_RISES_NEAR") == "1")
+        {
+            var cam = main.Player.Camera.GlobalTransform;
+            var ahead = -cam.Basis.Z with { Y = 0f };
+            ahead = ahead.Normalized();
+            var side = ahead.Cross(Vector3.Up);
+            for (int i = 0; i < 3; i++)
+            {
+                var at = cam.Origin + ahead * (5f + i * 2.5f) + side * (i - 1) * 2f;
+                main.Rises.SpawnAt(at.X, at.Z, 2f, 0.15f + i * 0.25f);
+            }
+            main.Rises.Frozen = true;
+        }
+        if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_RISES"), out int rises))
+            for (int i = 0; i < rises; i++)
+            {
+                main.Rises.Spawn();
+                for (int f = 0; f < 6; f++)
+                    await NextFrame();
+            }
         if (mode is 1 or 2)
         {
             rod.DevInstantBite = true;
