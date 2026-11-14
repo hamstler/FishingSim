@@ -764,6 +764,11 @@ public static class Icons
                 c.Disc(32, 28, 14, 14, C(0.6f, 0.44f, 0.25f), C(0.46f, 0.32f, 0.18f));
                 c.Rect(18, 32, 46, 35, C(0.7f, 0.2f, 0.15f));
                 break;
+            case AccessoryKind.GlowTip:            // a glowing green tube
+                c.Disc(32, 32, 16, 16, C(0.4f, 1f, 0.45f, 0.25f));
+                c.Line(22, 44, 42, 20, 7f, C(0.45f, 1f, 0.5f));
+                c.Line(24, 41, 40, 23, 3f, C(0.85f, 1f, 0.85f));
+                break;
             case AccessoryKind.Headlamp:           // tallow lantern
                 c.Rect(20, 18, 44, 52, C(0.25f, 0.24f, 0.24f));
                 c.Rect(23, 22, 41, 48, C(1f, 0.85f, 0.45f));

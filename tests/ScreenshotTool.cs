@@ -764,6 +764,9 @@ public partial class ScreenshotTool : Node
             {
                 // The line after a float cast: a fluorescent yellow monofilament (FISHSIM_LINE = another line id)
                 // lying on the water with its slack, bowed by the wind.
+                // FISHSIM_GLOW=1: with the glow tip (świetlik) on the float.
+                if (System.Environment.GetEnvironmentVariable("FISHSIM_GLOW") == "1")
+                    main.Gear.Buy(GearSlot.Accessory, GD.Load<TackleItem>("res://data/tackle/accessories/swietlik.tres"));
                 string lineId = System.Environment.GetEnvironmentVariable("FISHSIM_LINE") ?? "g_zylka_028_zolta_fluo";
                 pr.Owned["line"].Add(lineId);
                 lo.Index[(int)TackleSlot.Line] = lo.Items(TackleSlot.Line).ToList().FindIndex(i => i.ItemId == lineId);

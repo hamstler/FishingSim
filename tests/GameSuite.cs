@@ -319,6 +319,17 @@ public sealed class GameSuite : ITestSuite
                 && main.Scenery.WeedBeds.Any(b => rod.StructureAt(b.X, b.Z).Cover == 1f),
             $"the lake's plant beds are known to the rod ({main.Scenery.WeedBeds.Count})");
 
+        rod.World.Hour = 23f;
+        rod._Process(0.016);
+        float darkTip = rod.Bobber.TipGlow;
+        var glowStick = rod.Gear!.Items(GearSlot.Accessory).First(i => i.ItemId == "swietlik");
+        profile.Money += 100;
+        t.Check(rod.Gear.Buy(GearSlot.Accessory, glowStick) == null, "a glow tip can be bought");
+        rod._Process(0.016);
+        t.Check(darkTip < 0.1f && rod.Bobber.TipGlow > 3f, $"at night the float's tip shows only with a glow tip ({darkTip:0.00} -> {rod.Bobber.TipGlow:0.0})");
+        rod.World.Hour = 12f;
+        rod._Process(0.016);
+
         t.Section("pause menu");
         pause.Open();
         t.Check(t.Host.GetTree().Paused && rod.InputBlocked && pause.Visible, "Esc menu pauses the game and blocks fishing");

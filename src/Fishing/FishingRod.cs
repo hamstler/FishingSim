@@ -704,6 +704,10 @@ public partial class FishingRod : Node3D
         if (_bobber == null)
             return;
         UpdateBend(Math.Min((float)delta, 0.05f));
+        // After dark the float and the quiver tip show only with a glow tip (or in the lantern's light).
+        bool glowTip = Gear?.Has(AccessoryKind.GlowTip) == true;
+        _bobber.SetNight(1f - World.Daylight, glowTip);
+        _rig?.SetNight(1f - World.Daylight, glowTip);
         UpdateLine(Math.Min((float)delta, 0.05f));
     }
 

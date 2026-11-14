@@ -394,6 +394,7 @@ Przy dodawaniu: nowa ryba = plik w `data/fish/`, wpis w `SpeciesCatalog.Paths` i
 ## Jak działa hol i branie
 - **Hol** (`FightModel`, w kg-sile): ryba ciągnie z siłą zależną od gatunku i wagi. Hamulec puszcza żyłkę tylko wtedy, gdy ciągnięcie przekracza jego ustawienie. Napięcie to limit hamulca plus 25% nadwyżki (pomniejszone o amortyzację wędki), więc zrywy mogą przeciążyć żyłkę. Zbyt wysoki hamulec zrywa żyłkę, zbyt niski oddaje rybie całą szpulę. Im dłużej trwa hol, tym szybciej ryba traci siły.
 - **Branie** (`BiteModel`): szansa gatunku = rzadkość x przynęta x dopasowanie haka x liczebność na łowisku x głębokość x pora dnia x pogoda. Ekran ekwipunku (I) pokazuje te szanse dla każdej głębokości.
+- **Noc i świetlik**: po zmroku spławik, szczytówka i sygnalizator brania gasną razem ze światłem dnia, więc w nocy trudno je dostrzec. Świetlik z akcesoriów (25 monet) zakłada zielone światełko na antenę spławika i na szczytówkę wędki gruntowej.
 - **Turnieje** (T): wpisowe, dojazd na łowisko, wynik to suma N najcięższych ryb, rywale to boty o różnych umiejętnościach. Nagrody (pieniądze i XP) według miejsca, historia w zapisie.
 
 ## Zapis gry

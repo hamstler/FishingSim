@@ -149,6 +149,33 @@ public partial class Bobber : RigidBody3D
     /// <summary>How far the float lies over (0 upright .. 1 flat on the water): a lift bite, or a float set too deep.</summary>
     public float Tilt { get; set; }
 
+    private StandardMaterial3D _redMat = null!, _whiteMat = null!, _tipMat = null!;
+    private float _lastNight = -1f;
+    private bool _lastGlow;
+
+    /// <summary>
+    /// After dark (<paramref name="darkness"/> 0 day .. 1 night) the float's paint no longer shows by itself; a
+    /// glow tip (świetlik) makes its tip shine green. Changed only when it changes (no material churn per frame).
+    /// </summary>
+    public void SetNight(float darkness, bool glowTip)
+    {
+        darkness = MathF.Round(Math.Clamp(darkness, 0f, 1f) * 20f) / 20f;
+        if (MathF.Abs(darkness - _lastNight) < 1e-3f && glowTip == _lastGlow)
+            return;
+        _lastNight = darkness;
+        _lastGlow = glowTip;
+        float fade = 1f - 0.95f * darkness;
+        _redMat.EmissionEnergyMultiplier = 0.35f * fade;
+        _whiteMat.EmissionEnergyMultiplier = 0.2f * fade;
+        var tip = glowTip && darkness > 0.3f ? new Color(0.35f, 1f, 0.4f) : new Color(1f, 0.6f, 0.05f);
+        _tipMat.AlbedoColor = tip;
+        _tipMat.Emission = tip;
+        _tipMat.EmissionEnergyMultiplier = glowTip && darkness > 0.3f ? 1.5f + 2.5f * darkness : 0.6f * fade;
+    }
+
+    /// <summary>How brightly the float's tip shines now (tests).</summary>
+    public float TipGlow => _tipMat.EmissionEnergyMultiplier;
+
     /// <summary>The wind in flight (m/s) and how strongly it carries this end tackle (1/s; Casting.WindCatch).</summary>
     public Vector3 AirWind { get; set; }
     public float WindCatch { get; set; }
@@ -187,9 +214,9 @@ public partial class Bobber : RigidBody3D
         _visual.AddChild(_feeder);
         BuildHookRig();
         // Slightly self-lit colours so the float still reads at dusk and against glare.
-        var red = Glowing(new Color(0.95f, 0.1f, 0.06f), 0.35f);
-        var white = Glowing(new Color(0.96f, 0.96f, 0.92f), 0.2f);
-        var orange = Glowing(new Color(1f, 0.6f, 0.05f), 0.6f);
+        var red = _redMat = Glowing(new Color(0.95f, 0.1f, 0.06f), 0.35f);
+        var white = _whiteMat = Glowing(new Color(0.96f, 0.96f, 0.92f), 0.2f);
+        var orange = _tipMat = Glowing(new Color(1f, 0.6f, 0.05f), 0.6f);
         _float.AddChild(new MeshInstance3D
         {
             Mesh = new SphereMesh { Radius = 0.034f, Height = 0.07f, RadialSegments = 12, Rings = 6 },

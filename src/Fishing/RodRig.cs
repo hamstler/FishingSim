@@ -152,6 +152,7 @@ public partial class RodRig : Node3D
     }
 
     private Node3D? _indicator, _bobbin;
+    private StandardMaterial3D? _indicatorGlow;
 
     /// <summary>
     /// The bite indicator for bottom fishing: a bright bobbin hanging on a cord from the line between the reel and
@@ -168,7 +169,7 @@ public partial class RodRig : Node3D
             _bobbin = new Node3D();
             _indicator.AddChild(_bobbin);
             var cord = Mat(new Color(0.15f, 0.15f, 0.15f), 0.6f);
-            var glow = BuildingFactory.Pixel(new StandardMaterial3D
+            var glow = _indicatorGlow = BuildingFactory.Pixel(new StandardMaterial3D
             {
                 AlbedoColor = new Color(1f, 0.55f, 0.08f), Roughness = 0.4f,
                 EmissionEnabled = true, Emission = new Color(1f, 0.5f, 0.05f), EmissionEnergyMultiplier = 0.5f,
@@ -184,6 +185,20 @@ public partial class RodRig : Node3D
     private readonly List<MeshInstance3D> _blankMeshes = new();
     private Material? _blankMaterial;
     private Material? _quiverMaterial;
+
+    /// <summary>After dark the quiver tip and the bite indicator fade, unless a glow tip (świetlik) is fitted.</summary>
+    public void SetNight(float darkness, bool glowTip)
+    {
+        float energy = glowTip && darkness > 0.3f ? 1.2f + 2f * darkness : 0.35f * (1f - 0.95f * darkness);
+        if (_quiverMaterial is StandardMaterial3D q && MathF.Abs(q.EmissionEnergyMultiplier - energy) > 0.02f)
+        {
+            var c = glowTip && darkness > 0.3f ? new Color(0.35f, 1f, 0.4f) : new Color(1f, 0.4f, 0.1f);
+            q.Emission = c;
+            q.EmissionEnergyMultiplier = energy;
+        }
+        if (_indicatorGlow != null && MathF.Abs(_indicatorGlow.EmissionEnergyMultiplier - energy) > 0.02f)
+            _indicatorGlow.EmissionEnergyMultiplier = energy * 1.4f;
+    }
 
     /// <summary>
     /// A bottom rod's quiver tip: the last two sections of the blank painted bright (white and signal orange, a little
