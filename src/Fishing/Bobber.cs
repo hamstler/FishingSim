@@ -53,6 +53,28 @@ public partial class Bobber : RigidBody3D
     /// <summary>How deep under the float the hook hangs (m): the depth setting, or the water's depth when that is less.</summary>
     public float HangDepth { get; set; } = 1f;
 
+    /// <summary>Water clarity (m) and polarized glasses (0..1): how far the angler sees down into the water.</summary>
+    public float Clarity { get; set; } = 3f;
+    public float GlareCut { get; set; }
+
+    /// <summary>Tools only: draw the hook under the float (the angler cannot see it from the bank).</summary>
+    public static bool DebugShowHook { get; set; }
+
+    /// <summary>How far the float actually lies over now (eased towards <see cref="Tilt"/>).</summary>
+    public float VisualTilt => _tilt;
+
+    /// <summary>
+    /// Something under the surface is seen from the camera only as a fish would be: through the glare, as deep and
+    /// as far as the water's clarity allows (<see cref="World.FishPopulation.Sight"/>).
+    /// </summary>
+    private bool SeenUnderWater(Camera3D? cam)
+    {
+        var p = GlobalPosition;
+        if (cam == null || p.Y > WaterY - 0.03f)
+            return true;
+        return World.FishPopulation.Sight(cam.GlobalPosition, p, WaterY, WaterY - p.Y, Clarity, GlareCut) > World.FishPopulation.MinSight * 1.5f;
+    }
+
     /// <summary>The hook and its bait are in the water (not during the cast's flight or once a fish has them).</summary>
     public bool ShowHook { get; set; }
 
@@ -260,10 +282,12 @@ public partial class Bobber : RigidBody3D
         _visual.GlobalPosition = GlobalPosition;
         _visual.GlobalRotation = Vector3.Zero;
         _float.Visible = _method == FishingMethod.Float;
-        _lureRoot.Visible = _method == FishingMethod.Spinning && TerminalVisible;
-        _feeder.Visible = _method == FishingMethod.Bottom && TerminalVisible;
-        _feederHook.Visible = ShowHook;
-        _hookRig.Visible = _method == FishingMethod.Float && ShowHook && Visible;
+        var viewer = GetViewport()?.GetCamera3D();
+        bool seen = SeenUnderWater(viewer);
+        _lureRoot.Visible = _method == FishingMethod.Spinning && TerminalVisible && seen;
+        _feeder.Visible = _method == FishingMethod.Bottom && TerminalVisible && (seen || DebugShowHook);
+        _feederHook.Visible = ShowHook && DebugShowHook;
+        _hookRig.Visible = _method == FishingMethod.Float && ShowHook && Visible && DebugShowHook;
         if (_hookRig.Visible)
         {
             float hang = MathF.Max(HangDepth, 0.05f);

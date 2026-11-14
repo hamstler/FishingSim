@@ -151,6 +151,36 @@ public partial class RodRig : Node3D
         parent.AddChild(Tip);
     }
 
+    private Node3D? _indicator, _bobbin;
+
+    /// <summary>
+    /// The bite indicator for bottom fishing: a bright bobbin hanging on a cord from the line between the reel and
+    /// the first guide. <paramref name="lift"/> 0 hangs, 1 pulled right up to the blank (a fish running with the bait).
+    /// </summary>
+    public void SetIndicator(bool shown, float lift)
+    {
+        if (_indicator == null)
+        {
+            if (!shown)
+                return;
+            _indicator = new Node3D { Position = new Vector3(0f, 0.42f, -0.03f) };
+            AddChild(_indicator);
+            _bobbin = new Node3D();
+            _indicator.AddChild(_bobbin);
+            var cord = Mat(new Color(0.15f, 0.15f, 0.15f), 0.6f);
+            var glow = BuildingFactory.Pixel(new StandardMaterial3D
+            {
+                AlbedoColor = new Color(1f, 0.55f, 0.08f), Roughness = 0.4f,
+                EmissionEnabled = true, Emission = new Color(1f, 0.5f, 0.05f), EmissionEnergyMultiplier = 0.5f,
+            });
+            Cyl(_bobbin, 0.0007f, 0.0007f, 0.12f, new Vector3(0f, 0f, 0.06f), cord, 4).RotationDegrees = new Vector3(90f, 0f, 0f);
+            Cyl(_bobbin, 0.008f, 0.008f, 0.03f, Vector3.Zero, glow, 10).RotationDegrees = new Vector3(90f, 0f, 0f);
+        }
+        _indicator.Visible = shown;
+        if (_bobbin != null)
+            _bobbin.Position = new Vector3(0f, 0f, -0.13f * (1f - Math.Clamp(lift, 0f, 1f)));
+    }
+
     private readonly List<MeshInstance3D> _blankMeshes = new();
     private Material? _blankMaterial;
     private Material? _quiverMaterial;

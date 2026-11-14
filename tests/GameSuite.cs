@@ -409,7 +409,16 @@ public sealed class GameSuite : ITestSuite
         await WaitForState(t, rod, RodState.Nibble, 6);
         t.Check(rod.State == RodState.Nibble, "a nibble follows");
         await WaitForState(t, rod, RodState.Bite, 6);
-        t.Check(rod.State == RodState.Bite, "then the real bite");
+        t.Check(rod.State == RodState.Bite && rod.StateName == "Czekanie na branie", "then the real bite (the HUD does not give it away)");
+        if (!rod.StrikeReady)
+        {
+            rod.TryHook();
+            t.Check(rod.State == RodState.Waiting && rod.BannerText.Contains("Za wcześnie"), "striking before the float is right under is too early");
+            await WaitForState(t, rod, RodState.Bite, 8);
+        }
+        for (int i = 0; i < 240 && rod.State == RodState.Bite && !rod.StrikeReady; i++)
+            await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+        t.Check(rod.StrikeReady, $"the float goes right under (submerged {rod.Bobber.Submerged:0.00})");
         int baitBefore = loadout.BaitCount;
         ui.Open(1);
         rod._UnhandledInput(Key(Godot.Key.Space));

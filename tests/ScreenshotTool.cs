@@ -743,6 +743,7 @@ public partial class ScreenshotTool : Node
             if (arg == 5)
             {
                 // The baited hook under the float, seen from under the water beside it.
+                FishingSim.Fishing.Bobber.DebugShowHook = true;
                 lo.Index[(int)TackleSlot.Bait] = BaitIx(System.Environment.GetEnvironmentVariable("FISHSIM_BAIT") ?? "worm");
                 lo.BaitCounts[lo.Bait.ItemId] = 10;
                 rod.ApplyTackle();

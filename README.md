@@ -97,9 +97,15 @@ zatoka 19°C, staw 21°C), cieplejszą po południu i chłodniejszą w deszczu. 
 miętus) żerują najlepiej koło 11°C, ciepłolubne (karp, lin, karasie, sum) koło 22°C, reszta koło 17°C. Tabliczka pod
 tarczą pokazuje ciśnienie z trendem (na zielono, gdy sprzyja, na czerwono, gdy szkodzi) i temperaturę wody.
 
-**Haczyk z przynętą:** pod spławikiem widać żyłkę ze śrucinami i haczyk z założoną przynętą (robak, kukurydza, chleb,
-białe robaki, żywiec i inne mają własny kolor i kształt). Haczyk wisi na ustawionym gruncie albo leży na dnie, gdy
-woda jest płytsza. Przy koszyczku na dnie leży przypon z przynętą. W czystej wodzie przy brzegu widać to z pomostu.
+**Obserwacja brań:** gra nie podpowiada brania napisem. Trzeba patrzeć na spławik, a przy gruncie na jaskrawą
+szczytówkę i pomarańczowy sygnalizator wiszący na żyłce między kołowrotkiem a pierwszą przelotką (przy skubnięciach
+drga, przy odjeździe ryby podjeżdża pod wędkę); z podpórką z dzwoneczkiem słychać też dzwonek. Przy spławiku zacina
+się dopiero, gdy spławik całkiem zniknie pod wodą (przy braniu z podnoszeniem: gdy położy się płasko). Zacięcie
+wcześniej wyrywa przynętę rybie („Za wcześnie!”), a okno na zacięcie liczy się od pełnego zanurzenia.
+
+**Pod wodą:** wędkarz nie widzi pod powierzchnię dalej, niż pozwala woda: przynęta i koszyczek są widoczne tylko tam,
+gdzie widać by było rybę (płytko, blisko, w czystej wodzie, mniej pod odblaskiem; więcej w okularach
+polaryzacyjnych), a haczyka pod spławikiem z brzegu nie widać wcale.
 
 **Grafika na laptopie:** przy pierwszym uruchomieniu na zintegrowanej grafice gra sama ustawia jakość Niską, bliski
 zasięg widzenia i 3D w 70% (FSR). Wszystko to można zmienić w menu pauzy. Na Niskiej nie ma też poświaty (bloom).

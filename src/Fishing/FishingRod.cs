@@ -274,7 +274,19 @@ public partial class FishingRod : Node3D
     /// <summary>Weakest link of the setup: the line (with its leader) or the rod, whichever gives first.</summary>
     public float EffectiveLimit => MathF.Min(LineStrength, RodMaxLoad);
 
-    public string StateName => StateNames[State];
+    /// <summary>The HUD's line: a bite is not announced, the angler has to see it on the float, the quiver tip or
+    /// the bite indicator (or hear the bell).</summary>
+    public string StateName => StateNames[State is RodState.Nibble or RodState.Bite ? RodState.Waiting : State];
+
+    /// <summary>
+    /// The moment to strike has come: under a float only once it has gone right under (a lift bite: once it lies
+    /// flat); on the bottom and on a lure as soon as the fish takes.
+    /// </summary>
+    public bool StrikeReady => State == RodState.Bite && (_castMethod != FishingMethod.Float
+        || (FeedingHabits.StyleOf(CurrentSpecies?.SpeciesName ?? "") == BiteStyle.Lift ? _bobber.VisualTilt >= 0.85f : _bobber.Submerged >= 0.95f));
+
+    private float _readyAt = float.NaN;
+    private float _pluck;
 
     public void Setup(RodDependencies deps)
     {
@@ -359,6 +371,11 @@ public partial class FishingRod : Node3D
             return;
         bool lineOut = State is RodState.Waiting or RodState.Nibble or RodState.Bite or RodState.Fight or RodState.Close;
         _bitePull = Mathf.MoveToward(_bitePull, State == RodState.Bite && _castMethod == FishingMethod.Bottom ? 1f : 0f, dt * 3f);
+        _pluck = MathF.Max(0f, _pluck - dt * 5f);
+        // The bite indicator hanging on the line between the reel and the first guide (bottom fishing): plucks
+        // twitch it, a run pulls it up to the blank.
+        _rig.SetIndicator(_castMethod == FishingMethod.Bottom && State is RodState.Waiting or RodState.Nibble or RodState.Bite,
+            Math.Clamp(_bitePull + 0.35f * _pluck, 0f, 1f));
         float load = State is RodState.Fight or RodState.Close ? Tension
             : !lineOut ? 0.04f
             : _castMethod switch
@@ -658,6 +675,7 @@ public partial class FishingRod : Node3D
     {
         State = s;
         _stateTime = 0f;
+        _readyAt = float.NaN;
         // Whatever a bite did to the float ends with it.
         if (s is not (RodState.Nibble or RodState.Bite) && _bobber != null)
         {
@@ -767,6 +785,9 @@ public partial class FishingRod : Node3D
         _castMethod = Method;
         _bobber.SetTerminal(_castMethod, Loadout.Bait);
         _bobber.SetBait(Loadout.Bait.ItemId);
+        // What the angler can see into the water.
+        _bobber.Clarity = Lake.Location.WaterClarity;
+        _bobber.GlareCut = Population?.GlareCut ?? 0f;
         _feederLoaded = _castMethod == FishingMethod.Bottom && Loadout.BaitCount >= 2;
         if (_feederLoaded)
             Loadout.UseBait();
@@ -1011,9 +1032,10 @@ public partial class FishingRod : Node3D
             switch (_castMethod)
             {
                 case FishingMethod.Bottom:
-                    // Plucks on the quiver tip.
+                    // Plucks on the quiver tip and the bite indicator.
                     _pulseTimer = _rng.Range(0.35f, 0.8f);
                     Twitch(0.45f);
+                    _pluck = 1f;
                     break;
                 case FishingMethod.Spinning:
                     _pulseTimer = 1f;
@@ -1097,7 +1119,24 @@ public partial class FishingRod : Node3D
 
     private void TickBite()
     {
-        if (_stateTime < MethodRules.HookWindow(_castMethod))
+        // Under a float the strike window opens when the float is right under (or flat); the fish lets go if it
+        // never gets there in three seconds.
+        if (_castMethod == FishingMethod.Float)
+        {
+            if (!StrikeReady && float.IsNaN(_readyAt))
+            {
+                if (_stateTime < 3f)
+                    return;
+            }
+            else
+            {
+                if (float.IsNaN(_readyAt))
+                    _readyAt = _stateTime;
+                if (_stateTime - _readyAt < MethodRules.HookWindow(_castMethod))
+                    return;
+            }
+        }
+        else if (_stateTime < MethodRules.HookWindow(_castMethod))
             return;
         _bobber.ExtraForce = 0f;
         LoseBiter(_bobber.GlobalPosition);
@@ -1130,6 +1169,14 @@ public partial class FishingRod : Node3D
                 _bobber.ExtraForce = 0f;
                 LoseBiter(_bobber.GlobalPosition);
                 ShowBanner("Za wcześnie! Ryba uciekła");
+                NewBiteTimer();
+                SetState(RodState.Waiting);
+                break;
+            case RodState.Bite when _castMethod == FishingMethod.Float && !StrikeReady && float.IsNaN(_readyAt):
+                // Struck while the float is still going down: the bait is pulled out of the fish's mouth.
+                _bobber.ExtraForce = 0f;
+                LoseBiter(_bobber.GlobalPosition);
+                ShowBanner("Za wcześnie! Zacina się, gdy spławik zniknie pod wodą (lub położy się płasko)");
                 NewBiteTimer();
                 SetState(RodState.Waiting);
                 break;
