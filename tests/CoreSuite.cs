@@ -296,6 +296,7 @@ public sealed class CoreSuite : ITestSuite
         Wear(t);
         Fraying(t);
         Casts(t);
+        Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
     }
@@ -764,6 +765,23 @@ public sealed class CoreSuite : ITestSuite
         t.Check(Casting.WindCatch(FishingMethod.Float, 0f) > Casting.WindCatch(FishingMethod.Spinning, 25f) * 3f
                 && Casting.WindCatch(FishingMethod.Spinning, 2f) > Casting.WindCatch(FishingMethod.Spinning, 25f)
                 && Casting.WindCatch(FishingMethod.Bottom, 0f) < 0.2f, "the wind carries a float far more than a heavy spoon, a feeder hardly");
+    }
+
+    /// <summary>Plants and drop-offs (Core/Methods/Structure).</summary>
+    private static void Holds(TestContext t, LocationData lake)
+    {
+        t.Section("where the fish hold: plants and drop-offs");
+        var beds = new[] { new WeedBed(10f, -20f, 3f) };
+        t.Check(Structure.CoverAt(beds, 10f, -20f) == 1f && Structure.CoverAt(beds, 15f, -20f) is > 0.4f and < 0.6f && Structure.CoverAt(beds, 30f, -20f) == 0f,
+            "cover is full in a bed and fades four metres beyond it");
+        var pike = Species("szczupak");
+        var zander = Species("sandacz");
+        var roach = Species("ploc");
+        var open = new BiteContext("livebait", 6f, 3f, lake, null, Weather.Clear, null, null, 0f, 0f);
+        t.Check(BiteModel.Weight(pike, open with { Cover = 1f }) > BiteModel.Weight(pike, open) * 1.6f, "a pike takes far better by the plants");
+        t.Check(BiteModel.Weight(zander, open with { Edge = 1f }) > BiteModel.Weight(zander, open) * 1.4f, "a zander on a drop-off");
+        t.Check(BiteModel.Weight(roach, open with { Cover = 1f, Edge = 1f }) == BiteModel.Weight(roach, open), "a roach does not care");
+        t.Check(Structure.EdgeFrom(0.6f) == 1f && Structure.EdgeFrom(0.05f) < 0.2f, "a steep bottom is a drop-off, a gentle one is not");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

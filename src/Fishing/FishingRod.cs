@@ -460,9 +460,35 @@ public partial class FishingRod : Node3D
     /// <summary>How worn the line on the spool is (0 new .. 0.6).</summary>
     public float LineWearNow => Profile?.LineWear.GetValueOrDefault(Loadout.Line.ItemId) ?? 0f;
 
-    public BiteContext MakeBiteContext(float depth) =>
-        new(Loadout.Bait.ItemId, Loadout.Hook.Size + (Loadout.LureOn ? MethodRules.SizeHookShift(Loadout.Bait.SizeCm) : 0f), depth,
-            Lake.Location, World.Period, World.Weather, BaitLayerAt(depth), WaterTemp);
+    /// <summary>The map's water plant patches (set by Main from the scenery).</summary>
+    public IReadOnlyList<WeedBed> WeedBeds { get; set; } = Array.Empty<WeedBed>();
+
+    /// <summary>Plant cover (0..1) and how steep the bottom is (0..1) at a point of the lake.</summary>
+    public (float Cover, float Edge) StructureAt(float x, float z)
+    {
+        const float d = 1.5f;
+        float gx = (Lake.DepthAt(x + d, z) - Lake.DepthAt(x - d, z)) / (2f * d);
+        float gz = (Lake.DepthAt(x, z + d) - Lake.DepthAt(x, z - d)) / (2f * d);
+        return (Structure.CoverAt(WeedBeds, x, z), Structure.EdgeFrom(MathF.Sqrt(gx * gx + gz * gz)));
+    }
+
+    public BiteContext MakeBiteContext(float depth) => MakeBiteContext(depth, new Vector2(_bobber.GlobalPosition.X, _bobber.GlobalPosition.Z));
+
+    /// <summary>The bite context for a bait over water this deep at a point (the plants and the drop-offs there).</summary>
+    public BiteContext MakeBiteContext(float depth, Vector2 at)
+    {
+        var (cover, edge) = StructureAt(at.X, at.Y);
+        return new(Loadout.Bait.ItemId, Loadout.Hook.Size + (Loadout.LureOn ? MethodRules.SizeHookShift(Loadout.Bait.SizeCm) : 0f), depth,
+            Lake.Location, World.Period, World.Weather, BaitLayerAt(depth), WaterTemp, cover, edge);
+    }
+
+    /// <summary>Share of bites per species for the current setup at a point of the lake.</summary>
+    public IReadOnlyList<BiteChance> BiteChances(float depth, Vector2 at) => BiteModel.Chances(_species, MakeBiteContext(depth, at));
+
+    private float _weedTime;
+
+    /// <summary>The hooked fish is in a weed bed: lift the rod (RMB) to drag it out before it tangles the line.</summary>
+    public bool FishInWeeds => State == RodState.Fight && _weedTime > 0.2f;
 
     /// <summary>The water's temperature now (degrees Celsius).</summary>
     public float WaterTemp => WaterTemperature.At(Lake.Location.WaterTemperature, World.Hour, World.Weather);
@@ -1289,6 +1315,7 @@ public partial class FishingRod : Node3D
         _fishNode.Visible = true;
         _fishDepth = 0.3f;
         _jump = 0f;
+        _weedTime = 0f;
         _fishYaw = _fight.Heading;
         SetState(RodState.Fight);
     }
@@ -1316,6 +1343,17 @@ public partial class FishingRod : Node3D
             case FightOutcome.Landed:
                 EnterClose();
                 return;
+        }
+
+        // Into the weeds: a fish in a bed tangles the line unless it is lifted out with the rod up.
+        var fishAt = new Vector2(Origin().X + _fight.Position.X, Origin().Z + _fight.Position.Y);
+        bool inBed = Structure.CoverAt(WeedBeds, fishAt.X, fishAt.Y) >= 1f;
+        _weedTime = inBed && !Lifting ? _weedTime + dt : MathF.Max(0f, _weedTime - (Lifting ? 1.5f : 0.5f) * dt);
+        if (_weedTime > Structure.TangleSeconds && !DevUnbreakable)
+        {
+            _weedTime = 0f;
+            BreakLine("Ryba wpłynęła w zielsko i zaplątała żyłkę. Podnoś wędkę (PPM), gdy ryba idzie w rośliny!", TackleSlot.Hook);
+            return;
         }
 
         // Teeth: a pike (or a wels, a zander) may bite through anything but a wire leader.

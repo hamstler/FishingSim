@@ -127,6 +127,12 @@ przycisk „Nawiń nową”, który za cenę żyłki przywraca jej pełną wytrz
 stopni) i zmienność odległości. W locie wiatr znosi zestaw na bok: lekki spławik i mucha mocno, lekka obrotówka
 średnio, ciężka wahadłówka i koszyczek prawie wcale.
 
+**Kryjówki i spady:** ryby trzymają się miejsc. Szczupak, lin, okoń, karasie, wzdręga, karp i amur biorą lepiej przy
+płatach grążeli i zielska (do 4 m od nich), a sandacz, sum, miętus, jazgarz, węgorz, leszcz i okoń na spadach dna.
+Mapa (M) podpowiada pod kursorem, gdzie są rośliny i spady, i liczy szanse brań dla tego miejsca. W holu ryba, która
+wpłynie w zielsko, po 2,5 s zaplącze żyłkę i urwie zestaw, chyba że podniesiesz wędkę (PPM) i wyciągniesz ją z roślin;
+pasek stanu ostrzega „W ZIELSKU!”.
+
 **Grafika na laptopie:** przy pierwszym uruchomieniu na zintegrowanej grafice gra sama ustawia jakość Niską, bliski
 zasięg widzenia i 3D w 70% (FSR). Wszystko to można zmienić w menu pauzy. Na Niskiej nie ma też poświaty (bloom).
 

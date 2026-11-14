@@ -636,9 +636,12 @@ public partial class GameUI : CanvasLayer
         float reach = _rod.EstimateCastRange();
         sb.Append($"Głębokość: {depth:0.0} m · {dist:0} m od Ciebie\n");
         sb.Append(dist <= reach ? "W zasięgu rzutu." : $"Poza zasięgiem rzutu (do ok. {reach:0} m).");
+        var (cover, edge) = _rod.StructureAt(w.X, w.Y);
+        if (cover > 0.5f || edge > 0.5f)
+            sb.Append(cover > 0.5f && edge > 0.5f ? " Rośliny nad spadem dna." : cover > 0.5f ? " Rośliny: tu kryją się szczupaki, liny, okonie." : " Spad dna: tu polują sandacze i okonie.");
         sb.Append("\nNa obecny zestaw: ");
         // The fish run on as one wrapped paragraph (a name never breaks from its share: no-break spaces).
-        var shown = _rod.BiteChances(depth).Where(c => c.Share >= 0.01f).ToList();
+        var shown = _rod.BiteChances(depth, w).Where(c => c.Share >= 0.01f).ToList();
         for (int i = 0; i < shown.Count; i++)
         {
             if (i > 0)

@@ -22,7 +22,9 @@ public readonly record struct BiteContext(
     DayPeriod? Period = null,
     Weather Weather = Weather.Clear,
     float? BaitLayer = null,
-    float? WaterTemp = null);
+    float? WaterTemp = null,
+    float? Cover = null,
+    float Edge = 0f);
 
 /// <summary>One species' share of the bites.</summary>
 public readonly record struct BiteChance(FishSpecies Species, float Weight, float Share);
@@ -68,7 +70,8 @@ public static class BiteModel
     public static float Weight(FishSpecies sp, BiteContext ctx) =>
         sp.Rarity * sp.AffinityFor(ctx.BaitId) * HookFit(sp, ctx.HookSize) * Habitat(sp, ctx)
         * (ctx.BaitLayer is float layer ? Methods.FeedingHabits.LayerFit(sp.SpeciesName, layer, ctx.Depth) : 1f)
-        * (ctx.WaterTemp is float temp ? Methods.WaterTemperature.Fit(sp.SpeciesName, temp) : 1f);
+        * (ctx.WaterTemp is float temp ? Methods.WaterTemperature.Fit(sp.SpeciesName, temp) : 1f)
+        * (ctx.Cover is float cover ? Methods.Structure.Fit(sp.SpeciesName, cover, ctx.Edge) : 1f);
 
     /// <summary>Average attractiveness over all species (1 = neutral); drives how fast bites come.</summary>
     public static float Attraction(IReadOnlyList<FishSpecies> species, BiteContext ctx)

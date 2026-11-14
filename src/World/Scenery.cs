@@ -26,6 +26,9 @@ public partial class Scenery : Node3D
     /// <summary>Labelled places for the map screen.</summary>
     public List<MapMarker> Markers { get; } = new();
 
+    /// <summary>The water plant patches (lilies and underwater weed) of this map: where cover-loving fish hold.</summary>
+    public List<Core.Methods.WeedBed> WeedBeds { get; } = new();
+
     /// <summary>How many of each thing was placed on the current map (for tests and tuning).</summary>
     public Dictionary<string, int> Stats { get; } = new();
 
@@ -273,6 +276,7 @@ public partial class Scenery : Node3D
         _buildings.Clear();
         Interactables.Clear();
         Markers.Clear();
+        WeedBeds.Clear();
         Stats.Clear();
         _reserved.Clear();
         _props.Clear();
@@ -1264,6 +1268,7 @@ public partial class Scenery : Node3D
                 made++;
             // A patch: leaves crowd its middle and thin out to its edge.
             float radius = rng.RandfRange(1.6f, weed ? 3.5f : 5f);
+            WeedBeds.Add(new Core.Methods.WeedBed(cx, cz, radius));
             int count = (int)(radius * radius * rng.RandfRange(weed ? 0.9f : 2.2f, weed ? 1.6f : 3.6f));
             bool yellowPatch = !weed && rng.Randf() < 0.3f;
             for (int k = 0; k < count; k++)

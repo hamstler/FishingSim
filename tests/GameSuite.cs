@@ -315,6 +315,10 @@ public sealed class GameSuite : ITestSuite
                 && MathF.Abs(Minimap.ToMap(mc + new Vector2(Minimap.ViewMetres / 2f, 0f), mc).X - Minimap.MapDiameter) < 0.01f,
             $"the minimap is centred on the angler and shows {Minimap.ViewMetres:0} m across");
 
+        t.Check(main.Scenery.WeedBeds.Count > 5 && ReferenceEquals(rod.WeedBeds, main.Scenery.WeedBeds)
+                && main.Scenery.WeedBeds.Any(b => rod.StructureAt(b.X, b.Z).Cover == 1f),
+            $"the lake's plant beds are known to the rod ({main.Scenery.WeedBeds.Count})");
+
         t.Section("pause menu");
         pause.Open();
         t.Check(t.Host.GetTree().Paused && rod.InputBlocked && pause.Visible, "Esc menu pauses the game and blocks fishing");
