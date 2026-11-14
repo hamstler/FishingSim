@@ -293,6 +293,7 @@ public sealed class CoreSuite : ITestSuite
         LineRopePhysics(t);
         Noise(t);
         ThrownHooks(t);
+        Wear(t);
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
     }
@@ -716,6 +717,18 @@ public sealed class CoreSuite : ITestSuite
         int idle = Thrown(false, 0.5f), wound = Thrown(true, 0.5f), wellSet = Thrown(false, 1f);
         t.Check(idle > wound * 2 && idle > 15, $"a fish left on a slack line throws the hook ({idle}/120), one kept tight rarely ({wound}/120)");
         t.Check(wellSet < idle / 2, $"a well set hook holds better ({wellSet}/120)");
+    }
+
+    /// <summary>Bait wearing on the hook (Core/Methods/BaitWear).</summary>
+    private static void Wear(TestContext t)
+    {
+        t.Section("bait wearing on the hook");
+        t.Check(BaitWear.Step(1f, "bread", 180f) == 0f && BaitWear.Step(1f, "boilie", 180f) > 0.85f && BaitWear.Step(1f, "worm", 270f) is > 0.45f and < 0.55f,
+            "bread is gone in three minutes, a boilie lasts, a worm is half spent in four and a half");
+        t.Check(BaitWear.Dissolves("bread") && !BaitWear.Dissolves("worm") && BaitWear.Appeal(1f) == 1f && BaitWear.Appeal(0f) < 0.4f,
+            "soft baits fall off; a spent bait draws a third as well");
+        t.Check(BaitWear.Word(false, 1f).Contains("pusty") && BaitWear.Word(true, 0.2f).Contains("zużyta") && BaitWear.Word(true, 0.9f) == "",
+            "the HUD says when the hook is bare or the bait spent");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

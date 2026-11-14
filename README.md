@@ -112,6 +112,12 @@ zryw prosto do wędkarza; wtedy trzeba szybko zwijać, bo pasek stanu krzyczy �
 (rozmiar dobrany do pyska, zacięcie od razu, a nie pod koniec chwili na zacięcie, plecionka, naostrzony grot), tym
 dłużej trzyma; ryba, która zacięła się sama na przynęcie, trzyma się płycej. Spięta ryba ucieka, ale sprzęt zostaje.
 
+**Zużycie przynęty:** przynęta naturalna na haczyku słabnie w wodzie: chleb rozmięka i spada po ok. 3 minutach,
+ciasto po 4, białe robaki i owady po 5–6, robak po 9, żywiec po 12, kukurydza po 20, kulki proteinowe po 30.
+Zużyta przynęta wabi trzy razy słabiej. Ryba, przy której zacięcie chybiło (za wcześnie, za późno, spadła z haka),
+zwykle zjada przynętę: na pustym haczyku nic nie bierze, trzeba zwinąć i zarzucić od nowa. Pasek stanu mówi,
+kiedy przynęta słabnie, jest zużyta albo haczyk jest pusty. Przynęty sztuczne się nie zużywają.
+
 **Grafika na laptopie:** przy pierwszym uruchomieniu na zintegrowanej grafice gra sama ustawia jakość Niską, bliski
 zasięg widzenia i 3D w 70% (FSR). Wszystko to można zmienić w menu pauzy. Na Niskiej nie ma też poświaty (bloom).
 

@@ -178,6 +178,9 @@ public sealed class GameSuite : ITestSuite
             $"the baited hook lies on the bottom under it ({rod.Bobber.HangDepth:0.0} m down)");
         rod._UnhandledInput(Key(Godot.Key.Bracketleft));
         t.Check(MathF.Abs(rod.FloatDepth - 6f) < 0.01f, "the depth cannot be changed with the line out");
+        t.Check(rod.BaitOnHook && rod.BaitFreshness > 0.95f, "a fresh worm goes on with the cast");
+        rod.AgeBait(600f);
+        t.Check(rod.BaitOnHook && rod.BaitFreshness == 0f, "a worm left ten minutes is spent but stays on");
         rod.ResetToIdle();
         rod.SetFloatDepth(1.2f);
 

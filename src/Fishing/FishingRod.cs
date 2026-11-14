@@ -287,6 +287,41 @@ public partial class FishingRod : Node3D
 
     private float _readyAt = float.NaN;
     private float _hookHold = 0.8f;
+    private float _baitFresh = 1f;
+    private bool _baitOn = true;
+
+    /// <summary>A natural bait is on the hook (a missed fish usually takes it; bread falls off once soft).</summary>
+    public bool BaitOnHook => Loadout.LureOn || _baitOn;
+
+    /// <summary>The bait's freshness on the hook (1 fresh .. 0 spent).</summary>
+    public float BaitFreshness => Loadout.LureOn ? 1f : _baitFresh;
+
+    /// <summary>The bite clock's speed for the bait on the hook (0 with a bare hook).</summary>
+    private float BaitPace => Loadout.LureOn ? 1f : _baitOn ? BaitWear.Appeal(_baitFresh) : 0f;
+
+    /// <summary>The bait soaks for that long (tests and tools).</summary>
+    public void AgeBait(float seconds) => WearBait(seconds);
+
+    private void WearBait(float seconds)
+    {
+        if (Loadout.LureOn || !_baitOn)
+            return;
+        _baitFresh = BaitWear.Step(_baitFresh, Loadout.Bait.ItemId, seconds);
+        if (_baitFresh <= 0f && BaitWear.Dissolves(Loadout.Bait.ItemId))
+        {
+            _baitOn = false;
+            ShowBanner("Przynęta rozmiękła i spadła z haczyka: zwiń i załóż nową", 3f);
+        }
+    }
+
+    /// <summary>A fish that got away after taking the bait usually leaves a bare hook.</summary>
+    private string AfterMiss(string text)
+    {
+        if (Loadout.LureOn)
+            return text;
+        _baitOn = _rng.NextFloat() < BaitWear.KeptAfterMiss;
+        return _baitOn ? text : text + " Przynęta zjedzona: pusty haczyk.";
+    }
 
     /// <summary>The fish on the line has slack (the angler is not keeping it tight): it may throw the hook.</summary>
     public bool FightSlack => State == RodState.Fight && (_fight?.LineSlack ?? false);
@@ -614,6 +649,8 @@ public partial class FishingRod : Node3D
         BannerTime = MathF.Max(BannerTime - dt, 0f);
         UpdateBaitAttraction(dt);
         TickDisturbance(dt);
+        if (State is RodState.Waiting or RodState.Nibble or RodState.Bite)
+            WearBait(dt);
         _stateTime += dt;
         switch (State)
         {
@@ -789,6 +826,9 @@ public partial class FishingRod : Node3D
         _castMethod = Method;
         _bobber.SetTerminal(_castMethod, Loadout.Bait);
         _bobber.SetBait(Loadout.Bait.ItemId);
+        // A fresh bait goes on the hook for every cast.
+        _baitFresh = 1f;
+        _baitOn = true;
         // What the angler can see into the water.
         _bobber.Clarity = Lake.Location.WaterClarity;
         _bobber.GlareCut = Population?.GlareCut ?? 0f;
@@ -946,7 +986,7 @@ public partial class FishingRod : Node3D
         float pace = 1f;
         if (Loadout.LureOn)
             pace = Reeling ? (Loadout.Rod.Kind == RodKind.Spinning ? 3.2f : 2.4f) : 0.1f;
-        _biteTimer -= dt * pace * ConditionPace;
+        _biteTimer -= dt * pace * ConditionPace * BaitPace;
         if (_biteTimer <= 0f)
             StartNibble();
     }
@@ -1145,7 +1185,7 @@ public partial class FishingRod : Node3D
             return;
         _bobber.ExtraForce = 0f;
         LoseBiter(_bobber.GlobalPosition);
-        ShowBanner("Za późno - ryba się zerwała");
+        ShowBanner(AfterMiss("Za późno - ryba się zerwała."));
         NewBiteTimer();
         SetState(RodState.Waiting);
     }
@@ -1173,7 +1213,7 @@ public partial class FishingRod : Node3D
             case RodState.Nibble:
                 _bobber.ExtraForce = 0f;
                 LoseBiter(_bobber.GlobalPosition);
-                ShowBanner("Za wcześnie! Ryba uciekła");
+                ShowBanner(AfterMiss("Za wcześnie! Ryba uciekła."));
                 NewBiteTimer();
                 SetState(RodState.Waiting);
                 break;
@@ -1181,7 +1221,7 @@ public partial class FishingRod : Node3D
                 // Struck while the float is still going down: the bait is pulled out of the fish's mouth.
                 _bobber.ExtraForce = 0f;
                 LoseBiter(_bobber.GlobalPosition);
-                ShowBanner("Za wcześnie! Zacina się, gdy spławik zniknie pod wodą (lub położy się płasko)");
+                ShowBanner(AfterMiss("Za wcześnie! Zacina się, gdy spławik zniknie pod wodą (lub położy się płasko)."));
                 NewBiteTimer();
                 SetState(RodState.Waiting);
                 break;
@@ -1202,7 +1242,7 @@ public partial class FishingRod : Node3D
                 {
                     _bobber.ExtraForce = 0f;
                     LoseBiter(_bobber.GlobalPosition);
-                    ShowBanner("Ryba spadła z haka");
+                    ShowBanner(AfterMiss("Ryba spadła z haka."));
                     NewBiteTimer();
                     SetState(RodState.Waiting);
                 }
@@ -1774,7 +1814,7 @@ public partial class FishingRod : Node3D
         if (!_rigSettled)
             return;
         float pace = GroundbaitSpots.PaceFor(GroundbaitHeat) * (Reeling ? 0.5f : 1f);
-        _biteTimer -= dt * pace * ConditionPace;
+        _biteTimer -= dt * pace * ConditionPace * BaitPace;
         if (_biteTimer <= 0f)
             StartNibble();
     }
