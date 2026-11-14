@@ -311,6 +311,7 @@ public sealed class CoreSuite : ITestSuite
         Swallowed(t);
         Wood(t);
         Layers(t);
+        BaitSizes(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -1041,6 +1042,32 @@ public sealed class CoreSuite : ITestSuite
         t.Check(WaterTemperature.WindowFactor(8f) < 0.75f && WaterTemperature.WindowFactor(25f) > 1.1f
                 && MathF.Abs(WaterTemperature.WindowFactor(17f) - 0.99f) < 0.05f, "in cold water bites are short, in warm the fish hold on");
         t.Check(troutDeep > troutTop, $"in a warm lake trout feed better deep ({troutTop:0.00} at the top, {troutDeep:0.00} at 10 m)");
+    }
+
+    /// <summary>Natural bait sizes (Core/Methods/BaitSize).</summary>
+    private static void BaitSizes(TestContext t)
+    {
+        t.Section("bait size");
+        t.Check(BaitSize.HookShift("livebait") > BaitSize.HookShift("rosowka") && BaitSize.HookShift("rosowka") > BaitSize.HookShift("worm")
+                && BaitSize.HookShift("maggot") < 0f && BaitSize.HookShift("l_unknown") == 0f, "a live fish is a big mouthful, maggots a small one");
+        var pike = SpeciesCatalog.Paths.Select(path => GD.Load<FishSpecies>(path)).First(s => s.SpeciesName == "Szczupak");
+        float Mean(float hook)
+        {
+            var rng = new SeqRng();
+            float sum = 0f;
+            for (int i = 0; i < 400; i++)
+                sum += BiteModel.RollWeight(pike, hook, rng);
+            return sum / 400f;
+        }
+        float small = Mean(4f + BaitSize.HookShift("maggot")), big = Mean(4f + BaitSize.HookShift("livebait"));
+        t.Check(big > small * 1.1f, $"a big bait brings bigger fish ({small:0.00} kg on maggots, {big:0.00} kg on a live fish)");
+    }
+
+    /// <summary>Evenly spread values (deterministic).</summary>
+    private sealed class SeqRng : FishingSim.Core.IRng
+    {
+        private int _i;
+        public float NextFloat() => ((_i++ * 0.6180339f) % 1f);
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

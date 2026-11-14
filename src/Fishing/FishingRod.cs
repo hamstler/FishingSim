@@ -628,6 +628,11 @@ public partial class FishingRod : Node3D
 
     private float _windowFactor = 1f;
 
+    /// <summary>The hook's size as the fish see the whole offering: a big lure or a big natural bait (a live fish, a
+    /// night crawler, a boilie) makes it bigger, a pinch of maggots smaller (Core/Methods/BaitSize).</summary>
+    public float EffectiveHookSize => Loadout.Hook.Size
+        + (Loadout.LureOn ? MethodRules.SizeHookShift(Loadout.Bait.SizeCm) : BaitSize.HookShift(Loadout.Bait.ItemId));
+
     /// <summary>The map's sunken trees (set by Main from the scenery).</summary>
     public IReadOnlyList<SunkenWood> SunkenWood { get; set; } = Array.Empty<SunkenWood>();
 
@@ -647,7 +652,7 @@ public partial class FishingRod : Node3D
     public BiteContext MakeBiteContext(float depth, Vector2 at)
     {
         var (cover, edge) = StructureAt(at.X, at.Y);
-        return new(Loadout.Bait.ItemId, Loadout.Hook.Size + (Loadout.LureOn ? MethodRules.SizeHookShift(Loadout.Bait.SizeCm) : 0f), depth,
+        return new(Loadout.Bait.ItemId, EffectiveHookSize, depth,
             Lake.Location, World.Period, World.Weather, BaitLayerAt(depth),
             WaterTemperature.AtDepth(WaterTemp, depth * (BaitLayerAt(depth) ?? 1f)), cover, edge,
             World.Daylight < 0.5f ? World.MoonLight : null,
@@ -1236,7 +1241,7 @@ public partial class FishingRod : Node3D
     {
         if (_species.Count == 0)
             return false;
-        float hookSize = Loadout.Hook.Size;
+        float hookSize = EffectiveHookSize;
         _biter = null;
         if (DevSpeciesIndex >= 0 && DevSpeciesIndex < _species.Count)
         {
