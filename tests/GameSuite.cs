@@ -181,6 +181,15 @@ public sealed class GameSuite : ITestSuite
         t.Check(rod.BaitOnHook && rod.BaitFreshness > 0.95f, "a fresh worm goes on with the cast");
         rod.AgeBait(600f);
         t.Check(rod.BaitOnHook && rod.BaitFreshness == 0f, "a worm left ten minutes is spent but stays on");
+        int wormsLeft = loadout.BaitCount;
+        t.Check(!rod.LooseFeed() && loadout.BaitCount == wormsLeft, "worms are not thrown in by hand");
+        loadout.Index[(int)TackleSlot.Bait] = BaitIndex("maggot");
+        loadout.BaitCounts["maggot"] = 20;
+        float heatBefore = rod.GroundbaitHeat;
+        t.Check(rod.LooseFeed() && rod.LooseFeed() && loadout.BaitCounts["maggot"] == 20 - 2 * FishingRod.LooseFeedPieces
+                && rod.GroundbaitHeat > heatBefore + 0.5f, $"G throws handfuls of maggots round the float (heat {heatBefore:0.0} -> {rod.GroundbaitHeat:0.0})");
+        loadout.Index[(int)TackleSlot.Bait] = BaitIndex("worm");
+        rod.Groundbait.Clear();
         rod.ResetToIdle();
         rod.SetFloatDepth(1.2f);
 

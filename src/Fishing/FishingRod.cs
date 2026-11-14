@@ -219,7 +219,48 @@ public partial class FishingRod : Node3D
     public GroundbaitSpots Groundbait { get; } = new();
 
     /// <summary>How much groundbait works where the rig lies.</summary>
-    public float GroundbaitHeat => Groundbait.HeatAt(_rigPos.X, _rigPos.Z);
+    public float GroundbaitHeat => _castMethod == FishingMethod.Float
+        ? Groundbait.HeatAt(_bobber.GlobalPosition.X, _bobber.GlobalPosition.Z)
+        : Groundbait.HeatAt(_rigPos.X, _rigPos.Z);
+
+    /// <summary>Pieces of the bait thrown in by hand per handful (G).</summary>
+    public const int LooseFeedPieces = 3;
+
+    /// <summary>
+    /// G while float fishing: a handful of the hook bait (maggots, corn, groats, hemp, peas, bread) thrown by hand around
+    /// the float baits the spot like a feeder does, a little less strongly. Returns false (with a banner) when it cannot.
+    /// </summary>
+    public bool LooseFeed()
+    {
+        if (_castMethod != FishingMethod.Float || State is not (RodState.Waiting or RodState.Nibble or RodState.Bite))
+        {
+            ShowBanner("Zanęcanie z ręki: najpierw zarzuć spławik", 2f);
+            return false;
+        }
+        if (!LooseFeedBaits.Contains(Loadout.Bait.ItemId))
+        {
+            ShowBanner("Z ręki nęci się drobną przynętą: białe robaki, kukurydza, kasza, konopie, groch, chleb, ochotka", 3f);
+            return false;
+        }
+        if (Loadout.BaitCount <= LooseFeedPieces)
+        {
+            ShowBanner("Za mało przynęty, żeby nęcić", 2f);
+            return false;
+        }
+        for (int i = 0; i < LooseFeedPieces; i++)
+            Loadout.UseBait();
+        var at = _bobber.GlobalPosition;
+        // The handful lands round the float, not exactly on it (scatter grows with the distance).
+        float spread = MathF.Min(1f + FlatDistance(at) * 0.06f, 3f);
+        float ax = at.X + (_rng.NextFloat() * 2f - 1f) * spread, az = at.Z + (_rng.NextFloat() * 2f - 1f) * spread;
+        Groundbait.Feed(ax, az, 0.7f);
+        Disturbance.Add(0.04f * NoiseMasking);   // a patter of pieces, much quieter than a feeder
+        SoundCue?.Invoke(Core.Audio.OneShot.SmallSplash, 0.35f);
+        ShowBanner("Garść zanęty przy spławiku", 1.5f);
+        return true;
+    }
+
+    private static readonly HashSet<string> LooseFeedBaits = new() { "maggot", "corn", "kasza", "konopie", "groch", "bread", "ochotka" };
 
     /// <summary>Shift held while reeling: the lure is drawn fast.</summary>
     public bool FastReel { get; private set; }
@@ -623,6 +664,9 @@ public partial class FishingRod : Node3D
             case Key.Bracketleft:
                 ChangeFloatDepth(key.ShiftPressed ? -0.5f : -0.1f);
                 break;
+            case Key.G:
+                LooseFeed();
+                break;
             case Key.Z:
                 if (OnRest)
                 {
@@ -775,7 +819,7 @@ public partial class FishingRod : Node3D
             foreach (var sp in _species)
                 _interest[sp] = BiteModel.Weight(sp, ctx);
             // Fish gather over groundbait.
-            float baited = _castMethod == FishingMethod.Bottom ? GroundbaitSpots.PaceFor(GroundbaitHeat) : 1f;
+            float baited = _castMethod != FishingMethod.Spinning ? GroundbaitSpots.PaceFor(GroundbaitHeat) : 1f;
             Population.SetBait(_bobber.GlobalPosition, sp => Math.Clamp(_interest.GetValueOrDefault(sp) * 0.8f * baited, 0f, 1.2f));
         }
     }
@@ -1084,6 +1128,8 @@ public partial class FishingRod : Node3D
         float pace = 1f;
         if (Loadout.LureOn)
             pace = Reeling ? (Loadout.Rod.Kind == RodKind.Spinning ? 3.2f : 2.4f) : 0.1f;
+        if (!Loadout.LureOn)
+            pace *= GroundbaitSpots.PaceFor(GroundbaitHeat);   // fish gather over loose feed round the float
         _biteTimer -= dt * pace * ConditionPace * BaitPace;
         if (_biteTimer <= 0f)
             StartNibble();

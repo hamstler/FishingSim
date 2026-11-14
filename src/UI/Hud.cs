@@ -216,7 +216,7 @@ public partial class Hud : CanvasLayer
             + "PPM - podniesienie wędki: zacięcie, pompowanie, wyciągnięcie ryby\n"
             + "Spacja - kasarek (trzeba go kupić), kółko - hamulec\n"
             + "Spinning (przynęta sztuczna): LPM prowadzi (Shift szybciej), puszczona opada, PPM podszarpnięcie / zaczep\n"
-            + "Spławik: [ i ] (lub Ctrl + kółko) ustawiają grunt, czyli głębokość przynęty pod spławikiem\n"
+            + "Spławik: [ i ] (lub Ctrl + kółko) ustawiają grunt, czyli głębokość przynęty pod spławikiem; G - garść zanęty z ręki\n"
             + "Grunt (wędka gruntowa): koszyczek nęci miejsce, brania na szczytówce; Z - wędka na podpórkę / podnieś\n"
             + "1-5 - zmiana sprzętu (Shift = wstecz), Tab - stan\n"
             + "E - wejście | I ekwipunek | M mapa | J dziennik | T turnieje\n"
@@ -381,15 +381,19 @@ public partial class Hud : CanvasLayer
                     + (colour.Length > 0 ? $"  ·  {colour}" : "") + rest;
             case Core.Methods.FishingMethod.Bottom:
                 string rig = rod.RigSettled ? $"koszyczek na dnie, {rod.CurrentDepth():0.0} m" : "koszyczek opada";
-                float heat = rod.GroundbaitHeat;
-                int dots = heat < 0.05f ? 0 : heat < 0.8f ? 1 : heat < 1.8f ? 2 : 3;
-                string baited = dots > 0 ? $"  ·  nęcone miejsce {new string('●', dots)}{new string('○', 3 - dots)}" : "";
-                return $"  ·  {rig}{baited}{rest}";
+                return $"  ·  {rig}{Baited(rod.GroundbaitHeat)}{rest}";
             default:
                 float water = rod.CurrentDepth();
                 string hang = rod.OverDepth ? "przegruntowany: przynęta leży na dnie" : $"przynęta {System.MathF.Max(water - rod.FloatDepth, 0f):0.0} m nad dnem";
-                return $"  ·  woda {water:0.0} m, grunt {rod.FloatDepth:0.0} m ({hang}){rest}";
+                return $"  ·  woda {water:0.0} m, grunt {rod.FloatDepth:0.0} m ({hang}){Baited(rod.GroundbaitHeat)}{rest}";
         }
+    }
+
+    /// <summary>The baited spot's strength as dots ("" when there is none).</summary>
+    private static string Baited(float heat)
+    {
+        int dots = heat < 0.05f ? 0 : heat < 0.8f ? 1 : heat < 1.8f ? 2 : 3;
+        return dots > 0 ? $"  ·  nęcone miejsce {new string('●', dots)}{new string('○', 3 - dots)}" : "";
     }
 
     private string DevText()

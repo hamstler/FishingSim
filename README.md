@@ -403,6 +403,7 @@ Przy dodawaniu: nowa ryba = plik w `data/fish/`, wpis w `SpeciesCatalog.Paths` i
 - **Widoczność żyłki**: w przejrzystej wodzie i w pełnym słońcu ryby widzą grubą lub błyszczącą żyłkę, więc cienki przypon z fluorocarbonu wyraźnie skraca czekanie na branie. W mętnej wodzie, o zmierzchu i w nocy różnica prawie znika.
 - **Zmęczenie ryby**: długi hol (ponad 20 s) i trzymanie ryby na powietrzu ponad 20 s obniżają jej kondycję. Taka ryba trafia do siatki słabsza i jest tańsza na targu. Panel połowu ostrzega, gdy ryba jest za długo bez wody.
 - **Deszcz i fale tłumią hałas**: bębnienie deszczu i fale od wiatru zagłuszają kroki wędkarza i plusk zestawu. W deszczu przy silnym wietrze ryby płoszą się o ponad połowę słabiej niż w ciszy.
+- **Nęcenie z ręki** (G): przy spławiku można wrzucać garści drobnej przynęty (białe robaki, kukurydza, kasza, konopie, groch, chleb, ochotka), po 3 sztuki na garść. Garść ląduje w pobliżu spławika, im dalej, tym większy rozrzut. Ryby schodzą się na nęcone miejsce jak przy koszyczku, a HUD pokazuje jego siłę kropkami.
 - **Turnieje** (T): wpisowe, dojazd na łowisko, wynik to suma N najcięższych ryb, rywale to boty o różnych umiejętnościach. Nagrody (pieniądze i XP) według miejsca, historia w zapisie.
 
 ## Zapis gry
