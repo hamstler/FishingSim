@@ -145,6 +145,21 @@ public partial class FishingRod : Node3D
     private float _shoreCheck;
     private Vector3 _hookedAt;
 
+    /// <summary>Shoals found by catching one of them (cleared on a new map).</summary>
+    public Shoals Shoal { get; } = new();
+
+    private Func<string, float> ShoalAt(float x, float z)
+    {
+        float now = Profile.Clock;
+        return species => Shoal.Boost(species, x, z, now);
+    }
+
+    /// <summary>The fish just landed belongs to a shoal still at the spot.</summary>
+    public bool ShoalHere => State is RodState.Waiting or RodState.Nibble or RodState.Bite && Shoal.Any && Profile != null
+        && _lastShoalSpecies != null && Shoal.Boost(_lastShoalSpecies, _bobber.GlobalPosition.X, _bobber.GlobalPosition.Z, Profile.Clock) > 1.3f;
+
+    private string? _lastShoalSpecies;
+
     /// <summary>Recent catches round the lake: a spot fished hard bites slower (cleared on a new map).</summary>
     public SwimPressure Swim { get; } = new();
 
@@ -588,7 +603,8 @@ public partial class FishingRod : Node3D
         var (cover, edge) = StructureAt(at.X, at.Y);
         return new(Loadout.Bait.ItemId, Loadout.Hook.Size + (Loadout.LureOn ? MethodRules.SizeHookShift(Loadout.Bait.SizeCm) : 0f), depth,
             Lake.Location, World.Period, World.Weather, BaitLayerAt(depth), WaterTemp, cover, edge,
-            World.Daylight < 0.5f ? World.MoonLight : null);
+            World.Daylight < 0.5f ? World.MoonLight : null,
+            Shoal.Any && Profile != null ? ShoalAt(at.X, at.Y) : null);
     }
 
     /// <summary>Share of bites per species for the current setup at a point of the lake.</summary>
@@ -1700,6 +1716,9 @@ public partial class FishingRod : Node3D
         Profile.AddHookDull(Loadout.Hook.ItemId, HookWear.PerFish(CurrentWeight));
         // One fish fewer (or one more wary) at the spot where it bit.
         Swim.Add(_hookedAt.X, _hookedAt.Z, Profile.Clock);
+        Shoal.Add(species.SpeciesName, _hookedAt.X, _hookedAt.Z, Profile.Clock);
+        if (Shoals.IsShoaling(species.SpeciesName))
+            _lastShoalSpecies = species.SpeciesName;
         _lastFightSeconds = _fight?.Elapsed ?? 0f;
         if (_fight != null)
             Profile.AddLineTwist(Loadout.Line.ItemId, -LineTwist.FightRelief(_fight.Elapsed));

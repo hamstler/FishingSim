@@ -305,6 +305,7 @@ public sealed class CoreSuite : ITestSuite
         Handled(t);
         Leaps(t);
         Points(t);
+        Shoaling(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -947,6 +948,27 @@ public sealed class CoreSuite : ITestSuite
         p.AddHookDull("hak6", 0.5f);
         p.Sharpen("hak6");
         t.Check(!p.HookDull.ContainsKey("hak6"), "a hone puts the point back");
+    }
+
+    /// <summary>Shoals (Core/Methods/Shoals) and the bite model.</summary>
+    private static void Shoaling(TestContext t)
+    {
+        t.Section("shoals");
+        var shoals = new Shoals();
+        shoals.Add("Szczupak", 0f, 0f, 5f);
+        t.Check(!shoals.Any, "a pike is a loner: it leaves no shoal");
+        shoals.Add("Płoć", 0f, 0f, 5f);
+        float here = shoals.Boost("Płoć", 2f, 0f, 5.1f), other = shoals.Boost("Leszcz", 2f, 0f, 5.1f);
+        float far = shoals.Boost("Płoć", 20f, 0f, 5.1f), later = shoals.Boost("Płoć", 2f, 0f, 8f);
+        t.Check(here > 1.6f && other == 1f && far == 1f, $"a roach caught means more roach close by ({here:0.00}), not bream, not 20 m off");
+        t.Check(later < 1.05f, "the shoal moves on within a few game hours");
+        for (int i = 0; i < 6; i++)
+            shoals.Add("Płoć", 0f, 0f, 5.1f);
+        t.Check(shoals.Boost("Płoć", 0f, 0f, 5.1f) <= Shoals.MaxBoost, "the boost is capped");
+        var roach = SpeciesCatalog.Paths.Select(path => GD.Load<FishSpecies>(path)).First(s => s.SpeciesName == "Płoć");
+        var plain = new BiteContext("maggot", 6f, 2f);
+        var shoal = plain with { Shoal = name => name == "Płoć" ? 2f : 1f };
+        t.Check(MathF.Abs(BiteModel.Weight(roach, shoal) - 2f * BiteModel.Weight(roach, plain)) < 1e-4f, "the bite model weighs the shoal");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>
