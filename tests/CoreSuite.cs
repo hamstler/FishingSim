@@ -980,6 +980,8 @@ public sealed class CoreSuite : ITestSuite
         t.Check(dusk > 3f * noon, $"fish rise most in the evening ({dusk:0.0}/min vs {noon:0.0} at noon)");
         t.Check(Rises.PerMinute(19.5f, Weather.Rain, 0.85f) < 0.3f * dusk, "rain and wind put the rises down");
         t.Check(Rises.Riser(FeedingHabits.LayerOf("Ukleja")) && !Rises.Riser(FeedingHabits.LayerOf("Leszcz")), "bleak rise, bream stay on the bottom");
+        t.Check(Rises.Boost(1f, 5f) > 1.8f && Rises.Boost(1f, 50f) < 1.3f && Rises.Boost(8f, 1f) == 1f,
+            "a bait cast right to a fresh rise tempts that fish; an old or distant ring does little");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

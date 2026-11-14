@@ -23,4 +23,18 @@ public static class Rises
 
     /// <summary>A fish of a species feeding at this level (FeedingHabits.LayerOf: 0 surface .. 1 bottom) rises at all.</summary>
     public static bool Riser(float layer) => layer <= 0.6f;
+
+    /// <summary>How long (real seconds) a rise still tells where the fish is.</summary>
+    public const float FreshSeconds = 60f;
+
+    /// <summary>How far (m) from a rise a bait counts as cast to it.</summary>
+    public const float CastTo = 6f;
+
+    /// <summary>The bite weight multiplier for a species whose fish rose this far away this many seconds ago.</summary>
+    public static float Boost(float distance, float secondsAgo)
+    {
+        if (distance >= CastTo || secondsAgo >= FreshSeconds || secondsAgo < 0f)
+            return 1f;
+        return 1f + 1.2f * (1f - distance / CastTo) * (1f - secondsAgo / FreshSeconds);
+    }
 }

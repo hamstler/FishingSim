@@ -25,6 +25,9 @@ public partial class RiseRings : Node3D
     private float _due;
     private ShaderMaterial _mat = null!;
 
+    /// <summary>A fish of this species rose at (x, z).</summary>
+    public event Action<string, float, float>? Risen;
+
     /// <summary>Rings stop spreading and no new ones come (screenshots).</summary>
     public bool Frozen { get; set; }
 
@@ -98,6 +101,7 @@ public partial class RiseRings : Node3D
             if (dx * dx + dz * dz > Range * Range)
                 continue;
             SpawnAt(a.Position.X, a.Position.Y, 1.4f + 0.8f * MathF.Min(a.Weight, 2f));
+            Risen?.Invoke(a.Species, a.Position.X, a.Position.Y);
             return true;
         }
         return false;

@@ -363,6 +363,11 @@ public sealed class GameSuite : ITestSuite
             if (main.Rises.Spawn())
                 risen++;
         t.Check(risen > 0 && main.Rises.Count >= risen, $"surface feeders leave rings on the water ({risen} of 40 tries)");
+        var spot = new Vector2(3f, 20f);
+        float bleakBefore = rod.BiteChances(2f, spot).FirstOrDefault(c => c.Species.SpeciesName == "Ukleja").Weight;
+        rod.NoteRise("Ukleja", spot.X, spot.Y);
+        float bleakAfter = rod.BiteChances(2f, spot).FirstOrDefault(c => c.Species.SpeciesName == "Ukleja").Weight;
+        t.Check(bleakBefore <= 0f || bleakAfter > bleakBefore * 1.8f, $"a bait at a fresh bleak rise tempts bleak ({bleakBefore:0.000} -> {bleakAfter:0.000})");
 
         t.Section("hook point");
         string hookId = rod.Loadout.Hook.ItemId;

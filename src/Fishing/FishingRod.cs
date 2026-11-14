@@ -150,8 +150,44 @@ public partial class FishingRod : Node3D
 
     private Func<string, float> ShoalAt(float x, float z)
     {
-        float now = Profile.Clock;
-        return species => Shoal.Boost(species, x, z, now);
+        float now = Profile?.Clock ?? 0f;
+        float real = Time.GetTicksMsec() / 1000f;
+        return species =>
+        {
+            float boost = Shoal.Any ? Shoal.Boost(species, x, z, now) : 1f;
+            foreach (var r in _rises)
+                if (r.Species == species)
+                    boost *= Rises.Boost(MathF.Sqrt((r.X - x) * (r.X - x) + (r.Z - z) * (r.Z - z)), real - r.At);
+            return boost;
+        };
+    }
+
+    private readonly List<(string Species, float X, float Z, float At)> _rises = new();
+
+    /// <summary>A fish rose at (x, z) (World/RiseRings): a bait cast to the ring tempts that species for a minute.</summary>
+    public void NoteRise(string species, float x, float z)
+    {
+        float real = Time.GetTicksMsec() / 1000f;
+        _rises.RemoveAll(r => real - r.At > Rises.FreshSeconds);
+        if (_rises.Count >= 16)
+            _rises.RemoveAt(0);
+        _rises.Add((species, x, z, real));
+    }
+
+    /// <summary>The bait lies by a fresh rise.</summary>
+    public bool CastToRise
+    {
+        get
+        {
+            if (State is not (RodState.Waiting or RodState.Nibble or RodState.Bite) || _rises.Count == 0)
+                return false;
+            float real = Time.GetTicksMsec() / 1000f;
+            var b = _bobber.GlobalPosition;
+            foreach (var r in _rises)
+                if (Rises.Boost(MathF.Sqrt((r.X - b.X) * (r.X - b.X) + (r.Z - b.Z) * (r.Z - b.Z)), real - r.At) > 1.3f)
+                    return true;
+            return false;
+        }
     }
 
     /// <summary>The fish just landed belongs to a shoal still at the spot.</summary>
@@ -604,7 +640,7 @@ public partial class FishingRod : Node3D
         return new(Loadout.Bait.ItemId, Loadout.Hook.Size + (Loadout.LureOn ? MethodRules.SizeHookShift(Loadout.Bait.SizeCm) : 0f), depth,
             Lake.Location, World.Period, World.Weather, BaitLayerAt(depth), WaterTemp, cover, edge,
             World.Daylight < 0.5f ? World.MoonLight : null,
-            Shoal.Any && Profile != null ? ShoalAt(at.X, at.Y) : null);
+            (Shoal.Any && Profile != null) || _rises.Count > 0 ? ShoalAt(at.X, at.Y) : null);
     }
 
     /// <summary>Share of bites per species for the current setup at a point of the lake.</summary>

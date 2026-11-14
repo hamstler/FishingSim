@@ -127,6 +127,7 @@ public partial class Main : Node3D
         Rises = new RiseRings();
         Rises.Setup(Fish, _world, Player, WaterY);
         AddChild(Rises);
+        Rises.Risen += Rod.NoteRise;
         Rod.WeedBeds = Scenery.WeedBeds;
         AddChild(new Graphics.Gulls { Daylight = () => _world.Daylight });
 
