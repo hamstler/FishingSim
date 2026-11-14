@@ -379,7 +379,7 @@ public partial class FishingRod : Node3D
         _reelSpeed = reel.ReelSpeed * (1f + (Gear?.Accessory(AccessoryKind.ReelGrease)?.Power ?? 0f));
         MaxLine = reel.LineCapacity;
         // The leader is part of the line: the weaker of the two holds, and the fish see the leader, not the line.
-        LineStrength = MathF.Min(line.Strength, leader.Strength);
+        LineStrength = MathF.Min(Core.Methods.LineWear.Strength(line.Strength, Profile?.LineWear.GetValueOrDefault(line.ItemId) ?? 0f), leader.Strength);
         _lineVisibility = leader.Visibility > 0f ? leader.Visibility : line.Visibility;
         // Rated power: the rod's own limit; it reads as fully bent near that load.
         _bendModel = new Core.Physics.RodBendModel(RodRig.Joints * RodRig.SegmentLength, rod.MaxLoad, rod.Action);
@@ -457,6 +457,9 @@ public partial class FishingRod : Node3D
     }
 
     /// <summary>A lure's size counts as hook sizes: a big lure draws big fish and puts small mouths off.</summary>
+    /// <summary>How worn the line on the spool is (0 new .. 0.6).</summary>
+    public float LineWearNow => Profile?.LineWear.GetValueOrDefault(Loadout.Line.ItemId) ?? 0f;
+
     public BiteContext MakeBiteContext(float depth) =>
         new(Loadout.Bait.ItemId, Loadout.Hook.Size + (Loadout.LureOn ? MethodRules.SizeHookShift(Loadout.Bait.SizeCm) : 0f), depth,
             Lake.Location, World.Period, World.Weather, BaitLayerAt(depth), WaterTemp);
@@ -811,6 +814,7 @@ public partial class FishingRod : Node3D
         _floatDrawn = false;
         _lineLength = 0f;
         PickUpRod();
+        ApplyTackle();      // the line may have frayed
         SetState(RodState.Idle);
     }
 
@@ -1289,6 +1293,7 @@ public partial class FishingRod : Node3D
         if (_fight == null)
             return;
         var outcome = _fight.Step(dt, DragSetting, Reeling, Lifting);
+        Profile.AddLineWear(Loadout.Line.ItemId, Core.Methods.LineWear.FromLoad(_fight.Tension, Loadout.Line.Strength, dt));
         switch (outcome)
         {
             case FightOutcome.LineBroke:
@@ -1490,6 +1495,7 @@ public partial class FishingRod : Node3D
             MathF.Round(CurrentDepth() * 10f) / 10f, World.TimeText);
         // Counts, journal, records and XP now; the keepnet only when the angler chooses (catch panel: E / R).
         var result = Profile.AddCatch(species, CurrentWeight, context, toKeepnet: false);
+        Profile.AddLineWear(Loadout.Line.ItemId, Core.Methods.LineWear.PerFish);
         LastCatch = result;
         AwaitingDecision = true;
         if (_biter != null)
@@ -1682,6 +1688,7 @@ public partial class FishingRod : Node3D
         {
             if (Reeling)
             {
+                Profile.AddLineWear(Loadout.Line.ItemId, Core.Methods.LineWear.PerSnagPullSecond * dt);
                 switch (lure.Pull(_rng, dt))
                 {
                     case SnagResult.Broke:
@@ -1742,6 +1749,7 @@ public partial class FishingRod : Node3D
         Twitch(lure.Snagged ? 1.6f : 0.9f);
         if (lure.Snagged)
         {
+            Profile.AddLineWear(Loadout.Line.ItemId, Core.Methods.LineWear.PerSnagJerk);
             switch (lure.Jerk(_rng))
             {
                 case SnagResult.Broke:

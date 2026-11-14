@@ -417,7 +417,13 @@ public sealed class GameSuite : ITestSuite
         {
             rod.TryHook();
             t.Check(rod.State == RodState.Waiting && rod.BannerText.Contains("Za wcześnie"), "striking before the float is right under is too early");
-            await WaitForState(t, rod, RodState.Bite, 8);
+            if (!rod.BaitOnHook)
+            {
+                // The fish took the bait: a bare hook catches nothing, so cast again with a new one.
+                rod.ResetToIdle();
+                rod.CastNow(0.4f);
+            }
+            await WaitForState(t, rod, RodState.Bite, 12);
         }
         for (int i = 0; i < 240 && rod.State == RodState.Bite && !rod.StrikeReady; i++)
             await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);

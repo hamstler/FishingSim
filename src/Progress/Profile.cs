@@ -76,6 +76,17 @@ public sealed class Profile
     /// <summary>Forest pickings (Core/Camp/Foraging ids -> pieces): mushrooms and berries for cooking and notices.</summary>
     public Dictionary<string, int> Pantry { get; set; } = new();
 
+    /// <summary>Line id -> how worn the line on the spool is (0 new .. 0.6; Core/Methods/LineWear).</summary>
+    public Dictionary<string, float> LineWear { get; set; } = new();
+
+    /// <summary>Frays a line a little more (no change event: it happens every frame of a fight).</summary>
+    public void AddLineWear(string lineId, float amount)
+    {
+        if (amount <= 0f)
+            return;
+        LineWear[lineId] = MathF.Min(LineWear.GetValueOrDefault(lineId) + amount, Core.Methods.LineWear.Max);
+    }
+
     /// <summary>Fish hanging in the village smokehouse.</summary>
     public List<SmokingLot> Smokery { get; set; } = new();
 
@@ -113,6 +124,7 @@ public sealed class Profile
         Meal = null;
         MealHoursLeft = 0f;
         Pantry = new();
+        LineWear = new();
         Smokery = new();
         Smoked = new();
         Notices = new();
@@ -296,6 +308,16 @@ public sealed class Profile
     {
         if (Level < requiredLevel)
             return $"Wymagany poziom {requiredLevel}";
+        // New line on the spool for a worn line of the same kind.
+        if (slot == TackleSlot.Line && Owns(slot, id) && Core.Methods.LineWear.Worn(LineWear.GetValueOrDefault(id)))
+        {
+            if (Money < price)
+                return "Za mało pieniędzy";
+            Money -= price;
+            LineWear.Remove(id);
+            Changed?.Invoke();
+            return null;
+        }
         if (slot != TackleSlot.Bait && Owns(slot, id))
             return "Już to masz";
         if (slot != TackleSlot.Bait && !Owned.ContainsKey(slot.Key()))
@@ -332,6 +354,8 @@ public sealed class Profile
         if (slot == TackleSlot.Bait || (slot == TackleSlot.Leader && id == TackleSlotExtensions.NoLeader)
             || !Owned.TryGetValue(slot.Key(), out var ids) || !ids.Remove(id))
             return false;
+        if (slot == TackleSlot.Line)
+            LineWear.Remove(id);
         if (Equipped.GetValueOrDefault(slot.Key()) == id)
             Equipped[slot.Key()] = slot == TackleSlot.Leader ? TackleSlotExtensions.NoLeader : ids.Count > 0 ? ids[0] : "";
         Changed?.Invoke();

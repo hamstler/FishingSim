@@ -294,6 +294,7 @@ public sealed class CoreSuite : ITestSuite
         Noise(t);
         ThrownHooks(t);
         Wear(t);
+        Fraying(t);
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
     }
@@ -729,6 +730,24 @@ public sealed class CoreSuite : ITestSuite
             "soft baits fall off; a spent bait draws a third as well");
         t.Check(BaitWear.Word(false, 1f).Contains("pusty") && BaitWear.Word(true, 0.2f).Contains("zużyta") && BaitWear.Word(true, 0.9f) == "",
             "the HUD says when the hook is bare or the bait spent");
+    }
+
+    /// <summary>Line wear (Core/Methods/LineWear) and new line on the spool (Profile).</summary>
+    private static void Fraying(TestContext t)
+    {
+        t.Section("line wear");
+        t.Check(LineWear.FromLoad(2f, 6f, 10f) == 0f && LineWear.FromLoad(5f, 6f, 10f) > 0.05f, "only a load past half the line's strength frays it");
+        t.Check(MathF.Abs(LineWear.Strength(6f, 0.25f) - 4.5f) < 1e-4f && LineWear.Strength(6f, 5f) >= 6f * (1f - LineWear.Max) - 1e-4f,
+            "a quarter worn line holds a quarter less, never under 40 %");
+        var p = new Profile { Money = 100 };
+        p.Owned["line"].Add("zylka016");
+        p.AddLineWear("zylka016", 0.3f);
+        var saved = ProfileSerializer.FromJson(ProfileSerializer.ToJson(p).ToJsonString());
+        t.Check(MathF.Abs(saved.LineWear.GetValueOrDefault("zylka016") - 0.3f) < 1e-4f, "the wear survives a save");
+        t.Check(p.Buy(TackleSlot.Line, "zylka016", 10, 1) == null && p.LineWear.GetValueOrDefault("zylka016") == 0f && p.Money == 90,
+            "new line on the spool makes a worn line whole");
+        t.Check(p.Buy(TackleSlot.Line, "zylka016", 10, 1) == "Już to masz", "a whole line is not bought twice");
+        t.Check(LineWear.Word(0.3f) == "przetarta" && LineWear.Word(0.01f) == "", "the HUD names the wear");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

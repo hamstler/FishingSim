@@ -753,7 +753,10 @@ public partial class Shop : CanvasLayer
             else if (_profile.Owns(slot, item.ItemId))
             {
                 bool worn = _loadout.Index[(int)slot] == i;
+                string fray = slot == TackleSlot.Line ? Core.Methods.LineWear.Word(_profile.LineWear.GetValueOrDefault(item.ItemId)) : "";
                 (status, color) = worn ? ("w użyciu", Owned) : ("posiadane", Owned);
+                if (fray.Length > 0)
+                    status += " · " + fray;
                 badge = worn ? Badge.InUse : Badge.Owned;
             }
             else
@@ -992,6 +995,25 @@ public partial class Shop : CanvasLayer
                 : pack == 1 ? $"Kup za {Lore.Money(item.Price)}" : $"Kup paczkę ({pack} szt.) za {Lore.Money(item.Price)}";
             enabled = !locked && _profile.Money >= item.Price;
             action = () => Buy(slot, index);
+        }
+        else if (slot == TackleSlot.Line && _profile.Owns(slot, item.ItemId) && _loadout.Index[(int)slot] == index
+                 && Core.Methods.LineWear.Worn(_profile.LineWear.GetValueOrDefault(item.ItemId)))
+        {
+            // A frayed line in use: new line can be put on the spool.
+            float wear = _profile.LineWear.GetValueOrDefault(item.ItemId);
+            state = $"Tego używasz. Żyłka {Core.Methods.LineWear.Word(wear)}: wytrzymuje o {wear * 100f:0}% mniej.";
+            button = $"Nawiń nową za {Lore.Money(item.Price)}";
+            enabled = _profile.Money >= item.Price;
+            action = () =>
+            {
+                string? error = _profile.Buy(slot, item.ItemId, item.Price, item.RequiredLevel);
+                _message.Text = error ?? $"Nawinięto nową: {item.DisplayName}";
+                if (error == null)
+                {
+                    PurchaseEffect();
+                    _rod.ApplyTackle();
+                }
+            };
         }
         else if (_profile.Owns(slot, item.ItemId))
         {

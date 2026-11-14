@@ -118,6 +118,11 @@ Zużyta przynęta wabi trzy razy słabiej. Ryba, przy której zacięcie chybiło
 zwykle zjada przynętę: na pustym haczyku nic nie bierze, trzeba zwinąć i zarzucić od nowa. Pasek stanu mówi,
 kiedy przynęta słabnie, jest zużyta albo haczyk jest pusty. Przynęty sztuczne się nie zużywają.
 
+**Zużycie żyłki:** żyłka przeciera się w użyciu: każdy hol, który obciąża ją powyżej połowy wytrzymałości,
+szarpanie i ciągnięcie zaczepu oraz każda wyholowana ryba. Przetarta żyłka (do 60% słabsza) pęka wcześniej; zużycie
+jest zapisywane, widać je w opisie sprzętu (Tab) i na karcie w kramie. W kramie przy przetartej żyłce w użyciu jest
+przycisk „Nawiń nową”, który za cenę żyłki przywraca jej pełną wytrzymałość.
+
 **Grafika na laptopie:** przy pierwszym uruchomieniu na zintegrowanej grafice gra sama ustawia jakość Niską, bliski
 zasięg widzenia i 3D w 70% (FSR). Wszystko to można zmienić w menu pauzy. Na Niskiej nie ma też poświaty (bloom).
 
