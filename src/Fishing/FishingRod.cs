@@ -1584,6 +1584,81 @@ public partial class FishingRod : Node3D
         SetState(RodState.Fight);
     }
 
+    /// <summary>How many predators that take a struggling fish live here (abundance x tendency, summed).</summary>
+    private float PredatorPresence()
+    {
+        float sum = 0f;
+        foreach (var sp in _species)
+            if (PreyAttack.Predators.TryGetValue(sp.SpeciesName, out float tendency) && sp.SpeciesName != CurrentSpecies?.SpeciesName)
+                sum += tendency * Lake.Location.AbundanceOf(sp.SpeciesName);
+        return sum;
+    }
+
+    /// <summary>The predator that grabbed the hooked fish, for tests (null if none yet).</summary>
+    public string? PreyTakenBy { get; private set; }
+
+    /// <summary>
+    /// A predator takes the little fish on the line: the fight goes on with the predator where the prey was, holding
+    /// it (not the hook) in its jaws.
+    /// </summary>
+    public void PredatorTakes()
+    {
+        if (_fight == null || CurrentSpecies == null)
+            return;
+        var choices = new List<(FishSpecies Sp, float W)>();
+        float total = 0f;
+        foreach (var sp in _species)
+            if (PreyAttack.Predators.TryGetValue(sp.SpeciesName, out float tendency) && sp.SpeciesName != CurrentSpecies.SpeciesName)
+            {
+                float w = tendency * Lake.Location.AbundanceOf(sp.SpeciesName);
+                if (w > 0f)
+                {
+                    choices.Add((sp, w));
+                    total += w;
+                }
+            }
+        if (choices.Count == 0)
+            return;
+        float roll = _rng.NextFloat() * total;
+        var predator = choices[^1].Sp;
+        foreach (var (sp, w) in choices)
+        {
+            roll -= w;
+            if (roll <= 0f)
+            {
+                predator = sp;
+                break;
+            }
+        }
+        string prey = CurrentSpecies.SpeciesName;
+        float dist = _fight.Position.Length();
+        float heading = _fight.Heading;
+        if (_biter != null)
+        {
+            Population?.Catch(_biter);      // the little fish is eaten
+            _biter = null;
+        }
+        CurrentSpecies = predator;
+        // Hunting with a live fish: the takers run big (as on a live bait).
+        CurrentWeight = BiteModel.RollWeight(predator, Loadout.Hook.Size + BaitSize.HookShift("livebait"), _rng);
+        HookDeep = false;
+        var gear = new FightGear(DragMax, EffectiveLimit, _rodShock, _reelSpeed, MaxLine);
+        _fight = new FightModel(FishProfile.From(predator, CurrentWeight), gear, _rng, MathF.Max(dist, 1f), heading, DragSetting)
+        {
+            Unbreakable = DevUnbreakable,
+            HookHold = PreyAttack.Hold,
+        };
+        PreyTakenBy = predator.SpeciesName;
+        SoundCue?.Invoke(Core.Audio.OneShot.Splash, 1f);
+        Twitch(3f);
+        _fishModel?.QueueFree();
+        _fishModel = FishModel.Create(predator, CurrentWeight, detailed: true);
+        _fishNode.AddChild(_fishModel);
+        _jump = 0f;
+        _weedTime = 0f;
+        ShowBanner($"{predator.SpeciesName} porwał holowaną rybę ({prey})! Trzyma ją w pysku: holuj delikatnie.", 4f);
+    }
+
     private void TickFight(float dt)
     {
         if (_fight == null)
@@ -1594,6 +1669,14 @@ public partial class FishingRod : Node3D
             LoseFish(Lifting
                 ? "Ryba wyskoczyła i wypluła haczyk. Gdy ryba skacze, opuść wędkę (puść PPM)!"
                 : "Ryba wyskoczyła i wypluła haczyk.");
+            return;
+        }
+        // A little fish struggling on the line tempts the predators.
+        if (DevSpeciesIndex < 0 && !DevInstantBite && CurrentSpecies != null
+            && PreyAttack.IsPrey(CurrentSpecies.SpeciesName, CurrentWeight)
+            && _rng.NextFloat() < PreyAttack.ChancePerSecond(PredatorPresence()) * dt)
+        {
+            PredatorTakes();
             return;
         }
         var outcome = _fight.Step(dt, DragSetting, Reeling, Lifting);

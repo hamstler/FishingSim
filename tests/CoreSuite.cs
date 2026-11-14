@@ -316,6 +316,7 @@ public sealed class CoreSuite : ITestSuite
         Bag(t);
         Strikes(t);
         Seasons(t);
+        Ambush(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -1119,6 +1120,17 @@ public sealed class CoreSuite : ITestSuite
         t.Check(BaitSeason.Pace(0, 9f) > BaitSeason.Pace(1, 9f) * 1.6f, "in cold water a worm beats corn");
         t.Check(BaitSeason.Pace(1, 22f) >= BaitSeason.Pace(0, 22f) && BaitSeason.Pace(2, 24f) > 1.1f, "in warm water plant baits and boilies come into their own");
         t.Check(BaitSeason.Pace(3, 5f) == 1f, "lures are judged by their own rules");
+    }
+
+    /// <summary>Predators grabbing a hooked little fish (Core/Methods/PreyAttack).</summary>
+    private static void Ambush(TestContext t)
+    {
+        t.Section("prey attack");
+        t.Check(PreyAttack.IsPrey("Ukleja", 0.05f) && !PreyAttack.IsPrey("Płoć", 0.8f) && !PreyAttack.IsPrey("Karp", 0.2f),
+            "a little roach or bleak is prey, a big roach or a carp is not");
+        float pikeLake = PreyAttack.ChancePerSecond(1f);
+        t.Check(pikeLake * 20f > 0.1f && pikeLake * 20f < 0.3f && PreyAttack.ChancePerSecond(0f) == 0f,
+            $"in a pike lake a twenty-second fight is grabbed now and then ({pikeLake * 20f:0.00}), never without predators");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

@@ -151,6 +151,10 @@ public sealed class GameSuite : ITestSuite
         if (rod.State is RodState.Nibble or RodState.Bite)
             rod.TryHook();
         t.Check(rod.State == RodState.Fight && !rod.Bobber.TerminalVisible, $"struck (or hooked by itself) it fights, the lure in its mouth ({rod.State})");
+        rod.PredatorTakes();
+        t.Check(rod.State == RodState.Fight && rod.PreyTakenBy != null && rod.PreyTakenBy != "Szczupak"
+                && rod.CurrentSpecies?.SpeciesName == rod.PreyTakenBy && Core.Methods.PreyAttack.IsPrey("Płoć", 0.1f),
+            $"a predator can grab the fish on the line and the fight goes on with it ({rod.PreyTakenBy})");
         rod.ReelOverride = false;
         rod.ResetToIdle();
 
