@@ -346,7 +346,8 @@ public partial class Minimap : Control
             day ? new Color(1f, 0.85f, 0.5f, 0.9f) : new Color(0.75f, 0.82f, 1f, 0.9f));
         string weather = !day && world.Weather == Weather.Clear ? "Pogodnie" : world.Weather.DisplayName();
         string wind = world.WindTarget < 0.35f ? "lekki wiatr" : world.WindTarget < 0.7f ? "umiarkowany wiatr" : "silny wiatr";
-        string line = $"{weather} · {wind}";
+        // At night the moon's phase too: it tells how dark the night is.
+        string line = day ? $"{weather} · {wind}" : $"{weather} · {Core.Methods.Moon.Name(world.MoonPhase)} · {wind}";
         DrawString(font, new Vector2(box.Position.X, box.Position.Y + 31f), line, HorizontalAlignment.Center, box.Size.X,
             Fit(font, line, inner, 11), new Color(Ink, 0.88f));
         // The barometer and the water: what the fish feel.

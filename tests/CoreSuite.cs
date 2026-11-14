@@ -299,6 +299,7 @@ public sealed class CoreSuite : ITestSuite
         Casts(t);
         Spells(t);
         Shores(t);
+        Moonlight(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -838,6 +839,32 @@ public sealed class CoreSuite : ITestSuite
         t.Check(WindShore.Exposure(depth, 60f, 0f, 1f, 0f) == 0f && WindShore.Exposure(depth, 45f, 0f, 0f, 0f) == 0f, "nothing on land or in a calm");
         t.Check(WindShore.Pace(1f, 0.85f) > 1.25f && WindShore.Pace(1f, 0.25f) < 1.1f && WindShore.Pace(0f, 1f) == 1f,
             "a strong wind quickens the bites there, a breeze hardly");
+    }
+
+    /// <summary>The moon (Core/Methods/Moon).</summary>
+    private static void Moonlight(TestContext t)
+    {
+        t.Section("moon");
+        float full = 0f, newMoon = 1f;
+        for (int d = 0; d < 30; d++)
+        {
+            float ill = Moon.Illumination(Moon.Phase(d * 24f));
+            full = MathF.Max(full, ill);
+            newMoon = MathF.Min(newMoon, ill);
+        }
+        t.Check(full > 0.98f && newMoon < 0.02f, "a month of game days runs from new moon to full moon");
+        t.Check(Moon.Name(0f) == "nów" && Moon.Name(0.5f) == "pełnia" && Moon.Name(0.25f) == "pierwsza kwadra", "the dial names the phase");
+        t.Check(Moon.Light(0.5f, 0f, Weather.Clear) == 0f && Moon.Light(0.5f, 1f, Weather.Clear) > 0.99f
+                && Moon.Light(0.5f, 1f, Weather.Rain) < 0.2f, "moonlight only at night, hidden by rain clouds");
+        t.Check(Moon.Fit("Sum", 0f) > 1.2f && Moon.Fit("Sum", 1f) < 0.8f && Moon.Fit("Płoć", 1f) > Moon.Fit("Płoć", 0f),
+            "catfish hunt in the dark of a new moon, other fish feed a little more on bright nights");
+        var sum = SpeciesCatalog.Paths.Select(path => GD.Load<FishSpecies>(path)).FirstOrDefault(s => s.SpeciesName == "Sum");
+        if (sum != null)
+        {
+            var dark = new BiteContext("livebait", 4f, 4f, MoonLight: 0f);
+            var bright = dark with { MoonLight = 1f };
+            t.Check(BiteModel.Weight(sum, dark) > BiteModel.Weight(sum, bright) * 1.5f, "the bite model weighs the moonlight");
+        }
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

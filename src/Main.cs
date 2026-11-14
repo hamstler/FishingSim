@@ -176,6 +176,9 @@ public partial class Main : Node3D
         AddChild(Board);
         // Picked mushrooms and berries grow back a day later.
         _world.HoursAdvanced += _ => Scenery.RegrowForage(_profile.Clock);
+        // The moon's phase follows the profile's clock.
+        _world.MoonPhase = Core.Methods.Moon.Phase(_profile.Clock);
+        _world.HoursAdvanced += _ => _world.MoonPhase = Core.Methods.Moon.Phase(_profile.Clock);
 
         Interactions.Activated += spot => OnInteract(spot, shop, gameUi, Cooking);
 

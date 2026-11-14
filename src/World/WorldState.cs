@@ -35,6 +35,12 @@ public partial class WorldState : Node
     /// <summary>The air pressure and its trend (the fish feel it).</summary>
     public Core.Methods.Barometer Barometer { get; } = new();
 
+    /// <summary>The moon's phase (0 new, 0.5 full; Core/Methods/Moon), set from the profile's clock.</summary>
+    public float MoonPhase { get; set; } = 0.5f;
+
+    /// <summary>Moonlight on the water now (0 by day or in the dark of a new moon .. 1 a clear full moon at midnight).</summary>
+    public float MoonLight => Core.Methods.Moon.Light(MoonPhase, 1f - Daylight, Weather);
+
     public void Advance(float hours)
     {
         Hour = Mathf.PosMod(Hour + hours, 24f);
