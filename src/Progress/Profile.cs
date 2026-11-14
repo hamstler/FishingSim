@@ -428,13 +428,13 @@ public sealed class Profile
     public const int ReleaseXp = 3;
 
     /// <summary>Puts a landed fish into the keepnet. Null on success, otherwise why not (a full keepnet).</summary>
-    public string? Keep(FishSpecies species, float weight)
+    public string? Keep(FishSpecies species, float weight, float condition = 1f)
     {
         if (!KeepnetFits(weight))
             return KeepnetLimit is { } net && Keepnet.Count >= net.MaxFish
                 ? "Siatka pełna: wypuść rybę albo sprzedaj połów"
                 : "Ryba nie zmieści się w siatce: jest za ciężka na tę siatkę";
-        Keepnet.Add(new CatchRecord(species.SpeciesName, weight, Progression.FishValue(species, weight), 1f, weight < species.LegalWeight));
+        Keepnet.Add(new CatchRecord(species.SpeciesName, weight, Progression.FishValue(species, weight), Math.Clamp(condition, 0f, 1f), weight < species.LegalWeight));
         Changed?.Invoke();
         return null;
     }

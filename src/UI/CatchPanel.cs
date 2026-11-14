@@ -192,7 +192,25 @@ public partial class CatchPanel : Control
         _turntable.Rotation = new Vector3(MathF.Sin(_time * 0.9f) * 0.04f, _angle, 0f);
         _turntable.Position = new Vector3(0f, MathF.Sin(_time * 1.3f) * 0.012f, 0f);
         Adopt();
+        // Out of the water too long: the fish suffers (shown twice a second).
+        _airShown -= dt;
+        if (_airShown <= 0f)
+        {
+            _airShown = 0.5f;
+            string air = _rod.AirSeconds > Core.Methods.Handling.AirGrace
+                ? $"Ryba za długo bez wody: kondycja {_rod.CatchCondition * 100f:0}%. Zdecyduj szybko!"
+                : "";
+            string text = _baseWarning.Length > 0 && air.Length > 0 ? _baseWarning + "\n" + air : _baseWarning + air;
+            if (text != _warning.Text)
+            {
+                _warning.Text = text;
+                _warning.Visible = text != "";
+            }
+        }
     }
+
+    private string _baseWarning = "";
+    private float _airShown;
 
     /// <summary>Puts the rod's landed fish on the stage (the rod made it; it frees it once the angler decides).</summary>
     private void Adopt()
@@ -276,6 +294,7 @@ public partial class CatchPanel : Control
             : undersized
                 ? $"Niewymiarowa (wymiar ochronny {sp.LegalWeight:0.00} kg): zatrzymanie grozi karą strażnika."
                 : "";
+        _baseWarning = _warning.Text;
         _warning.Visible = _warning.Text != "";
         _keep.Disabled = !fits;
         _release.Text = $"Do wody  [R]  +{Profile.ReleaseXp} XP";

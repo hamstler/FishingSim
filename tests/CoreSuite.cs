@@ -302,6 +302,7 @@ public sealed class CoreSuite : ITestSuite
         Moonlight(t);
         Pressure(t);
         LineSight(t);
+        Handled(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -901,6 +902,19 @@ public sealed class CoreSuite : ITestSuite
         t.Check(thickClear > 1f && fluoroClear < 0.65f, $"in clear water at midday a thin leader pays off most ({fluoroClear:0.00} vs {thickClear:0.00})");
         t.Check(thickMurk - fluoroMurk < 0.2f * (thickClear - fluoroClear), "in murky water at night the line hardly matters");
         t.Check(MathF.Abs(LineShyness.Effective(LineShyness.Ordinary, 6f, 1f) - LineShyness.Ordinary) < 1e-5f, "an ordinary line stays ordinary");
+    }
+
+    /// <summary>Handling the catch (Core/Methods/Handling).</summary>
+    private static void Handled(TestContext t)
+    {
+        t.Section("handling the catch");
+        t.Check(Handling.Condition(15f, 10f) == 1f, "a quick fight and a quick decision leave the fish fresh");
+        t.Check(Handling.Condition(120f, 10f) < 0.8f && Handling.Condition(120f, 10f) >= 0.75f, "a long fight tires it");
+        t.Check(Handling.Condition(15f, 60f) < 0.9f && Handling.Condition(600f, 600f) == 0.4f, "time out of the water costs condition, down to a floor");
+        var p = new Profile();
+        var roach = GD.Load<FishSpecies>(SpeciesCatalog.Paths[0]);
+        p.Keep(roach, roach.LegalWeight + 0.1f, 0.7f);
+        t.Check(MathF.Abs(p.Keepnet[^1].Condition - 0.7f) < 1e-5f, "the keepnet takes the fish in the condition it was handled to");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

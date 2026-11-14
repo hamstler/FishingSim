@@ -1602,6 +1602,7 @@ public partial class FishingRod : Node3D
         Profile.AddLineWear(Loadout.Line.ItemId, Core.Methods.LineWear.PerFish);
         // One fish fewer (or one more wary) at the spot where it bit.
         Swim.Add(_hookedAt.X, _hookedAt.Z, Profile.Clock);
+        _lastFightSeconds = _fight?.Elapsed ?? 0f;
         if (_fight != null)
             Profile.AddLineTwist(Loadout.Line.ItemId, -LineTwist.FightRelief(_fight.Elapsed));
         LastCatch = result;
@@ -1711,13 +1712,20 @@ public partial class FishingRod : Node3D
     public bool CanRelease => State == RodState.Landed && AwaitingDecision;
 
     private float _decidedAt = -1f;
+    private float _lastFightSeconds;
+
+    /// <summary>Seconds the landed fish has been out of the water while the angler decides.</summary>
+    public float AirSeconds => State == RodState.Landed && AwaitingDecision ? _stateTime : 0f;
+
+    /// <summary>The landed fish's condition now: the fight's length and the time out of the water.</summary>
+    public float CatchCondition => Handling.Condition(_lastFightSeconds, AirSeconds);
 
     /// <summary>The catch panel's "Do siatki": the fish goes into the keepnet (if it fits).</summary>
     public bool KeepCatch()
     {
         if (!AwaitingDecision || CurrentSpecies == null)
             return false;
-        string? error = Profile.Keep(CurrentSpecies, CurrentWeight);
+        string? error = Profile.Keep(CurrentSpecies, CurrentWeight, CatchCondition);
         if (error != null)
         {
             ShowBanner(error, 3f);
