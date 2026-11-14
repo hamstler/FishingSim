@@ -284,6 +284,18 @@ public sealed class GearSuite : ITestSuite
         t.Check(!r1.Released && r2.Released && p.Keepnet.Count == 1 && p.TotalCatches == 2, "a full keepnet releases the fish (XP and journal still count)");
         p.PassTime(3f);
         t.Check(p.Keepnet[0].Condition < 1f, $"fish lose condition in the net ({p.Keepnet[0].Condition:0.00})");
+        t.Check(Core.Methods.WaterTemperature.KeepnetStress("Pstrąg potokowy", 20f) > 1.5f
+                && Core.Methods.WaterTemperature.KeepnetStress("Karp", 20f) < 0.8f
+                && Core.Methods.WaterTemperature.KeepnetStress("Płoć", 22f) > Core.Methods.WaterTemperature.KeepnetStress("Płoć", 12f),
+            "warm water tires fish in the net; trout suffer most, carp least");
+        float coolLoss = 1f - p.Keepnet[0].Condition;
+        var before = p.Keepnet[0];
+        p.WaterTempNow = () => 24f;
+        p.PassTime(3f);
+        float warmLoss = before.Condition - p.Keepnet[0].Condition;
+        p.Keepnet[0] = before;
+        p.WaterTempNow = null;
+        t.Check(warmLoss > coolLoss * 1.3f, $"a warm day costs more condition ({coolLoss:0.000} -> {warmLoss:0.000} in 3 h)");
         int money = p.Money;
         int quote = p.MarketQuote(p.Keepnet[0], all);
         int paid = p.SellAtMarket(0, all);

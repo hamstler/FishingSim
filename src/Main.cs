@@ -129,6 +129,7 @@ public partial class Main : Node3D
         AddChild(sound);
         _gear.GearChanged += ApplyGearEffects;
         ApplyGearEffects();
+        _profile.WaterTempNow = () => Rod.WaterTemp;
         _world.HoursAdvanced += _profile.PassTime;
 
         Tournaments = new TournamentManager();
@@ -367,6 +368,7 @@ public partial class Main : Node3D
     {
         _profile.Changed -= Save;
         _world.HoursAdvanced -= _profile.PassTime;
+        _profile.WaterTempNow = null;
         _gear.GearChanged -= ApplyGearEffects;
         _lake.Rebuilt -= RespawnPlayer;
         _lake.Rebuilt -= Rod.Groundbait.Clear;

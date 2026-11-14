@@ -191,6 +191,9 @@ public sealed class Profile
     public bool KeepnetFits(float weight) =>
         KeepnetLimit is not KeepnetSpec spec || KeepnetModel.Fits(spec, Keepnet.Count, KeepnetWeight, weight);
 
+    /// <summary>The water's temperature where the keepnet hangs (degrees Celsius; null = 17). Not saved.</summary>
+    public Func<float>? WaterTempNow { get; set; }
+
     /// <summary>Fish in the keepnet lose condition as time passes; the market recovers from earlier sales.</summary>
     public void PassTime(float hours)
     {
@@ -207,7 +210,10 @@ public sealed class Profile
             return;
         float fill = spec.MaxKg > 0f ? KeepnetWeight / spec.MaxKg : 1f;
         for (int i = 0; i < Keepnet.Count; i++)
-            Keepnet[i] = Keepnet[i] with { Condition = KeepnetModel.Decay(Keepnet[i].Condition, spec, hours, fill) };
+        {
+            float stress = Core.Methods.WaterTemperature.KeepnetStress(Keepnet[i].Species, WaterTempNow?.Invoke() ?? 17f);
+            Keepnet[i] = Keepnet[i] with { Condition = KeepnetModel.Decay(Keepnet[i].Condition, spec, hours, fill, stress) };
+        }
     }
 
     private static FishLot LotFor(CatchRecord fish, IEnumerable<FishSpecies> species)

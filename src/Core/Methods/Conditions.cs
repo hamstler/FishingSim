@@ -82,6 +82,17 @@ public static class WaterTemperature
     public static (float Optimum, float Tolerance) Preference(string species) =>
         Cold.Contains(species) ? (11f, 5f) : Warm.Contains(species) ? (22f, 6f) : (17f, 7f);
 
+    /// <summary>
+    /// How fast a fish of this species tires in a keepnet at this water temperature (1 = an ordinary fish at 17 degrees):
+    /// warm water holds less oxygen, and the cold-water fish (trout, whitefish, burbot) suffer most, while carp, tench
+    /// and crucians hardly mind.
+    /// </summary>
+    public static float KeepnetStress(string species, float temperature)
+    {
+        float hardiness = Cold.Contains(species) ? 1.5f : Warm.Contains(species) ? 0.55f : 1f;
+        return hardiness * Math.Clamp(1f + 0.08f * (temperature - 17f), 0.5f, 2f);
+    }
+
     /// <summary>How well a species feeds at this temperature (1.1 at its optimum, 0.25 far from it).</summary>
     public static float Fit(string species, float temperature)
     {
