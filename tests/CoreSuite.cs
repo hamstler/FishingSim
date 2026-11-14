@@ -315,6 +315,7 @@ public sealed class CoreSuite : ITestSuite
         Murk(t);
         Bag(t);
         Strikes(t);
+        Seasons(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -1109,6 +1110,15 @@ public sealed class CoreSuite : ITestSuite
         float mono = Strike.Efficiency(60f, 0.55f, 0f), braid = Strike.Efficiency(60f, 0.05f, 0f);
         t.Check(mono < 0.8f && braid > 0.95f, $"at 60 m a stretchy mono loses the strike ({mono:0.00}), a braid hardly ({braid:0.00})");
         t.Check(Strike.Efficiency(10f, 0.05f, 2f) < 0.7f, "slack on the water eats the strike");
+    }
+
+    /// <summary>Bait kinds and water temperature (Core/Methods/BaitSeason).</summary>
+    private static void Seasons(TestContext t)
+    {
+        t.Section("bait and temperature");
+        t.Check(BaitSeason.Pace(0, 9f) > BaitSeason.Pace(1, 9f) * 1.6f, "in cold water a worm beats corn");
+        t.Check(BaitSeason.Pace(1, 22f) >= BaitSeason.Pace(0, 22f) && BaitSeason.Pace(2, 24f) > 1.1f, "in warm water plant baits and boilies come into their own");
+        t.Check(BaitSeason.Pace(3, 5f) == 1f, "lures are judged by their own rules");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

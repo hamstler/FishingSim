@@ -417,6 +417,7 @@ Przy dodawaniu: nowa ryba = plik w `data/fish/`, wpis w `SpeciesCatalog.Paths` i
 - **Mętna woda po deszczu**: deszcz mąci wodę (ok. +0,18 na godzinę gry), a potem woda się klaruje (połowa mętności znika co 8 godzin). W mętnej wodzie żyłka mniej płoszy, kolory przynęt słabiej działają i widać płycej. Tarcza dopisuje przy temperaturze „lekko mętna” albo „mętna”.
 - **Limity dzienne**: jak w regulaminach łowisk, niektóre gatunki można zatrzymać tylko w ograniczonej liczbie na dzień gry: 2 szczupaki, 2 sandacze, 2 bolenie, 1 sum, 2 węgorze, 3 pstrągi, 2 karpie, 3 liny i inne. Rybę ponad limit trzeba wypuścić, a panel połowu o tym mówi. Liczenie zaczyna się od nowa każdego dnia.
 - **Zacięcie na odległość**: rozciągliwa żyłka na dalekim rzucie (powyżej 15 m, najmocniej od 65 m) „zjada” część zacięcia, a luz leżący na wodzie trzeba wybrać, zanim haczyk się ruszy. Plecionka przenosi zacięcie prawie w całości, dlatego daleko łowi się lepiej na plecionkę i z napiętą żyłką.
+- **Przynęta a temperatura**: w zimnej wodzie (np. w górskim jeziorze albo głęboko) lepiej działają przynęty zwierzęce: robaki, białe robaki, ochotka. Przynęty roślinne (kukurydza, chleb, kasza) i kulki proteinowe rozkręcają się w ciepłej wodzie, gdy karpiowate żerują najmocniej. Liczy się temperatura tam, gdzie leży przynęta.
 - **Turnieje** (T): wpisowe, dojazd na łowisko, wynik to suma N najcięższych ryb, rywale to boty o różnych umiejętnościach. Nagrody (pieniądze i XP) według miejsca, historia w zapisie.
 
 ## Zapis gry

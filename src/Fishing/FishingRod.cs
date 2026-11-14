@@ -132,6 +132,7 @@ public partial class FishingRod : Node3D
                 var wind = WindVelocity;
                 WindShoreExposure = WindShore.Exposure(Lake.DepthAt, bait.X, bait.Z, wind.X, wind.Z);
                 SwimLoad = Profile != null ? Swim.Load(bait.X, bait.Z, Profile.Clock) : 0f;
+                _seasonPace = BaitSeason.Pace((int)Loadout.Bait.Kind, BaitTemperature);
             }
         }
         else
@@ -424,7 +425,20 @@ public partial class FishingRod : Node3D
     public float BaitFreshness => Loadout.LureOn ? 1f : _baitFresh;
 
     /// <summary>The bite clock's speed for the bait on the hook (0 with a bare hook).</summary>
-    private float BaitPace => Loadout.LureOn ? 1f : _baitOn ? BaitWear.Appeal(_baitFresh) : 0f;
+    private float BaitPace => Loadout.LureOn ? 1f : _baitOn ? BaitWear.Appeal(_baitFresh) * _seasonPace : 0f;
+
+    /// <summary>How the bait's kind suits the temperature at the bait (Core/Methods/BaitSeason; read once a second).</summary>
+    private float _seasonPace = 1f;
+
+    /// <summary>The temperature at the bait now (degrees).</summary>
+    public float BaitTemperature
+    {
+        get
+        {
+            float depth = CurrentDepth();
+            return WaterTemperature.AtDepth(WaterTemp, depth * (BaitLayerAt(depth) ?? 1f));
+        }
+    }
 
     /// <summary>The bait soaks for that long (tests and tools).</summary>
     public void AgeBait(float seconds) => WearBait(seconds);
