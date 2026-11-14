@@ -122,8 +122,28 @@ public partial class FishingRod : Node3D
             var bait = _bobber.GlobalPosition;
             float dist = new Vector2(at.X - bait.X, at.Z - bait.Z).Length();
             Disturbance.Add(Disturbance.Steps(speed, dist, Lake.DepthAt(at.X, at.Z) > 0.05f, dt));
+            _shoreCheck -= dt;
+            if (_shoreCheck <= 0f)
+            {
+                _shoreCheck = 1f;
+                var wind = WindVelocity;
+                WindShoreExposure = WindShore.Exposure(Lake.DepthAt, bait.X, bait.Z, wind.X, wind.Z);
+            }
+        }
+        else
+        {
+            WindShoreExposure = 0f;
+            _shoreCheck = 0f;
         }
     }
+
+    private float _shoreCheck;
+
+    /// <summary>How near the bait lies to the shore the wind blows onto (0 .. 1, read once a second while fishing).</summary>
+    public float WindShoreExposure { get; private set; }
+
+    /// <summary>The wind-blown shore's pull on the fish at the bait (1 = none).</summary>
+    public float WindShorePace => WindShore.Pace(WindShoreExposure, World.WindTarget);
 
     // the line: a rope of points from the tip to the end tackle, as long as the line paid out
     private readonly Core.Physics.LineRope _rope = new();
@@ -494,7 +514,7 @@ public partial class FishingRod : Node3D
     public float WaterTemp => WaterTemperature.At(Lake.Location.WaterTemperature, World.Hour, World.Weather);
 
     /// <summary>What slows or quickens every bite clock: frightened fish and the air pressure's trend.</summary>
-    private float ConditionPace => Disturbance.Pace * World.Barometer.Pace * FeedingSpells.Pace(Profile.Clock, Lake.LocationIndex);
+    private float ConditionPace => Disturbance.Pace * World.Barometer.Pace * FeedingSpells.Pace(Profile.Clock, Lake.LocationIndex) * WindShorePace;
 
     /// <summary>How the lure's colours suit the light and the water now (1 = neutral).</summary>
     public float LureAppeal => Loadout.LureOn

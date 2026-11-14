@@ -297,6 +297,7 @@ public sealed class CoreSuite : ITestSuite
         Fraying(t);
         Casts(t);
         Spells(t);
+        Shores(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -796,6 +797,23 @@ public sealed class CoreSuite : ITestSuite
                 && FeedingSpells.Pace(10.3f, 0) != FeedingSpells.Pace(10.3f, 1), "the same hour is the same, another day or lake differs");
         float step = Enumerable.Range(0, 200).Max(i => MathF.Abs(FeedingSpells.Pace(i * 0.05f + 0.05f, 2) - FeedingSpells.Pace(i * 0.05f, 2)));
         t.Check(step < 0.25f, "the waves change gradually, not from minute to minute");
+    }
+
+    /// <summary>The wind-blown shore (Core/Methods/WindShore).</summary>
+    private static void Shores(TestContext t)
+    {
+        t.Section("wind-blown shore");
+        // A lake whose shore runs along x = 50: water for x < 50.
+        Func<float, float, float> depth = (x, z) => x < 50f ? 3f : -1f;
+        float near = WindShore.Exposure(depth, 45f, 0f, 1f, 0f);
+        float far = WindShore.Exposure(depth, 20f, 0f, 1f, 0f);
+        float back = WindShore.Exposure(depth, 45f, 0f, -1f, 0f);
+        float beyond = WindShore.Exposure(depth, -10f, 0f, 1f, 0f);
+        t.Check(near > 0.85f && far > 0f && far < near, $"the drift gathers towards the shore the wind blows onto ({far:0.00} at 30 m, {near:0.00} at 5 m)");
+        t.Check(back == 0f && beyond == 0f, "nothing with the wind at the shore's back or beyond the reach");
+        t.Check(WindShore.Exposure(depth, 60f, 0f, 1f, 0f) == 0f && WindShore.Exposure(depth, 45f, 0f, 0f, 0f) == 0f, "nothing on land or in a calm");
+        t.Check(WindShore.Pace(1f, 0.85f) > 1.25f && WindShore.Pace(1f, 0.25f) < 1.1f && WindShore.Pace(0f, 1f) == 1f,
+            "a strong wind quickens the bites there, a breeze hardly");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>
