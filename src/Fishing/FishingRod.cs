@@ -622,6 +622,12 @@ public partial class FishingRod : Node3D
     /// <summary>The map's water plant patches (set by Main from the scenery).</summary>
     public IReadOnlyList<WeedBed> WeedBeds { get; set; } = Array.Empty<WeedBed>();
 
+    /// <summary>How long a bite lasts before the fish lets go: the method's window, shorter in cold water (cautious
+    /// takes), a little longer in warm (read once at the bite: the bait's depth and the water then).</summary>
+    private float HookWindowNow => MethodRules.HookWindow(_castMethod) * _windowFactor;
+
+    private float _windowFactor = 1f;
+
     /// <summary>The map's sunken trees (set by Main from the scenery).</summary>
     public IReadOnlyList<SunkenWood> SunkenWood { get; set; } = Array.Empty<SunkenWood>();
 
@@ -1335,6 +1341,8 @@ public partial class FishingRod : Node3D
                 (_rest as RodRest)?.Ring();
             }
             Twitch(_castMethod == FishingMethod.Spinning ? 1.8f : 1.2f);
+            float depth = CurrentDepth();
+            _windowFactor = WaterTemperature.WindowFactor(WaterTemperature.AtDepth(WaterTemp, depth * (BaitLayerAt(depth) ?? 1f)));
             SetState(RodState.Bite);
         }
     }
@@ -1412,11 +1420,11 @@ public partial class FishingRod : Node3D
             {
                 if (float.IsNaN(_readyAt))
                     _readyAt = _stateTime;
-                if (_stateTime - _readyAt < MethodRules.HookWindow(_castMethod))
+                if (_stateTime - _readyAt < HookWindowNow)
                     return;
             }
         }
-        else if (_stateTime < MethodRules.HookWindow(_castMethod))
+        else if (_stateTime < HookWindowNow)
             return;
         _bobber.ExtraForce = 0f;
         LoseBiter(_bobber.GlobalPosition);
@@ -1469,7 +1477,7 @@ public partial class FishingRod : Node3D
                 if (DevInstantBite || _rng.NextFloat() <= chance)
                 {
                     // How well it is set: the fit of the hook, the tackle, and a strike at once rather than late.
-                    float window = MethodRules.HookWindow(_castMethod);
+                    float window = HookWindowNow;
                     float late = float.IsNaN(_readyAt) ? _stateTime : _stateTime - _readyAt;
                     _hookHold = Math.Clamp(chance * (1f - 0.4f * Math.Clamp(late / window, 0f, 1f)), 0.2f, 1f);
                     // Given time, a fish swallows a natural bait: the hook sits deep (holds, but is hard to get out).

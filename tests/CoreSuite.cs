@@ -1038,6 +1038,8 @@ public sealed class CoreSuite : ITestSuite
             "the top is mixed, the deep water colder, never below 6 degrees");
         float troutDeep = WaterTemperature.Fit("Pstrąg tęczowy", WaterTemperature.AtDepth(21.5f, 10f));
         float troutTop = WaterTemperature.Fit("Pstrąg tęczowy", WaterTemperature.AtDepth(21.5f, 0.5f));
+        t.Check(WaterTemperature.WindowFactor(8f) < 0.75f && WaterTemperature.WindowFactor(25f) > 1.1f
+                && MathF.Abs(WaterTemperature.WindowFactor(17f) - 0.99f) < 0.05f, "in cold water bites are short, in warm the fish hold on");
         t.Check(troutDeep > troutTop, $"in a warm lake trout feed better deep ({troutTop:0.00} at the top, {troutDeep:0.00} at 10 m)");
     }
 

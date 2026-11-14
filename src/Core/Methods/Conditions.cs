@@ -85,6 +85,10 @@ public static class WaterTemperature
     public static float AtDepth(float surface, float depth) =>
         MathF.Min(surface, MathF.Max(6f, surface - 0.9f * Math.Clamp(depth - 1.5f, 0f, 12f)));
 
+    /// <summary>How long a fish holds the bait at this temperature, as a share of the usual window: cold fish take
+    /// cautiously and drop it soon (0.7 at 8 degrees), warm ones hold on (1.15 from 22 degrees).</summary>
+    public static float WindowFactor(float temperature) => Math.Clamp(0.7f + 0.0321f * (temperature - 8f), 0.7f, 1.15f);
+
     /// <summary>The temperature a species feeds best at, and how many degrees off it still feeds well.</summary>
     public static (float Optimum, float Tolerance) Preference(string species) =>
         Cold.Contains(species) ? (11f, 5f) : Warm.Contains(species) ? (22f, 6f) : (17f, 7f);
