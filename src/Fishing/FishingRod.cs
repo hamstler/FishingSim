@@ -403,7 +403,13 @@ public partial class FishingRod : Node3D
     /// <summary>A lure's size counts as hook sizes: a big lure draws big fish and puts small mouths off.</summary>
     public BiteContext MakeBiteContext(float depth) =>
         new(Loadout.Bait.ItemId, Loadout.Hook.Size + (Loadout.LureOn ? MethodRules.SizeHookShift(Loadout.Bait.SizeCm) : 0f), depth,
-            Lake.Location, World.Period, World.Weather, BaitLayerAt(depth));
+            Lake.Location, World.Period, World.Weather, BaitLayerAt(depth), WaterTemp);
+
+    /// <summary>The water's temperature now (degrees Celsius).</summary>
+    public float WaterTemp => WaterTemperature.At(Lake.Location.WaterTemperature, World.Hour, World.Weather);
+
+    /// <summary>What slows or quickens every bite clock: frightened fish and the air pressure's trend.</summary>
+    private float ConditionPace => Disturbance.Pace * World.Barometer.Pace;
 
     /// <summary>How the lure's colours suit the light and the water now (1 = neutral).</summary>
     public float LureAppeal => Loadout.LureOn
@@ -911,7 +917,7 @@ public partial class FishingRod : Node3D
         float pace = 1f;
         if (Loadout.LureOn)
             pace = Reeling ? (Loadout.Rod.Kind == RodKind.Spinning ? 3.2f : 2.4f) : 0.1f;
-        _biteTimer -= dt * pace * Disturbance.Pace;
+        _biteTimer -= dt * pace * ConditionPace;
         if (_biteTimer <= 0f)
             StartNibble();
     }
@@ -1595,7 +1601,7 @@ public partial class FishingRod : Node3D
         _lineOutOutsideFight = dist;
         // The play, the rod, the lure's size and how its colours suit the light and the water.
         _biteTimer -= dt * lure.BitePace * MethodRules.LureRodMatch(Loadout.Rod.Kind) * 2f
-            * MethodRules.SizePace(Loadout.Bait.SizeCm) * _lureAppeal * Disturbance.Pace;
+            * MethodRules.SizePace(Loadout.Bait.SizeCm) * _lureAppeal * ConditionPace;
         if (_biteTimer <= 0f)
             StartNibble();
     }
@@ -1690,7 +1696,7 @@ public partial class FishingRod : Node3D
         if (!_rigSettled)
             return;
         float pace = GroundbaitSpots.PaceFor(GroundbaitHeat) * (Reeling ? 0.5f : 1f);
-        _biteTimer -= dt * pace * Disturbance.Pace;
+        _biteTimer -= dt * pace * ConditionPace;
         if (_biteTimer <= 0f)
             StartNibble();
     }

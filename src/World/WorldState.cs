@@ -32,9 +32,13 @@ public partial class WorldState : Node
     /// <summary>Raised with the number of in-game hours that passed (keepnet freshness, market recovery).</summary>
     public event Action<float>? HoursAdvanced;
 
+    /// <summary>The air pressure and its trend (the fish feel it).</summary>
+    public Core.Methods.Barometer Barometer { get; } = new();
+
     public void Advance(float hours)
     {
         Hour = Mathf.PosMod(Hour + hours, 24f);
+        Barometer.Step(hours, Weather);
         HoursAdvanced?.Invoke(hours);
         _weatherTimer -= hours;
         if (_weatherTimer <= 0f)

@@ -292,6 +292,7 @@ public sealed class CoreSuite : ITestSuite
         TackleCatalogue(t);
         LineRopePhysics(t);
         Noise(t);
+        PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
     }
 
@@ -651,6 +652,38 @@ public sealed class CoreSuite : ITestSuite
         for (int i = 0; i < 50; i++)
             d.Add(1f);
         t.Check(d.Level <= Disturbance.MaxLevel && d.Pace >= 0.25f, "bites never stop altogether");
+    }
+
+    /// <summary>Air pressure and water temperature (Core/Methods/Conditions).</summary>
+    private static void PressureAndTemperature(TestContext t, LocationData lake)
+    {
+        t.Section("pressure and water temperature");
+        var b = new Barometer();
+        for (int i = 0; i < 40; i++)
+            b.Step(0.25f, Weather.Clear);
+        float high = b.Pressure;
+        t.Check(high > 1020f && MathF.Abs(b.Trend) < 0.3f && b.Pace == 1f && b.TrendWord == "stałe", $"settled clear weather: high, steady pressure ({high:0} hPa)");
+        for (int i = 0; i < 8; i++)
+            b.Step(0.25f, Weather.Rain);
+        t.Check(b.Pressure < high - 3f && b.Trend < -0.3f && b.Pace > 1f && b.TrendWord == "spada", $"a front coming: the pressure falls ({b.Trend:0.0} hPa/h) and the fish feed (x{b.Pace:0.00})");
+        for (int i = 0; i < 60; i++)
+            b.Step(0.25f, Weather.Rain);
+        float low = b.Pace;
+        for (int i = 0; i < 6; i++)
+            b.Step(0.25f, Weather.Clear);
+        t.Check(low < 1f && b.Trend > 0.3f && b.Pace < 0.9f && b.TrendWord == "rośnie", $"after the front the pressure rises and the fish go off the feed (x{b.Pace:0.00})");
+        t.Check(Barometer.PaceFor(1015f, -0.8f) > Barometer.PaceFor(1015f, 0f) && Barometer.PaceFor(1015f, 0f) > Barometer.PaceFor(1015f, 1f)
+                && Barometer.PaceFor(1015f, 1f) > Barometer.PaceFor(1015f, 3f), "slowly falling beats steady beats rising");
+        t.Check(WaterTemperature.At(17f, 16f, Weather.Clear) > WaterTemperature.At(17f, 4f, Weather.Clear) + 2.5f
+                && WaterTemperature.At(17f, 12f, Weather.Rain) < WaterTemperature.At(17f, 12f, Weather.Clear), "the water is warmest in the afternoon, cooler in the rain");
+        var trout = Species("pstrag");
+        var carp = Species("karp");
+        t.Check(WaterTemperature.Fit(trout.SpeciesName, 11f) > WaterTemperature.Fit(trout.SpeciesName, 22f) * 3f
+                && WaterTemperature.Fit(carp.SpeciesName, 22f) > WaterTemperature.Fit(carp.SpeciesName, 10f) * 3f,
+            "trout feed in cold water, carp in warm");
+        var cold = new BiteContext("worm", 5f, 2f, lake, null, Weather.Clear, null, 10f);
+        t.Check(BiteModel.Weight(carp, cold) < BiteModel.Weight(carp, cold with { WaterTemp = 22f }) * 0.4f
+                && BiteModel.Weight(carp, cold with { WaterTemp = null }) > BiteModel.Weight(carp, cold), "the bite model weighs the species by the water's temperature");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

@@ -60,6 +60,9 @@ public partial class LocationData : Resource
         .Select(p => float.TryParse(p, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : float.NaN)
         .Where(v => !float.IsNaN(v)).ToArray();
 
+    /// <summary>The lake's own water temperature in degrees Celsius (a mountain lake is cold, a pond warm).</summary>
+    [Export] public float WaterTemperature { get; set; } = 18f;
+
     /// <summary>How many metres into the water you can see (clear mountain lake ~6, murky marsh ~1.5).</summary>
     [Export] public float WaterClarity { get; set; } = 3f;
 

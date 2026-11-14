@@ -90,6 +90,13 @@ Płoszy chlupnięcie zestawu (spławik prawie wcale, pełny koszyczek mocno, prz
 płyciźnie wszystko słychać dalej), bieganie po brzegu i pomoście blisko przynęty, brodzenie w wodzie oraz hol ryby.
 Ryby widoczne w wodzie rozpierzchają się od głośnego chlupnięcia, a pasek stanu pokazuje „ryby spłoszone”.
 
+**Ciśnienie i temperatura wody:** ciśnienie powoli podąża za pogodą (wysokie przy słońcu, niskie w deszczu), a dla ryb
+liczy się jego zmiana: gdy powoli spada przed frontem, biorą najlepiej; gdy rośnie po froncie, żerują słabo; przy
+stałym jest zwyczajnie. Każde łowisko ma własną temperaturę wody (górskie jezioro ok. 11°C, Jezioro Zielone 17°C,
+zatoka 19°C, staw 21°C), cieplejszą po południu i chłodniejszą w deszczu. Ryby zimnolubne (pstrągi, lipień, sieja,
+miętus) żerują najlepiej koło 11°C, ciepłolubne (karp, lin, karasie, sum) koło 22°C, reszta koło 17°C. Tabliczka pod
+tarczą pokazuje ciśnienie z trendem (na zielono, gdy sprzyja, na czerwono, gdy szkodzi) i temperaturę wody.
+
 **Grafika na laptopie:** przy pierwszym uruchomieniu na zintegrowanej grafice gra sama ustawia jakość Niską, bliski
 zasięg widzenia i 3D w 70% (FSR). Wszystko to można zmienić w menu pauzy. Na Niskiej nie ma też poświaty (bloom).
 

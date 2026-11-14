@@ -45,3 +45,4 @@ Lobes = PackedStringArray("-108,-108,34,24", "92,-136,46,14")
 Islands = PackedStringArray("-35,-82,12", "-50,-66,4")
 Landmarks = PackedStringArray("tower,-35,-82", "chapel,104,-8")
 WaterClarity = 3.5
+WaterTemperature = 17
