@@ -997,11 +997,15 @@ public partial class FishingRod : Node3D
         }
     }
 
+    /// <summary>The line's visibility as the fish see it now (clear water and daylight show it, murk and night hide it).</summary>
+    public float LineShynessNow => LineShyness.Effective(_lineVisibility, Lake.Location.WaterClarity,
+        MethodRules.LightLevel(World.Hour, World.Weather));
+
     // ------------------------------------------------------------------ waiting / bite
     private void NewBiteTimer() =>
         _biteTimer = DevInstantBite
             ? 0.5f
-            : BiteModel.WaitSeconds(_rng, BiteWaitMin, BiteWaitMax, _lineVisibility, Attraction())
+            : BiteModel.WaitSeconds(_rng, BiteWaitMin, BiteWaitMax, LineShynessNow, Attraction())
               / (1f + (Profile.ActiveMeal?.BiteBonus ?? 0f));   // a well-fed angler waits a little less
 
     private void TickWaiting(float dt)

@@ -301,6 +301,7 @@ public sealed class CoreSuite : ITestSuite
         Shores(t);
         Moonlight(t);
         Pressure(t);
+        LineSight(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -889,6 +890,17 @@ public sealed class CoreSuite : ITestSuite
         t.Check(MathF.Abs(released.Load(0f, 0f, 0f) - SwimPressure.Released) < 1e-4f, "a released fish weighs half");
         swim.Clear();
         t.Check(swim.Load(0f, 0f, 11.2f) == 0f, "a new map starts fresh");
+    }
+
+    /// <summary>Line visibility by water and light (Core/Methods/LineShyness).</summary>
+    private static void LineSight(TestContext t)
+    {
+        t.Section("line shyness");
+        float thickClear = LineShyness.Effective(1f, 6f, 1f), fluoroClear = LineShyness.Effective(0.65f, 6f, 1f);
+        float thickMurk = LineShyness.Effective(1f, 1.6f, 0.08f), fluoroMurk = LineShyness.Effective(0.65f, 1.6f, 0.08f);
+        t.Check(thickClear > 1f && fluoroClear < 0.65f, $"in clear water at midday a thin leader pays off most ({fluoroClear:0.00} vs {thickClear:0.00})");
+        t.Check(thickMurk - fluoroMurk < 0.2f * (thickClear - fluoroClear), "in murky water at night the line hardly matters");
+        t.Check(MathF.Abs(LineShyness.Effective(LineShyness.Ordinary, 6f, 1f) - LineShyness.Ordinary) < 1e-5f, "an ordinary line stays ordinary");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

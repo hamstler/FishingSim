@@ -400,6 +400,7 @@ Przy dodawaniu: nowa ryba = plik w `data/fish/`, wpis w `SpeciesCatalog.Paths` i
 - **Księżyc**: fazy trwają 29,5 dnia gry (nów, kwadry, pełnia), a w nocy tarcza pokazuje fazę. Przy pełni noc jest jaśniejsza. Nocne drapieżniki (sum, sumiki, węgorz, sandacz, miętus) najlepiej biorą w ciemne noce przy nowiu i są ostrożne w jasne noce, pozostałe ryby żerują przy pełni nieco chętniej. Chmury i deszcz zasłaniają księżyc.
 - **Siatka w ciepłej wodzie**: ryby w siatce tracą kondycję szybciej, gdy woda jest ciepła, bo jest w niej mniej tlenu. Pstrągi, sieje i miętusy męczą się najszybciej, a karpie, liny i karasie prawie wcale.
 - **Wyławianie miejsca**: każda ryba wyjęta z jednego miejsca (w promieniu 15 m) spowalnia tam brania: ryb jest mniej, a reszta jest ostrożniejsza. Wypuszczona ryba liczy się jak pół zatrzymanej. Miejsce odżywa w ciągu kilku godzin gry. Gdy brania wyraźnie słabną, HUD podpowiada „miejsce wyłowione”, więc warto przejść kilkadziesiąt metrów dalej.
+- **Widoczność żyłki**: w przejrzystej wodzie i w pełnym słońcu ryby widzą grubą lub błyszczącą żyłkę, więc cienki przypon z fluorocarbonu wyraźnie skraca czekanie na branie. W mętnej wodzie, o zmierzchu i w nocy różnica prawie znika.
 - **Turnieje** (T): wpisowe, dojazd na łowisko, wynik to suma N najcięższych ryb, rywale to boty o różnych umiejętnościach. Nagrody (pieniądze i XP) według miejsca, historia w zapisie.
 
 ## Zapis gry
