@@ -130,6 +130,15 @@ public partial class Main : Node3D
         Rises.Risen += Rod.NoteRise;
         Rod.WeedBeds = Scenery.WeedBeds;
         Rod.SunkenWood = Scenery.SunkenWood;
+        Rod.OtherAnglers = Scenery.Anglers;
+        // The other anglers catch a fish now and then: the water in front of them gets fished.
+        var anglerLuck = new Random(77);
+        _world.HoursAdvanced += hours =>
+        {
+            foreach (var (_, at) in Scenery.Anglers)
+                if (anglerLuck.NextDouble() < Core.Methods.OtherAnglers.CatchesPerHour * hours)
+                    Rod.Swim.Add(at.X, at.Z, _profile.Clock);
+        };
         AddChild(new Graphics.Gulls { Daylight = () => _world.Daylight });
 
         var sound = new Audio.SoundEngine();

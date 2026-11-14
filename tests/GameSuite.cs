@@ -330,6 +330,14 @@ public sealed class GameSuite : ITestSuite
         t.Check(main.Scenery.SunkenWood.Count > 3 && ReferenceEquals(rod.SunkenWood, main.Scenery.SunkenWood)
                 && main.Scenery.SunkenWood.All(w => rod.Lake.DepthAt(w.X, w.Z) > 0.3f),
             $"trees lie sunk off the wooded banks, in the water ({main.Scenery.SunkenWood.Count})");
+        t.Check(main.Scenery.Anglers.Count >= 2 && ReferenceEquals(rod.OtherAnglers, main.Scenery.Anglers)
+                && main.Scenery.Anglers.All(a => rod.Lake.DepthAt(a.Seat.X, a.Seat.Z) <= 0f && rod.Lake.DepthAt(a.Float.X, a.Float.Z) > 0.5f),
+            $"local anglers sit on the bank with their floats in the water ({main.Scenery.Anglers.Count})");
+        var theirs = main.Scenery.Anglers[0].Float;
+        float loadBefore = rod.Swim.Load(theirs.X, theirs.Z, profile.Clock);
+        for (int i = 0; i < 6; i++)
+            rod.World.Advance(1f);
+        t.Check(rod.Swim.Load(theirs.X, theirs.Z, profile.Clock) > loadBefore, "they catch fish: their swim gets fished");
 
         rod.World.Hour = 23f;
         rod._Process(0.016);

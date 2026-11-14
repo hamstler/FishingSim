@@ -633,6 +633,24 @@ public partial class FishingRod : Node3D
     public float EffectiveHookSize => Loadout.Hook.Size
         + (Loadout.LureOn ? MethodRules.SizeHookShift(Loadout.Bait.SizeCm) : BaitSize.HookShift(Loadout.Bait.ItemId));
 
+    /// <summary>The other anglers on the bank: their seats and floats (set by Main from the scenery).</summary>
+    public IReadOnlyList<(Vector3 Seat, Vector3 Float)> OtherAnglers { get; set; } = Array.Empty<(Vector3, Vector3)>();
+
+    /// <summary>The end tackle lies in another angler's swim.</summary>
+    public bool CrowdingAngler
+    {
+        get
+        {
+            if (State is not (RodState.Waiting or RodState.Nibble or RodState.Bite))
+                return false;
+            var b = _bobber.GlobalPosition;
+            foreach (var (_, f) in OtherAnglers)
+                if (Core.Methods.OtherAnglers.Crowds(new Vector2(b.X - f.X, b.Z - f.Z).Length()))
+                    return true;
+            return false;
+        }
+    }
+
     /// <summary>The map's sunken trees (set by Main from the scenery).</summary>
     public IReadOnlyList<SunkenWood> SunkenWood { get; set; } = Array.Empty<SunkenWood>();
 
@@ -1133,6 +1151,11 @@ public partial class FishingRod : Node3D
             _lineLength = TipDistance() * (_castMethod == FishingMethod.Spinning ? 1.02f : 1.07f);
             NewBiteTimer();
             SetState(RodState.Waiting);
+            if (CrowdingAngler)
+            {
+                Disturbance.Add(0.25f);
+                ShowBanner("Wędkarz z brzegu: \"Hej! Rzucasz mi na spławik, poszukaj sobie innego miejsca!\"", 3.5f);
+            }
         }
         else if (_stateTime > 1f && _bobber.LinearVelocity.Length() < 0.5f && _bobber.Submerged < 0.1f)
         {

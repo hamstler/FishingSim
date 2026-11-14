@@ -397,6 +397,20 @@ public partial class ScreenshotTool : Node
             for (int i = 0; i < 20; i++)
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         }
+        // FISHSIM_LOOK_ANGLER=1: stand a few metres to the side of the first local angler, looking at him and his float.
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_LOOK_ANGLER") == "1" && main.Scenery.Anglers.Count > 0)
+        {
+            var bed = main.GetChildren().OfType<LakeBed>().First();
+            var (seat, fl) = main.Scenery.Anglers[0];
+            var outward = new Vector3(fl.X - seat.X, 0f, fl.Z - seat.Z).Normalized();
+            var side = outward.Cross(Vector3.Up);
+            var stand = seat - outward * 1.5f + side * 5f;
+            main.Player.GlobalPosition = new Vector3(stand.X, bed.HeightAt(stand.X, stand.Z) + 0.3f, stand.Z);
+            for (int i = 0; i < 20; i++)
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            var look = (seat + outward * 4f) - stand;
+            yaw = Mathf.RadToDeg(MathF.Atan2(-look.X, -look.Z));
+        }
         // FISHSIM_LOOK_WOOD=1: stand on the bank nearest the closest sunken tree and look at it.
         if (System.Environment.GetEnvironmentVariable("FISHSIM_LOOK_WOOD") == "1" && main.Scenery.SunkenWood.Count > 0)
         {

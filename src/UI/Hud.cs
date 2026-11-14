@@ -374,6 +374,7 @@ public partial class Hud : CanvasLayer
             + (rod.Spooked ? "  ·  ryby spłoszone" : "")
             + (rod.FishedOut ? "  ·  miejsce wyłowione" : rod.ShoalHere ? "  ·  ławica w pobliżu" : "")
             + (rod.CastToRise ? "  ·  przy kręgu" : "")
+            + (rod.CrowdingAngler ? "  ·  łowisko innego wędkarza" : "")
             + (BaitWear.Word(rod.BaitOnHook, rod.BaitFreshness) is { Length: > 0 } baitWord && rod.CastMethod != FishingMethod.Spinning ? "  ·  " + baitWord : "");
         switch (rod.CastMethod)
         {

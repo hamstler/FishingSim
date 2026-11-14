@@ -29,6 +29,9 @@ public partial class Scenery : Node3D
     /// <summary>The water plant patches (lilies and underwater weed) of this map: where cover-loving fish hold.</summary>
     public List<Core.Methods.WeedBed> WeedBeds { get; } = new();
 
+    /// <summary>Other anglers on the bank: where each sits and where its float lies (BuildAnglers; cleared on rebuild).</summary>
+    public List<(Vector3 Seat, Vector3 Float)> Anglers { get; } = new();
+
     /// <summary>Sunken trees off the wooded banks (ScatterSunkenWood; cleared on rebuild).</summary>
     public List<Core.Methods.SunkenWood> SunkenWood { get; } = new();
 
@@ -281,6 +284,7 @@ public partial class Scenery : Node3D
         Markers.Clear();
         WeedBeds.Clear();
         SunkenWood.Clear();
+        Anglers.Clear();
         Stats.Clear();
         _reserved.Clear();
         _props.Clear();
@@ -291,6 +295,7 @@ public partial class Scenery : Node3D
         BuildCampfires(loc);
         BuildEverydayLife(loc);
         BuildLandmarks(loc);
+        BuildAnglers(loc);
         var rng = new RandomNumberGenerator { Seed = 42 };
         ScatterTrees(loc, rng);
         ScatterGroundCover(loc, rng);
@@ -1253,6 +1258,93 @@ public partial class Scenery : Node3D
     /// 0.6-3 m deep, at least 12 m apart and away from the pier. A grey, weathered branch or two pokes out of the water
     /// over each, so the angler can see where the snags are.
     /// </summary>
+    /// <summary>
+    /// Two or three local anglers along the bank, well away from the pier and each other: each sits on a log behind a
+    /// hazel rod rest, the rod pointing out over the water, its float lying 9-13 m out. They fish the water in front of
+    /// them (Main lets them catch now and then, which leaves that swim fished: FishingRod.Swim).
+    /// </summary>
+    private void BuildAnglers(LocationData loc)
+    {
+        var rng = new RandomNumberGenerator { Seed = (ulong)(loc.DisplayName.Length * 7919 + 17) };
+        var shores = Shores(loc);
+        var main = shores[0];
+        int want = 3;
+        for (int tries = 0; Anglers.Count < want && tries < 600; tries++)
+        {
+            float angle = rng.Randf() * Mathf.Tau;
+            float wx = main.X + main.Rx * 0.8f * MathF.Cos(angle), wz = main.Z + main.Rz * 0.8f * MathF.Sin(angle);
+            if (_lake.DepthAt(loc, wx, wz) < 1f)
+                continue;
+            // Walk out from the water to the bank.
+            var dir = new Vector2(MathF.Cos(angle) * main.Rx, MathF.Sin(angle) * main.Rz).Normalized();
+            Vector2? bank = null;
+            for (float d = 0f; d < 60f; d += 0.5f)
+            {
+                float x = wx + dir.X * d, z = wz + dir.Y * d;
+                if (_lake.DepthAt(loc, x, z) <= 0f)
+                {
+                    bank = new Vector2(x, z) + dir * 2.2f;
+                    break;
+                }
+            }
+            if (bank is not Vector2 seat || MathF.Abs(seat.X) < 40f && seat.Y > -40f)
+                continue;
+            if (!_lake.IsWalkable(seat.X, seat.Y) || !Clear(loc, seat.X, seat.Y, 3f, 2.5f) || _lake.HeightAt(loc, seat.X, seat.Y) > 2.5f)
+                continue;
+            bool crowded = false;
+            foreach (var (s, _) in Anglers)
+                if (new Vector2(s.X, s.Z).DistanceTo(seat) < 60f)
+                    crowded = true;
+            if (crowded)
+                continue;
+            var toWater = -dir;
+            float reach = rng.RandfRange(9f, 13f);
+            var floatAt = seat + toWater * (2.2f + reach);
+            if (_lake.DepthAt(loc, floatAt.X, floatAt.Y) < 0.8f)
+                continue;
+            float h = _lake.HeightAt(loc, seat.X, seat.Y);
+            var root = new Node3D { Name = "Angler", Position = new Vector3(seat.X, h, seat.Y) };
+            root.Rotation = new Vector3(0f, MathF.Atan2(toWater.X, toWater.Y), 0f);
+            var log = Props.CampProps.SeatLog(1.1f, Anglers.Count + 11, 0.16f);
+            log.RotationDegrees = new Vector3(0f, 90f, 0f);
+            root.AddChild(log);
+            var angler = Props.People.Create(Props.Role.Fisherman, 60 + Anglers.Count, "Sitting_Idle_Loop", new[] { "Sitting_Talking_Loop" });
+            angler.Position = new Vector3(0f, 0f, 0.08f);
+            root.AddChild(angler);
+            // The rod on a forked stick in front, its tip out over the water.
+            var rest = Fishing.RodRest.Create(false);
+            rest.Position = new Vector3(0.35f, 0f, 1.4f);
+            root.AddChild(rest);
+            var rod = new MeshInstance3D
+            {
+                Mesh = new CylinderMesh { TopRadius = 0.004f, BottomRadius = 0.016f, Height = 3.6f, RadialSegments = 6 },
+                MaterialOverride = Props.CampProps.DarkWood,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
+            };
+            // From the butt by the seat over the fork, rising 22 degrees towards the water.
+            var butt = new Vector3(0.3f, 0.2f, 0.5f);
+            var along = new Vector3(0f, MathF.Sin(Mathf.DegToRad(22f)), MathF.Cos(Mathf.DegToRad(22f)));
+            rod.Position = butt + along * 1.8f;
+            rod.Basis = new Basis(Vector3.Right, Mathf.DegToRad(90f - 22f));
+            root.AddChild(rod);
+            // The float: a red-topped quill riding the water.
+            var bob = new MeshInstance3D
+            {
+                Mesh = new CapsuleMesh { Radius = 0.025f, Height = 0.16f, RadialSegments = 8, Rings = 2 },
+                MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.9f, 0.18f, 0.12f), Roughness = 0.5f },
+                Position = new Vector3(floatAt.X, 0.03f, floatAt.Y),
+            };
+            AddChild(bob);
+            Track(bob);
+            AddChild(root);
+            Track(root);
+            Prop(root, 160f);
+            _reserved.Add((seat, 3.5f));
+            Anglers.Add((root.Position, new Vector3(floatAt.X, 0f, floatAt.Y)));
+            Count("angler");
+        }
+    }
+
     private void ScatterSunkenWood(LocationData loc, RandomNumberGenerator rng)
     {
         var stems = new List<Transform3D>();
