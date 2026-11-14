@@ -2083,6 +2083,9 @@ public partial class FishingRod : Node3D
     /// Bottom: the feeder sinks to the bottom and empties its groundbait there; the line is tight and bites show on the
     /// quiver tip. Reeling drags the rig slowly over the bottom towards the angler.
     /// </summary>
+    /// <summary>The chance per metre dragged among sunken branches that the feeder wedges in for good.</summary>
+    public const float FeederSnagPerMetre = 0.35f;
+
     private void TickBottom(float dt)
     {
         float bottom = Lake.DepthAt(_rigPos.X, _rigPos.Z);
@@ -2114,6 +2117,14 @@ public partial class FishingRod : Node3D
             float pull = TakeUpSlack(_reelSpeed * (FastReel ? 0.5f : 0.25f) * dt);
             _rigPos += dir * pull;
             _rigDepth = MathF.Max(Lake.DepthAt(_rigPos.X, _rigPos.Z) - 0.03f, 0f);
+            // Dragged through sunken branches the feeder wedges in; pulling it out breaks the hook link.
+            float wood = Structure.WoodAt(SunkenWood, _rigPos.X, _rigPos.Z);
+            if (pull > 0f && wood > 0f && !DevUnbreakable && _rng.NextFloat() < FeederSnagPerMetre * wood * pull)
+            {
+                Profile.AddLineWear(Loadout.Line.ItemId, Core.Methods.LineWear.PerSnagJerk);
+                BreakLine("Koszyczek utknął w zatopionych gałęziach i przypon pękł. Nie przeciągaj zestawu przez zaczepy!", TackleSlot.Hook);
+                return;
+            }
             KeepLineTight(true);
             if (Lake.DepthAt(_rigPos.X, _rigPos.Z) <= 0.03f || dist < 1.6f)
             {
