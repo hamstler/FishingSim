@@ -777,6 +777,12 @@ public static class Icons
                 c.Line(36, 46, 38, 56, 2.5f, C(0.62f, 0.64f, 0.68f));
                 c.Line(26, 58, 38, 56, 2.5f, C(0.62f, 0.64f, 0.68f));
                 break;
+            case AccessoryKind.Disgorger:          // a slim disgorger with a forked tip and a grip
+                c.Line(16, 52, 46, 14, 3f, C(0.7f, 0.72f, 0.76f));
+                c.Line(46, 14, 50, 8, 2f, C(0.7f, 0.72f, 0.76f));
+                c.Line(46, 14, 52, 13, 2f, C(0.7f, 0.72f, 0.76f));
+                c.Line(12, 58, 24, 44, 7f, C(0.85f, 0.3f, 0.2f));
+                break;
             case AccessoryKind.Headlamp:           // tallow lantern
                 c.Rect(20, 18, 44, 52, C(0.25f, 0.24f, 0.24f));
                 c.Rect(23, 22, 41, 48, C(1f, 0.85f, 0.45f));

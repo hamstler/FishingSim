@@ -308,6 +308,7 @@ public sealed class CoreSuite : ITestSuite
         Shoaling(t);
         Rising(t);
         Migration(t);
+        Swallowed(t);
         Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
         Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
@@ -992,6 +993,17 @@ public sealed class CoreSuite : ITestSuite
         t.Check(DailyMigration.Fit(1f, 0.1f) > 1.2f && DailyMigration.Fit(1f, 1f) < 0.8f, "the shallows fish well in low light, poorly in bright sun");
         t.Check(DailyMigration.Fit(7f, 1f) > DailyMigration.Fit(7f, 0.1f), "at noon the deep water pays");
         t.Check(MathF.Abs(DailyMigration.Fit(3.5f, 0.5f) - 1f) < 0.1f, "middling depths hardly change");
+    }
+
+    /// <summary>Swallowed hooks (Core/Methods/Unhooking).</summary>
+    private static void Swallowed(TestContext t)
+    {
+        t.Section("swallowed hooks");
+        t.Check(Unhooking.DeepChance(FishingMethod.Float, 1f) > 4f * Unhooking.DeepChance(FishingMethod.Float, 0f)
+                && Unhooking.DeepChance(FishingMethod.Spinning, 1f) < 0.1f, "a late strike lets the fish swallow a natural bait; lures seldom");
+        t.Check(Unhooking.Seconds(true, false) > Handling.AirGrace && Unhooking.Seconds(true, true) < Handling.AirGrace,
+            "a deep hook keeps the fish out of the water too long without a disgorger");
+        t.Check(Unhooking.Harm(true, false) > 5f * Unhooking.Harm(true, true) && Unhooking.Harm(false, false) == 0f, "and tearing it out hurts");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

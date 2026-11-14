@@ -197,7 +197,7 @@ public partial class CatchPanel : Control
         if (_airShown <= 0f)
         {
             _airShown = 0.5f;
-            string air = _rod.AirSeconds > Core.Methods.Handling.AirGrace
+            string air = _rod.AirSeconds + _rod.UnhookSeconds > Core.Methods.Handling.AirGrace
                 ? $"Ryba za długo bez wody: kondycja {_rod.CatchCondition * 100f:0}%. Zdecyduj szybko!"
                 : "";
             string text = _baseWarning.Length > 0 && air.Length > 0 ? _baseWarning + "\n" + air : _baseWarning + air;
@@ -294,6 +294,11 @@ public partial class CatchPanel : Control
             : undersized
                 ? $"Niewymiarowa (wymiar ochronny {sp.LegalWeight:0.00} kg): zatrzymanie grozi karą strażnika."
                 : "";
+        if (_rod.HookDeep)
+            _warning.Text = (_warning.Text.Length > 0 ? _warning.Text + "\n" : "")
+                + (_rod.Gear?.Has(Data.AccessoryKind.Disgorger) == true
+                    ? "Haczyk połknięty: wypychacz wyjął go szybko."
+                    : "Haczyk połknięty głęboko: wyjmowanie trwa i rani rybę (kup wypychacz, zacinaj szybciej).");
         _baseWarning = _warning.Text;
         _warning.Visible = _warning.Text != "";
         _keep.Disabled = !fits;

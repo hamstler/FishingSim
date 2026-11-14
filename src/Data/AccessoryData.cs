@@ -33,6 +33,8 @@ public enum AccessoryKind
     GlowTip,
     /// <summary>Krętlik z agrafką: a swivel ahead of the lure takes most of the line twist (Core/Methods/LineTwist).</summary>
     Swivel,
+    /// <summary>Wypychacz: takes a swallowed hook out quickly and gently (Core/Methods/Unhooking).</summary>
+    Disgorger,
 }
 
 /// <summary>Any other accessory. Owning one is enough for it to work (they are not equipped in a slot).</summary>

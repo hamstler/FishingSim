@@ -1288,6 +1288,7 @@ public partial class FishingRod : Node3D
             {
                 ShowBanner("Uderzenie! Ryba sama zacięła się na prowadzonej przynęcie", 2.5f);
                 _hookHold = 0.55f;      // hooked by itself: held, but not deeply
+                HookDeep = false;
                 StartFight();
                 return;
             }
@@ -1463,6 +1464,10 @@ public partial class FishingRod : Node3D
                     float window = MethodRules.HookWindow(_castMethod);
                     float late = float.IsNaN(_readyAt) ? _stateTime : _stateTime - _readyAt;
                     _hookHold = Math.Clamp(chance * (1f - 0.4f * Math.Clamp(late / window, 0f, 1f)), 0.2f, 1f);
+                    // Given time, a fish swallows a natural bait: the hook sits deep (holds, but is hard to get out).
+                    HookDeep = !DevInstantBite && _rng.NextFloat() < Unhooking.DeepChance(_castMethod, late / window);
+                    if (HookDeep)
+                        _hookHold = MathF.Min(1f, _hookHold + Unhooking.DeepHold);
                     StartFight();
                 }
                 else
@@ -1872,7 +1877,16 @@ public partial class FishingRod : Node3D
     public float AirSeconds => State == RodState.Landed && AwaitingDecision ? _stateTime : 0f;
 
     /// <summary>The landed fish's condition now: the fight's length and the time out of the water.</summary>
-    public float CatchCondition => Handling.Condition(_lastFightSeconds, AirSeconds);
+    public float CatchCondition => Math.Clamp(Handling.Condition(_lastFightSeconds, AirSeconds + UnhookSeconds)
+        - Unhooking.Harm(HookDeep, HasDisgorger), 0.3f, 1f);
+
+    /// <summary>The hook went deep (swallowed bait after a late strike).</summary>
+    public bool HookDeep { get; private set; }
+
+    private bool HasDisgorger => Gear?.Has(AccessoryKind.Disgorger) == true;
+
+    /// <summary>Seconds the unhooking of the landed fish takes out of the water.</summary>
+    public float UnhookSeconds => Unhooking.Seconds(HookDeep, HasDisgorger);
 
     /// <summary>The catch panel's "Do siatki": the fish goes into the keepnet (if it fits).</summary>
     public bool KeepCatch()

@@ -33,6 +33,7 @@ public sealed class GearCatalog
         "res://data/tackle/accessories/garnek.tres", "res://data/tackle/accessories/podrywka.tres",
         "res://data/tackle/accessories/swietlik.tres",
         "res://data/tackle/accessories/kretlik.tres",
+        "res://data/tackle/accessories/wypychacz.tres",
     };
 
     private readonly Dictionary<GearSlot, List<TackleItem>> _items;
