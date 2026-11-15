@@ -85,7 +85,7 @@ public partial class FishingRod : Node3D
     private float _lineOutOutsideFight;
     private FightModel? _fight;
     private ImmediateMesh _lineMesh = null!;
-    private StandardMaterial3D _lineMaterial = null!;
+    private ShaderMaterial _lineMaterial = null!;
     private Node3D _fishNode = null!;
     private FishModel? _fishModel;
     private FishModel? _heldFish;
@@ -97,6 +97,7 @@ public partial class FishingRod : Node3D
     private bool _rigSettled;
     private float _rigDepth;
     private bool _feederLoaded;
+    private float _bailOpen;
     private float _bitePull;          // the quiver tip pulled round by a bite on the bottom (0..1)
     private float _lastGroundbaitHour = float.NaN;
     private float _lureAppeal = 1f;
@@ -489,11 +490,8 @@ public partial class FishingRod : Node3D
     public override void _Ready()
     {
         _lineMesh = new ImmediateMesh();
-        _lineMaterial = new StandardMaterial3D
-        {
-            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true,
-            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-        };
+        // shaders/fishing_line.gdshader: the line's colour dimmed at night, the sun glinting along it.
+        _lineMaterial = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/fishing_line.gdshader") };
         AddChild(new MeshInstance3D
         {
             Mesh = _lineMesh,
@@ -572,6 +570,9 @@ public partial class FishingRod : Node3D
         _pluck = MathF.Max(0f, _pluck - dt * 5f);
         // The bite indicator hanging on the line between the reel and the first guide (bottom fishing): plucks
         // twitch it, a run pulls it up to the blank.
+        // The bail opens for the cast and snaps shut when the line lands.
+        _bailOpen = Mathf.MoveToward(_bailOpen, State is RodState.Charging or RodState.Flying ? 1f : 0f, dt * 7f);
+        _rig.SetBail(_bailOpen);
         _rig.SetIndicator(_castMethod == FishingMethod.Bottom && State is RodState.Waiting or RodState.Nibble or RodState.Bite,
             Math.Clamp(_bitePull + 0.35f * _pluck, 0f, 1f));
         float load = State is RodState.Fight or RodState.Close ? Tension
@@ -2468,9 +2469,13 @@ public partial class FishingRod : Node3D
             {
                 0 => new Color(0.9f, 0.25f, 0.2f), 1 => new Color(0.95f, 0.85f, 0.2f), 2 => new Color(0.25f, 0.5f, 0.9f), _ => new Color(0.3f, 0.75f, 0.3f),
             } : colour;
+            // The normal carries the line's direction for the sun's glint (fishing_line.gdshader).
+            var dirN = tangent.Normalized();
             _lineMesh.SurfaceSetColor(c);
+            _lineMesh.SurfaceSetNormal(dirN);
             _lineMesh.SurfaceAddVertex(p - side * half);
             _lineMesh.SurfaceSetColor(c);
+            _lineMesh.SurfaceSetNormal(dirN);
             _lineMesh.SurfaceAddVertex(p + side * half);
             if (i < pts.Length - 1)
                 along += (pts[i + 1] - p).Length();

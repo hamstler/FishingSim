@@ -57,6 +57,18 @@ water_dir={
 "type": "vec2",
 "value": Vector2(0.8, 0.6)
 }
+sun_dir={
+"type": "vec3",
+"value": Vector3(0, 1, 0)
+}
+daylight={
+"type": "float",
+"value": 1.0
+}
+sun_color={
+"type": "color",
+"value": Color(1, 0.97, 0.92, 1)
+}
 water_chop={
 "type": "float",
 "value": 1.4

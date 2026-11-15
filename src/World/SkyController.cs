@@ -260,6 +260,10 @@ public partial class SkyController : Node
         _sun.LightColor = SunColour(el);
         _sun.ShadowEnabled = _cloud < 0.75f && day > 0.02f;
         _sun.Visible = el > -0.12f;
+        // For shaders that light themselves (the fishing line's glint): the sun's direction, colour and the daylight.
+        RenderingServer.GlobalShaderParameterSet("sun_dir", _sun.GlobalTransform.Basis.Z.Normalized());
+        RenderingServer.GlobalShaderParameterSet("sun_color", _sun.LightColor);
+        RenderingServer.GlobalShaderParameterSet("daylight", Math.Clamp(day * (1f - _cloud * 0.5f) + 0.15f * Core.Methods.Moon.Illumination(World?.MoonPhase ?? 0f) * (1f - day), 0f, 1f));
 
         _moon.RotationDegrees = new Vector3(elDeg, 150f, 0f);
         _moon.LightEnergy = 0.25f * (0.2f + 0.8f * Core.Methods.Moon.Illumination(World.MoonPhase)) * Math.Clamp(-el * 2.5f, 0f, 1f) * (1f - _cloud * 0.6f);
