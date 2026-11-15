@@ -5,6 +5,8 @@ using FishingSim.Core;
 using FishingSim.Fishing;
 using FishingSim.Tournaments;
 using FishingSim.World;
+using FishingSim.Core.Methods;
+using FishingSim.Progress;
 
 namespace FishingSim.UI;
 
@@ -21,7 +23,9 @@ public partial class Hud : CanvasLayer
     private static readonly Color Ink = new(0.97f, 0.92f, 0.8f);
     private static readonly Color Gold = new(1f, 0.84f, 0.45f);
 
-    private FishingRod _rod = null!;
+    private FishingRod _rodFixed = null!;
+    /// <summary>The rod in use (the active one of the rod set, Fishing/RodSet).</summary>
+    private FishingRod _rod => FishingRod.ActiveRod ?? _rodFixed;
     private TournamentManager _tournaments = null!;
     private InteractionManager _interactions = null!;
     private HBoxContainer _toolbar = null!;
@@ -31,39 +35,89 @@ public partial class Hud : CanvasLayer
     /// <summary>The angler's tools (set by Main), shown as a little bar when more than the rod is owned.</summary>
     public HandTools? Tools { get; set; }
 
+    private float _toolbarCheck;
+
+    /// <summary>
+    /// The hotbar (keys 1-9) along the bottom: rods 1-3 (their rod's picture, and where each is: in the hand, on its
+    /// rest in the water, in the backpack), the shovel, the insect net and the lift net (4-6, dim until bought), 7-9 free.
+    /// The slot in hand is framed in gold.
+    /// </summary>
     private void UpdateToolbar()
     {
         if (Tools == null)
             return;
-        var list = Tools.Available();
-        string key = string.Join(",", list) + "|" + Tools.Current;
-        if (key != _toolbarKey)
+        _toolbar.Visible = !_helpOpen;
+        _toolbarCheck -= (float)GetProcessDeltaTime();
+        if (_toolbarCheck > 0f)
+            return;
+        _toolbarCheck = 0.15f;
+        var owned = Tools.Available();
+        var sb = new System.Text.StringBuilder();
+        var slots = new (Texture2D? Icon, string Note, bool On, bool Dim)[9];
+        for (int i = 0; i < 9; i++)
         {
-            _toolbarKey = key;
-            foreach (var c in _toolbar.GetChildren())
-                c.QueueFree();
-            foreach (var tool in list)
+            if (i < RodSet.MaxRods)
             {
-                bool on = tool == Tools.Current;
-                var slot = new PanelContainer { CustomMinimumSize = new Vector2(52, 52), TooltipText = HandTools.NameOf(tool) };
-                slot.AddThemeStyleboxOverride("panel", UiArt.Nine(UiArt.InsetTexture, 4, 3));
-                slot.Modulate = on ? Colors.White : new Color(1f, 1f, 1f, 0.55f);
-                slot.AddChild(new TextureRect
-                {
-                    Texture = IconOf(tool), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-                    StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered, CustomMinimumSize = new Vector2(44, 44),
-                });
-                if (on)
-                    slot.AddThemeStyleboxOverride("panel", UITheme.Box(new Color(0.3f, 0.22f, 0.1f, 0.85f), UITheme.Accent, 4, 2, 3));
-                _toolbar.AddChild(slot);
+                var rod = Tools.Rods?.At(i) ?? (i == 0 ? _rod : null);
+                string rodId = rod?.Loadout.Rod.ItemId ?? _rod.Profile.EquippedFor(i).GetValueOrDefault("rod", "");
+                bool ready = rod?.Loadout.Ready ?? (rodId != "" && _rod.Profile.Owns(TackleSlot.Rod, rodId));
+                var item = rodId == "" ? null : _rod.Loadout.Items(TackleSlot.Rod).FirstOrDefault(t => t.ItemId == rodId);
+                bool on = Tools.Current == HandTool.Rod && (Tools.Rods?.ActiveSlot ?? 0) == i && rod is { OnRest: false };
+                string note = rod == null ? (ready ? "plecak" : "pusty")
+                    : rod.OnRest ? "podpórka"
+                    : RodSet.InWater(rod) ? "w wodzie"
+                    : on ? "w ręku" : ready ? "plecak" : "pusty";
+                slots[i] = (ready && item != null ? Graphics.Icons.For(item) : null, note, on, !ready);
             }
-            var hint = new Label { Text = "Q", SizeFlagsVertical = Control.SizeFlags.ShrinkCenter };
-            hint.AddThemeFontSizeOverride("font_size", 14);
-            hint.AddThemeColorOverride("font_color", new Color(Ink, 0.8f));
-            _toolbar.AddChild(hint);
+            else if (HandTools.ToolSlots[i - RodSet.MaxRods] is HandTool tool)
+                slots[i] = (IconOf(tool), "", Tools.Current == tool, !owned.Contains(tool));
+            else
+                slots[i] = (null, "", false, true);
+            sb.Append(slots[i].Icon?.GetInstanceId() ?? 0).Append(slots[i].Note).Append(slots[i].On).Append(slots[i].Dim).Append('|');
         }
-        _toolbar.Visible = list.Count > 1 && !_helpOpen;
+        string key = sb.ToString();
+        if (key == _toolbarKey)
+            return;
+        _toolbarKey = key;
+        foreach (var c in _toolbar.GetChildren())
+            c.QueueFree();
+        for (int i = 0; i < 9; i++)
+        {
+            var (icon, note, on, dim) = slots[i];
+            var slot = new PanelContainer { CustomMinimumSize = new Vector2(54, 50) };
+            slot.AddThemeStyleboxOverride("panel", on
+                ? UITheme.Box(new Color(0.3f, 0.22f, 0.1f, 0.9f), UITheme.Accent, 4, 2, 3)
+                : UiArt.Nine(UiArt.InsetTexture, 4, 3));
+            slot.Modulate = on ? Colors.White : new Color(1f, 1f, 1f, dim ? 0.4f : 0.75f);
+            var stack = new Control { CustomMinimumSize = new Vector2(48, 44) };
+            if (icon != null)
+                stack.AddChild(new TextureRect
+                {
+                    Texture = icon, ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                    StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered, Size = new Vector2(48, 36),
+                });
+            var num = new Label { Text = (i + 1).ToString(), Position = new Vector2(-2, -6) };
+            num.AddThemeFontSizeOverride("font_size", 13);
+            num.AddThemeColorOverride("font_color", on ? Gold : new Color(Ink, 0.9f));
+            num.AddThemeConstantOverride("outline_size", 4);
+            num.AddThemeColorOverride("font_outline_color", new Color(0f, 0f, 0f, 0.8f));
+            stack.AddChild(num);
+            if (note != "")
+            {
+                var lab = new Label { Text = note, Position = new Vector2(-4, 31), Size = new Vector2(56, 14), HorizontalAlignment = HorizontalAlignment.Center };
+                lab.AddThemeFontSizeOverride("font_size", 9);
+                lab.AddThemeColorOverride("font_color", note == "w wodzie" || note == "podpórka" ? new Color(0.6f, 0.85f, 1f) : new Color(Ink, 0.85f));
+                lab.AddThemeConstantOverride("outline_size", 3);
+                lab.AddThemeColorOverride("font_outline_color", new Color(0f, 0f, 0f, 0.85f));
+                stack.AddChild(lab);
+            }
+            slot.AddChild(stack);
+            _toolbar.AddChild(slot);
+        }
     }
+
+    /// <summary>The hotbar's slots as text (tests): "1:w ręku 2:pusty ...".</summary>
+    public string HotbarText => _toolbarKey;
 
     private Texture2D IconOf(HandTool tool) => tool switch
     {
@@ -117,7 +171,7 @@ public partial class Hud : CanvasLayer
             _minimap = new Minimap();
             _minimap.Setup(rod, player, scenery);
         }
-        _rod = rod;
+        _rodFixed = rod;
         _tournaments = tournaments;
         _interactions = interactions;
     }
@@ -169,10 +223,10 @@ public partial class Hud : CanvasLayer
         _banner = Text(26, Ink, HorizontalAlignment.Center);
         Anchor(_banner, 0.5f, 0f, -420, 90, 420, 220);
 
-        // The tools in hand (Q): rod, shovel, insect net; and the meal's buff under them.
-        _toolbar = new HBoxContainer { Visible = false };
-        _toolbar.AddThemeConstantOverride("separation", 6);
-        Anchor(_toolbar, 0f, 1f, 16, -168, 300, -112);
+        // The hotbar (keys 1-9) along the bottom in the middle; the meal's buff on the left.
+        _toolbar = new HBoxContainer { Visible = false, Alignment = BoxContainer.AlignmentMode.Center };
+        _toolbar.AddThemeConstantOverride("separation", 4);
+        Anchor(_toolbar, 0.5f, 1f, -270, -60, 270, -6);
         AddChild(_toolbar);
         _meal = Text(14, new Color(1f, 0.86f, 0.55f));
         Anchor(_meal, 0f, 1f, 16, -196, 520, -170);
@@ -209,12 +263,17 @@ public partial class Hud : CanvasLayer
         _hint.Text = "H - sterowanie";
         Anchor(_hint, 0f, 1f, 16, -30, 300, -10);
         _help = Text(14, Ink);
-        Anchor(_help, 0f, 0.5f, 16, -90, 600, 90);
+        Anchor(_help, 0f, 0.5f, 16, -120, 720, 120);
         _help.Text = "WASD - ruch, Shift - bieg, mysz - rozglądanie\n"
             + "LPM przytrzymaj i puść - rzut, potem LPM - zwijanie linki\n"
             + "PPM - podniesienie wędki: zacięcie, pompowanie, wyciągnięcie ryby\n"
             + "Spacja - kasarek (trzeba go kupić), kółko - hamulec\n"
-            + "1-5 - zmiana sprzętu (Shift = wstecz), Tab - stan\n"
+            + "Spinning (przynęta sztuczna): LPM prowadzi (Shift szybciej), puszczona opada, PPM podszarpnięcie / zaczep\n"
+            + "Spławik: [ i ] (lub Ctrl + kółko) ustawiają grunt, czyli głębokość przynęty pod spławikiem; G - garść zanęty z ręki\n"
+            + "K - naostrz haczyk osełką (gdy zestaw jest wyjęty z wody)\n"
+            + "Grunt (wędka gruntowa): koszyczek nęci miejsce, brania na szczytówce; Z - wędka na podpórkę / podnieś\n"
+            + "1-3 - wędki (do 3 w wodzie naraz, druga i trzecia na podpórkach), 4-6 - łopata, siatka, podrywka; ten sam klawisz chowa do plecaka\n"
+            + "Zmiana wędziska, przynęty itd.: kram wędkarski (dla wędki w ręku), Tab - stan\n"
             + "E - wejście | I ekwipunek | M mapa | J dziennik | T turnieje\n"
             + "Esc - menu | F1 - dev | F11 - wydajność (FPS)";
 
@@ -266,11 +325,13 @@ public partial class Hud : CanvasLayer
         bool fighting = rod.State is RodState.Fight or RodState.Close;
         string state = rod.StateName;
         if (rod.State is RodState.Waiting or RodState.Nibble or RodState.Bite)
-            state += $"  ·  {rod.CurrentDepth():0.0} m";
+            state += MethodLine(rod);
+        else if (rod.State == RodState.Idle)
+            state += $"  ·  {rod.Method.Title()}" + (rod.Method == FishingMethod.Float ? $", grunt {rod.FloatDepth:0.0} m ([ ])" : "");
         if (rod.State == RodState.Waiting && rod.World.TimeScale > 1f)
             state += "  ·  odpoczynek na zydlu";
         if (rod.State == RodState.Fight)
-            state += $"  ·  {rod.LineOut:0} m{(rod.Lifting ? "  ·  pompowanie" : "")}";
+            state += $"  ·  {rod.LineOut:0} m{(rod.Lifting ? "  ·  pompowanie" : "")}{(rod.FightSlack ? "  ·  LUZ! zwijaj" : "")}{(rod.FishInWeeds ? rod.FishInWood ? "  ·  W GAŁĘZIACH! podnieś wędkę (PPM)" : "  ·  W ZIELSKU! podnieś wędkę (PPM)" : "")}{(rod.FishJumping ? "  ·  SKOK! opuść wędkę" : "")}";
         if (rod.State == RodState.Close && rod.HasNet)
             state += ", Spacja - kasarek";
         SetText(_status, state);
@@ -308,7 +369,11 @@ public partial class Hud : CanvasLayer
 
         var lo = rod.Loadout;
         string leader = lo.Leader.ItemId == Progress.TackleSlotExtensions.NoLeader ? "" : $", {lo.Leader.DisplayName}";
-        string tackle = $"{lo.Rod.DisplayName}, {lo.Reel.DisplayName}\n{lo.Line.DisplayName}{leader}, {lo.Hook.DisplayName}\n{lo.Bait.DisplayName} ×{lo.BaitCount}";
+        string fray = Core.Methods.LineWear.Word(rod.LineWearNow);
+        string twist = Core.Methods.LineTwist.Word(rod.LineTwistNow);
+        if (twist.Length > 0)
+            fray = fray.Length > 0 ? fray + ", " + twist : twist;
+        string tackle = $"{lo.Rod.DisplayName}, {lo.Reel.DisplayName}\n{lo.Line.DisplayName}{(fray.Length > 0 ? $" ({fray})" : "")}{leader}, {lo.Hook.DisplayName}{(HookWear.Word(rod.HookDullNow) is { Length: > 0 } dull ? $" ({dull}, K - osełka)" : "")}\n{lo.Bait.DisplayName} ×{lo.BaitCount}";
         if (tackle != _lastTackle)
         {
             if (_lastTackle != "")
@@ -353,6 +418,39 @@ public partial class Hud : CanvasLayer
         _dev.Visible = _devOpen;
         if (_devOpen)
             SetText(_dev, DevText());
+    }
+
+    /// <summary>What the line in the water is doing: the float's depth; the lure, how deep it runs over how deep a
+    /// bottom and how well it is led; the feeder sinking or on the bottom, the baited spot, the rod on its rest.</summary>
+    private static string MethodLine(FishingRod rod)
+    {
+        string rest = (rod.OnRest ? "  ·  wędka na podpórce (Z)" : "") + (rod.Slack > 0.3f ? $"  ·  luz {rod.Slack:0.0} m" : "")
+            + (rod.Spooked ? "  ·  ryby spłoszone" : "")
+            + (rod.FishedOut ? "  ·  miejsce wyłowione" : rod.ShoalHere ? "  ·  ławica w pobliżu" : "")
+            + (rod.CastToRise ? "  ·  przy kręgu" : "")
+            + (rod.CrowdingAngler ? "  ·  łowisko innego wędkarza" : "")
+            + (BaitWear.Word(rod.BaitOnHook, rod.BaitFreshness) is { Length: > 0 } baitWord && rod.CastMethod != FishingMethod.Spinning ? "  ·  " + baitWord : "");
+        switch (rod.CastMethod)
+        {
+            case Core.Methods.FishingMethod.Spinning when rod.Lure is { } lure:
+                string colour = Method.ColourWord(rod.LureAppeal);
+                return $"  ·  {lure.Family.Title()} {lure.Depth:0.0} m (dno {rod.CurrentDepth():0.0} m)  ·  {lure.Judgement.Title()}"
+                    + (colour.Length > 0 ? $"  ·  {colour}" : "") + rest;
+            case Core.Methods.FishingMethod.Bottom:
+                string rig = rod.RigSettled ? $"koszyczek na dnie, {rod.CurrentDepth():0.0} m" : "koszyczek opada";
+                return $"  ·  {rig}{Baited(rod.GroundbaitHeat)}{rest}";
+            default:
+                float water = rod.CurrentDepth();
+                string hang = rod.OverDepth ? "przegruntowany: przynęta leży na dnie" : $"przynęta {System.MathF.Max(water - rod.FloatDepth, 0f):0.0} m nad dnem";
+                return $"  ·  woda {water:0.0} m, grunt {rod.FloatDepth:0.0} m ({hang}){Baited(rod.GroundbaitHeat)}{rest}";
+        }
+    }
+
+    /// <summary>The baited spot's strength as dots ("" when there is none).</summary>
+    private static string Baited(float heat)
+    {
+        int dots = heat < 0.05f ? 0 : heat < 0.8f ? 1 : heat < 1.8f ? 2 : 3;
+        return dots > 0 ? $"  ·  nęcone miejsce {new string('●', dots)}{new string('○', 3 - dots)}" : "";
     }
 
     private string DevText()

@@ -12,3 +12,5 @@ Stretch = 0.02
 Price = 700
 RequiredLevel = 6
 Description = "Smołowana plecionka na sumy: najmocniejsza, ale widoczna z daleka."
+Diameter = 0.35
+LineColor = Color(0.18, 0.16, 0.14, 1)

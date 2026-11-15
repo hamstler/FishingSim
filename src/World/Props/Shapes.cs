@@ -76,7 +76,7 @@ public static class Shapes
     }
 
     /// <summary>Adds a log (a slightly uneven cylinder with flat ends) to <paramref name="st"/>, along <paramref name="axis"/>.</summary>
-    public static void Log(SurfaceTool st, Vector3 centre, Vector3 axis, float length, float radius, int seed)
+    public static void Log(SurfaceTool st, Vector3 centre, Vector3 axis, float length, float radius, int seed, bool even = false)
     {
         const int sides = 12;
         var a = axis.Normalized();
@@ -84,10 +84,14 @@ public static class Shapes
         var up = a.Cross(side).Normalized();
         var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 7919 + 13) };
         float wobble = rng.RandfRange(0.92f, 1.06f);
+        if (even)
+            wobble = 1f;
         Vector3 Ring(int i, float t, out Vector3 n)
         {
             float ang = i * Mathf.Tau / sides;
-            float rr = radius * wobble * (1f + 0.04f * MathF.Sin(ang * 3f + seed)) * (1f - 0.06f * t);
+            float rr = even
+                ? radius * (1f + 0.03f * MathF.Sin(ang * 3f + seed))     // a log to sit on: as thick from end to end
+                : radius * wobble * (1f + 0.04f * MathF.Sin(ang * 3f + seed)) * (1f - 0.06f * t);
             n = (side * MathF.Cos(ang) + up * MathF.Sin(ang)).Normalized();
             return centre + a * (length * (t - 0.5f)) + n * rr;
         }

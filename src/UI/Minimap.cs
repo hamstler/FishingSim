@@ -21,7 +21,7 @@ public partial class Minimap : Control
     private const float Scale = 0.5f;
 
     /// <summary>The whole widget's size on screen.</summary>
-    public const float WidgetWidth = 172f, WidgetHeight = 182f;
+    public const float WidgetWidth = 172f, WidgetHeight = 195f;
 
     /// <summary>Metres shown across the map.</summary>
     public const float ViewMetres = 120f;
@@ -36,7 +36,7 @@ public partial class Minimap : Control
     public const float MapDiameter = MapRadius * 2f * Scale;
 
     /// <summary>Height of the plaque under the dial (screen units).</summary>
-    private const float PlaqueHeight = 50f;
+    private const float PlaqueHeight = 63f;
 
     private static readonly Color Ink = UITheme.Text;
     private static readonly Color Brass = new(0.86f, 0.68f, 0.34f);
@@ -46,7 +46,9 @@ public partial class Minimap : Control
     private static readonly Color DayGold = new(0.98f, 0.78f, 0.32f);
     private static readonly Color NightBlue = new(0.32f, 0.42f, 0.72f);
 
-    private FishingRod _rod = null!;
+    private FishingRod _rodFixed = null!;
+    /// <summary>The rod in use (the active one of the rod set, Fishing/RodSet).</summary>
+    private FishingRod _rod => FishingRod.ActiveRod ?? _rodFixed;
     private Node3D _player = null!;
     private Scenery _scenery = null!;
     private Data.LocationData? _renderedFor;
@@ -60,7 +62,7 @@ public partial class Minimap : Control
 
     public void Setup(FishingRod rod, Node3D player, Scenery scenery)
     {
-        _rod = rod;
+        _rodFixed = rod;
         _player = player;
         _scenery = scenery;
         MouseFilter = MouseFilterEnum.Ignore;
@@ -346,9 +348,16 @@ public partial class Minimap : Control
             day ? new Color(1f, 0.85f, 0.5f, 0.9f) : new Color(0.75f, 0.82f, 1f, 0.9f));
         string weather = !day && world.Weather == Weather.Clear ? "Pogodnie" : world.Weather.DisplayName();
         string wind = world.WindTarget < 0.35f ? "lekki wiatr" : world.WindTarget < 0.7f ? "umiarkowany wiatr" : "silny wiatr";
-        string line = $"{weather} · {wind}";
+        // At night the moon's phase too: it tells how dark the night is.
+        string line = day ? $"{weather} · {wind}" : $"{weather} · {Core.Methods.Moon.Name(world.MoonPhase)} · {wind}";
         DrawString(font, new Vector2(box.Position.X, box.Position.Y + 31f), line, HorizontalAlignment.Center, box.Size.X,
             Fit(font, line, inner, 11), new Color(Ink, 0.88f));
+        // The barometer and the water: what the fish feel.
+        var baro = world.Barometer;
+        string murk = Core.Methods.Turbidity.Word(world.Murk);
+        string air = $"{baro.Pressure:0} hPa, {baro.TrendWord} · woda {_rod.WaterTemp:0}°C{(murk.Length > 0 ? ", " + murk : "")}";
+        DrawString(font, new Vector2(box.Position.X, box.Position.Y + 57f), air, HorizontalAlignment.Center, box.Size.X,
+            Fit(font, air, inner, 11), baro.Pace > 1.05f ? new Color(0.6f, 0.95f, 0.6f) : baro.Pace < 0.95f ? new Color(1f, 0.65f, 0.5f) : new Color(Ink, 0.8f));
         string place = _rod.Lake.Location.DisplayName;
         DrawString(font, new Vector2(box.Position.X, box.Position.Y + 44f), place, HorizontalAlignment.Center, box.Size.X,
             Fit(font, place, inner, 11), new Color(Brass, 0.95f));

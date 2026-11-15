@@ -4,10 +4,12 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Bęben sumowy"
+DisplayName = "Ironwood Titan 8000 · bęben sumowy"
 DragMax = 14.0
 ReelSpeed = 2.6
 LineCapacity = 220.0
 Price = 980
 RequiredLevel = 6
 Description = "Ogromny bęben z mocnym hamulcem: dla sumów i jesiotrów."
+BodyColor = Color(0.1, 0.12, 0.18, 1)
+TrimColor = Color(0.7, 0.7, 0.72, 1)

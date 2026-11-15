@@ -12,3 +12,5 @@ Stretch = 0.03
 Price = 480
 RequiredLevel = 5
 Description = "Bardzo mocna i cienka plecionka z jedwabiu."
+Diameter = 0.28
+LineColor = Color(0.97, 0.95, 0.9, 1)

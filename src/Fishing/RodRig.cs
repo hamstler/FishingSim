@@ -77,15 +77,15 @@ public partial class RodRig : Node3D
         Position = new Vector3(0.3f, -0.35f, -0.4f);
         RotationDegrees = new Vector3(-80f, 0f, 0f);
 
-        var cork = Mat(new Color(0.72f, 0.56f, 0.38f), 0.85f);        // cork grips
+        var cork = _cork = Mat(new Color(0.72f, 0.56f, 0.38f), 0.85f);        // cork grips
         var corkDark = Mat(new Color(0.55f, 0.4f, 0.26f), 0.9f);      // filler rings in the cork
         var rubber = Mat(new Color(0.12f, 0.11f, 0.1f), 0.7f);         // butt cap
         var seat = Mat(new Color(0.16f, 0.16f, 0.17f), 0.45f, 0.3f);   // graphite reel seat
         var chrome = Mat(new Color(0.72f, 0.72f, 0.74f), 0.25f, 0.9f); // hoods, guides, bail
-        var blank = Mat(new Color(0.24f, 0.12f, 0.09f), 0.35f, 0.15f); // lacquered blank
-        var whip = Mat(new Color(0.75f, 0.62f, 0.3f), 0.5f, 0.2f);     // gold thread whippings
-        var reelBody = Mat(new Color(0.2f, 0.21f, 0.23f), 0.4f, 0.5f); // reel housing
-        var reelTrim = Mat(new Color(0.62f, 0.52f, 0.3f), 0.3f, 0.8f); // champagne trim
+        var blank = _blank = Mat(new Color(0.24f, 0.12f, 0.09f), 0.35f, 0.15f); // lacquered blank
+        var whip = _whip = Mat(new Color(0.75f, 0.62f, 0.3f), 0.5f, 0.2f);     // gold thread whippings
+        var reelBody = _reelBody = Mat(new Color(0.2f, 0.21f, 0.23f), 0.4f, 0.5f); // reel housing
+        var reelTrim = _reelTrim = Mat(new Color(0.62f, 0.52f, 0.3f), 0.3f, 0.8f); // champagne trim
         var line = Mat(new Color(0.82f, 0.86f, 0.78f), 0.5f);          // line on the spool
         var knob = Mat(new Color(0.32f, 0.2f, 0.12f), 0.55f);          // wooden knob
 
@@ -119,7 +119,9 @@ public partial class RodRig : Node3D
             float r0 = Mathf.Lerp(0.0078f, 0.0017f, MathF.Pow(t0, 0.85f)), r1 = Mathf.Lerp(0.0078f, 0.0017f, MathF.Pow(t1, 0.85f));
             var seg = new Node3D { Position = new Vector3(0, yOffset, 0) };
             parent.AddChild(seg);
-            Cyl(seg, r1, r0, SegmentLength, new Vector3(0, SegmentLength * 0.5f, 0), blank, 10);
+            var blankMesh = Cyl(seg, r1, r0, SegmentLength, new Vector3(0, SegmentLength * 0.5f, 0), blank, 10);
+            _blankMeshes.Add(blankMesh);
+            _blankMaterial = blank;
             if (guides.TryGetValue(i, out var g))
                 Guide(seg, SegmentLength * 0.55f, Mathf.Lerp(r0, r1, 0.55f), g.Ring, g.Height, chrome, whip);
             if (i == 0)
@@ -147,6 +149,98 @@ public partial class RodRig : Node3D
         parent.AddChild(top);
         Tip = new Node3D { Position = new Vector3(0, SegmentLength, 0) };
         parent.AddChild(Tip);
+        SetLook(_lookRod, _lookReel);
+    }
+
+    private Node3D? _indicator, _bobbin;
+    private StandardMaterial3D? _indicatorGlow;
+
+    /// <summary>
+    /// The bite indicator for bottom fishing: a bright bobbin hanging on a cord from the line between the reel and
+    /// the first guide. <paramref name="lift"/> 0 hangs, 1 pulled right up to the blank (a fish running with the bait).
+    /// </summary>
+    public void SetIndicator(bool shown, float lift)
+    {
+        if (_indicator == null)
+        {
+            if (!shown)
+                return;
+            _indicator = new Node3D { Position = new Vector3(0f, 0.42f, -0.03f) };
+            AddChild(_indicator);
+            _bobbin = new Node3D();
+            _indicator.AddChild(_bobbin);
+            var cord = Mat(new Color(0.15f, 0.15f, 0.15f), 0.6f);
+            var glow = _indicatorGlow = BuildingFactory.Pixel(new StandardMaterial3D
+            {
+                AlbedoColor = new Color(1f, 0.55f, 0.08f), Roughness = 0.4f,
+                EmissionEnabled = true, Emission = new Color(1f, 0.5f, 0.05f), EmissionEnergyMultiplier = 0.5f,
+            });
+            Cyl(_bobbin, 0.0007f, 0.0007f, 0.12f, new Vector3(0f, 0f, 0.06f), cord, 4).RotationDegrees = new Vector3(90f, 0f, 0f);
+            Cyl(_bobbin, 0.008f, 0.008f, 0.03f, Vector3.Zero, glow, 10).RotationDegrees = new Vector3(90f, 0f, 0f);
+        }
+        _indicator.Visible = shown;
+        if (_bobbin != null)
+            _bobbin.Position = new Vector3(0f, 0f, -0.13f * (1f - Math.Clamp(lift, 0f, 1f)));
+    }
+
+    private readonly List<MeshInstance3D> _blankMeshes = new();
+    private Material? _blankMaterial;
+    private Data.RodData? _lookRod;
+    private Data.ReelData? _lookReel;
+    private StandardMaterial3D? _cork, _blank, _whip, _reelBody, _reelTrim;
+
+    /// <summary>Dresses the rig in the maker's colours of a rod and reel (blank lacquer, whippings, cork or foam
+    /// grips, reel housing and trim).</summary>
+    public void SetLook(Data.RodData? rod, Data.ReelData? reel)
+    {
+        _lookRod = rod ?? _lookRod;
+        _lookReel = reel ?? _lookReel;
+        if (_blank == null)
+            return;
+        if (rod != null)
+        {
+            _blank.AlbedoColor = rod.BlankColor;
+            _whip!.AlbedoColor = rod.WhipColor;
+            _cork!.AlbedoColor = rod.FoamGrip ? new Color(0.09f, 0.09f, 0.1f) : new Color(0.72f, 0.56f, 0.38f);
+            _cork.Roughness = rod.FoamGrip ? 0.95f : 0.85f;
+        }
+        if (reel != null)
+        {
+            _reelBody!.AlbedoColor = reel.BodyColor;
+            _reelTrim!.AlbedoColor = reel.TrimColor;
+        }
+    }
+    private Material? _quiverMaterial;
+
+    /// <summary>After dark the quiver tip and the bite indicator fade, unless a glow tip (świetlik) is fitted.</summary>
+    public void SetNight(float darkness, bool glowTip)
+    {
+        float energy = glowTip && darkness > 0.3f ? 1.2f + 2f * darkness : 0.35f * (1f - 0.95f * darkness);
+        if (_quiverMaterial is StandardMaterial3D q && MathF.Abs(q.EmissionEnergyMultiplier - energy) > 0.02f)
+        {
+            var c = glowTip && darkness > 0.3f ? new Color(0.35f, 1f, 0.4f) : new Color(1f, 0.4f, 0.1f);
+            q.Emission = c;
+            q.EmissionEnergyMultiplier = energy;
+        }
+        if (_indicatorGlow != null && MathF.Abs(_indicatorGlow.EmissionEnergyMultiplier - energy) > 0.02f)
+            _indicatorGlow.EmissionEnergyMultiplier = energy * 1.4f;
+    }
+
+    /// <summary>
+    /// A bottom rod's quiver tip: the last two sections of the blank painted bright (white and signal orange, a little
+    /// self-lit) so the smallest pluck on the bait shows against the water; other rods keep the lacquered blank.
+    /// </summary>
+    public void SetQuiverTip(bool on)
+    {
+        if (_blankMeshes.Count < 2 || _blankMaterial == null)
+            return;
+        _quiverMaterial ??= BuildingFactory.Pixel(new StandardMaterial3D
+        {
+            AlbedoColor = new Color(1f, 0.45f, 0.12f), Roughness = 0.35f,
+            EmissionEnabled = true, Emission = new Color(1f, 0.4f, 0.1f), EmissionEnergyMultiplier = 0.35f,
+        });
+        for (int i = _blankMeshes.Count - 2; i < _blankMeshes.Count; i++)
+            _blankMeshes[i].MaterialOverride = on ? _quiverMaterial : _blankMaterial;
     }
 
     /// <summary>A guide under the blank: a ring standing on a two-legged frame, whipped to the blank.</summary>

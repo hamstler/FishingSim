@@ -13,7 +13,7 @@ namespace FishingSim.Graphics;
 /// </summary>
 public static class PhotoTextures
 {
-    private const int Version = 1;
+    private const int Version = 2;     // 2: the 4K sets
 
     public sealed record Photo(Texture2D Albedo, Texture2D Normal, float Metres);
 

@@ -9,13 +9,15 @@ namespace FishingSim.UI;
 /// <summary>Modal results window shown when a tournament ends.</summary>
 public partial class TournamentResultsScreen : CanvasLayer
 {
-    private FishingRod _rod = null!;
+    private FishingRod _rodFixed = null!;
+    /// <summary>The rod in use (the active one of the rod set, Fishing/RodSet).</summary>
+    private FishingRod _rod => FishingRod.ActiveRod ?? _rodFixed;
     private TournamentManager _manager = null!;
     private VBoxContainer _box = null!;
 
     public void Setup(FishingRod rod, TournamentManager manager)
     {
-        _rod = rod;
+        _rodFixed = rod;
         _manager = manager;
     }
 

@@ -10,7 +10,9 @@ public partial class InteractionManager : Node
 {
     private Player _player = null!;
     private Scenery _scenery = null!;
-    private FishingRod _rod = null!;
+    private FishingRod _rodFixed = null!;
+    /// <summary>The rod in use (the active one of the rod set, Fishing/RodSet).</summary>
+    private FishingRod _rod => FishingRod.ActiveRod ?? _rodFixed;
 
     /// <summary>The spot in reach right now, or null.</summary>
     public Interactable? Current { get; private set; }
@@ -21,7 +23,7 @@ public partial class InteractionManager : Node
     {
         _player = player;
         _scenery = scenery;
-        _rod = rod;
+        _rodFixed = rod;
     }
 
     /// <summary>The nearest interactable whose radius contains the point, or null.</summary>

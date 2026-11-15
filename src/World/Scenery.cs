@@ -26,13 +26,26 @@ public partial class Scenery : Node3D
     /// <summary>Labelled places for the map screen.</summary>
     public List<MapMarker> Markers { get; } = new();
 
+    /// <summary>The water plant patches (lilies and underwater weed) of this map: where cover-loving fish hold.</summary>
+    public List<Core.Methods.WeedBed> WeedBeds { get; } = new();
+
+    /// <summary>Other anglers on the bank: where each sits and where its float lies (BuildAnglers; cleared on rebuild).</summary>
+    public List<(Vector3 Seat, Vector3 Float)> Anglers { get; } = new();
+
+    /// <summary>Sunken trees off the wooded banks (ScatterSunkenWood; cleared on rebuild).</summary>
+    public List<Core.Methods.SunkenWood> SunkenWood { get; } = new();
+
     /// <summary>How many of each thing was placed on the current map (for tests and tuning).</summary>
     public Dictionary<string, int> Stats { get; } = new();
+
+    /// <summary>Collision for the trees, boulders and props that have no body of their own.</summary>
+    public Solids Solids { get; } = new();
 
     public void Build(LakeBed lake, WorldState? world = null)
     {
         _lake = lake;
         _world = world;
+        AddChild(Solids);
         BuildPier();
         lake.Rebuilt += Rebuild;
         GraphicsQuality.Changed += ApplyFoliageRange;
@@ -265,6 +278,7 @@ public partial class Scenery : Node3D
     // ------------------------------------------------------------------ rebuild
     private void Rebuild()
     {
+        Solids.Clear();
         foreach (var n in _dynamic)
             n.QueueFree();
         _dynamic.Clear();
@@ -273,6 +287,11 @@ public partial class Scenery : Node3D
         _buildings.Clear();
         Interactables.Clear();
         Markers.Clear();
+        WeedBeds.Clear();
+        SunkenWood.Clear();
+        _landmarkTrees.Clear();
+        Anglers.Clear();
+        _anglerParts.Clear();
         Stats.Clear();
         _reserved.Clear();
         _props.Clear();
@@ -283,6 +302,7 @@ public partial class Scenery : Node3D
         BuildCampfires(loc);
         BuildEverydayLife(loc);
         BuildLandmarks(loc);
+        BuildAnglers(loc);
         var rng = new RandomNumberGenerator { Seed = 42 };
         ScatterTrees(loc, rng);
         ScatterGroundCover(loc, rng);
@@ -290,6 +310,7 @@ public partial class Scenery : Node3D
         ScatterReeds(loc, rng);
         ScatterShoreline(loc, rng);
         ScatterWaterPlants(loc, rng);
+        ScatterSunkenWood(loc, rng);
         ScatterRocks(loc, rng);
         ApplyFoliageRange();
     }
@@ -434,6 +455,7 @@ public partial class Scenery : Node3D
                 AddChild(board);
                 Track(board);
                 Prop(board, 120f);
+                Solids.BoxIn(board.Transform, new Vector3(0f, 1.1f, 0f), new Vector3(1.9f, 2.2f, 0.35f));
                 NoticeBoard = board;
                 _reserved.Add((p, 4f));
                 var front = p + toPlaza.Normalized() * 1.4f;
@@ -461,16 +483,22 @@ public partial class Scenery : Node3D
         for (int i = 0; i < (playerCamp ? 2 : 3); i++)
         {
             float a = (playerCamp ? 0.6f + i * 2.2f : 0.4f + i * 2.1f);
-            var log = Props.CampProps.SeatLog(1.3f, i + (playerCamp ? 0 : 5), playerCamp ? 0.17f : 0.21f);
+            Props.Npc? sitter = !playerCamp && i < 2
+                ? Props.People.Create(i == 0 ? Props.Role.Elder : Props.Role.Woman, 40 + i,
+                    i == 0 ? "Sitting_Idle_Loop" : "Sitting_Talking_Loop", Array.Empty<string>())
+                : null;
+            // A log as thick as the sitter's seat is high, so whoever sits on it touches it.
+            float radius = sitter?.SeatLogRadius ?? (playerCamp ? 0.2f : 0.23f);
+            var log = Props.CampProps.SeatLog(1.3f, i + (playerCamp ? 0 : 5), radius, even: sitter != null);
+            log.Name = $"SeatLog{i}";
             log.Position = new Vector3(MathF.Cos(a) * 1.7f, 0f, MathF.Sin(a) * 1.7f);
             log.Rotation = new Vector3(0f, -a + Mathf.Pi / 2f, 0f);
             root.AddChild(log);
-            if (!playerCamp && i < 2)
+            if (sitter != null)
             {
-                var sitter = Props.People.Create(i == 0 ? Props.Role.Elder : Props.Role.Woman, 40 + i,
-                    i == 0 ? "Sitting_Idle_Loop" : "Sitting_Talking_Loop", Array.Empty<string>());
-                // Facing the fire, seated on the log.
-                sitter.Position = new Vector3(MathF.Cos(a) * 1.78f, 0f, MathF.Sin(a) * 1.78f);
+                // Facing the fire, the hips right over the log's axis.
+                float back = sitter.Seat.Back;
+                sitter.Position = new Vector3(MathF.Cos(a) * (1.7f - back), 0f, MathF.Sin(a) * (1.7f - back));
                 sitter.Rotation = new Vector3(0f, MathF.Atan2(-MathF.Cos(a), -MathF.Sin(a)), 0f);
                 root.AddChild(sitter);
                 Count("villager_sitting");
@@ -482,6 +510,7 @@ public partial class Scenery : Node3D
             for (int i = 0; i < 6; i++)
             {
                 var piece = Props.CampProps.SeatLog(0.6f, i + 20);
+                piece.Name = $"Firewood{i}";
                 piece.Scale = new Vector3(1f, 0.45f, 0.45f);
                 piece.Position = new Vector3(-2.4f + (i % 3) * 0.02f, 0.02f + (i / 3) * 0.14f, 1.1f + (i % 3) * 0.16f);
                 piece.Rotation = new Vector3(0f, 0.2f, 0f);
@@ -508,6 +537,11 @@ public partial class Scenery : Node3D
         Track(root);
         Prop(root, 140f);
         Campfires.Add(fire);
+        // The stone ring is solid (the angler walks round the fire), and so are the logs round it.
+        Solids.Cylinder(root.Position - new Vector3(0f, 0.2f, 0f), 0.7f, 1.2f);
+        foreach (var child in root.GetChildren())
+            if (child is Node3D { Name: var n } seat && n.ToString().StartsWith("SeatLog"))
+                Solids.BoxIn(root.Transform * seat.Transform, new Vector3(0f, 0.2f, 0f), new Vector3(1.3f, 0.4f, 0.42f));
         _reserved.Add((at, 4.5f));
         var spot = new Interactable { Kind = InteractKind.Campfire, Title = title, Radius = 3.2f, Position = root.Position, Target = fire };
         AddChild(spot);
@@ -610,6 +644,25 @@ public partial class Scenery : Node3D
             Track(root);
             Prop(root, 110f);
             Count("everyday_" + kind);
+            var frame = root.Transform;
+            foreach (var child in root.GetChildren())
+                switch (child.Name.ToString())
+                {
+                    case "Laundry":
+                        foreach (float x in new[] { -1.4f, 1.4f })
+                            Solids.CylinderIn(frame, new Vector3(x, 0f, 0f), 0.08f, 1.9f);
+                        break;
+                    case "ChoppingBlock":
+                        Solids.CylinderIn(frame, new Vector3(-1.4f, 0f, 0f), 0.36f, 0.55f);
+                        Solids.CylinderIn(frame, new Vector3(0.9f, 0f, 0f), 0.26f, 1.5f);
+                        break;
+                    case "NetRack":
+                        foreach (float x in new[] { -1.6f, 1.6f })
+                            Solids.CylinderIn(frame, new Vector3(x, 0f, 0f), 0.08f, 1.8f);
+                        break;
+                }
+            if (kind == 2)
+                Solids.BoxIn(frame, new Vector3(0f, 0.6f, -0.1f), new Vector3(1.9f, 1.2f, 0.6f));
         }
         // Rowboats pulled up on the beach either side of the pier, bows towards the water.
         int boats = 0;
@@ -632,6 +685,7 @@ public partial class Scenery : Node3D
                     AddChild(boat);
                     Track(boat);
                     Prop(boat, 160f);
+                    Solids.BoxIn(boat.Transform, new Vector3(0f, 0.25f, 0f), new Vector3(1.4f, 0.6f, 3.6f));
                     boats++;
                     Count("rowboat");
                     x = 1000f;
@@ -677,6 +731,18 @@ public partial class Scenery : Node3D
             Track(building);
             _buildings.Add(building);
             Count("landmark_" + kind);
+            foreach (var spot in building.TreeSpots)
+                _landmarkTrees.Add(building.Transform * spot);
+            // Keep trees, plants and the local anglers off the landmark: a long dike gets a row of circles.
+            if (kind == "dike")
+            {
+                float length = MathF.Max(size, 20f);
+                var along = new Vector2(MathF.Cos(yaw), -MathF.Sin(yaw));
+                for (float t = -length / 2f; t <= length / 2f; t += 4f)
+                    _reserved.Add((new Vector2(x, z) + along * t, 6f));
+            }
+            else if (kind is not ("platforms" or "rocks" or "stilthouse"))
+                _reserved.Add((new Vector2(x, z), 8f));
             if (building.Title != "" && kind != "platforms")
                 Markers.Add(new MapMarker(new Vector2(x, z), building.Title, new Color(0.8f, 0.78f, 0.7f)));
         }
@@ -792,6 +858,16 @@ public partial class Scenery : Node3D
     };
 
     private readonly List<(float X, float Z, string Kind)> _treeSpots = new();
+    private readonly List<(float X, float Z)> _allTrees = new();
+
+    /// <summary>Feet of the trees the landmarks ask for (world positions; planted with the forest's trees).</summary>
+    private readonly List<Vector3> _landmarkTrees = new();
+
+    /// <summary>The trunk's radius at the foot for a kind of tree at scale 1 (TreeFactory.Get's trunks).</summary>
+    private static float TrunkRadius(string kind) => kind switch
+    {
+        "spruce" => 0.17f, "oak" => 0.2f, "birch" => 0.1f, "pine" => 0.18f, "willow" => 0.24f, _ => 0.15f,
+    };
 
     private void ScatterTrees(LocationData loc, RandomNumberGenerator rng)
     {
@@ -801,6 +877,7 @@ public partial class Scenery : Node3D
         var crowns = kinds.ToDictionary(k => k, _ => new List<Transform3D>());
         var crownColors = kinds.ToDictionary(k => k, _ => new List<Color>());
         _treeSpots.Clear();
+        _allTrees.Clear();
 
         void Plant(string kind, float x, float z, float h, float s, float yaw, float tint, bool understorey)
         {
@@ -813,6 +890,10 @@ public partial class Scenery : Node3D
             crownColors[kind].Add(Tint(CrownColor(kind), tint));
             if (understorey)
                 _treeSpots.Add((x, z, kind));
+            _allTrees.Add((x, z));
+            // The trunk is solid where the angler can walk (beyond the edge nobody reaches it).
+            if (_lake.PlayDistance(x, z) < 2f)
+                Solids.Cylinder(new Vector3(x, h - 0.3f, z), TrunkRadius(kind) * s * 1.1f, 3f);
             Count("tree_" + kind);
         }
 
@@ -867,6 +948,15 @@ public partial class Scenery : Node3D
                 continue;
             Plant(Choose(weights, pick), x, z, h, s, yaw, tint, true);
             placed++;
+        }
+
+        // Trees the landmarks ask for (the row along the fish-pond dike): tall birches and oaks, the same trees as the
+        // forest's, standing where the landmark says.
+        foreach (var foot in _landmarkTrees)
+        {
+            float pick = rng.Randf();
+            string kind = pick < 0.65f ? "birch" : "oak";
+            Plant(kind, foot.X, foot.Z, foot.Y + 0.1f, rng.RandfRange(1.15f, 1.45f), rng.Randf() * Mathf.Tau, rng.RandfRange(-0.1f, 0.1f), false);
         }
 
         // The forest at the edge of the map: dense at the foot of the mountains, where the angler is stopped (so the
@@ -1236,6 +1326,205 @@ public partial class Scenery : Node3D
     }
 
     // ------------------------------------------------------------------ on the water: lilies and pondweed
+    /// <summary>
+    /// Trees fallen from the wooded banks into the water: from tree spots near the shore, a few metres out into water
+    /// 0.6-3 m deep, at least 12 m apart and away from the pier. A grey, weathered branch or two pokes out of the water
+    /// over each, so the angler can see where the snags are.
+    /// </summary>
+    /// <summary>
+    /// Two or three local anglers along the bank, well away from the pier and each other: each sits on a log behind a
+    /// hazel rod rest, the rod pointing out over the water, its float lying 9-13 m out. They fish the water in front of
+    /// them (Main lets them catch now and then, which leaves that swim fished: FishingRod.Swim).
+    /// </summary>
+    /// <summary>The ground within <paramref name="radius"/> of (x, z) stays within <paramref name="tolerance"/> m of its
+    /// height there (checked over a ring and halfway in).</summary>
+    private bool Level(LocationData loc, float x, float z, float radius, float tolerance)
+    {
+        float h = _lake.HeightAt(loc, x, z);
+        for (int k = 0; k < 8; k++)
+        {
+            float a = k * Mathf.Tau / 8f;
+            foreach (float r in new[] { radius * 0.5f, radius })
+                if (MathF.Abs(_lake.HeightAt(loc, x + MathF.Cos(a) * r, z + MathF.Sin(a) * r) - h) > tolerance)
+                    return false;
+        }
+        return true;
+    }
+
+    private readonly List<(Props.Npc Angler, MeshInstance3D Float)> _anglerParts = new();
+
+    /// <summary>
+    /// A local angler gets a bite and lands a fish: the float goes under, the angler gets up to land it, and a little
+    /// later the float is back out on the water.
+    /// </summary>
+    public void AnglerCatches(int index)
+    {
+        if (index < 0 || index >= _anglerParts.Count)
+            return;
+        var (angler, bob) = _anglerParts[index];
+        if (!IsInstanceValid(angler) || !IsInstanceValid(bob))
+            return;
+        var rest = bob.Position;
+        var tween = bob.CreateTween();
+        tween.TweenProperty(bob, "position", rest + new Vector3(0f, -0.25f, 0f), 0.35f);
+        tween.TweenCallback(Callable.From(() => { bob.Visible = false; angler.PlayGesture("Interact"); }));
+        tween.TweenInterval(6f);
+        tween.TweenCallback(Callable.From(() => { bob.Position = rest; bob.Visible = true; }));
+        AnglerCaught?.Invoke(index);
+    }
+
+    /// <summary>A local angler landed a fish (for the sound and tests).</summary>
+    public event Action<int>? AnglerCaught;
+
+    private void BuildAnglers(LocationData loc)
+    {
+        var rng = new RandomNumberGenerator { Seed = (ulong)(loc.DisplayName.Length * 7919 + 17) };
+        var shores = Shores(loc);
+        var main = shores[0];
+        int want = 3;
+        for (int tries = 0; Anglers.Count < want && tries < 600; tries++)
+        {
+            float angle = rng.Randf() * Mathf.Tau;
+            float wx = main.X + main.Rx * 0.8f * MathF.Cos(angle), wz = main.Z + main.Rz * 0.8f * MathF.Sin(angle);
+            if (_lake.DepthAt(loc, wx, wz) < 1f)
+                continue;
+            // Walk out from the water to the bank.
+            var dir = new Vector2(MathF.Cos(angle) * main.Rx, MathF.Sin(angle) * main.Rz).Normalized();
+            Vector2? edge = null;
+            for (float d = 0f; d < 60f; d += 0.5f)
+            {
+                float x = wx + dir.X * d, z = wz + dir.Y * d;
+                if (_lake.DepthAt(loc, x, z) <= 0f)
+                {
+                    edge = new Vector2(x, z);
+                    break;
+                }
+            }
+            if (edge is not Vector2 waterline || MathF.Abs(waterline.X) < 40f && waterline.Y > -40f)
+                continue;
+            // The first level, walkable spot 1.5-7 m up the bank: the terrain mesh (a 2.5 m grid) cuts corners on a
+            // steep bank, which would bury the angler's legs or leave his log hanging.
+            Vector2? found = null;
+            for (float back = 1.5f; back <= 7f && found == null; back += 0.5f)
+            {
+                var p = waterline + dir * back;
+                if (_lake.IsWalkable(p.X, p.Y) && Clear(loc, p.X, p.Y, 3f, 2.5f) && _lake.HeightAt(loc, p.X, p.Y) <= 2.5f
+                    && Level(loc, p.X, p.Y, 2.5f, 0.3f))
+                    found = p;
+            }
+            if (found is not Vector2 seat)
+                continue;
+            bool crowded = false;
+            foreach (var (s, _) in Anglers)
+                if (new Vector2(s.X, s.Z).DistanceTo(seat) < 60f)
+                    crowded = true;
+            if (crowded)
+                continue;
+            var toWater = -dir;
+            float reach = rng.RandfRange(9f, 13f);
+            var floatAt = seat + toWater * (seat.DistanceTo(waterline) + reach);
+            if (_lake.DepthAt(loc, floatAt.X, floatAt.Y) < 0.8f)
+                continue;
+            float h = _lake.HeightAt(loc, seat.X, seat.Y);
+            var root = new Node3D { Name = "Angler", Position = new Vector3(seat.X, h, seat.Y) };
+            root.Rotation = new Vector3(0f, MathF.Atan2(toWater.X, toWater.Y), 0f);
+            var angler = Props.People.Create(Props.Role.Fisherman, 60 + Anglers.Count, "Sitting_Idle_Loop", new[] { "Sitting_Talking_Loop" });
+            // The log lies across, as thick as his seat is high; he sits with his hips over its axis, facing the water.
+            var log = Props.CampProps.SeatLog(1.1f, Anglers.Count + 11, angler.SeatLogRadius, even: true);
+            root.AddChild(log);
+            angler.Position = new Vector3(0f, 0f, angler.Seat.Back);
+            root.AddChild(angler);
+            // The rod on a forked stick in front, its tip out over the water.
+            var rest = Fishing.RodRest.Create(false);
+            rest.Position = new Vector3(0.35f, 0f, 1.4f);
+            root.AddChild(rest);
+            var rod = new MeshInstance3D
+            {
+                Mesh = new CylinderMesh { TopRadius = 0.004f, BottomRadius = 0.016f, Height = 3.6f, RadialSegments = 6 },
+                MaterialOverride = Props.CampProps.DarkWood,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
+            };
+            // From the butt by the seat over the fork, rising 22 degrees towards the water.
+            var butt = new Vector3(0.3f, 0.2f, 0.5f);
+            var along = new Vector3(0f, MathF.Sin(Mathf.DegToRad(22f)), MathF.Cos(Mathf.DegToRad(22f)));
+            rod.Position = butt + along * 1.8f;
+            rod.Basis = new Basis(Vector3.Right, Mathf.DegToRad(90f - 22f));
+            root.AddChild(rod);
+            // The float: a red-topped quill riding the water.
+            var bob = new MeshInstance3D
+            {
+                Mesh = new CapsuleMesh { Radius = 0.025f, Height = 0.16f, RadialSegments = 8, Rings = 2 },
+                MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.9f, 0.18f, 0.12f), Roughness = 0.5f },
+                Position = new Vector3(floatAt.X, 0.03f, floatAt.Y),
+            };
+            AddChild(bob);
+            Track(bob);
+            AddChild(root);
+            Track(root);
+            Prop(root, 160f);
+            _anglerParts.Add((angler, bob));
+            Solids.BoxIn(root.Transform, new Vector3(0f, 0.25f, 0f), new Vector3(1.1f, 0.5f, 0.5f));
+            _reserved.Add((seat, 3.5f));
+            Anglers.Add((root.Position, new Vector3(floatAt.X, 0f, floatAt.Y)));
+            Count("angler");
+        }
+    }
+
+    private void ScatterSunkenWood(LocationData loc, RandomNumberGenerator rng)
+    {
+        var stems = new List<Transform3D>();
+        var colors = new List<Color>();
+        var shores = Shores(loc);
+        for (int tries = 0; SunkenWood.Count < 16 && tries < 4000; tries++)
+        {
+            var shore = shores.Count == 1 || rng.Randf() < 0.45f ? shores[0] : shores[rng.RandiRange(1, shores.Count - 1)];
+            float angle = rng.Randf() * Mathf.Tau;
+            float shrink = shore.Island ? rng.RandfRange(1.05f, 1.5f) : rng.RandfRange(0.8f, 0.97f);
+            float cx = shore.X + shore.Rx * shrink * MathF.Cos(angle);
+            float cz = shore.Z + shore.Rz * shrink * MathF.Sin(angle);
+            float depth = _lake.DepthAt(loc, cx, cz);
+            if (depth < 0.6f || depth > 3f || NearPier(cx, cz))
+                continue;
+            bool crowded = false;
+            foreach (var w in SunkenWood)
+                if ((w.X - cx) * (w.X - cx) + (w.Z - cz) * (w.Z - cz) < 196f)
+                    crowded = true;
+            if (crowded)
+                continue;
+            // Mostly where trees stand on the bank nearby; now and then a drifted trunk elsewhere.
+            float nearest = float.MaxValue;
+            foreach (var (tx, tz) in _allTrees)
+                nearest = MathF.Min(nearest, (tx - cx) * (tx - cx) + (tz - cz) * (tz - cz));
+            if (nearest > 30f * 30f && rng.Randf() > 0.15f)
+                continue;
+            SunkenWood.Add(new Core.Methods.SunkenWood(cx, cz, rng.RandfRange(1.5f, 2.8f)));
+            // Grey, weathered branches sticking out of the water at a slant.
+            int branches = rng.RandiRange(1, 3);
+            for (int b = 0; b < branches; b++)
+            {
+                float lean = rng.RandfRange(0.35f, 0.9f);
+                float yaw = rng.Randf() * Mathf.Tau;
+                float len = (depth + rng.RandfRange(0.6f, 1.6f)) / MathF.Cos(lean);
+                var basis = (new Basis(Vector3.Up, yaw) * new Basis(Vector3.Right, lean)).Scaled(new Vector3(1f, len, 1f));
+                var foot = new Vector3(cx + rng.RandfRange(-1f, 1f), -depth, cz + rng.RandfRange(-1f, 1f));
+                stems.Add(new Transform3D(basis, foot + basis.Y * 0.5f));
+                float g = rng.RandfRange(0.32f, 0.46f);
+                var colour = new Color(g, g * 0.93f, g * 0.84f);
+                colors.Add(colour);
+                // A side twig forking off high up.
+                float twig = len * rng.RandfRange(0.3f, 0.45f);
+                var tb = (new Basis(Vector3.Up, yaw + rng.RandfRange(-1.2f, 1.2f)) * new Basis(Vector3.Right, lean + rng.RandfRange(0.5f, 0.9f)))
+                    .Scaled(new Vector3(0.55f, twig, 0.55f));
+                var fork = foot + basis.Y * rng.RandfRange(0.65f, 0.85f);
+                stems.Add(new Transform3D(tb, fork + tb.Y * 0.5f));
+                colors.Add(colour);
+            }
+        }
+        if (stems.Count > 0)
+            AddMultiMesh(new CylinderMesh { TopRadius = 0.03f, BottomRadius = 0.11f, Height = 1f, RadialSegments = 7, Rings = 1 },
+                stems, colors);
+    }
+
     private void ScatterWaterPlants(LocationData loc, RandomNumberGenerator rng)
     {
         var pads = new List<Transform3D>(); var padColors = new List<Color>();
@@ -1264,6 +1553,7 @@ public partial class Scenery : Node3D
                 made++;
             // A patch: leaves crowd its middle and thin out to its edge.
             float radius = rng.RandfRange(1.6f, weed ? 3.5f : 5f);
+            WeedBeds.Add(new Core.Methods.WeedBed(cx, cz, radius));
             int count = (int)(radius * radius * rng.RandfRange(weed ? 0.9f : 2.2f, weed ? 1.6f : 3.6f));
             bool yellowPatch = !weed && rng.Randf() < 0.3f;
             for (int k = 0; k < count; k++)
@@ -1336,6 +1626,8 @@ public partial class Scenery : Node3D
             var scale = new Vector3(rng.RandfRange(0.3f, 1.1f), rng.RandfRange(0.2f, 0.6f), rng.RandfRange(0.3f, 1f)) * size;
             var b = new Basis(Vector3.Up, rng.Randf() * Mathf.Tau).Scaled(scale);
             rocks.Add(new Transform3D(b, new Vector3(x, h, z)));
+            // A boulder of unit radius scaled: the angler walks round it (or steps onto a low one).
+            Solids.Cylinder(new Vector3(x, h - scale.Y, z), (scale.X + scale.Z) * 0.5f * 0.85f, scale.Y * 2f);
             float gr = rng.RandfRange(0.38f, 0.55f);
             colors.Add(new Color(gr, gr * 0.98f, gr * 0.93f));
         }

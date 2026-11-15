@@ -33,7 +33,7 @@ public partial class Shop : CanvasLayer
 
     // Browsing: the category rail, sub-categories, search, sort and the "only what I can buy" switch.
     private readonly Dictionary<string, Button> _rail = new();
-    private HBoxContainer _chips = null!;
+    private HFlowContainer _chips = null!;
     private Control _filterBar = null!;
     private LineEdit _search = null!;
     private OptionButton _sort = null!;
@@ -44,9 +44,11 @@ public partial class Shop : CanvasLayer
     private TextureRect _coin = null!;
     private int _shownMoney = -1;
 
-    private FishingRod _rod = null!;
+    private FishingRod _rodFixed = null!;
+    /// <summary>The rod in use (the active one of the rod set, Fishing/RodSet).</summary>
+    private FishingRod _rod => FishingRod.ActiveRod ?? _rodFixed;
     private Profile _profile = null!;
-    private TackleLoadout _loadout = null!;
+    private TackleLoadout _loadout => _rod.Loadout;
     private LakeBed _lake = null!;
     private GearCatalog? _gear;
     private TabContainer _tabs = null!;
@@ -94,9 +96,8 @@ public partial class Shop : CanvasLayer
 
     public void Setup(FishingRod rod)
     {
-        _rod = rod;
+        _rodFixed = rod;
         _profile = rod.Profile;
-        _loadout = rod.Loadout;
         _lake = rod.Lake;
         _gear = rod.Gear;
     }
@@ -255,8 +256,10 @@ public partial class Shop : CanvasLayer
         // Two rows: the sub-categories, then search, order and the "only what I can buy" switch.
         var rows = new VBoxContainer();
         rows.AddThemeConstantOverride("separation", 6);
-        _chips = new HBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-        _chips.AddThemeConstantOverride("separation", 4);
+        // Wraps onto a second row when a page has many sub-categories (the lures).
+        _chips = new HFlowContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        _chips.AddThemeConstantOverride("h_separation", 4);
+        _chips.AddThemeConstantOverride("v_separation", 4);
         rows.AddChild(_chips);
         var bar = new HBoxContainer();
         bar.AddThemeConstantOverride("separation", 8);
@@ -308,6 +311,9 @@ public partial class Shop : CanvasLayer
             case "line":
                 all.Add(("Żyłki", i => i is LineData { Kind: LineKind.Mono }));
                 all.Add(("Plecionki", i => i is LineData { Kind: LineKind.Braid }));
+                all.Add(("Fluorocarbon", i => i is LineData { Kind: LineKind.Fluoro }));
+                all.Add(("Cienkie (do 0,16)", i => i is LineData { Diameter: <= 0.165f }));
+                all.Add(("Grube (od 0,30)", i => i is LineData { Diameter: >= 0.295f }));
                 break;
             case "leader":
                 all.Add(("Niewidoczne", i => i is LeaderData { BiteProof: <= 0f, Visibility: > 0f }));
@@ -322,7 +328,11 @@ public partial class Shop : CanvasLayer
                 all.Add(("Naturalne", i => i is BaitData { Kind: BaitKind.Natural }));
                 all.Add(("Roślinne", i => i is BaitData { Kind: BaitKind.Plant }));
                 all.Add(("Karpiowe", i => i is BaitData { Kind: BaitKind.Carp }));
-                all.Add(("Sztuczne", i => i is BaitData { Kind: BaitKind.Lure }));
+                all.Add(("Obrotówki", i => i is BaitData { Kind: BaitKind.Lure, AffinityAs: "spinner" }));
+                all.Add(("Wahadłówki", i => i is BaitData { Kind: BaitKind.Lure, AffinityAs: "spoon" }));
+                all.Add(("Woblery", i => i is BaitData { Kind: BaitKind.Lure, AffinityAs: "wobbler" }));
+                all.Add(("Gumy", i => i is BaitData { Kind: BaitKind.Lure, AffinityAs: "softbait" }));
+                all.Add(("Muchy", i => i is BaitData { Kind: BaitKind.Lure, AffinityAs: "fly" }));
                 break;
         }
         return all;
@@ -506,7 +516,8 @@ public partial class Shop : CanvasLayer
         if (Visible || _rod.State != RodState.Idle)
             return;
         var (title, tabs) = Kinds[kind];
-        _title.Text = title;
+        // Gear is put on the rod in hand: say which of the three it is.
+        _title.Text = tabs.Contains("rod") ? $"{title} · wędka {_loadout.RodSlot + 1}" : title;
         _tackleCounter = tabs.Contains("rod");
         int first = -1;
         for (int i = 0; i < TabDefinitions.Length; i++)
@@ -744,7 +755,10 @@ public partial class Shop : CanvasLayer
             else if (_profile.Owns(slot, item.ItemId))
             {
                 bool worn = _loadout.Index[(int)slot] == i;
+                string fray = slot == TackleSlot.Line ? Core.Methods.LineWear.Word(_profile.LineWear.GetValueOrDefault(item.ItemId)) : "";
                 (status, color) = worn ? ("w użyciu", Owned) : ("posiadane", Owned);
+                if (fray.Length > 0)
+                    status += " · " + fray;
                 badge = worn ? Badge.InUse : Badge.Owned;
             }
             else
@@ -951,7 +965,7 @@ public partial class Shop : CanvasLayer
     }
 
     private static string Describe(TackleItem item) => item.Description != "" && item is not AccessoryData
-        ? item.Description + (item is BaitData { Kind: BaitKind.Lure } ? "\nPrzynęta sztuczna: nie zużywa się, bierze tylko podczas zwijania (LPM)." : "")
+        ? item.Description + (item is BaitData { Kind: BaitKind.Lure } ? "\nPrzynęta sztuczna (spinning): nie zużywa się; prowadzi się ją zwijając (LPM, Shift szybciej), PPM podszarpuje, puszczona opada." : "")
         : item switch
     {
         RodData => "Wędka decyduje o zasięgu rzutu i o tym, ile ryba może pociągnąć, zanim kij pęknie.",
@@ -983,6 +997,43 @@ public partial class Shop : CanvasLayer
                 : pack == 1 ? $"Kup za {Lore.Money(item.Price)}" : $"Kup paczkę ({pack} szt.) za {Lore.Money(item.Price)}";
             enabled = !locked && _profile.Money >= item.Price;
             action = () => Buy(slot, index);
+        }
+        else if (slot == TackleSlot.Line && _profile.Owns(slot, item.ItemId) && _loadout.Index[(int)slot] == index
+                 && _profile.NeedsRespool(item.ItemId))
+        {
+            // A frayed or twisted line in use: new line can be put on the spool.
+            float wear = _profile.LineWear.GetValueOrDefault(item.ItemId);
+            string twist = Core.Methods.LineTwist.Word(_profile.LineTwist.GetValueOrDefault(item.ItemId));
+            state = Core.Methods.LineWear.Worn(wear)
+                ? $"Tego używasz. Żyłka {Core.Methods.LineWear.Word(wear)}: wytrzymuje o {wear * 100f:0}% mniej."
+                : $"Tego używasz. Żyłka {twist}: przy rzutach robi brody.";
+            button = $"Nawiń nową za {Lore.Money(item.Price)}";
+            enabled = _profile.Money >= item.Price;
+            action = () =>
+            {
+                string? error = _profile.Buy(slot, item.ItemId, item.Price, item.RequiredLevel);
+                _message.Text = error ?? $"Nawinięto nową: {item.DisplayName}";
+                if (error == null)
+                {
+                    PurchaseEffect();
+                    _rod.ApplyTackle();
+                }
+            };
+        }
+        else if (slot == TackleSlot.Hook && _profile.Owns(slot, item.ItemId)
+                 && Core.Methods.HookWear.Blunt(_profile.HookDull.GetValueOrDefault(item.ItemId)))
+        {
+            // A blunt hook: a new one of the same kind (or sharpen it with a hone, K).
+            state = $"Masz go. Haczyk {Core.Methods.HookWear.Word(_profile.HookDull.GetValueOrDefault(item.ItemId))}: gorzej zacina (osełka: K).";
+            button = $"Nowy haczyk za {Lore.Money(item.Price)}";
+            enabled = _profile.Money >= item.Price;
+            action = () =>
+            {
+                string? error = _profile.Buy(slot, item.ItemId, item.Price, item.RequiredLevel);
+                _message.Text = error ?? $"Nowy haczyk: {item.DisplayName}";
+                if (error == null)
+                    PurchaseEffect();
+            };
         }
         else if (_profile.Owns(slot, item.ItemId))
         {
@@ -1061,6 +1112,17 @@ public partial class Shop : CanvasLayer
 
     private void Equip(TackleSlot slot, int index)
     {
+        var wanted = _loadout.Items(slot)[index];
+        if (_profile.InUseElsewhere(slot, wanted.ItemId, _loadout.RodSlot))
+        {
+            _message.Text = $"{wanted.DisplayName} jest już założona na innej wędce (sloty 1-3). Każda wędka w wodzie potrzebuje własnego wędziska i kołowrotka.";
+            return;
+        }
+        if (_rod.State != RodState.Idle)
+        {
+            _message.Text = "Najpierw wyjmij zestaw z wody.";
+            return;
+        }
         _loadout.Index[(int)slot] = index;
         _loadout.SyncToProfile();
         _rod.ApplyTackle();

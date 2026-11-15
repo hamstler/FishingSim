@@ -17,7 +17,9 @@ public partial class CatchPanel : Control
     private const float TurnSpeed = 0.42f;     // rad/s once settled: one turn in about 15 s
     private const float SpinIn = 5.5f;          // rad/s when the card appears
 
-    private FishingRod _rod = null!;
+    private FishingRod _rodFixed = null!;
+    /// <summary>The rod in use (the active one of the rod set, Fishing/RodSet).</summary>
+    private FishingRod _rod => FishingRod.ActiveRod ?? _rodFixed;
     private Control _card = null!, _stage = null!;
     private ColorRect _dim = null!;
     private Label _title = null!, _latin = null!, _status = null!, _warning = null!;
@@ -38,7 +40,7 @@ public partial class CatchPanel : Control
     /// <summary>The fish on the stage, or null.</summary>
     public FishModel? ShownFish => _fish;
 
-    public void Setup(FishingRod rod) => _rod = rod;
+    public void Setup(FishingRod rod) => _rodFixed = rod;
 
     public override void _Ready()
     {
@@ -192,7 +194,25 @@ public partial class CatchPanel : Control
         _turntable.Rotation = new Vector3(MathF.Sin(_time * 0.9f) * 0.04f, _angle, 0f);
         _turntable.Position = new Vector3(0f, MathF.Sin(_time * 1.3f) * 0.012f, 0f);
         Adopt();
+        // Out of the water too long: the fish suffers (shown twice a second).
+        _airShown -= dt;
+        if (_airShown <= 0f)
+        {
+            _airShown = 0.5f;
+            string air = _rod.AirSeconds + _rod.UnhookSeconds > Core.Methods.Handling.AirGrace
+                ? $"Ryba za długo bez wody: kondycja {_rod.CatchCondition * 100f:0}%. Zdecyduj szybko!"
+                : "";
+            string text = _baseWarning.Length > 0 && air.Length > 0 ? _baseWarning + "\n" + air : _baseWarning + air;
+            if (text != _warning.Text)
+            {
+                _warning.Text = text;
+                _warning.Visible = text != "";
+            }
+        }
     }
+
+    private string _baseWarning = "";
+    private float _airShown;
 
     /// <summary>Puts the rod's landed fish on the stage (the rod made it; it frees it once the angler decides).</summary>
     private void Adopt()
@@ -270,12 +290,21 @@ public partial class CatchPanel : Control
         string net = profile.KeepnetLimit is { } spec ? $"siatka {profile.Keepnet.Count}/{spec.MaxFish}" : $"siatka {profile.Keepnet.Count}";
         _status.Text = $"{record}   ·   {net}";
         bool undersized = w < sp.LegalWeight;
-        bool fits = profile.KeepnetFits(w);
-        _warning.Text = !fits
+        bool overLimit = profile.OverBagLimit(sp.SpeciesName);
+        bool fits = profile.KeepnetFits(w) && !overLimit;
+        _warning.Text = overLimit
+            ? $"Limit dzienny: {sp.SpeciesName} - wolno zatrzymać {Core.Methods.BagLimits.LimitOf(sp.SpeciesName)} szt. na dzień. Możesz ją tylko wypuścić."
+            : !fits
             ? "Siatka pełna albo za słaba na tę rybę: możesz ją tylko wypuścić."
             : undersized
                 ? $"Niewymiarowa (wymiar ochronny {sp.LegalWeight:0.00} kg): zatrzymanie grozi karą strażnika."
                 : "";
+        if (_rod.HookDeep)
+            _warning.Text = (_warning.Text.Length > 0 ? _warning.Text + "\n" : "")
+                + (_rod.Gear?.Has(Data.AccessoryKind.Disgorger) == true
+                    ? "Haczyk połknięty: wypychacz wyjął go szybko."
+                    : "Haczyk połknięty głęboko: wyjmowanie trwa i rani rybę (kup wypychacz, zacinaj szybciej).");
+        _baseWarning = _warning.Text;
         _warning.Visible = _warning.Text != "";
         _keep.Disabled = !fits;
         _release.Text = $"Do wody  [R]  +{Profile.ReleaseXp} XP";

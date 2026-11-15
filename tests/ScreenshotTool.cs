@@ -76,6 +76,65 @@ public partial class ScreenshotTool : Node
             return;
         }
 
+        if (mode == 33 && arg is 0 or 3)
+        {
+            // The end tackle in a studio. arg 0: a sample of the catalogue (every lure model in a few colours), the
+            // feeder and the float; arg 3: every lure of one family (FISHSIM_LURE_FAMILY = spinner/spoon/wobbler/
+            // softbait/fly).
+            var root3d = new Node3D();
+            GetTree().Root.AddChild(root3d);
+            var env = new Godot.Environment
+            {
+                BackgroundMode = Godot.Environment.BGMode.Color, BackgroundColor = new Color(0.2f, 0.27f, 0.3f),
+                AmbientLightSource = Godot.Environment.AmbientSource.Color, AmbientLightColor = new Color(0.6f, 0.66f, 0.72f), AmbientLightEnergy = 0.7f,
+                TonemapMode = Godot.Environment.ToneMapper.Aces,
+            };
+            root3d.AddChild(new WorldEnvironment { Environment = env });
+            root3d.AddChild(new DirectionalLight3D { RotationDegrees = new Vector3(-40, 25, 0), LightEnergy = 1.6f, LightColor = new Color(1f, 0.96f, 0.88f) });
+            root3d.AddChild(new OmniLight3D { Position = new Vector3(0f, 0.3f, 0.6f), LightEnergy = 0.6f, OmniRange = 3f });
+            var lures = new FishingSim.Progress.TackleLoadout().Items(TackleSlot.Bait).OfType<BaitData>().Where(b => b.Kind == BaitKind.Lure).ToList();
+            string family = System.Environment.GetEnvironmentVariable("FISHSIM_LURE_FAMILY") ?? "spinner";
+            var shown = arg == 3
+                ? lures.Where(b => b.AffinityAs == family).ToList()
+                : lures.Where(b => b.ResourcePath.Contains("/l_")).GroupBy(b => b.AffinityAs + b.Shape).SelectMany(g => g.Take(3)).Take(40).ToList();
+            int cols = arg == 3 ? 6 : 8;
+            var pieces = new List<(FishingSim.Fishing.Bobber B, FishingSim.Core.Methods.FishingMethod M, BaitData? Bait)>();
+            foreach (var b in shown)
+                pieces.Add((new FishingSim.Fishing.Bobber(), FishingSim.Core.Methods.FishingMethod.Spinning, b));
+            if (arg == 0)
+            {
+                pieces.Add((new FishingSim.Fishing.Bobber(), FishingSim.Core.Methods.FishingMethod.Bottom, null));
+                pieces.Add((new FishingSim.Fishing.Bobber(), FishingSim.Core.Methods.FishingMethod.Float, null));
+            }
+            foreach (var p in pieces)
+                root3d.AddChild(p.B);
+            await NextFrame();
+            int rows = (pieces.Count + cols - 1) / cols;
+            const float dx = 0.16f, dy = 0.07f;
+            for (int i = 0; i < pieces.Count; i++)
+            {
+                var (b, method, bait) = pieces[i];
+                b.SetTerminal(method, bait);
+                b.FeederLoaded = true;
+                b.LureSpeed = 0.8f;
+                b.Heading = Mathf.Pi / 2f;
+                b.Visible = true;
+                int col = i % cols, row = i / cols;
+                b.Hold(new Vector3((col - (cols - 1) / 2f) * dx, ((rows - 1) / 2f - row) * dy - (method == FishingSim.Core.Methods.FishingMethod.Float ? 0.08f : 0f), 0f));
+            }
+            var cam = new Camera3D { Fov = 30f, Current = true, Near = 0.01f };
+            root3d.AddChild(cam);
+            float wide = cols * dx * 0.5f + 0.06f;
+            cam.Position = new Vector3(0f, 0f, wide / MathF.Tan(Mathf.DegToRad(15f)) * size.Y / size.X * 1.05f + 0.05f);
+            cam.LookAt(Vector3.Zero);
+            for (int i = 0; i < 30; i++)
+                await NextFrame();
+            GetViewport().GetTexture().GetImage().SavePng(output);
+            GD.Print($"saved {output} (end tackle studio, {pieces.Count} pieces)");
+            GetTree().Quit();
+            return;
+        }
+
         if (mode == 23)
         {
             // Villagers in a row: arg 0 = every role as the village dresses it (variant = map index + 1),
@@ -275,16 +334,28 @@ public partial class ScreenshotTool : Node
             // Contact sheet of every item and fish icon (no 3D needed).
             var icons = new List<ImageTexture>();
             var loadout = new FishingSim.Progress.TackleLoadout();
+            // arg 1: only the lures and the lines of the catalogue.
             foreach (FishingSim.Progress.TackleSlot slot in Enum.GetValues(typeof(FishingSim.Progress.TackleSlot)))
                 foreach (var item in loadout.Items(slot))
-                    icons.Add(FishingSim.Graphics.Icons.For(item));
+                    if (arg == 0 || (arg == 1 && (item is LineData || item is BaitData { Kind: BaitKind.Lure }))
+                        || (arg == 2 && item is RodData or ReelData or BaitData { Kind: BaitKind.Lure }))
+                        icons.Add(FishingSim.Graphics.Icons.For(item));
             var gear = new FishingSim.Progress.GearCatalog();
-            foreach (FishingSim.Progress.GearSlot slot in FishingSim.Progress.GearSlotExtensions.All)
-                foreach (var item in gear.Items(slot))
-                    icons.Add(FishingSim.Graphics.Icons.For(item));
-            foreach (var path in FishingSim.Data.SpeciesCatalog.Paths)
-                icons.Add(FishingSim.Graphics.Icons.Fish(GD.Load<FishSpecies>(path)));
-            const int cols = 10, iconPx = FishingSim.Graphics.Icons.TextureSize, cell = iconPx + 8;
+            if (arg >= 1)
+                gear = null!;
+            if (gear != null)
+            {
+                foreach (FishingSim.Progress.GearSlot slot in FishingSim.Progress.GearSlotExtensions.All)
+                    foreach (var item in gear.Items(slot))
+                        icons.Add(FishingSim.Graphics.Icons.For(item));
+                foreach (var path in FishingSim.Data.SpeciesCatalog.Paths)
+                    icons.Add(FishingSim.Graphics.Icons.Fish(GD.Load<FishSpecies>(path)));
+            }
+            // arg 2: the studio photographs of rods, reels and lures (needs a renderer): wait for them.
+            for (int f = 0; f < 20000 && FishingSim.Graphics.IconStudio.Pending > 0; f++)
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            int cols = arg >= 1 ? 14 : 10;
+            const int iconPx = FishingSim.Graphics.Icons.TextureSize, cell = iconPx + 8;
             int rows = (icons.Count + cols - 1) / cols;
             var sheet = Image.CreateEmpty(cols * cell, rows * cell, false, Image.Format.Rgba8);
             sheet.Fill(new Color(0.93f, 0.86f, 0.7f));
@@ -330,6 +401,48 @@ public partial class ScreenshotTool : Node
             for (int i = 0; i < 20; i++)
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         }
+        // FISHSIM_LOOK_ANGLER=1: stand a few metres to the side of the first local angler, looking at him and his float.
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_LOOK_ANGLER") == "1" && main.Scenery.Anglers.Count > 0)
+        {
+            var bed = main.GetChildren().OfType<LakeBed>().First();
+            var (seat, fl) = main.Scenery.Anglers[0];
+            var outward = new Vector3(fl.X - seat.X, 0f, fl.Z - seat.Z).Normalized();
+            var side = outward.Cross(Vector3.Up);
+            // FISHSIM_SHOT_DIST sets how far to the side (default 5 m), so the seated angler can be seen close up.
+            float sideDist = float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_DIST"), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float sd) ? sd : 5f;
+            var stand = seat - outward * (sideDist < 4f ? 0f : 1.5f) + side * sideDist;
+            main.Player.GlobalPosition = new Vector3(stand.X, bed.HeightAt(stand.X, stand.Z) + 0.3f, stand.Z);
+            for (int i = 0; i < 20; i++)
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            var look = (seat + outward * (sideDist < 4f ? 0.3f : 4f)) - stand;
+            yaw = Mathf.RadToDeg(MathF.Atan2(-look.X, -look.Z));
+        }
+        // FISHSIM_LOOK_WOOD=1: stand on the bank nearest the closest sunken tree and look at it.
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_LOOK_WOOD") == "1" && main.Scenery.SunkenWood.Count > 0)
+        {
+            var bed = main.GetChildren().OfType<LakeBed>().First();
+            var w = main.Scenery.SunkenWood.OrderBy(v => v.X * v.X + v.Z * v.Z).First();
+            Vector3 stand = new(w.X, 0f, w.Z);
+            for (int k = 0; k < 16; k++)
+            {
+                float ang = k * Mathf.Tau / 16f;
+                for (float d = 6f; d < 30f; d += 1f)
+                {
+                    float sx = w.X + MathF.Cos(ang) * d, sz = w.Z + MathF.Sin(ang) * d;
+                    if (bed.DepthAt(sx, sz) <= 0f)
+                    {
+                        if (d < new Vector2(stand.X - w.X, stand.Z - w.Z).Length() || stand.X == w.X)
+                            stand = new Vector3(sx, 0f, sz);
+                        break;
+                    }
+                }
+            }
+            main.Player.GlobalPosition = new Vector3(stand.X, bed.HeightAt(stand.X, stand.Z) + 0.3f, stand.Z);
+            for (int i = 0; i < 20; i++)
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            yaw = Mathf.RadToDeg(MathF.Atan2(-(w.X - stand.X), -(w.Z - stand.Z)));
+        }
         main.Player.RotationDegrees = new Vector3(0, yaw, 0);
         main.Player.Camera.RotationDegrees = new Vector3(pitch, 0, 0);
         var rod = main.Rod;
@@ -337,6 +450,60 @@ public partial class ScreenshotTool : Node
         if (a.Length > 11 && a[11] == "1")
             main.GetChildren().OfType<Hud>().First().Visible = false;
 
+        // FISHSIM_RISES=N: N rise rings spread over the last second before the shot (any mode).
+        // FISHSIM_THREE_RODS=1: rods 2 and 3 get their own rod and reel, all three are cast with a worm under a float
+        // and the first two laid on rests (the third stays in the hands).
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_THREE_RODS") == "1")
+        {
+            var pr3 = main.Rod.Profile;
+            foreach (var (kind, id) in new[] { ("rod", "teleskop"), ("rod", "karpiowka"), ("reel", "mlynek3000"), ("reel", "freerunner") })
+                if (!pr3.Owned[kind].Contains(id))
+                    pr3.Owned[kind].Add(id);
+            pr3.BaitCounts["worm"] = 40;
+            int Ix3(TackleLoadout lo, TackleSlot slot, string id) => lo.Items(slot).ToList().FindIndex(i => i.ItemId == id);
+            foreach (var (k, r, reel) in new[] { (1, "teleskop", "mlynek3000"), (2, "karpiowka", "freerunner") })
+            {
+                var lo = main.Rods.Get(k).Loadout;
+                lo.Index[(int)TackleSlot.Rod] = Ix3(lo, TackleSlot.Rod, r);
+                lo.Index[(int)TackleSlot.Reel] = Ix3(lo, TackleSlot.Reel, reel);
+                lo.Index[(int)TackleSlot.Bait] = Ix3(lo, TackleSlot.Bait, "worm");
+                lo.SyncToProfile();
+                main.Rods.Get(k).ApplyTackle();
+            }
+            main.Rod.Loadout.Index[(int)TackleSlot.Bait] = Ix3(main.Rod.Loadout, TackleSlot.Bait, "worm");
+            main.Rod.ApplyTackle();
+            for (int k = 0; k < 3; k++)
+            {
+                if (k > 0)
+                    main.Tools.SelectRod(k);
+                main.Player.RotationDegrees = new Vector3(0, yaw + (k - 1) * 18f, 0);
+                main.Rod.CastNow(0.45f + 0.1f * k);
+                for (int f = 0; f < 240 && main.Rod.State != RodState.Waiting; f++)
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            }
+            main.Player.RotationDegrees = new Vector3(0, yaw, 0);
+        }
+        // FISHSIM_RISES_NEAR=1: three rings of different ages a few metres ahead of the camera.
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_RISES_NEAR") == "1")
+        {
+            var cam = main.Player.Camera.GlobalTransform;
+            var ahead = -cam.Basis.Z with { Y = 0f };
+            ahead = ahead.Normalized();
+            var side = ahead.Cross(Vector3.Up);
+            for (int i = 0; i < 3; i++)
+            {
+                var at = cam.Origin + ahead * (5f + i * 2.5f) + side * (i - 1) * 2f;
+                main.Rises.SpawnAt(at.X, at.Z, 2f, 0.15f + i * 0.25f);
+            }
+            main.Rises.Frozen = true;
+        }
+        if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_RISES"), out int rises))
+            for (int i = 0; i < rises; i++)
+            {
+                main.Rises.Spawn();
+                for (int f = 0; f < 6; f++)
+                    await NextFrame();
+            }
         if (mode is 1 or 2)
         {
             rod.DevInstantBite = true;
@@ -349,7 +516,7 @@ public partial class ScreenshotTool : Node
             {
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
                 t += 1.0 / 60.0;
-                if (rod.State == RodState.Bite && !hooked)
+                if (rod.State == RodState.Bite && !hooked && rod.StrikeReady)
                 {
                     hooked = true;
                     rod.TryHook();
@@ -663,6 +830,134 @@ public partial class ScreenshotTool : Node
                 await NextFrame();
             GD.Print($"village shot {arg}: notices {profile.Notices.Count}, forage {main.Scenery.Forage.Count}");
         }
+        else if (mode == 33)
+        {
+            // Spinning and bottom fishing in the game: arg 1 = a wobbler led back to the pier, looked down at in the
+            // water; arg 2 = the bottom rod on its rest with the bell, the angler stepped aside to see it.
+            var lo = rod.Loadout;
+            var pr = rod.Profile;
+            pr.Money += 2000;
+            pr.Level = Math.Max(pr.Level, 5);
+            int RodIx(string id) => lo.Items(TackleSlot.Rod).ToList().FindIndex(i => i.ItemId == id);
+            int BaitIx(string id) => lo.Items(TackleSlot.Bait).ToList().FindIndex(i => i.ItemId == id);
+            if (arg == 5)
+            {
+                // The baited hook under the float, seen from under the water beside it.
+                FishingSim.Fishing.Bobber.DebugShowHook = true;
+                lo.Index[(int)TackleSlot.Bait] = BaitIx(System.Environment.GetEnvironmentVariable("FISHSIM_BAIT") ?? "worm");
+                lo.BaitCounts[lo.Bait.ItemId] = 10;
+                rod.ApplyTackle();
+                rod.SetFloatDepth(0.8f);
+                rod.CastNow(0.3f);
+                for (int i = 0; i < 400 && rod.State != RodState.Waiting; i++)
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                for (int i = 0; i < 90; i++)
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                var fp = rod.Bobber.GlobalPosition;
+                var hookCam = new Camera3D { Fov = 40f, Near = 0.02f, Current = true };
+                main.AddChild(hookCam);
+                hookCam.GlobalPosition = fp + new Vector3(0.35f, -0.68f, 0.2f);
+                hookCam.LookAt(fp + Vector3.Down * 0.74f);
+                GD.Print($"hook: {rod.State}, hang {rod.Bobber.HangDepth:0.00} m, water {rod.CurrentDepth():0.0} m, show {rod.Bobber.ShowHook}");
+            }
+            else if (arg == 4)
+            {
+                // The line after a float cast: a fluorescent yellow monofilament (FISHSIM_LINE = another line id)
+                // lying on the water with its slack, bowed by the wind.
+                // FISHSIM_GLOW=1: with the glow tip (świetlik) on the float.
+                if (System.Environment.GetEnvironmentVariable("FISHSIM_GLOW") == "1")
+                    main.Gear.Buy(GearSlot.Accessory, GD.Load<TackleItem>("res://data/tackle/accessories/swietlik.tres"));
+                string lineId = System.Environment.GetEnvironmentVariable("FISHSIM_LINE") ?? "g_zylka_028_zolta_fluo";
+                pr.Owned["line"].Add(lineId);
+                lo.Index[(int)TackleSlot.Line] = lo.Items(TackleSlot.Line).ToList().FindIndex(i => i.ItemId == lineId);
+                lo.Index[(int)TackleSlot.Bait] = BaitIx("worm");
+                lo.BaitCounts["worm"] = 10;
+                rod.ApplyTackle();
+                rod.CastNow(0.7f);
+                for (int i = 0; i < 400 && rod.State != RodState.Waiting; i++)
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                for (int i = 0; i < 150; i++)
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                GD.Print($"line: {lo.Line.DisplayName}, slack {rod.Slack:0.0} m, out {rod.LineOut:0.0} m");
+                // A camera off to the side of the line, looking across it.
+                var tipAt = main.Player.RodTip.GlobalPosition;
+                var endAt = rod.Bobber.GlobalPosition;
+                var mid = tipAt.Lerp(endAt, 0.45f);
+                var along = endAt - tipAt;
+                along.Y = 0f;
+                var side = new Vector3(along.Z, 0f, -along.X).Normalized();
+                var lineCam = new Camera3D { Fov = 50f, Near = 0.05f, Current = true };
+                main.AddChild(lineCam);
+                lineCam.GlobalPosition = new Vector3(mid.X, 2.2f, mid.Z) + side * 7.5f;
+                lineCam.LookAt(new Vector3(mid.X, 0.6f, mid.Z));
+            }
+            else if (arg == 1)
+            {
+                pr.Owned["rod"].Add("cisowy_spinning");
+                lo.BaitCounts["rybka_drewniana"] = 1;
+                lo.Index[(int)TackleSlot.Rod] = RodIx("cisowy_spinning");
+                lo.Index[(int)TackleSlot.Bait] = BaitIx("rybka_drewniana");
+                rod.ApplyTackle();
+                rod.CastNow(0.4f);
+                for (int i = 0; i < 400 && rod.State != RodState.Waiting; i++)
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                rod.ReelOverride = true;
+                for (int i = 0; i < 1200 && rod.State == RodState.Waiting && rod.LineOut > float.Parse(System.Environment.GetEnvironmentVariable("FISHSIM_LURE_AT") ?? "7", System.Globalization.CultureInfo.InvariantCulture); i++)
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                rod.ReelOverride = false;
+                GD.Print($"spinning: {rod.State}, line {rod.LineOut:0.0} m, lure {rod.Lure?.Depth:0.00} m, {rod.Lure?.Judgement}, "
+                    + $"bobber {rod.Bobber.GlobalPosition} visible {rod.Bobber.IsVisibleInTree()} method {rod.Bobber.Method} terminal {rod.Bobber.TerminalVisible}");
+                foreach (var n in rod.Bobber.FindChildren("*", "Node3D", true, false))
+                    if (n is Node3D n3 && n3.Name.ToString() is "Lure")
+                        GD.Print($"  lure node at {n3.GlobalPosition} visible {n3.IsVisibleInTree()} scale {n3.GlobalTransform.Basis.Scale}");
+                // FISHSIM_LURE_CAM=1: a camera just above the water beside the lure.
+                if (System.Environment.GetEnvironmentVariable("FISHSIM_LURE_CAM") == "1")
+                {
+                    // Hold the lure where it is, still playing as if drawn, and look at it from just above the water.
+                    rod.ProcessMode = ProcessModeEnum.Disabled;
+                    rod.Bobber.LureSpeed = 0.8f;
+                    var lp = rod.Bobber.GlobalPosition;
+                    var cam = new Camera3D { Fov = 40f, Near = 0.02f, Current = true };
+                    main.AddChild(cam);
+                    cam.GlobalPosition = new Vector3(lp.X + 0.45f, 0.55f, lp.Z + 0.55f);
+                    cam.LookAt(lp);
+                }
+            }
+            else
+            {
+                pr.Owned["rod"].Add("grabowy_gruntowy");
+                main.Gear.Buy(GearSlot.Accessory, GD.Load<TackleItem>("res://data/tackle/accessories/podporka.tres"));
+                lo.BaitCounts["worm"] = 10;
+                lo.Index[(int)TackleSlot.Rod] = RodIx("grabowy_gruntowy");
+                lo.Index[(int)TackleSlot.Bait] = BaitIx("worm");
+                rod.ApplyTackle();
+                rod.CastNow(0.5f);
+                for (int i = 0; i < 400 && rod.State != RodState.Waiting; i++)
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                rod.PutOnRest();
+                for (int i = 0; i < 300 && !rod.RigSettled; i++)
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                // Step to the side of the rod, looking at the rest and the rod across the view.
+                var restAt = rod.RestPosition ?? main.Player.GlobalPosition;
+                var basis = main.Player.GlobalTransform.Basis;
+                main.Player.GlobalPosition += basis.X * 1.9f + basis.Z * 0.2f;
+                var look = restAt + (-basis.Z) * 0.5f - main.Player.GlobalPosition;
+                main.Player.Rotation = new Vector3(0f, MathF.Atan2(-look.X, -look.Z), 0f);
+                GD.Print($"bottom: {rod.State}, rest {rod.OnRest} at {restAt}, settled {rod.RigSettled}, heat {rod.GroundbaitHeat:0.00}");
+                // A camera beside the rod on its rest, looking across at the rest, the reel and the quiver tip.
+                var butt = main.Player.Rig.GlobalPosition;
+                var tip = main.Player.Rig.Tip.GlobalPosition;
+                var along = tip - butt;
+                along.Y = 0f;
+                var side = new Vector3(-along.Z, 0f, along.X).Normalized();
+                var mid = butt.Lerp(tip, 0.45f);
+                var restCam = new Camera3D { Fov = 50f, Near = 0.02f, Current = true };
+                main.AddChild(restCam);
+                restCam.GlobalPosition = mid + side * 1.7f + Vector3.Up * 0.35f - along.Normalized() * 0.4f;
+                restCam.LookAt(mid + Vector3.Down * 0.15f);
+            }
+            frames = 40;
+        }
         else if (mode == 28)
         {
             // The lift net from the bank: arg 0 = down in the water, 1 = lifted with the catch flapping in it,
@@ -830,11 +1125,49 @@ public partial class ScreenshotTool : Node
             var ui = main.GetChildren().OfType<GameUI>().First();
             ui.Open(arg);
             ui.EnsureMap();
+            // The topographic map is painted in the background: wait for it on the map tab.
+            for (int i = 0; arg == 1 && i < 900 && !ui.MapReady; i++)
+                await NextFrame();
+            // FISHSIM_MAP_HOVER=x,y puts the cursor on the map (fractions of its size).
+            var hover = System.Environment.GetEnvironmentVariable("FISHSIM_MAP_HOVER")?.Split(',');
+            if (hover is { Length: 2 })
+            {
+                for (int i = 0; i < 3; i++)
+                    await NextFrame();
+                ui.HoverMap(new Vector2(float.Parse(hover[0], System.Globalization.CultureInfo.InvariantCulture),
+                    float.Parse(hover[1], System.Globalization.CultureInfo.InvariantCulture)));
+            }
         }
 
         for (int i = 0; i < frames; i++)
             await NextFrame();
-        // FISHSIM_CLOSEUP = 0 (left, the crank side), 1 (right front), 2 (from below), 3 (over the left shoulder):
+        // FISHSIM_SIT_PROBE=1: print where each seated villager's hips and thighs are against the ground under them.
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_SIT_PROBE") == "1")
+        {
+            var bedProbe = main.GetChildren().OfType<LakeBed>().First();
+            foreach (var npc in main.Scenery.FindChildren("*", "Node3D", true, false).OfType<FishingSim.World.Props.Npc>())
+            {
+                var sk = FishingSim.World.Props.CharacterAsset.SkeletonOf(npc);
+                if (sk == null)
+                    continue;
+                string Bone(string name)
+                {
+                    int b = sk.FindBone(name);
+                    if (b < 0)
+                        return name + " ?";
+                    var g = sk.GlobalTransform * sk.GetBoneGlobalPose(b).Origin;
+                    var local = npc.ToLocal(g);
+                    return $"{name} y={local.Y:0.000} z={local.Z:0.000}";
+                }
+                var anim = FishingSim.World.Props.CharacterAsset.PlayerOf(npc)?.CurrentAnimation ?? "";
+                if (!anim.ToString().StartsWith("Sitting"))
+                    continue;
+                GD.Print($"SIT {npc.Name} at {npc.GlobalPosition} scale {sk.GlobalTransform.Basis.Scale.X:0.000}: "
+                    + $"{Bone("pelvis")}, {Bone("thigh_l")}, {Bone("calf_l")}, {Bone("foot_l")}, {Bone("ball_l")}");
+            }
+        }
+        // FISHSIM_CLOSEUP = 0 (left, the crank side), 1 (right front), 2 (from below), 3 (over the left shoulder),
+        // 4 (from the front, down the rod at the grip: shows whether the palm lies on the handle), 5 (from above):
         // a second camera beside the reel and the hands, in any mode.
         if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_CLOSEUP"), out int close))
         {
@@ -845,12 +1178,16 @@ public partial class ScreenshotTool : Node
                 1 => rig.GlobalTransform.Basis * new Vector3(0.28f, 0.22f, -0.05f),
                 2 => rig.GlobalTransform.Basis * new Vector3(-0.05f, 0.12f, -0.3f),
                 3 => rig.GlobalTransform.Basis * new Vector3(-0.22f, -0.12f, 0.16f),
+                4 => rig.GlobalTransform.Basis * new Vector3(0.02f, 0.32f, 0.04f),
+                5 => rig.GlobalTransform.Basis * new Vector3(0.0f, 0.0f, 0.3f),
                 _ => rig.GlobalTransform.Basis * new Vector3(-0.3f, 0.05f, -0.06f),
             };
             var cam = new Camera3D { Fov = 40f, Near = 0.01f };
             main.AddChild(cam);
+            if (close >= 4)
+                reel = rig.ToGlobal(FishingSim.Fishing.RodRig.GripPoint);
             cam.GlobalPosition = reel + offset;
-            cam.LookAt(reel, rig.GlobalTransform.Basis * Vector3.Back);
+            cam.LookAt(reel, rig.GlobalTransform.Basis * (close == 5 ? Vector3.Up : Vector3.Back));
             cam.Current = true;
             for (int i = 0; i < 4; i++)
                 await NextFrame();

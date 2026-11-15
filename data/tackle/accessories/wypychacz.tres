@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AccessoryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/AccessoryData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Wypychacz do haczyków"
+Kind = 14
+Power = 1.0
+Description = "Połknięty haczyk wyjmuje szybko i delikatnie: ryba krócej jest bez wody i mniej cierpi."
+Price = 6
+RequiredLevel = 1

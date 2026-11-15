@@ -7,6 +7,7 @@ using FishingSim.Data;
 using Godot;
 using FishingSim.Core.Camp;
 using FishingSim.Progress;
+using FishingSim.Core.Methods;
 
 namespace FishingSim.Tests;
 
@@ -287,6 +288,38 @@ public sealed class CoreSuite : ITestSuite
         t.Check(p.BaitCounts.GetValueOrDefault("jetka") == 3, "gathered bait goes into the bait box");
 
         LiftNetForestSmoke(t, roach);
+        FishingMethods(t, Species("szczupak"), Species("leszcz"));
+        TackleCatalogue(t);
+        LineRopePhysics(t);
+        Noise(t);
+        ThrownHooks(t);
+        Wear(t);
+        Fraying(t);
+        Twisting(t);
+        Casts(t);
+        Spells(t);
+        Shores(t);
+        Moonlight(t);
+        Pressure(t);
+        LineSight(t);
+        Handled(t);
+        Leaps(t);
+        Points(t);
+        Shoaling(t);
+        Rising(t);
+        Migration(t);
+        Swallowed(t);
+        Wood(t);
+        Layers(t);
+        BaitSizes(t);
+        Murk(t);
+        Bag(t);
+        Strikes(t);
+        Seasons(t);
+        Ambush(t);
+        Holds(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
+        PressureAndTemperature(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
+        Feeding(t, GD.Load<LocationData>("res://data/locations/jezioro.tres"));
     }
 
     /// <summary>The lift net, mushrooms and berries, the smokehouse and the notice board (Core/Camp).</summary>
@@ -388,5 +421,724 @@ public sealed class CoreSuite : ITestSuite
         t.Check(fresh.Count == 3 && fresh.All(r => r.Done), "the same day keeps the handed-in notices");
         p.PassTime(24f);
         t.Check(p.NoticesFor(0, lake, true).Any(r => !r.Done), "a new day brings new notices");
+    }
+
+    /// <summary>Spinning lures and bottom groundbait (Core/Methods).</summary>
+    private static void FishingMethods(TestContext t, FishSpecies pike, FishSpecies bream)
+    {
+        t.Section("fishing methods: spinning and bottom");
+        t.Check(Method.For(RodKind.Spinning, BaitKind.Lure) == FishingMethod.Spinning && Method.For(RodKind.Float, BaitKind.Lure) == FishingMethod.Spinning
+                && Method.For(RodKind.Bottom, BaitKind.Natural) == FishingMethod.Bottom && Method.For(RodKind.Carp, BaitKind.Carp) == FishingMethod.Bottom
+                && Method.For(RodKind.Float, BaitKind.Natural) == FishingMethod.Float && Method.For(RodKind.Spinning, BaitKind.Natural) == FishingMethod.Float,
+            "a lure means spinning, bait on a bottom or carp rod lies on the bottom, otherwise the float");
+        var rng = new FishingSim.Core.SystemRng(5);
+        LureMotion Run(LureFamily f, float seconds, float retrieve, float bottom = 4f, LureMotion? lure = null)
+        {
+            lure ??= new LureMotion(f);
+            for (float s = 0f; s < seconds; s += 0.05f)
+                lure.Step(0.05f, retrieve, bottom, new FixedRng(0.99f));
+            return lure;
+        }
+        var spinner = Run(LureFamily.Spinner, 3f, 0f);
+        float sunk = spinner.Depth;
+        Run(LureFamily.Spinner, 4f, 1.6f, lure: spinner);
+        t.Check(sunk > 1.2f && spinner.Depth < 0.6f, $"a spinner sinks when the reel stands ({sunk:0.0} m) and rises on a fast retrieve ({spinner.Depth:0.0} m)");
+        var wobbler = Run(LureFamily.Wobbler, 5f, 1.8f);
+        float dived = wobbler.Depth;
+        Run(LureFamily.Wobbler, 4f, 0f, lure: wobbler);
+        t.Check(dived > 1.4f && wobbler.Depth < dived - 0.8f, $"a wobbler dives on a fast retrieve ({dived:0.0} m) and floats up when stopped ({wobbler.Depth:0.0} m)");
+        var jig = Run(LureFamily.Softbait, 4f, 0f);
+        t.Check(jig.OnBottom && jig.Depth > 3.8f, $"a jig drops to the bottom ({jig.Depth:0.0} m)");
+        t.Check(Run(LureFamily.Fly, 3f, 0.4f).Depth == 0f, "a fly rides the surface");
+        var good = Run(LureFamily.Spinner, 1f, 0.7f);
+        var fast = Run(LureFamily.Spinner, 1f, 2f);
+        var still = Run(LureFamily.Spinner, 10f, 0f);
+        t.Check(good.Judgement == RetrieveJudgement.Good && fast.Judgement == RetrieveJudgement.TooFast && good.BitePace > fast.BitePace * 2f
+                && still.BitePace < good.BitePace * 0.1f, $"a well led lure brings bites ({good.BitePace:0.00}), too fast less ({fast.BitePace:0.00}), lying still hardly ({still.BitePace:0.00})");
+        var falling = Run(LureFamily.Softbait, 0.5f, 0f);
+        t.Check(falling.Falling && falling.BitePace > 1f, $"a falling jig is taken ({falling.BitePace:0.00})");
+        var lifted = Run(LureFamily.Softbait, 4f, 0f);
+        lifted.Step(0.05f, 0.5f, 4f, new FixedRng(0.99f));
+        t.Check(lifted.BitePace > 1.5f, $"a jig lifted off the bottom after the fall is taken best ({lifted.BitePace:0.00})");
+        float before = good.BitePace;
+        good.Twitch();
+        t.Check(good.BitePace > before * 1.2f, "a twitch flashes the lure");
+
+        int Snags(LureFamily f)
+        {
+            int n = 0;
+            for (int i = 0; i < 200; i++)
+            {
+                var l = new LureMotion(f);
+                for (int k = 0; k < 120; k++)
+                    l.Step(0.05f, k < 80 ? 0f : 0.5f, 0.6f, rng);   // falls to a shallow bottom, then dragged along it
+                n += l.Snagged ? 1 : 0;
+            }
+            return n;
+        }
+        int wobblerSnags = Snags(LureFamily.Wobbler), jigSnags = Snags(LureFamily.Softbait);
+        t.Check(Snags(LureFamily.Spoon) > 20 && jigSnags < Snags(LureFamily.Spoon), $"dragged along the bottom lures catch (spoon), a jig less ({jigSnags})");
+        var snag = new LureMotion(LureFamily.Spoon);
+        for (int k = 0; k < 400 && !snag.Snagged; k++)
+            snag.Step(0.05f, k < 40 ? 0f : 0.5f, 1f, rng);
+        t.Check(snag.Snagged && snag.BitePace == 0f && snag.Judgement == RetrieveJudgement.Snagged, "a snagged lure fishes no more");
+        var pulled = new LureMotion(LureFamily.Spoon);
+        for (int k = 0; k < 400 && !pulled.Snagged; k++)
+            pulled.Step(0.05f, k < 40 ? 0f : 0.5f, 1f, rng);
+        var hold = new FixedRng(0.99f);
+        SnagResult r = SnagResult.Stuck;
+        for (int k = 0; k < 100 && r == SnagResult.Stuck; k++)
+            r = pulled.Pull(hold, 0.05f);
+        t.Check(r == SnagResult.Broke, "pulling a snag for four seconds breaks the line");
+        int freed = 0;
+        for (int i = 0; i < 300; i++)
+        {
+            var l = new LureMotion(LureFamily.Spoon);
+            for (int k = 0; k < 400 && !l.Snagged; k++)
+                l.Step(0.05f, k < 40 ? 0f : 0.5f, 1f, rng);
+            freed += l.Jerk(rng) == SnagResult.Freed ? 1 : 0;
+        }
+        t.Check(freed is > 70 and < 140, $"a jerk frees a snag about a third of the time ({freed}/300)");
+        t.Check(Method.SelfHookChance(pike.Aggression, true) > Method.SelfHookChance(bream.Aggression, true) * 3f
+                && Method.SelfHookChance(pike.Aggression, false) == 0f, "a pike hooks itself on a moving lure far more often than a bream");
+        t.Check(Method.HookWindow(FishingMethod.Bottom) > Method.HookWindow(FishingMethod.Float) && Method.HookWindow(FishingMethod.Spinning) < Method.HookWindow(FishingMethod.Float),
+            "a fish on the bottom gives more time to strike, a hit on a lure less");
+
+        var spots = new GroundbaitSpots();
+        spots.Feed(10f, -30f);
+        spots.Feed(11f, -31f);
+        spots.Feed(40f, -30f);
+        t.Check(spots.Spots.Count == 2 && spots.HeatAt(10.5f, -30.5f) > 1.5f && spots.HeatAt(25f, -30f) == 0f,
+            $"feeders emptied close together make one baited spot ({spots.HeatAt(10.5f, -30.5f):0.0}), nothing between spots");
+        for (int i = 0; i < 10; i++)
+            spots.Feed(10f, -30f);
+        t.Check(spots.HeatAt(10f, -30f) <= GroundbaitSpots.MaxStrength + 1e-3f && GroundbaitSpots.PaceFor(spots.HeatAt(10f, -30f)) > 2.5f
+                && GroundbaitSpots.PaceFor(0f) == 1f, "a well baited spot brings bites up to almost three times faster");
+        spots.Decay(1.5f);
+        float faded = spots.HeatAt(10f, -30f);
+        spots.Decay(6f);
+        t.Check(faded is > 0.9f and < 1.3f && spots.Spots.Count == 0, $"groundbait fades over game hours ({faded:0.00} after 1.5 h, gone after 7.5)");
+    }
+
+    /// <summary>The lure and line catalogue: every lure's run, colours, size and weight; every line's diameter.</summary>
+    private static void TackleCatalogue(TestContext t)
+    {
+        t.Section("tackle catalogue: lures and lines");
+        var loadout = new TackleLoadout();
+        var lures = loadout.Items(TackleSlot.Bait).OfType<BaitData>().Where(b => b.Kind == BaitKind.Lure).ToList();
+        var lines = loadout.Items(TackleSlot.Line).OfType<LineData>().ToList();
+        var families = lures.GroupBy(b => b.AffinityAs).ToDictionary(g => g.Key, g => g.Count());
+        t.Check(lures.Count >= 120 && families.Count == 5 && families.Values.All(n => n >= 10),
+            $"a big lure catalogue ({lures.Count}: {string.Join(", ", families.Select(kv => $"{kv.Key} {kv.Value}"))})");
+        t.Check(lures.All(b => b.Reusable && b.Price > 0 && b.Description.Length > 10 && b.Shape.Length > 0 && b.SizeCm > 0f && b.WeightG > 0f),
+            "every lure has a model, a size, a weight, a price and a description");
+        t.Check(lures.Select(b => b.LureColor).Distinct().Count() >= 25, $"in many colours ({lures.Select(b => b.LureColor).Distinct().Count()})");
+        var kinds = lines.GroupBy(l => l.Kind).ToDictionary(g => g.Key, g => g.Count());
+        t.Check(lines.Count >= 50 && kinds.Count == 3 && lines.All(l => l.Diameter > 0f && l.Strength > 0f),
+            $"many lines: monofilament, braid and fluorocarbon ({lines.Count}: {string.Join(", ", kinds.Select(kv => $"{kv.Key} {kv.Value}"))})");
+        t.Check(lines.Select(l => l.Diameter).Distinct().Count() >= 15 && lines.Select(l => l.LineColor).Distinct().Count() >= 8,
+            "in many diameters and colours");
+        bool Thicker(LineKind kind) => lines.Where(l => l.Kind == kind && l.ItemId.StartsWith("g_")).GroupBy(l => l.LineColor)
+            .All(g => g.OrderBy(l => l.Diameter).Zip(g.OrderBy(l => l.Diameter).Skip(1)).All(p => p.Second.Strength > p.First.Strength));
+        t.Check(Thicker(LineKind.Mono) && Thicker(LineKind.Braid) && Thicker(LineKind.Fluoro), "a thicker line holds more");
+        var mono = lines.First(l => l.ItemId == "g_zylka_020_przezroczysta");
+        var braid = lines.First(l => l.ItemId == "g_plecionka_020_zielona");
+        t.Check(braid.Strength > mono.Strength * 3f && braid.Stretch < mono.Stretch, "a braid is far stronger than a monofilament of its diameter and does not stretch");
+
+        // How the lures run.
+        LureMotion Still(BaitData b, float seconds)
+        {
+            var l = new LureMotion(Method.FamilyOf(b.AffinityAs), LureTuning.From(b));
+            for (float s = 0f; s < seconds; s += 0.05f)
+                l.Step(0.05f, 0f, 5f, new FixedRng(0.99f));
+            return l;
+        }
+        var popper = lures.First(b => b.Shape == "popper");
+        var nymph = lures.First(b => b.Shape == "nymph");
+        var dry = lures.First(b => b.Shape == "dry");
+        var jerk = lures.First(b => b.Shape == "jerk");
+        var minnow = lures.First(b => b.Shape == "minnow" && b.ItemId.StartsWith("l_"));
+        t.Check(Still(popper, 3f) is { Surface: true, Depth: 0f } && Still(dry, 3f).Surface, "a popper and a dry fly stay on the surface");
+        t.Check(Still(nymph, 3f) is { Surface: false } n && n.Depth > 0.4f, "a nymph sinks under the surface");
+        t.Check(Still(jerk, 3f).Depth > 0.6f && Still(minnow, 3f).Depth < 0.1f, "a sinking jerk goes down where a floating minnow comes up");
+        var deep = lures.First(b => b.Shape == "crank");
+        var drawn = new LureMotion(LureFamily.Wobbler, LureTuning.From(deep));
+        var shallow = new LureMotion(LureFamily.Wobbler, LureTuning.From(lures.First(b => b.Shape == "minnow" && b.DepthScale < 0.7f)));
+        for (int i = 0; i < 100; i++)
+        {
+            drawn.Step(0.05f, 1f, 6f, new FixedRng(0.99f));
+            shallow.Step(0.05f, 1f, 6f, new FixedRng(0.99f));
+        }
+        t.Check(drawn.Depth > shallow.Depth * 2.5f, $"a crank with a big lip runs deep ({drawn.Depth:0.0} m), a shallow minnow high ({shallow.Depth:0.0} m)");
+
+        // Colours, size, weight and line.
+        var chartreuse = new Color(0.75f, 1f, 0.15f);
+        var natural = new Color(0.42f, 0.55f, 0.18f);
+        var black = new Color(0.07f, 0.07f, 0.08f);
+        var silver = new Color(0.86f, 0.87f, 0.9f);
+        float dusk = Method.LightLevel(19f, Weather.Cloudy), noon = Method.LightLevel(12f, Weather.Clear);
+        t.Check(noon > 0.95f && dusk < 0.4f && Method.LightLevel(1f, Weather.Clear) < 0.1f && Method.LightLevel(12f, Weather.Rain) < noon,
+            "daylight: full at noon, dim at dusk, dark at night, less in the rain");
+        t.Check(Method.ColourAppeal(chartreuse, chartreuse, false, dusk, 1.2f) > Method.ColourAppeal(natural, natural, false, dusk, 1.2f) * 1.2f,
+            "a fluorescent lure wins in murky water at dusk");
+        t.Check(Method.ColourAppeal(natural, natural, false, noon, 5f) > Method.ColourAppeal(chartreuse, chartreuse, false, noon, 5f),
+            "a natural colour wins in clear water by day");
+        t.Check(Method.ColourAppeal(silver, silver, true, noon, 5f) > Method.ColourAppeal(silver, silver, true, 0.08f, 5f)
+                && Method.ColourAppeal(black, black, false, 0.08f, 3f) > Method.ColourAppeal(black, black, false, noon, 3f),
+            "polished metal flashes in the sun, black shows at night");
+        t.Check(Method.SizeHookShift(14f) > 2f && Method.SizeHookShift(3f) < 0f && Method.SizePace(3f) > Method.SizePace(14f),
+            "a big lure acts as a big hook and is taken less often");
+        t.Check(Method.CastFactor(25f, 0.2f, true) > Method.CastFactor(3f, 0.2f, true) * 1.2f && Method.CastFactor(0f, 0.12f, false) > Method.CastFactor(0f, 0.4f, false) * 1.2f,
+            "a heavy lure and a thin line cast further");
+    }
+
+    /// <summary>The fishing line as a rope (Core/Physics/LineRope).</summary>
+    private static void LineRopePhysics(TestContext t)
+    {
+        t.Section("line physics");
+        var tip = new Vector3(0f, 3f, 0f);
+        var end = new Vector3(0f, 0f, -20f);
+        FishingSim.Core.Physics.LineRope Run(float length, float seconds, Vector3 wind, int kind = 0, float bottom = -50f)
+        {
+            var rope = new FishingSim.Core.Physics.LineRope { WaterY = 0f, Length = length, Wind = wind, BottomY = (_, _) => bottom };
+            var (sink, floats) = FishingSim.Core.Physics.LineRope.Behaviour(kind);
+            rope.SinkSpeed = sink;
+            rope.Floats = floats;
+            rope.Reset(tip, end);
+            for (float s = 0f; s < seconds; s += 1f / 60f)
+                rope.Step(1f / 60f, tip, end);
+            return rope;
+        }
+        var slack = Run(24f, 4f, Vector3.Zero);
+        var pts = slack.Positions.ToArray();
+        int onWater = pts.Count(p => MathF.Abs(p.Y) < 0.02f);
+        t.Check(onWater > pts.Length / 3 && pts.All(p => p.Y >= -0.001f), $"a slack monofilament lies on the water ({onWater}/{pts.Length} points on the surface, none under it)");
+        float seg = 24f / (FishingSim.Core.Physics.LineRope.Points - 1);
+        bool stretched = false;
+        for (int i = 0; i < pts.Length - 1; i++)
+            stretched |= pts[i].DistanceTo(pts[i + 1]) > seg * 1.05f;
+        t.Check(!stretched, "the line never stretches beyond its length");
+        var windy = Run(24f, 6f, new Vector3(3f, 0f, 0f)).Positions.ToArray();
+        float bow = windy.Max(p => p.X);
+        t.Check(bow > 0.5f, $"the wind blows the slack into a bow ({bow:0.0} m downwind)");
+        var taut = Run(tip.DistanceTo(end), 1f, Vector3.Zero).Positions.ToArray();
+        t.Check(taut.All(p => (p - tip.Lerp(end, (p.Z - tip.Z) / (end.Z - tip.Z))).Length() < 0.01f), "a tight line runs straight");
+        var fluoro = Run(24f, 8f, Vector3.Zero, kind: 2, bottom: -1.5f).Positions.ToArray();
+        float deepest = fluoro.Min(p => p.Y);
+        t.Check(deepest < -0.5f && deepest >= -1.5f + 0.005f, $"a fluorocarbon sinks under the surface ({deepest:0.00} m), down to the bottom and no further");
+        var air = new FishingSim.Core.Physics.LineRope { WaterY = -10f, Length = 22f };
+        air.Reset(tip, new Vector3(0f, 3f, -20f));
+        for (int i = 0; i < 60; i++)
+            air.Step(1f / 60f, tip, new Vector3(0f, 3f, -20f));
+        t.Check(air.Positions[FishingSim.Core.Physics.LineRope.Points / 2].Y < 2f, "in the air the slack line hangs under the chord");
+        t.Check(slack.Slack(tip, end) > 3f && taut.Length > 0, "the slack is the line paid out beyond the straight distance");
+    }
+
+    /// <summary>Feeding levels (the float's depth setting, a lure's depth) and bite styles (Core/Methods/FeedingHabits).</summary>
+    private static void Feeding(TestContext t, LocationData lake)
+    {
+        t.Section("feeding levels and bite styles");
+        var bream = Species("leszcz");
+        var bleak = Species("ukleja");
+        var onBottom = new BiteContext("maggot", 3f, 3f, lake, null, Weather.Clear, 1f);
+        var high = onBottom with { BaitLayer = 0.15f };
+        t.Check(BiteModel.Weight(bream, onBottom) > BiteModel.Weight(bream, high) * 4f, "a bream finds a bait on the bottom, hardly one hung near the surface");
+        var shallow = new BiteContext("maggot", 2f, 1.5f, lake, null, Weather.Clear, 1f);
+        t.Check(BiteModel.Weight(bleak, shallow with { BaitLayer = 0.15f }) > BiteModel.Weight(bleak, shallow) * 1.5f, "a bleak takes high in the water");
+        t.Check(BiteModel.Weight(bream, onBottom with { BaitLayer = null }) >= BiteModel.Weight(bream, onBottom), "without a level the bait's depth is not judged");
+        t.Check(FeedingHabits.BaitLayer(1f, 4f) == 0.25f && FeedingHabits.BaitLayer(5f, 2f) == 1f, "a float set deeper than the water puts the bait on the bottom");
+        t.Check(FeedingHabits.LayerFit("Leszcz", 0.6f, 0.8f) > FeedingHabits.LayerFit("Leszcz", 0.6f, 5f), "in shallow water the level matters less (it is fewer metres off)");
+        t.Check(FeedingHabits.StyleOf("Leszcz") == BiteStyle.Lift && FeedingHabits.StyleOf("Karp") == BiteStyle.Run
+                && FeedingHabits.StyleOf("Ukleja") == BiteStyle.Pluck && FeedingHabits.StyleOf("Okoń") == BiteStyle.Dive,
+            "a bream lifts the float, a carp runs with it, a bleak plucks, a perch pulls it under");
+        var names = SpeciesCatalog.Paths.Select(path => GD.Load<FishSpecies>(path).SpeciesName).ToHashSet();
+        t.Check(new[] { "Leszcz", "Lin", "Karp", "Szczupak", "Ukleja", "Płoć", "Wzdręga", "Boleń", "Sandacz" }.All(names.Contains),
+            "the habits name real species");
+    }
+
+    /// <summary>Noise at the swim (Core/Methods/Disturbance).</summary>
+    private static void Noise(TestContext t)
+    {
+        t.Section("disturbing the fish");
+        float fly = Disturbance.Splash(FishingMethod.Spinning, 0.3f, 2f), spoon = Disturbance.Splash(FishingMethod.Spinning, 25f, 2f);
+        t.Check(spoon > fly * 4f && Disturbance.Splash(FishingMethod.Bottom, 0f, 0.8f) > Disturbance.Splash(FishingMethod.Bottom, 0f, 5f) * 2f
+                && Disturbance.Splash(FishingMethod.Float, 0f, 2f) < 0.2f,
+            $"a heavy lure splashes louder than a fly ({spoon:0.00} vs {fly:0.00}), a feeder louder in shallow water, a float hardly");
+        t.Check(Disturbance.Masking(Weather.Clear, 0f) == 1f && Disturbance.Masking(Weather.Rain, 0.85f) < 0.5f
+                && Disturbance.Masking(Weather.Cloudy, 0.5f) < 1f, "rain on the water and wind waves mask the angler's noise");
+        var d = new Disturbance();
+        d.Add(0.9f);
+        t.Check(d.Spooked && d.Pace < 0.4f, $"spooked fish bite slower (x{d.Pace:0.00})");
+        d.Decay(Disturbance.HalfLife);
+        float half = d.Level;
+        d.Decay(Disturbance.HalfLife * 5f);
+        t.Check(MathF.Abs(half - 0.45f) < 0.01f && d.Level < 0.03f && d.Pace > 0.97f, "the water calms down with time");
+        t.Check(Disturbance.Steps(5.8f, 3f, false, 1f) > Disturbance.Steps(2.5f, 3f, false, 1f) * 4f
+                && Disturbance.Steps(2.5f, 3f, true, 1f) > Disturbance.Steps(2.5f, 3f, false, 1f) * 2f
+                && Disturbance.Steps(5.8f, 20f, false, 1f) == 0f && Disturbance.Steps(0f, 1f, true, 1f) == 0f,
+            "running near the bait scares more than walking, wading more still; far away or standing still nothing");
+        for (int i = 0; i < 50; i++)
+            d.Add(1f);
+        t.Check(d.Level <= Disturbance.MaxLevel && d.Pace >= 0.25f, "bites never stop altogether");
+    }
+
+    /// <summary>Air pressure and water temperature (Core/Methods/Conditions).</summary>
+    private static void PressureAndTemperature(TestContext t, LocationData lake)
+    {
+        t.Section("pressure and water temperature");
+        var b = new Barometer();
+        for (int i = 0; i < 40; i++)
+            b.Step(0.25f, Weather.Clear);
+        float high = b.Pressure;
+        t.Check(high > 1020f && MathF.Abs(b.Trend) < 0.3f && b.Pace == 1f && b.TrendWord == "stałe", $"settled clear weather: high, steady pressure ({high:0} hPa)");
+        for (int i = 0; i < 8; i++)
+            b.Step(0.25f, Weather.Rain);
+        t.Check(b.Pressure < high - 3f && b.Trend < -0.3f && b.Pace > 1f && b.TrendWord == "spada", $"a front coming: the pressure falls ({b.Trend:0.0} hPa/h) and the fish feed (x{b.Pace:0.00})");
+        for (int i = 0; i < 60; i++)
+            b.Step(0.25f, Weather.Rain);
+        float low = b.Pace;
+        for (int i = 0; i < 6; i++)
+            b.Step(0.25f, Weather.Clear);
+        t.Check(low < 1f && b.Trend > 0.3f && b.Pace < 0.9f && b.TrendWord == "rośnie", $"after the front the pressure rises and the fish go off the feed (x{b.Pace:0.00})");
+        t.Check(Barometer.PaceFor(1015f, -0.8f) > Barometer.PaceFor(1015f, 0f) && Barometer.PaceFor(1015f, 0f) > Barometer.PaceFor(1015f, 1f)
+                && Barometer.PaceFor(1015f, 1f) > Barometer.PaceFor(1015f, 3f), "slowly falling beats steady beats rising");
+        t.Check(WaterTemperature.At(17f, 16f, Weather.Clear) > WaterTemperature.At(17f, 4f, Weather.Clear) + 2.5f
+                && WaterTemperature.At(17f, 12f, Weather.Rain) < WaterTemperature.At(17f, 12f, Weather.Clear), "the water is warmest in the afternoon, cooler in the rain");
+        var trout = Species("pstrag");
+        var carp = Species("karp");
+        t.Check(WaterTemperature.Fit(trout.SpeciesName, 11f) > WaterTemperature.Fit(trout.SpeciesName, 22f) * 3f
+                && WaterTemperature.Fit(carp.SpeciesName, 22f) > WaterTemperature.Fit(carp.SpeciesName, 10f) * 3f,
+            "trout feed in cold water, carp in warm");
+        var cold = new BiteContext("worm", 5f, 2f, lake, null, Weather.Clear, null, 10f);
+        t.Check(BiteModel.Weight(carp, cold) < BiteModel.Weight(carp, cold with { WaterTemp = 22f }) * 0.4f
+                && BiteModel.Weight(carp, cold with { WaterTemp = null }) > BiteModel.Weight(carp, cold), "the bite model weighs the species by the water's temperature");
+    }
+
+    /// <summary>A fish given slack shakes the hook out (FightModel.HookThrown).</summary>
+    private static void ThrownHooks(TestContext t)
+    {
+        t.Section("fish throwing the hook on a slack line");
+        var perch = Species("okon");
+        int Thrown(bool reeling, float hold)
+        {
+            int n = 0;
+            for (int i = 0; i < 120; i++)
+            {
+                var rng = new FishingSim.Core.SystemRng(i * 31 + 7);
+                var fight = new FightModel(FishProfile.From(perch, 0.6f), new FightGear(3f, 6f, 0.2f, 1.6f, 100f), rng, 15f, 0f, 0.5f) { HookHold = hold };
+                for (float s = 0f; s < 90f; s += 0.05f)
+                {
+                    var o = fight.Step(0.05f, 0.5f, reeling);
+                    if (o == FightOutcome.HookThrown)
+                    {
+                        n++;
+                        break;
+                    }
+                    if (o != FightOutcome.Ongoing)
+                        break;
+                }
+            }
+            return n;
+        }
+        int idle = Thrown(false, 0.5f), wound = Thrown(true, 0.5f), wellSet = Thrown(false, 1f);
+        t.Check(idle > wound * 2 && idle > 15, $"a fish left on a slack line throws the hook ({idle}/120), one kept tight rarely ({wound}/120)");
+        t.Check(wellSet < idle / 2, $"a well set hook holds better ({wellSet}/120)");
+    }
+
+    /// <summary>Bait wearing on the hook (Core/Methods/BaitWear).</summary>
+    private static void Wear(TestContext t)
+    {
+        t.Section("bait wearing on the hook");
+        t.Check(BaitWear.Step(1f, "bread", 180f) == 0f && BaitWear.Step(1f, "boilie", 180f) > 0.85f && BaitWear.Step(1f, "worm", 270f) is > 0.45f and < 0.55f,
+            "bread is gone in three minutes, a boilie lasts, a worm is half spent in four and a half");
+        t.Check(BaitWear.Dissolves("bread") && !BaitWear.Dissolves("worm") && BaitWear.Appeal(1f) == 1f && BaitWear.Appeal(0f) < 0.4f,
+            "soft baits fall off; a spent bait draws a third as well");
+        t.Check(BaitWear.Word(false, 1f).Contains("pusty") && BaitWear.Word(true, 0.2f).Contains("zużyta") && BaitWear.Word(true, 0.9f) == "",
+            "the HUD says when the hook is bare or the bait spent");
+    }
+
+    /// <summary>Line wear (Core/Methods/LineWear) and new line on the spool (Profile).</summary>
+    private static void Fraying(TestContext t)
+    {
+        t.Section("line wear");
+        t.Check(LineWear.FromLoad(2f, 6f, 10f) == 0f && LineWear.FromLoad(5f, 6f, 10f) > 0.05f, "only a load past half the line's strength frays it");
+        t.Check(MathF.Abs(LineWear.Strength(6f, 0.25f) - 4.5f) < 1e-4f && LineWear.Strength(6f, 5f) >= 6f * (1f - LineWear.Max) - 1e-4f,
+            "a quarter worn line holds a quarter less, never under 40 %");
+        var p = new Profile { Money = 100 };
+        p.Owned["line"].Add("zylka016");
+        p.AddLineWear("zylka016", 0.3f);
+        var saved = ProfileSerializer.FromJson(ProfileSerializer.ToJson(p).ToJsonString());
+        t.Check(MathF.Abs(saved.LineWear.GetValueOrDefault("zylka016") - 0.3f) < 1e-4f, "the wear survives a save");
+        t.Check(p.Buy(TackleSlot.Line, "zylka016", 10, 1) == null && p.LineWear.GetValueOrDefault("zylka016") == 0f && p.Money == 90,
+            "new line on the spool makes a worn line whole");
+        t.Check(p.Buy(TackleSlot.Line, "zylka016", 10, 1) == "Już to masz", "a whole line is not bought twice");
+        t.Check(LineWear.Word(0.3f) == "przetarta" && LineWear.Word(0.01f) == "", "the HUD names the wear");
+    }
+
+    /// <summary>Line twist (Core/Methods/LineTwist) and new line on the spool (Profile).</summary>
+    private static void Twisting(TestContext t)
+    {
+        t.Section("line twist");
+        t.Check(LineTwist.PerMetre(LureFamily.Spinner, false) > LineTwist.PerMetre(LureFamily.Spoon, false)
+                && LineTwist.PerMetre(LureFamily.Spoon, false) > LineTwist.PerMetre(LureFamily.Wobbler, false)
+                && LineTwist.PerMetre(LureFamily.Fly, false) == 0f, "a spinner twists the line most, a spoon less, a wobbler hardly");
+        t.Check(LineTwist.PerMetre(LureFamily.Spinner, true) < 0.2f * LineTwist.PerMetre(LureFamily.Spinner, false), "a swivel takes most of the twist");
+        t.Check(LineTwist.TangleChance(20f, 0) == 0f && LineTwist.TangleChance(200f, 0) > 0.5f, "a little twist is harmless, a lot ends casts in bird's nests");
+        t.Check(LineTwist.TangleChance(150f, 1) < LineTwist.TangleChance(150f, 0) && LineTwist.TangleChance(150f, 2) > LineTwist.TangleChance(150f, 0),
+            "a braid hardly loops, a stiff fluorocarbon most");
+        var p = new Profile { Money = 100 };
+        p.Owned["line"].Add("zylka016");
+        p.AddLineTwist("zylka016", 120f);
+        var saved = ProfileSerializer.FromJson(ProfileSerializer.ToJson(p).ToJsonString());
+        t.Check(MathF.Abs(saved.LineTwist.GetValueOrDefault("zylka016") - 120f) < 1e-3f, "the twist survives a save");
+        p.AddLineTwist("zylka016", -LineTwist.FightRelief(30f));
+        t.Check(p.LineTwist["zylka016"] < 120f, "a fight untwists the line a little");
+        t.Check(p.Buy(TackleSlot.Line, "zylka016", 10, 1) == null && !p.LineTwist.ContainsKey("zylka016") && p.Money == 90,
+            "new line on the spool takes the twist away");
+        t.Check(LineTwist.Word(60f) == "skręcona" && LineTwist.Word(5f) == "", "the HUD names a twisted line");
+    }
+
+    /// <summary>Cast scatter and wind in flight (Core/Methods/Casting).</summary>
+    private static void Casts(TestContext t)
+    {
+        t.Section("casting: scatter and wind");
+        var rng = new FishingSim.Core.SystemRng(9);
+        float Spread(float power) => Enumerable.Range(0, 400).Select(_ => MathF.Abs(Casting.Scatter(power, rng).Degrees)).Average();
+        float soft = Spread(0.2f), full = Spread(1f);
+        t.Check(full > soft * 1.8f && full < 4f && soft > 0.3f, $"a full swing strays wider ({full:0.0} deg) than a gentle one ({soft:0.0} deg)");
+        var speeds = Enumerable.Range(0, 400).Select(_ => Casting.Scatter(1f, rng).Speed).ToList();
+        t.Check(speeds.Min() > 0.9f && speeds.Max() < 1.1f && speeds.Max() - speeds.Min() > 0.05f, "and its distance varies a little");
+        t.Check(Casting.WindCatch(FishingMethod.Float, 0f) > Casting.WindCatch(FishingMethod.Spinning, 25f) * 3f
+                && Casting.WindCatch(FishingMethod.Spinning, 2f) > Casting.WindCatch(FishingMethod.Spinning, 25f)
+                && Casting.WindCatch(FishingMethod.Bottom, 0f) < 0.2f, "the wind carries a float far more than a heavy spoon, a feeder hardly");
+    }
+
+    /// <summary>Plants and drop-offs (Core/Methods/Structure).</summary>
+    private static void Holds(TestContext t, LocationData lake)
+    {
+        t.Section("where the fish hold: plants and drop-offs");
+        var beds = new[] { new WeedBed(10f, -20f, 3f) };
+        t.Check(Structure.CoverAt(beds, 10f, -20f) == 1f && Structure.CoverAt(beds, 15f, -20f) is > 0.4f and < 0.6f && Structure.CoverAt(beds, 30f, -20f) == 0f,
+            "cover is full in a bed and fades four metres beyond it");
+        var pike = Species("szczupak");
+        var zander = Species("sandacz");
+        var roach = Species("ploc");
+        var open = new BiteContext("livebait", 6f, 3f, lake, null, Weather.Clear, null, null, 0f, 0f);
+        t.Check(BiteModel.Weight(pike, open with { Cover = 1f }) > BiteModel.Weight(pike, open) * 1.6f, "a pike takes far better by the plants");
+        t.Check(BiteModel.Weight(zander, open with { Edge = 1f }) > BiteModel.Weight(zander, open) * 1.4f, "a zander on a drop-off");
+        t.Check(BiteModel.Weight(roach, open with { Cover = 1f, Edge = 1f }) == BiteModel.Weight(roach, open), "a roach does not care");
+        t.Check(Structure.EdgeFrom(0.6f) == 1f && Structure.EdgeFrom(0.05f) < 0.2f, "a steep bottom is a drop-off, a gentle one is not");
+    }
+
+    /// <summary>Feeding in spells (Core/Methods/FeedingSpells).</summary>
+    private static void Spells(TestContext t)
+    {
+        t.Section("feeding spells");
+        var day = Enumerable.Range(0, 24 * 12).Select(i => FeedingSpells.Pace(100f + i / 12f, 0)).ToList();
+        t.Check(day.Max() > 1.3f && day.Min() < 0.7f && MathF.Abs(day.Average() - 1f) < 0.12f,
+            $"bites come in waves over a day ({day.Min():0.00}..{day.Max():0.00}, mean {day.Average():0.00})");
+        t.Check(FeedingSpells.Pace(10.3f, 0) == FeedingSpells.Pace(10.3f, 0) && FeedingSpells.Pace(10.3f, 0) != FeedingSpells.Pace(34.3f, 0)
+                && FeedingSpells.Pace(10.3f, 0) != FeedingSpells.Pace(10.3f, 1), "the same hour is the same, another day or lake differs");
+        float step = Enumerable.Range(0, 200).Max(i => MathF.Abs(FeedingSpells.Pace(i * 0.05f + 0.05f, 2) - FeedingSpells.Pace(i * 0.05f, 2)));
+        t.Check(step < 0.25f, "the waves change gradually, not from minute to minute");
+    }
+
+    /// <summary>The wind-blown shore (Core/Methods/WindShore).</summary>
+    private static void Shores(TestContext t)
+    {
+        t.Section("wind-blown shore");
+        // A lake whose shore runs along x = 50: water for x < 50.
+        Func<float, float, float> depth = (x, z) => x < 50f ? 3f : -1f;
+        float near = WindShore.Exposure(depth, 45f, 0f, 1f, 0f);
+        float far = WindShore.Exposure(depth, 20f, 0f, 1f, 0f);
+        float back = WindShore.Exposure(depth, 45f, 0f, -1f, 0f);
+        float beyond = WindShore.Exposure(depth, -10f, 0f, 1f, 0f);
+        t.Check(near > 0.85f && far > 0f && far < near, $"the drift gathers towards the shore the wind blows onto ({far:0.00} at 30 m, {near:0.00} at 5 m)");
+        t.Check(back == 0f && beyond == 0f, "nothing with the wind at the shore's back or beyond the reach");
+        t.Check(WindShore.Exposure(depth, 60f, 0f, 1f, 0f) == 0f && WindShore.Exposure(depth, 45f, 0f, 0f, 0f) == 0f, "nothing on land or in a calm");
+        t.Check(WindShore.Pace(1f, 0.85f) > 1.25f && WindShore.Pace(1f, 0.25f) < 1.1f && WindShore.Pace(0f, 1f) == 1f,
+            "a strong wind quickens the bites there, a breeze hardly");
+    }
+
+    /// <summary>The moon (Core/Methods/Moon).</summary>
+    private static void Moonlight(TestContext t)
+    {
+        t.Section("moon");
+        float full = 0f, newMoon = 1f;
+        for (int d = 0; d < 30; d++)
+        {
+            float ill = Moon.Illumination(Moon.Phase(d * 24f));
+            full = MathF.Max(full, ill);
+            newMoon = MathF.Min(newMoon, ill);
+        }
+        t.Check(full > 0.98f && newMoon < 0.02f, "a month of game days runs from new moon to full moon");
+        t.Check(Moon.Name(0f) == "nów" && Moon.Name(0.5f) == "pełnia" && Moon.Name(0.25f) == "pierwsza kwadra", "the dial names the phase");
+        t.Check(Moon.Light(0.5f, 0f, Weather.Clear) == 0f && Moon.Light(0.5f, 1f, Weather.Clear) > 0.99f
+                && Moon.Light(0.5f, 1f, Weather.Rain) < 0.2f, "moonlight only at night, hidden by rain clouds");
+        t.Check(Moon.Fit("Sum", 0f) > 1.2f && Moon.Fit("Sum", 1f) < 0.8f && Moon.Fit("Płoć", 1f) > Moon.Fit("Płoć", 0f),
+            "catfish hunt in the dark of a new moon, other fish feed a little more on bright nights");
+        var sum = SpeciesCatalog.Paths.Select(path => GD.Load<FishSpecies>(path)).FirstOrDefault(s => s.SpeciesName == "Sum");
+        if (sum != null)
+        {
+            var dark = new BiteContext("livebait", 4f, 4f, MoonLight: 0f);
+            var bright = dark with { MoonLight = 1f };
+            t.Check(BiteModel.Weight(sum, dark) > BiteModel.Weight(sum, bright) * 1.5f, "the bite model weighs the moonlight");
+        }
+    }
+
+    /// <summary>A swim fished hard (Core/Methods/SwimPressure).</summary>
+    private static void Pressure(TestContext t)
+    {
+        t.Section("swim pressure");
+        var swim = new SwimPressure();
+        t.Check(SwimPressure.Pace(swim.Load(0f, 0f, 10f)) == 1f, "an unfished spot bites as usual");
+        for (int i = 0; i < 6; i++)
+            swim.Add(0f, 0f, 10f + i * 0.2f);
+        float here = SwimPressure.Pace(swim.Load(0f, 0f, 11.2f));
+        float near = SwimPressure.Pace(swim.Load(8f, 0f, 11.2f));
+        float away = SwimPressure.Pace(swim.Load(30f, 0f, 11.2f));
+        t.Check(here < 0.55f && near > here && away == 1f, $"six fish from one spot slow it down ({here:0.00}), less 8 m off ({near:0.00}), not 30 m away");
+        t.Check(SwimPressure.FishedOut(swim.Load(0f, 0f, 11.2f)), "the HUD tells the angler to move");
+        float later = SwimPressure.Pace(swim.Load(0f, 0f, 11.2f + 12f));
+        t.Check(later > 0.85f, $"the swim recovers over game hours ({later:0.00} after 12 h)");
+        var released = new SwimPressure();
+        released.Add(0f, 0f, 0f);
+        released.Add(0f, 0f, 0f, SwimPressure.Released - 1f);
+        t.Check(MathF.Abs(released.Load(0f, 0f, 0f) - SwimPressure.Released) < 1e-4f, "a released fish weighs half");
+        swim.Clear();
+        t.Check(swim.Load(0f, 0f, 11.2f) == 0f, "a new map starts fresh");
+    }
+
+    /// <summary>Line visibility by water and light (Core/Methods/LineShyness).</summary>
+    private static void LineSight(TestContext t)
+    {
+        t.Section("line shyness");
+        float thickClear = LineShyness.Effective(1f, 6f, 1f), fluoroClear = LineShyness.Effective(0.65f, 6f, 1f);
+        float thickMurk = LineShyness.Effective(1f, 1.6f, 0.08f), fluoroMurk = LineShyness.Effective(0.65f, 1.6f, 0.08f);
+        t.Check(thickClear > 1f && fluoroClear < 0.65f, $"in clear water at midday a thin leader pays off most ({fluoroClear:0.00} vs {thickClear:0.00})");
+        t.Check(thickMurk - fluoroMurk < 0.2f * (thickClear - fluoroClear), "in murky water at night the line hardly matters");
+        t.Check(MathF.Abs(LineShyness.Effective(LineShyness.Ordinary, 6f, 1f) - LineShyness.Ordinary) < 1e-5f, "an ordinary line stays ordinary");
+    }
+
+    /// <summary>Handling the catch (Core/Methods/Handling).</summary>
+    private static void Handled(TestContext t)
+    {
+        t.Section("handling the catch");
+        t.Check(Handling.Condition(15f, 10f) == 1f, "a quick fight and a quick decision leave the fish fresh");
+        t.Check(Handling.Condition(120f, 10f) < 0.8f && Handling.Condition(120f, 10f) >= 0.75f, "a long fight tires it");
+        t.Check(Handling.Condition(15f, 60f) < 0.9f && Handling.Condition(600f, 600f) == 0.4f, "time out of the water costs condition, down to a floor");
+        var p = new Profile();
+        var roach = GD.Load<FishSpecies>(SpeciesCatalog.Paths[0]);
+        p.Keep(roach, roach.LegalWeight + 0.1f, 0.7f);
+        t.Check(MathF.Abs(p.Keepnet[^1].Condition - 0.7f) < 1e-5f, "the keepnet takes the fish in the condition it was handled to");
+    }
+
+    /// <summary>Jumping fish (Core/Methods/Jumps).</summary>
+    private static void Leaps(TestContext t)
+    {
+        t.Section("jumping fish");
+        t.Check(Jumps.ThrowChance(true, 0.6f, 1f) > 4f * Jumps.ThrowChance(false, 0.6f, 1f), "a rod held high lets a leaping fish throw the hook; bowing to it saves most");
+        t.Check(Jumps.ThrowChance(true, 1f, 1f) < Jumps.ThrowChance(true, 0.3f, 1f) && Jumps.ThrowChance(true, 0.6f, 0.2f) < Jumps.ThrowChance(true, 0.6f, 1f),
+            "a deeply set hook and a softer line hold better");
+    }
+
+    /// <summary>Hook points (Core/Methods/HookWear) and new hooks (Profile).</summary>
+    private static void Points(TestContext t)
+    {
+        t.Section("hook wear");
+        t.Check(HookWear.PerFish(4f) > HookWear.PerFish(0.2f) && HookWear.PerSnag > HookWear.PerFish(1f), "big fish and snags blunt the point most");
+        t.Check(HookWear.SetFactor(0f) == 1f && HookWear.SetFactor(HookWear.Max) < 0.7f, "a blunt hook sets far worse");
+        var p = new Profile { Money = 100 };
+        p.Owned["hook"].Add("hak6");
+        for (int i = 0; i < 3; i++)
+            p.AddHookDull("hak6", HookWear.PerSnag);
+        var saved = ProfileSerializer.FromJson(ProfileSerializer.ToJson(p).ToJsonString());
+        t.Check(MathF.Abs(saved.HookDull.GetValueOrDefault("hak6") - 0.3f) < 1e-4f && HookWear.Word(0.3f) == "stępiony", "the dulling survives a save and the HUD names it");
+        t.Check(p.Buy(TackleSlot.Hook, "hak6", 5, 1) == null && !p.HookDull.ContainsKey("hak6") && p.Money == 95, "a new hook replaces a blunt one");
+        t.Check(p.Buy(TackleSlot.Hook, "hak6", 5, 1) == "Już to masz", "a sharp hook is not bought twice");
+        p.AddHookDull("hak6", 0.5f);
+        p.Sharpen("hak6");
+        t.Check(!p.HookDull.ContainsKey("hak6"), "a hone puts the point back");
+    }
+
+    /// <summary>Shoals (Core/Methods/Shoals) and the bite model.</summary>
+    private static void Shoaling(TestContext t)
+    {
+        t.Section("shoals");
+        var shoals = new Shoals();
+        shoals.Add("Szczupak", 0f, 0f, 5f);
+        t.Check(!shoals.Any, "a pike is a loner: it leaves no shoal");
+        shoals.Add("Płoć", 0f, 0f, 5f);
+        float here = shoals.Boost("Płoć", 2f, 0f, 5.1f), other = shoals.Boost("Leszcz", 2f, 0f, 5.1f);
+        float far = shoals.Boost("Płoć", 20f, 0f, 5.1f), later = shoals.Boost("Płoć", 2f, 0f, 8f);
+        t.Check(here > 1.6f && other == 1f && far == 1f, $"a roach caught means more roach close by ({here:0.00}), not bream, not 20 m off");
+        t.Check(later < 1.05f, "the shoal moves on within a few game hours");
+        for (int i = 0; i < 6; i++)
+            shoals.Add("Płoć", 0f, 0f, 5.1f);
+        t.Check(shoals.Boost("Płoć", 0f, 0f, 5.1f) <= Shoals.MaxBoost, "the boost is capped");
+        var roach = SpeciesCatalog.Paths.Select(path => GD.Load<FishSpecies>(path)).First(s => s.SpeciesName == "Płoć");
+        var plain = new BiteContext("maggot", 6f, 2f);
+        var shoal = plain with { Shoal = name => name == "Płoć" ? 2f : 1f };
+        t.Check(MathF.Abs(BiteModel.Weight(roach, shoal) - 2f * BiteModel.Weight(roach, plain)) < 1e-4f, "the bite model weighs the shoal");
+    }
+
+    /// <summary>Fish rising (Core/Methods/Rises).</summary>
+    private static void Rising(TestContext t)
+    {
+        t.Section("rises");
+        float dusk = Rises.PerMinute(19.5f, Weather.Clear, 0.25f), noon = Rises.PerMinute(13f, Weather.Clear, 0.25f);
+        t.Check(dusk > 3f * noon, $"fish rise most in the evening ({dusk:0.0}/min vs {noon:0.0} at noon)");
+        t.Check(Rises.PerMinute(19.5f, Weather.Rain, 0.85f) < 0.3f * dusk, "rain and wind put the rises down");
+        t.Check(Rises.Riser(FeedingHabits.LayerOf("Ukleja")) && !Rises.Riser(FeedingHabits.LayerOf("Leszcz")), "bleak rise, bream stay on the bottom");
+        t.Check(Rises.Boost(1f, 5f) > 1.8f && Rises.Boost(1f, 50f) < 1.3f && Rises.Boost(8f, 1f) == 1f,
+            "a bait cast right to a fresh rise tempts that fish; an old or distant ring does little");
+    }
+
+    /// <summary>The daily move between shallow and deep water (Core/Methods/DailyMigration).</summary>
+    private static void Migration(TestContext t)
+    {
+        t.Section("daily migration");
+        t.Check(DailyMigration.Fit(1f, 0.1f) > 1.2f && DailyMigration.Fit(1f, 1f) < 0.8f, "the shallows fish well in low light, poorly in bright sun");
+        t.Check(DailyMigration.Fit(7f, 1f) > DailyMigration.Fit(7f, 0.1f), "at noon the deep water pays");
+        t.Check(MathF.Abs(DailyMigration.Fit(3.5f, 0.5f) - 1f) < 0.1f, "middling depths hardly change");
+    }
+
+    /// <summary>Swallowed hooks (Core/Methods/Unhooking).</summary>
+    private static void Swallowed(TestContext t)
+    {
+        t.Section("swallowed hooks");
+        t.Check(Unhooking.DeepChance(FishingMethod.Float, 1f) > 4f * Unhooking.DeepChance(FishingMethod.Float, 0f)
+                && Unhooking.DeepChance(FishingMethod.Spinning, 1f) < 0.1f, "a late strike lets the fish swallow a natural bait; lures seldom");
+        t.Check(Unhooking.Seconds(true, false) > Handling.AirGrace && Unhooking.Seconds(true, true) < Handling.AirGrace,
+            "a deep hook keeps the fish out of the water too long without a disgorger");
+        t.Check(Unhooking.Harm(true, false) > 5f * Unhooking.Harm(true, true) && Unhooking.Harm(false, false) == 0f, "and tearing it out hurts");
+    }
+
+    /// <summary>Sunken wood (Core/Methods/Structure).</summary>
+    private static void Wood(TestContext t)
+    {
+        t.Section("sunken wood");
+        var wood = new List<SunkenWood> { new(10f, 10f, 2f) };
+        t.Check(Structure.WoodAt(wood, 11f, 10f) == 1f && Structure.WoodAt(wood, 13.5f, 10f) > 0f && Structure.WoodAt(wood, 20f, 10f) == 0f,
+            "the branches are felt among them and a little beyond");
+        t.Check(Structure.SnagFactor(1f) > 5f && Structure.SnagFactor(0f) == 1f, "lures snag far more among sunken wood");
+        var lure = new LureMotion(LureFamily.Wobbler) { SnagFactor = Structure.SnagFactor(1f) };
+        var open = new LureMotion(LureFamily.Wobbler);
+        var rng = new FixedRng(0.01f);
+        int snagWood = 0, snagOpen = 0;
+        for (int i = 0; i < 400; i++)
+        {
+            lure.Step(0.05f, 0.6f, 0.3f, rng);
+            open.Step(0.05f, 0.6f, 0.3f, rng);
+            if (lure.Snagged) snagWood++;
+            if (open.Snagged) snagOpen++;
+        }
+        t.Check(snagWood >= snagOpen, $"the lure's snag rate follows the bottom ({snagWood} vs {snagOpen} steps snagged)");
+    }
+
+    /// <summary>Temperature layers (Core/Methods/Conditions).</summary>
+    private static void Layers(TestContext t)
+    {
+        t.Section("temperature layers");
+        t.Check(WaterTemperature.AtDepth(21f, 1f) == 21f && WaterTemperature.AtDepth(21f, 6f) < 18f && WaterTemperature.AtDepth(21f, 40f) >= 6f,
+            "the top is mixed, the deep water colder, never below 6 degrees");
+        float troutDeep = WaterTemperature.Fit("Pstrąg tęczowy", WaterTemperature.AtDepth(21.5f, 10f));
+        float troutTop = WaterTemperature.Fit("Pstrąg tęczowy", WaterTemperature.AtDepth(21.5f, 0.5f));
+        t.Check(WaterTemperature.WindowFactor(8f) < 0.75f && WaterTemperature.WindowFactor(25f) > 1.1f
+                && MathF.Abs(WaterTemperature.WindowFactor(17f) - 0.99f) < 0.05f, "in cold water bites are short, in warm the fish hold on");
+        t.Check(troutDeep > troutTop, $"in a warm lake trout feed better deep ({troutTop:0.00} at the top, {troutDeep:0.00} at 10 m)");
+    }
+
+    /// <summary>Natural bait sizes (Core/Methods/BaitSize).</summary>
+    private static void BaitSizes(TestContext t)
+    {
+        t.Section("bait size");
+        t.Check(BaitSize.HookShift("livebait") > BaitSize.HookShift("rosowka") && BaitSize.HookShift("rosowka") > BaitSize.HookShift("worm")
+                && BaitSize.HookShift("maggot") < 0f && BaitSize.HookShift("l_unknown") == 0f, "a live fish is a big mouthful, maggots a small one");
+        var pike = SpeciesCatalog.Paths.Select(path => GD.Load<FishSpecies>(path)).First(s => s.SpeciesName == "Szczupak");
+        float Mean(float hook)
+        {
+            var rng = new SeqRng();
+            float sum = 0f;
+            for (int i = 0; i < 400; i++)
+                sum += BiteModel.RollWeight(pike, hook, rng);
+            return sum / 400f;
+        }
+        float small = Mean(4f + BaitSize.HookShift("maggot")), big = Mean(4f + BaitSize.HookShift("livebait"));
+        t.Check(big > small * 1.1f, $"a big bait brings bigger fish ({small:0.00} kg on maggots, {big:0.00} kg on a live fish)");
+    }
+
+    /// <summary>Evenly spread values (deterministic).</summary>
+    private sealed class SeqRng : FishingSim.Core.IRng
+    {
+        private int _i;
+        public float NextFloat() => ((_i++ * 0.6180339f) % 1f);
+    }
+
+    /// <summary>Rain and murky water (Core/Methods/Turbidity).</summary>
+    private static void Murk(TestContext t)
+    {
+        t.Section("turbidity");
+        float m = Turbidity.Step(0f, 4f, Weather.Rain);
+        t.Check(m > 0.6f && Turbidity.ClarityFactor(m) < 0.7f && Turbidity.Word(m) == "mętna", $"four hours of rain muddy the water ({m:0.00})");
+        float later = Turbidity.Step(m, 8f, Weather.Clear);
+        t.Check(MathF.Abs(later - m / 2f) < 1e-3f && Turbidity.Step(m, 48f, Weather.Clear) < 0.05f, "it clears over the next day");
+        t.Check(LineShyness.Effective(0.65f, 6f * Turbidity.ClarityFactor(1f), 1f) > LineShyness.Effective(0.65f, 6f, 1f),
+            "in muddied water a fine leader matters less");
+    }
+
+    /// <summary>Daily bag limits (Core/Methods/BagLimits, Profile.Keep).</summary>
+    private static void Bag(TestContext t)
+    {
+        t.Section("bag limits");
+        t.Check(BagLimits.LimitOf("Szczupak") == 2 && BagLimits.LimitOf("Płoć") == null && BagLimits.MayKeep("Płoć", 99), "pike are limited, roach are not");
+        var pike = SpeciesCatalog.Paths.Select(path => GD.Load<FishSpecies>(path)).First(s => s.SpeciesName == "Szczupak");
+        var p = new Profile();
+        float w = pike.LegalWeight + 0.5f;
+        t.Check(p.Keep(pike, w) == null && p.Keep(pike, w) == null && p.Keep(pike, w) is string error && error.StartsWith("Limit dzienny"),
+            "a third pike in a day goes back");
+        var saved = ProfileSerializer.FromJson(ProfileSerializer.ToJson(p).ToJsonString());
+        t.Check(saved.OverBagLimit("Szczupak"), "the day's count survives a save");
+        p.PassTime(24f);
+        t.Check(p.Keep(pike, w) == null, "the next day the limit starts over");
+    }
+
+    /// <summary>Strike efficiency (Core/Methods/Strike).</summary>
+    private static void Strikes(TestContext t)
+    {
+        t.Section("strike over distance");
+        t.Check(Strike.Efficiency(10f, 0.55f, 0f) == 1f, "a short line sets the hook fully");
+        float mono = Strike.Efficiency(60f, 0.55f, 0f), braid = Strike.Efficiency(60f, 0.05f, 0f);
+        t.Check(mono < 0.8f && braid > 0.95f, $"at 60 m a stretchy mono loses the strike ({mono:0.00}), a braid hardly ({braid:0.00})");
+        t.Check(Strike.Efficiency(10f, 0.05f, 2f) < 0.7f, "slack on the water eats the strike");
+        t.Check(Strike.DragFactor(0.2f) < 0.7f && Strike.DragFactor(1.5f) == 1f, "a drag set too loose slips on the strike");
+    }
+
+    /// <summary>Bait kinds and water temperature (Core/Methods/BaitSeason).</summary>
+    private static void Seasons(TestContext t)
+    {
+        t.Section("bait and temperature");
+        t.Check(BaitSeason.Pace(0, 9f) > BaitSeason.Pace(1, 9f) * 1.6f, "in cold water a worm beats corn");
+        t.Check(BaitSeason.Pace(1, 22f) >= BaitSeason.Pace(0, 22f) && BaitSeason.Pace(2, 24f) > 1.1f, "in warm water plant baits and boilies come into their own");
+        t.Check(BaitSeason.Pace(3, 5f) == 1f, "lures are judged by their own rules");
+    }
+
+    /// <summary>Predators grabbing a hooked little fish (Core/Methods/PreyAttack).</summary>
+    private static void Ambush(TestContext t)
+    {
+        t.Section("prey attack");
+        t.Check(PreyAttack.IsPrey("Ukleja", 0.05f) && !PreyAttack.IsPrey("Płoć", 0.8f) && !PreyAttack.IsPrey("Karp", 0.2f),
+            "a little roach or bleak is prey, a big roach or a carp is not");
+        float pikeLake = PreyAttack.ChancePerSecond(1f);
+        t.Check(pikeLake * 20f > 0.1f && pikeLake * 20f < 0.3f && PreyAttack.ChancePerSecond(0f) == 0f,
+            $"in a pike lake a twenty-second fight is grabbed now and then ({pikeLake * 20f:0.00}), never without predators");
+    }
+
+    /// <summary>Always returns the same value (deterministic checks).</summary>
+    private sealed class FixedRng : FishingSim.Core.IRng
+    {
+        private readonly float _v;
+        public FixedRng(float v) => _v = v;
+        public float NextFloat() => _v;
     }
 }

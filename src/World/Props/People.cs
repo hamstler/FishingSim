@@ -75,6 +75,7 @@ public static class People
         if (CharacterAsset.Create(appearance, idle) is { } model)
         {
             model.Scale = Vector3.One * (look.Height / CharacterAsset.HeightOf(appearance.Model));
+            npc.ModelScale = model.Scale.X;
             npc.AddChild(model);
             npc.Rig(model, Greets(role) && !idle.StartsWith("Sitting"), idle, gestures);
             if (inHand != null && CharacterAsset.SkeletonOf(model) is { } skeleton)
@@ -361,6 +362,22 @@ public static class People
 /// <summary>A standing figure: breathes, sways, shifts its weight now and then, and watches the angler when near.</summary>
 public partial class Npc : Node3D
 {
+    /// <summary>The rigged model's scale (1 for the built figures).</summary>
+    public float ModelScale { get; set; } = 1f;
+
+    /// <summary>
+    /// Where a villager playing a Sitting_* animation sits, measured from the animation (FISHSIM_SIT_PROBE): the seat
+    /// under the buttocks is <see cref="SeatModelHeight"/> above the feet and the hips are <see cref="SeatModelBack"/>
+    /// behind the origin, in model units (times <see cref="ModelScale"/>).
+    /// </summary>
+    public const float SeatModelHeight = 0.455f, SeatModelBack = 0.334f;
+
+    /// <summary>The seat's height above the feet and how far behind the origin the hips are (m).</summary>
+    public (float Height, float Back) Seat => (SeatModelHeight * ModelScale, SeatModelBack * ModelScale);
+
+    /// <summary>A log's radius for this sitter: its top 1.5 cm above the seat, so the sitter presses on it lightly.</summary>
+    public float SeatLogRadius => (Seat.Height + 0.015f) / 2f;
+
     public Node3D? BodyRoot { get; set; }
     public Node3D? Head { get; set; }
     public Node3D? LeftArm { get; set; }
@@ -403,6 +420,9 @@ public partial class Npc : Node3D
                 }
             };
     }
+
+    /// <summary>Plays a one-off animation now (a local angler landing a fish).</summary>
+    public void PlayGesture(string name) => Gesture(name);
 
     private void Gesture(string name)
     {

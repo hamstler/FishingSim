@@ -4,10 +4,12 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Kołowrotek mistrza cechu"
+DisplayName = "Hokuto Kaiten FR 4000 · kołowrotek mistrza cechu"
 DragMax = 9.0
 ReelSpeed = 3.4
 LineCapacity = 150.0
 Price = 650
 RequiredLevel = 5
 Description = "Najlepszy kołowrotek cechu: mocny hamulec i duża szpula."
+BodyColor = Color(0.08, 0.08, 0.09, 1)
+TrimColor = Color(0.75, 0.15, 0.1, 1)

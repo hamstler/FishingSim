@@ -15,7 +15,9 @@ namespace FishingSim.UI;
 /// </summary>
 public partial class CardPanel : Control
 {
-    protected FishingRod Rod = null!;
+    private FishingRod _rodFixed = null!;
+    /// <summary>The rod in use (the active one of the rod set).</summary>
+    protected FishingRod Rod => FishingRod.ActiveRod ?? _rodFixed;
     protected IReadOnlyList<FishSpecies> Species = Array.Empty<FishSpecies>();
     protected Label TitleLabel = null!, State = null!, Footer = null!;
     protected VBoxContainer Body = null!;
@@ -26,7 +28,7 @@ public partial class CardPanel : Control
 
     public void Setup(FishingRod rod, IReadOnlyList<FishSpecies> species)
     {
-        Rod = rod;
+        _rodFixed = rod;
         Species = species;
     }
 

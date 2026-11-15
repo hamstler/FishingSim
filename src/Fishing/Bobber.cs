@@ -1,14 +1,40 @@
 using System;
 using Godot;
+using FishingSim.Core.Methods;
 
 namespace FishingSim.Fishing;
 
-/// <summary>Floating bobber: simple buoyancy and water damping. Frozen (kinematic) while stowed or during a fight.</summary>
+/// <summary>
+/// The end of the line: a floating bobber with simple buoyancy and water damping (frozen, kinematic, while stowed or
+/// during a fight). It flies the cast for every method; once in the water a lure or a feeder is moved by the rod
+/// (<see cref="FishingRod"/> holds it where the lure runs or the feeder lies). It shows the float, the lure (spinner,
+/// spoon, wobbler, jig, fly; animated by <see cref="LureSpeed"/> and facing <see cref="Heading"/>) or the feeder.
+/// </summary>
 public partial class Bobber : RigidBody3D
 {
     private const float BodyRadius = 0.05f;
 
     private Node3D _visual = null!;
+    private Node3D _float = null!, _lureRoot = null!, _feeder = null!;
+    private Node3D? _lure, _spin, _tail;
+    private Node3D _feederBait = null!;
+    private FishingMethod _method = FishingMethod.Float;
+    private LureFamily _family;
+    private float _time;
+
+    /// <summary>The lure's speed through the water (m/s): spins the blade, rocks the body, wags the tail.</summary>
+    public float LureSpeed { get; set; }
+
+    /// <summary>The way the lure or the feeder points (yaw, radians; +Z of the model faces it).</summary>
+    public float Heading { get; set; }
+
+    /// <summary>The feeder carries groundbait (shown in its cage).</summary>
+    public bool FeederLoaded { get; set; }
+
+    /// <summary>False hides the lure or the feeder (in the fish's mouth during the fight).</summary>
+    public bool TerminalVisible { get; set; } = true;
+
+    public FishingMethod Method => _method;
     private bool _pendingLaunch;
     private Vector3 _launchPosition;
     private Vector3 _launchVelocity;
@@ -23,6 +49,141 @@ public partial class Bobber : RigidBody3D
 
     /// <summary>Downward pull as a multiple of the bobber's weight (bites).</summary>
     public float ExtraForce { get; set; }
+
+    /// <summary>How deep under the float the hook hangs (m): the depth setting, or the water's depth when that is less.</summary>
+    public float HangDepth { get; set; } = 1f;
+
+    /// <summary>Water clarity (m) and polarized glasses (0..1): how far the angler sees down into the water.</summary>
+    public float Clarity { get; set; } = 3f;
+    public float GlareCut { get; set; }
+
+    /// <summary>Tools only: draw the hook under the float (the angler cannot see it from the bank).</summary>
+    public static bool DebugShowHook { get; set; }
+
+    /// <summary>How far the float actually lies over now (eased towards <see cref="Tilt"/>).</summary>
+    public float VisualTilt => _tilt;
+
+    /// <summary>
+    /// Something under the surface is seen from the camera only as a fish would be: through the glare, as deep and
+    /// as far as the water's clarity allows (<see cref="World.FishPopulation.Sight"/>).
+    /// </summary>
+    private bool SeenUnderWater(Camera3D? cam)
+    {
+        var p = GlobalPosition;
+        if (cam == null || p.Y > WaterY - 0.03f)
+            return true;
+        return World.FishPopulation.Sight(cam.GlobalPosition, p, WaterY, WaterY - p.Y, Clarity, GlareCut) > World.FishPopulation.MinSight * 1.5f;
+    }
+
+    /// <summary>The hook and its bait are in the water (not during the cast's flight or once a fish has them).</summary>
+    public bool ShowHook { get; set; }
+
+    private Node3D _hookRig = null!, _hook = null!, _shot = null!, _feederHook = null!;
+    private MeshInstance3D _hookLine = null!, _bait = null!, _feederBaitOnHook = null!;
+    private StandardMaterial3D _baitMaterial = null!;
+
+    /// <summary>What a natural bait looks like on the hook: its colour and whether it is long (a worm, a small fish).</summary>
+    public static (Color Colour, bool Long) BaitLook(string id) => id switch
+    {
+        "worm" or "rosowka" => (new Color(0.72f, 0.36f, 0.34f), true),
+        "ochotka" => (new Color(0.75f, 0.1f, 0.1f), true),
+        "maggot" or "pedrak" => (new Color(0.95f, 0.9f, 0.76f), false),
+        "corn" or "kasza" => (new Color(0.98f, 0.82f, 0.2f), false),
+        "bread" or "ciasto" or "kulka_czosnkowa" => (new Color(0.95f, 0.92f, 0.82f), false),
+        "groch" => (new Color(0.55f, 0.7f, 0.3f), false),
+        "konopie" => (new Color(0.3f, 0.25f, 0.18f), false),
+        "boilie" => (new Color(0.6f, 0.25f, 0.16f), false),
+        "kulka_plywajaca" => (new Color(0.95f, 0.55f, 0.2f), false),
+        "livebait" or "martwa_rybka" => (new Color(0.75f, 0.8f, 0.84f), true),
+        "insect" or "chrabaszcz" => (new Color(0.35f, 0.42f, 0.15f), false),
+        "jetka" => (new Color(0.85f, 0.8f, 0.55f), true),
+        _ => (new Color(0.8f, 0.7f, 0.5f), false),
+    };
+
+    /// <summary>The bait on the hook for the next cast.</summary>
+    public void SetBait(string id)
+    {
+        var (colour, isLong) = BaitLook(id);
+        _baitMaterial.AlbedoColor = colour;
+        var size = isLong ? new Vector3(0.008f, 0.03f, 0.008f) : new Vector3(0.012f, 0.012f, 0.012f);
+        _bait.Scale = size;
+        _feederBaitOnHook.Scale = size;
+    }
+
+    /// <summary>The rig under the float: the line down to the hook, a split shot, the hook with its bait; and the
+    /// feeder's hook link lying on the bottom behind it. Drawn at 1.6 times life size so it can be seen in the water.</summary>
+    private void BuildHookRig()
+    {
+        _baitMaterial = new StandardMaterial3D { AlbedoColor = new Color(0.72f, 0.36f, 0.34f), Roughness = 0.6f };
+        var steel = Metal(new Color(0.3f, 0.3f, 0.32f), 0.35f);
+        var lineMat = new StandardMaterial3D { AlbedoColor = new Color(0.85f, 0.88f, 0.85f, 0.5f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
+        Node3D Hook(out MeshInstance3D bait)
+        {
+            var hook = new Node3D { Scale = new Vector3(1.6f, 1.6f, 1.6f) };
+            Part(hook, new CylinderMesh { TopRadius = 0.0006f, BottomRadius = 0.0006f, Height = 0.014f, RadialSegments = 4 }, steel, new Vector3(0f, -0.007f, 0f));
+            Part(hook, new TorusMesh { InnerRadius = 0.0034f, OuterRadius = 0.0046f, Rings = 12, RingSegments = 4 }, steel,
+                new Vector3(0.004f, -0.014f, 0f), new Vector3(Mathf.Pi / 2f, 0f, 0f));
+            bait = Part(hook, new SphereMesh { Radius = 0.5f, Height = 1f, RadialSegments = 10, Rings = 6 }, _baitMaterial, new Vector3(0.004f, -0.02f, 0f));
+            return hook;
+        }
+        _hookRig = new Node3D { Visible = false };
+        _visual.AddChild(_hookRig);
+        _hookLine = Part(_hookRig, new CylinderMesh { TopRadius = 0.0006f, BottomRadius = 0.0006f, Height = 1f, RadialSegments = 4 }, lineMat, Vector3.Zero);
+        _shot = new Node3D();
+        _hookRig.AddChild(_shot);
+        foreach (float y in new[] { 0f, 0.012f })
+            Part(_shot, new SphereMesh { Radius = 0.004f, Height = 0.008f, RadialSegments = 8, Rings = 4 }, Metal(new Color(0.4f, 0.4f, 0.42f), 0.6f), new Vector3(0f, y, 0f));
+        _hook = Hook(out _bait);
+        _hookRig.AddChild(_hook);
+        // The feeder's hook link: 30 cm of line on the bottom, the baited hook at its end.
+        _feederHook = new Node3D();
+        _feeder.AddChild(_feederHook);
+        Part(_feederHook, new CylinderMesh { TopRadius = 0.0006f, BottomRadius = 0.0006f, Height = 0.23f, RadialSegments = 4 }, lineMat,
+            new Vector3(0f, 0.004f, -0.135f), new Vector3(Mathf.Pi / 2f, 0f, 0f));
+        var lying = Hook(out _feederBaitOnHook);
+        lying.Position = new Vector3(0f, 0.012f, -0.25f);
+        lying.Rotation = new Vector3(-Mathf.Pi / 2f, 0f, 0f);
+        _feederHook.AddChild(lying);
+    }
+
+    /// <summary>How far the float lies over (0 upright .. 1 flat on the water): a lift bite, or a float set too deep.</summary>
+    public float Tilt { get; set; }
+
+    private StandardMaterial3D _redMat = null!, _whiteMat = null!, _tipMat = null!;
+    private float _lastNight = -1f;
+    private bool _lastGlow;
+
+    /// <summary>
+    /// After dark (<paramref name="darkness"/> 0 day .. 1 night) the float's paint no longer shows by itself; a
+    /// glow tip (świetlik) makes its tip shine green. Changed only when it changes (no material churn per frame).
+    /// </summary>
+    public void SetNight(float darkness, bool glowTip)
+    {
+        darkness = MathF.Round(Math.Clamp(darkness, 0f, 1f) * 20f) / 20f;
+        if (MathF.Abs(darkness - _lastNight) < 1e-3f && glowTip == _lastGlow)
+            return;
+        _lastNight = darkness;
+        _lastGlow = glowTip;
+        float fade = 1f - 0.95f * darkness;
+        _redMat.EmissionEnergyMultiplier = 0.35f * fade;
+        _whiteMat.EmissionEnergyMultiplier = 0.2f * fade;
+        var tip = glowTip && darkness > 0.3f ? new Color(0.35f, 1f, 0.4f) : new Color(1f, 0.6f, 0.05f);
+        _tipMat.AlbedoColor = tip;
+        _tipMat.Emission = tip;
+        _tipMat.EmissionEnergyMultiplier = glowTip && darkness > 0.3f ? 1.5f + 2.5f * darkness : 0.6f * fade;
+    }
+
+    /// <summary>How brightly the float's tip shines now (tests).</summary>
+    public float TipGlow => _tipMat.EmissionEnergyMultiplier;
+
+    /// <summary>The wind in flight (m/s) and how strongly it carries this end tackle (1/s; Casting.WindCatch).</summary>
+    public Vector3 AirWind { get; set; }
+    public float WindCatch { get; set; }
+
+    /// <summary>The wind's push on the float (a velocity it drifts towards, m/s).</summary>
+    public Vector3 Drift { get; set; }
+
+    private float _tilt;
 
     /// <summary>0 = fully above water, 1 = fully under.</summary>
     public float Submerged { get; private set; }
@@ -44,22 +205,30 @@ public partial class Bobber : RigidBody3D
     {
         _visual = new Node3D { TopLevel = true };
         AddChild(_visual);
+        _float = new Node3D();
+        _visual.AddChild(_float);
+        _lureRoot = new Node3D { Visible = false, Scale = new Vector3(1.4f, 1.4f, 1.4f) };
+        _visual.AddChild(_lureRoot);
+        _feeder = BuildFeeder();
+        _feeder.Visible = false;
+        _visual.AddChild(_feeder);
+        BuildHookRig();
         // Slightly self-lit colours so the float still reads at dusk and against glare.
-        var red = Glowing(new Color(0.95f, 0.1f, 0.06f), 0.35f);
-        var white = Glowing(new Color(0.96f, 0.96f, 0.92f), 0.2f);
-        var orange = Glowing(new Color(1f, 0.6f, 0.05f), 0.6f);
-        _visual.AddChild(new MeshInstance3D
+        var red = _redMat = Glowing(new Color(0.95f, 0.1f, 0.06f), 0.35f);
+        var white = _whiteMat = Glowing(new Color(0.96f, 0.96f, 0.92f), 0.2f);
+        var orange = _tipMat = Glowing(new Color(1f, 0.6f, 0.05f), 0.6f);
+        _float.AddChild(new MeshInstance3D
         {
             Mesh = new SphereMesh { Radius = 0.034f, Height = 0.07f, RadialSegments = 12, Rings = 6 },
             MaterialOverride = red,
         });
-        _visual.AddChild(new MeshInstance3D
+        _float.AddChild(new MeshInstance3D
         {
             Mesh = new CylinderMesh { TopRadius = 0.006f, BottomRadius = 0.009f, Height = 0.1f, RadialSegments = 8, Rings = 1 },
             MaterialOverride = white,
             Position = new Vector3(0, 0.07f, 0),
         });
-        _visual.AddChild(new MeshInstance3D
+        _float.AddChild(new MeshInstance3D
         {
             Mesh = new CylinderMesh { TopRadius = 0.004f, BottomRadius = 0.006f, Height = 0.045f, RadialSegments = 8, Rings = 1 },
             MaterialOverride = orange,
@@ -106,12 +275,24 @@ public partial class Bobber : RigidBody3D
         GlobalPosition = at;
     }
 
+    /// <summary>Lets the float ride the water by itself again after the rod held it (drawn in by the line).</summary>
+    public void Release()
+    {
+        if (!Visible)
+            return;
+        Freeze = false;
+        LinearVelocity = Vector3.Zero;
+    }
+
     public void Stow()
     {
         Visible = false;
         Freeze = true;
         DriveVelocity = Vector3.Zero;
+        Drift = Vector3.Zero;
         ExtraForce = 0f;
+        Tilt = 0f;
+        ShowHook = false;
         Submerged = 0f;
     }
 
@@ -127,11 +308,144 @@ public partial class Bobber : RigidBody3D
 
     public override void _Process(double delta)
     {
+        float dt = (float)delta;
+        _time += dt;
         _visual.GlobalPosition = GlobalPosition;
         _visual.GlobalRotation = Vector3.Zero;
-        var cam = GetViewport()?.GetCamera3D();
-        float k = cam == null ? 1f : VisualScale(cam.GlobalPosition.DistanceTo(GlobalPosition));
-        _visual.Scale = new Vector3(k, k, k);
+        _float.Visible = _method == FishingMethod.Float;
+        var viewer = GetViewport()?.GetCamera3D();
+        bool seen = SeenUnderWater(viewer);
+        _lureRoot.Visible = _method == FishingMethod.Spinning && TerminalVisible && seen;
+        _feeder.Visible = _method == FishingMethod.Bottom && TerminalVisible && (seen || DebugShowHook);
+        _feederHook.Visible = ShowHook && DebugShowHook;
+        _hookRig.Visible = _method == FishingMethod.Float && ShowHook && Visible && DebugShowHook;
+        if (_hookRig.Visible)
+        {
+            float hang = MathF.Max(HangDepth, 0.05f);
+            _hookLine.Scale = new Vector3(1f, hang, 1f);
+            _hookLine.Position = new Vector3(0f, -hang / 2f, 0f);
+            _shot.Position = new Vector3(0f, -hang * 0.7f, 0f);
+            // The bait sways a little in the water.
+            _hook.Position = new Vector3(MathF.Sin(_time * 0.9f) * 0.01f, -hang, MathF.Cos(_time * 0.7f) * 0.01f);
+        }
+        if (_float.Visible)
+        {
+            var cam = GetViewport()?.GetCamera3D();
+            float k = cam == null ? 1f : VisualScale(cam.GlobalPosition.DistanceTo(GlobalPosition));
+            _float.Scale = new Vector3(k, k, k);
+            _tilt = Mathf.MoveToward(_tilt, Math.Clamp(Tilt, 0f, 1f), dt * 2.5f);
+            _float.Rotation = new Vector3(0f, Heading, _tilt * 1.4f);
+        }
+        else if (_lureRoot.Visible)
+        {
+            // Like the float, the lure is drawn a little larger further out (up to 2.5x), so it can be followed in
+            // clear water as it comes in.
+            var cam = GetViewport()?.GetCamera3D();
+            float k = 1.4f * (cam == null ? 1f : Math.Clamp(cam.GlobalPosition.DistanceTo(GlobalPosition) / 5f, 1f, 2.5f));
+            _lureRoot.Scale = new Vector3(k, k, k);
+            AnimateLure(dt);
+        }
+        else if (_feeder.Visible)
+        {
+            _feeder.Rotation = new Vector3(0f, Heading, 0f);
+            _feederBait.Visible = FeederLoaded;
+        }
+    }
+
+    // ------------------------------------------------------------------ lures and the feeder
+    private string _lureId = "";
+
+    /// <summary>Chooses what hangs on the line for the next cast: the float, the feeder, or this lure (built from its
+    /// family, model, colours and size: <see cref="LureModels"/>).</summary>
+    public void SetTerminal(FishingMethod method, Data.BaitData? bait)
+    {
+        _method = method;
+        TerminalVisible = true;
+        LureSpeed = 0f;
+        if (method != FishingMethod.Spinning || bait == null)
+            return;
+        string key = bait.ResourcePath.Length > 0 ? bait.ResourcePath : bait.DisplayName;
+        if (_lure != null && key == _lureId)
+            return;
+        _lureId = key;
+        _family = Core.Methods.Method.FamilyOf(bait.AffinityAs);
+        _lure?.QueueFree();
+        _lure = LureModels.Build(bait, out _spin, out _tail);
+        _lureRoot.AddChild(_lure);
+    }
+
+    /// <summary>The lure works as it is drawn: the spinner's blade turns round the wire, a spoon rolls and swings,
+    /// a wobbler rocks from side to side, a jig's paddle tail wags, a fly sits still on the surface film.</summary>
+    private void AnimateLure(float dt)
+    {
+        if (_lure == null)
+            return;
+        float v = Math.Clamp(LureSpeed, 0f, 2.5f);
+        float roll = 0f, yaw = 0f;
+        switch (_family)
+        {
+            case LureFamily.Spinner:
+                if (_spin != null)
+                    _spin.Rotation = new Vector3(0f, 0f, _spin.Rotation.Z + dt * (4f + 28f * v));
+                break;
+            case LureFamily.Spoon:
+                roll = MathF.Sin(_time * (3f + 7f * v)) * (0.15f + 0.5f * MathF.Min(v, 1f));
+                yaw = MathF.Sin(_time * (3f + 7f * v) + 1.2f) * 0.3f * MathF.Min(v, 1f);
+                break;
+            case LureFamily.Wobbler:
+                roll = MathF.Sin(_time * (4f + 9f * v)) * 0.4f * MathF.Min(v * 1.5f, 1f);
+                yaw = MathF.Sin(_time * (4f + 9f * v) + 1.5f) * 0.12f * MathF.Min(v * 1.5f, 1f);
+                if (_tail != null)      // a jointed swimbait's rear segment swings the other way
+                    _tail.Rotation = new Vector3(0f, MathF.Sin(_time * (4f + 9f * v) + 0.6f) * 0.45f * MathF.Min(v * 1.5f, 1f), 0f);
+                break;
+            case LureFamily.Softbait:
+                if (_tail != null)
+                    _tail.Rotation = new Vector3(0f, MathF.Sin(_time * (5f + 12f * v)) * (0.15f + 0.6f * MathF.Min(v, 1f)), 0f);
+                break;
+            default:
+                yaw = MathF.Sin(_time * 0.7f) * 0.1f;
+                break;
+        }
+        _lure.Rotation = new Vector3(0f, Heading + yaw, roll);
+    }
+
+    private static StandardMaterial3D Metal(Color c, float rough = 0.25f) => new() { AlbedoColor = c, Metallic = 0.95f, Roughness = rough };
+
+    private static StandardMaterial3D Paint(Color c, float rough = 0.45f) => new() { AlbedoColor = c, Roughness = rough };
+
+    private static MeshInstance3D Part(Node3D parent, Mesh mesh, Material mat, Vector3 at, Vector3? rot = null, Vector3? scale = null)
+    {
+        var mi = new MeshInstance3D
+        {
+            Mesh = mesh, MaterialOverride = mat, Position = at, Rotation = rot ?? Vector3.Zero, Scale = scale ?? Vector3.One,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        };
+        parent.AddChild(mi);
+        return mi;
+    }
+
+    /// <summary>The feeder: an open green cage with a lead strip along its bottom, lying on its side, and its groundbait.</summary>
+    private Node3D BuildFeeder()
+    {
+        var root = new Node3D { Name = "Feeder", Scale = new Vector3(1.3f, 1.3f, 1.3f) };
+        var cage = new StandardMaterial3D { AlbedoColor = new Color(0.12f, 0.3f, 0.14f), Roughness = 0.5f, Metallic = 0.3f };
+        var lead = Metal(new Color(0.42f, 0.42f, 0.44f), 0.6f);
+        var lying = new Vector3(Mathf.Pi / 2f, 0f, 0f);
+        foreach (float z in new[] { -0.02f, 0f, 0.02f })
+            Part(root, new TorusMesh { InnerRadius = 0.0135f, OuterRadius = 0.0155f, Rings = 16, RingSegments = 4 }, cage,
+                new Vector3(0f, 0.015f, z), lying);
+        for (int i = 0; i < 8; i++)
+        {
+            float a = i / 8f * Mathf.Tau;
+            Part(root, new CylinderMesh { TopRadius = 0.0008f, BottomRadius = 0.0008f, Height = 0.042f, RadialSegments = 4 }, cage,
+                new Vector3(MathF.Cos(a) * 0.0145f, 0.015f + MathF.Sin(a) * 0.0145f, 0f), lying);
+        }
+        Part(root, new BoxMesh { Size = new Vector3(0.012f, 0.004f, 0.044f) }, lead, new Vector3(0f, 0.001f, 0f));
+        _feederBait = Part(root, new CylinderMesh { TopRadius = 0.012f, BottomRadius = 0.012f, Height = 0.036f, RadialSegments = 10 },
+            Paint(new Color(0.42f, 0.3f, 0.17f), 0.95f), new Vector3(0f, 0.015f, 0f), lying);
+        Part(root, new TorusMesh { InnerRadius = 0.0025f, OuterRadius = 0.0035f, Rings = 8, RingSegments = 4 }, Metal(new Color(0.7f, 0.7f, 0.72f)),
+            new Vector3(0f, 0.03f, 0.024f));
+        return root;
     }
 
     public override void _PhysicsProcess(double delta)
@@ -147,10 +461,18 @@ public partial class Bobber : RigidBody3D
         ApplyCentralForce(Vector3.Up * weight * 2f * Submerged);
         if (Submerged > 0f)
         {
-            if (ExtraForce > 0f)
+            // Positive pulls under (a bite), negative lifts (a fish picking the bait up off the bottom).
+            if (ExtraForce != 0f)
                 ApplyCentralForce(Vector3.Down * weight * ExtraForce);
-            if (DriveVelocity != Vector3.Zero)
-                ApplyCentralForce(DriveVelocity * Mass * LinearDamp);
+            var push = DriveVelocity + Drift;
+            if (push != Vector3.Zero)
+                ApplyCentralForce(push * Mass * LinearDamp);
+        }
+        // In the air the wind carries it sideways (a light float or fly most).
+        if (Submerged <= 0f && WindCatch > 0f && AirWind != Vector3.Zero)
+        {
+            var flat = new Vector3(LinearVelocity.X, 0f, LinearVelocity.Z);
+            ApplyCentralForce((AirWind - flat) * Mass * WindCatch * 0.35f);
         }
         LinearDamp = Mathf.Lerp(0.05f, 6f, Submerged);
         AngularDamp = Mathf.Lerp(0.5f, 4f, Submerged);

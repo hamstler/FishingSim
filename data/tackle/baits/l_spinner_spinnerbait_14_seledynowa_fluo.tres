@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Bayou Bill Reed Blade · Spinnerbait 14 g, seledynowa fluo"
+Kind = 3
+AffinityAs = "spinner"
+AffinityScale = 1.1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 70
+RequiredLevel = 3
+Description = "Ramię z dwoma skrzydełkami nad główką ze spódniczką: przechodzi przez zielsko bez zaczepów. Na szczupaki."
+Shape = "spinnerbait"
+LureColor = Color(0.75, 1, 0.15, 1)
+AccentColor = Color(0.2, 0.4, 0.1, 1)
+Pattern = "glitter"
+Metallic = false
+SizeCm = 9
+WeightG = 14
+SinkScale = 1.2
+SinkOffset = 0
+DepthScale = 1
+DepthOffset = 0

@@ -142,12 +142,27 @@ public static class GraphicsQuality
         cfg.Save(ConfigPath);
     }
 
+    /// <summary>True when the first start found integrated graphics (no saved settings) and picked light ones.</summary>
+    public static bool PickedForIntegratedGpu { get; private set; }
+
     private static void Load()
     {
         _loaded = true;
         var cfg = new ConfigFile();
         if (cfg.Load(ConfigPath) != Error.Ok)
+        {
+            // The first start on a laptop's integrated graphics: light effects, a short view and a 70 % 3D image
+            // upscaled by FSR (the angler can raise them in the pause menu). Dedicated cards keep High.
+            if (!Renderer.IsHeadless && RenderingServer.GetVideoAdapterType() == RenderingDevice.DeviceType.IntegratedGpu)
+            {
+                _level = QualityLevel.Low;
+                _view = ViewDistance.Short;
+                _scale = 70;
+                PickedForIntegratedGpu = true;
+                SaveConfig();
+            }
             return;
+        }
         _level = (QualityLevel)Math.Clamp(cfg.GetValue("graphics", "quality", (int)QualityLevel.High).AsInt32(), 0, 3);
         _view = (ViewDistance)Math.Clamp(cfg.GetValue("graphics", "view", (int)ViewDistance.Long).AsInt32(), 0, 3);
         _scale = Math.Clamp(cfg.GetValue("graphics", "scale", 100).AsInt32(), 50, 100);
@@ -199,7 +214,7 @@ public static class GraphicsQuality
         env.SsrMaxSteps = 40;
         env.SdfgiEnabled = false;                       // far too expensive for what it adds outdoors
 
-        env.GlowEnabled = true;
+        env.GlowEnabled = q >= QualityLevel.Medium;     // the blur passes cost integrated graphics dearly
         env.GlowIntensity = 0.7f;
         env.GlowStrength = 1f;
         env.GlowBloom = 0.03f;

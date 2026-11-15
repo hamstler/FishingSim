@@ -65,6 +65,31 @@ public sealed class Profile
     public Dictionary<string, int> BaitCounts { get; set; } = new();
     public Dictionary<string, string> Equipped { get; set; } = new();
 
+    /// <summary>The tackle of rod slots 2 and 3 (slot 1 is <see cref="Equipped"/>): slot key -> item id. A slot with
+    /// no rod and reel of its own is not assembled yet (each rod in the water needs its own rod and reel).</summary>
+    public List<Dictionary<string, string>> RodSlots { get; set; } = new() { new(), new() };
+
+    /// <summary>The equipped tackle of rod slot 0..2.</summary>
+    public Dictionary<string, string> EquippedFor(int rodSlot)
+    {
+        if (rodSlot <= 0)
+            return Equipped;
+        while (RodSlots.Count < rodSlot)
+            RodSlots.Add(new());
+        return RodSlots[rodSlot - 1];
+    }
+
+    /// <summary>A rod or a reel is mounted in another rod slot (one rod or reel cannot be in two places).</summary>
+    public bool InUseElsewhere(TackleSlot slot, string id, int rodSlot)
+    {
+        if (slot is not (TackleSlot.Rod or TackleSlot.Reel) || id == "")
+            return false;
+        for (int k = 0; k <= RodSlots.Count; k++)
+            if (k != rodSlot && EquippedFor(k).GetValueOrDefault(slot.Key()) == id)
+                return true;
+        return false;
+    }
+
     /// <summary>The last meal's lasting effect and the game hours it has left (none when null or run out).</summary>
     public Core.Camp.MealBuff? Meal { get; set; }
 
@@ -75,6 +100,48 @@ public sealed class Profile
 
     /// <summary>Forest pickings (Core/Camp/Foraging ids -> pieces): mushrooms and berries for cooking and notices.</summary>
     public Dictionary<string, int> Pantry { get; set; } = new();
+
+    /// <summary>Line id -> how worn the line on the spool is (0 new .. 0.6; Core/Methods/LineWear).</summary>
+    public Dictionary<string, float> LineWear { get; set; } = new();
+
+    /// <summary>Frays a line a little more (no change event: it happens every frame of a fight).</summary>
+    public void AddLineWear(string lineId, float amount)
+    {
+        if (amount <= 0f)
+            return;
+        LineWear[lineId] = MathF.Min(LineWear.GetValueOrDefault(lineId) + amount, Core.Methods.LineWear.Max);
+    }
+
+    /// <summary>Line id -> twist in turns (Core/Methods/LineTwist); new line on the spool clears it.</summary>
+    public Dictionary<string, float> LineTwist { get; set; } = new();
+
+    /// <summary>Twists (or untwists, with a negative amount) a line.</summary>
+    public void AddLineTwist(string lineId, float turns)
+    {
+        float t = Math.Clamp(LineTwist.GetValueOrDefault(lineId) + turns, 0f, Core.Methods.LineTwist.Max);
+        if (t <= 0f)
+            LineTwist.Remove(lineId);
+        else
+            LineTwist[lineId] = t;
+    }
+
+    /// <summary>Hook id -> how blunt its point is (0 sharp .. 0.6; Core/Methods/HookWear).</summary>
+    public Dictionary<string, float> HookDull { get; set; } = new();
+
+    /// <summary>Blunts a hook a little more.</summary>
+    public void AddHookDull(string hookId, float amount)
+    {
+        if (amount <= 0f)
+            return;
+        HookDull[hookId] = MathF.Min(HookDull.GetValueOrDefault(hookId) + amount, Core.Methods.HookWear.Max);
+    }
+
+    /// <summary>The hone puts the point back on a hook.</summary>
+    public void Sharpen(string hookId) => HookDull.Remove(hookId);
+
+    /// <summary>The line on the spool is worn or twisted enough to be worth respooling.</summary>
+    public bool NeedsRespool(string lineId) => Core.Methods.LineWear.Worn(LineWear.GetValueOrDefault(lineId))
+        || LineTwist.GetValueOrDefault(lineId) >= Core.Methods.LineTwist.Loops;
 
     /// <summary>Fish hanging in the village smokehouse.</summary>
     public List<SmokingLot> Smokery { get; set; } = new();
@@ -113,6 +180,11 @@ public sealed class Profile
         Meal = null;
         MealHoursLeft = 0f;
         Pantry = new();
+        LineWear = new();
+        LineTwist = new();
+        HookDull = new();
+        KeptToday = new();
+        KeptDay = -1;
         Smokery = new();
         Smoked = new();
         Notices = new();
@@ -142,6 +214,7 @@ public sealed class Profile
             ["rod"] = "junior", ["reel"] = "mlynek1000", ["line"] = "zylka025", ["hook"] = "hak5", ["bait"] = "worm",
             ["leader"] = TackleSlotExtensions.NoLeader,
         };
+        RodSlots = new() { new(), new() };
         Gear = new GearInventory();
         Market = new FishMarket();
     }
@@ -161,6 +234,9 @@ public sealed class Profile
     public bool KeepnetFits(float weight) =>
         KeepnetLimit is not KeepnetSpec spec || KeepnetModel.Fits(spec, Keepnet.Count, KeepnetWeight, weight);
 
+    /// <summary>The water's temperature where the keepnet hangs (degrees Celsius; null = 17). Not saved.</summary>
+    public Func<float>? WaterTempNow { get; set; }
+
     /// <summary>Fish in the keepnet lose condition as time passes; the market recovers from earlier sales.</summary>
     public void PassTime(float hours)
     {
@@ -177,7 +253,10 @@ public sealed class Profile
             return;
         float fill = spec.MaxKg > 0f ? KeepnetWeight / spec.MaxKg : 1f;
         for (int i = 0; i < Keepnet.Count; i++)
-            Keepnet[i] = Keepnet[i] with { Condition = KeepnetModel.Decay(Keepnet[i].Condition, spec, hours, fill) };
+        {
+            float stress = Core.Methods.WaterTemperature.KeepnetStress(Keepnet[i].Species, WaterTempNow?.Invoke() ?? 17f);
+            Keepnet[i] = Keepnet[i] with { Condition = KeepnetModel.Decay(Keepnet[i].Condition, spec, hours, fill, stress) };
+        }
     }
 
     private static FishLot LotFor(CatchRecord fish, IEnumerable<FishSpecies> species)
@@ -296,6 +375,27 @@ public sealed class Profile
     {
         if (Level < requiredLevel)
             return $"Wymagany poziom {requiredLevel}";
+        // New line on the spool for a worn line of the same kind.
+        if (slot == TackleSlot.Line && Owns(slot, id) && NeedsRespool(id))
+        {
+            if (Money < price)
+                return "Za mało pieniędzy";
+            Money -= price;
+            LineWear.Remove(id);
+            LineTwist.Remove(id);
+            Changed?.Invoke();
+            return null;
+        }
+        // A new hook for a blunt one of the same kind.
+        if (slot == TackleSlot.Hook && Owns(slot, id) && Core.Methods.HookWear.Blunt(HookDull.GetValueOrDefault(id)))
+        {
+            if (Money < price)
+                return "Za mało pieniędzy";
+            Money -= price;
+            HookDull.Remove(id);
+            Changed?.Invoke();
+            return null;
+        }
         if (slot != TackleSlot.Bait && Owns(slot, id))
             return "Już to masz";
         if (slot != TackleSlot.Bait && !Owned.ContainsKey(slot.Key()))
@@ -332,8 +432,20 @@ public sealed class Profile
         if (slot == TackleSlot.Bait || (slot == TackleSlot.Leader && id == TackleSlotExtensions.NoLeader)
             || !Owned.TryGetValue(slot.Key(), out var ids) || !ids.Remove(id))
             return false;
+        if (slot == TackleSlot.Line)
+        {
+            LineWear.Remove(id);
+            LineTwist.Remove(id);
+        }
+        if (slot == TackleSlot.Hook)
+            HookDull.Remove(id);
         if (Equipped.GetValueOrDefault(slot.Key()) == id)
             Equipped[slot.Key()] = slot == TackleSlot.Leader ? TackleSlotExtensions.NoLeader : ids.Count > 0 ? ids[0] : "";
+        // The other rod slots lose it too (a destroyed rod or reel leaves its slot unassembled).
+        foreach (var other in RodSlots)
+            if (other.GetValueOrDefault(slot.Key()) == id)
+                other[slot.Key()] = slot == TackleSlot.Leader ? TackleSlotExtensions.NoLeader
+                    : slot is TackleSlot.Rod or TackleSlot.Reel ? "" : ids.Count > 0 ? ids[0] : "";
         Changed?.Invoke();
         return true;
     }
@@ -376,13 +488,33 @@ public sealed class Profile
     public const int ReleaseXp = 3;
 
     /// <summary>Puts a landed fish into the keepnet. Null on success, otherwise why not (a full keepnet).</summary>
-    public string? Keep(FishSpecies species, float weight)
+    /// <summary>Fish kept today per species (bag limits; Core/Methods/BagLimits), for <see cref="KeptDay"/>.</summary>
+    public Dictionary<string, int> KeptToday { get; set; } = new();
+
+    /// <summary>The market day <see cref="KeptToday"/> counts.</summary>
+    public int KeptDay { get; set; } = -1;
+
+    /// <summary>How many of a species were kept today.</summary>
+    public int KeptTodayOf(string species) => KeptDay == Market.Day ? KeptToday.GetValueOrDefault(species) : 0;
+
+    /// <summary>The daily bag limit for this species is reached.</summary>
+    public bool OverBagLimit(string species) => !Core.Methods.BagLimits.MayKeep(species, KeptTodayOf(species));
+
+    public string? Keep(FishSpecies species, float weight, float condition = 1f)
     {
+        if (OverBagLimit(species.SpeciesName))
+            return $"Limit dzienny: {species.SpeciesName} - wolno zatrzymać {Core.Methods.BagLimits.LimitOf(species.SpeciesName)} szt. na dzień. Wypuść ją.";
         if (!KeepnetFits(weight))
             return KeepnetLimit is { } net && Keepnet.Count >= net.MaxFish
                 ? "Siatka pełna: wypuść rybę albo sprzedaj połów"
                 : "Ryba nie zmieści się w siatce: jest za ciężka na tę siatkę";
-        Keepnet.Add(new CatchRecord(species.SpeciesName, weight, Progression.FishValue(species, weight), 1f, weight < species.LegalWeight));
+        Keepnet.Add(new CatchRecord(species.SpeciesName, weight, Progression.FishValue(species, weight), Math.Clamp(condition, 0f, 1f), weight < species.LegalWeight));
+        if (KeptDay != Market.Day)
+        {
+            KeptDay = Market.Day;
+            KeptToday.Clear();
+        }
+        KeptToday[species.SpeciesName] = KeptToday.GetValueOrDefault(species.SpeciesName) + 1;
         Changed?.Invoke();
         return null;
     }

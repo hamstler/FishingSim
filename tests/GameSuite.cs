@@ -8,6 +8,7 @@ using FishingSim.Accounts;
 using FishingSim.Core;
 using FishingSim.Data;
 using FishingSim.Fishing;
+using FishingSim.Core.Methods;
 using FishingSim.Progress;
 using FishingSim.UI;
 using FishingSim.World;
@@ -87,6 +88,204 @@ public sealed class GameSuite : ITestSuite
         return main;
     }
 
+    /// <summary>Spinning (a lure led, twitched, struck) and bottom fishing (feeder, groundbait, the rod rest).</summary>
+    private static async Task SpinningAndBottom(TestContext t, Main main)
+    {
+        t.Section("spinning and bottom fishing");
+        var rod = main.Rod;
+        var loadout = rod.Loadout;
+        var profile = rod.Profile;
+        int RodIndex(string id) => loadout.Items(TackleSlot.Rod).ToList().FindIndex(i => i.ItemId == id);
+        int BaitIndex(string id) => loadout.Items(TackleSlot.Bait).ToList().FindIndex(i => i.ItemId == id);
+        int rodBefore = loadout.Index[(int)TackleSlot.Rod], baitBefore = loadout.Index[(int)TackleSlot.Bait];
+        profile.Owned["rod"].Add("cisowy_spinning");
+        profile.Owned["rod"].Add("grabowy_gruntowy");
+        loadout.BaitCounts["blystka_obrotowa"] = 1;
+        loadout.Index[(int)TackleSlot.Rod] = RodIndex("cisowy_spinning");
+        loadout.Index[(int)TackleSlot.Bait] = BaitIndex("blystka_obrotowa");
+        rod.ApplyTackle();
+        rod.DevInstantBite = false;
+        rod.DevSpeciesIndex = -1;
+        t.Check(rod.Method == FishingSim.Core.Methods.FishingMethod.Spinning && loadout.Ready, "a lure on a spinning rod fishes by spinning");
+        rod.CastNow(0.9f);
+        await WaitForState(t, rod, RodState.Waiting, 6);
+        t.Check(rod.State == RodState.Waiting && rod.Lure != null && rod.CastMethod == FishingSim.Core.Methods.FishingMethod.Spinning,
+            $"the spinner lands ({rod.State})");
+        await t.Seconds(1.2);
+        float sank = rod.Lure?.Depth ?? 0f;
+        t.Check(sank > 0.25f && rod.Bobber.GlobalPosition.Y < -0.2f, $"left alone it sinks ({sank:0.00} m, y {rod.Bobber.GlobalPosition.Y:0.00})");
+        float outBefore = rod.LineOut, slackBefore = rod.Slack;
+        t.Check(slackBefore > 0.1f, $"the cast leaves some slack on the water ({slackBefore:0.0} m)");
+        rod.ReelOverride = true;
+        await t.Seconds(1.5);
+        var lure = rod.Lure;
+        t.Check(lure != null && rod.Slack < 0.1f && rod.LineOut < outBefore - 0.2f && lure.Speed > 0f && rod.Reeling,
+            $"reeling takes up the slack, then draws the lure in ({outBefore:0.0} -> {rod.LineOut:0.0} m, slack {rod.Slack:0.0} m, {lure?.Judgement.Title()})");
+        var ropePts = rod.Rope.Positions.ToArray();
+        t.Check(ropePts.Length == FishingSim.Core.Physics.LineRope.Points && ropePts[0].DistanceTo(main.Player.RodTip.GlobalPosition) < 0.05f
+                && ropePts[^1].DistanceTo(rod.Bobber.GlobalPosition) < 0.05f, "the line runs from the rod tip to the lure");
+        rod.ReelOverride = false;
+        await t.NextFrame();
+        float beforeTwitch = rod.LineOut;
+        rod.TryHook();
+        // physics_frame is emitted before the nodes' physics step: wait for two, so one step has run.
+        await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+        await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+        t.Check(rod.State == RodState.Waiting && rod.LineOut < beforeTwitch - 0.05f, $"RMB twitches the lure: it darts towards the angler ({beforeTwitch:0.00} -> {rod.LineOut:0.00} m, {rod.Lure?.Judgement.Title()}, banner {rod.BannerText}, depth {rod.Lure?.Depth:0.00})");
+        rod.ResetToIdle();
+        t.Check(rod.Lure == null && rod.State == RodState.Idle, "reset takes the lure out");
+
+        int pikeIndex = rod.Species.ToList().FindIndex(sp => sp.SpeciesName == "Szczupak");
+        rod.DevInstantBite = true;
+        rod.DevSpeciesIndex = pikeIndex;
+        rod.CastNow(0.9f);
+        await WaitForState(t, rod, RodState.Waiting, 6);
+        rod.ReelOverride = true;
+        double waited = 0;
+        while (rod.State == RodState.Waiting && waited < 8)
+        {
+            await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+            waited += 1.0 / Engine.PhysicsTicksPerSecond;
+        }
+        t.Check(rod.State is RodState.Nibble or RodState.Bite or RodState.Fight, $"a pike hits the lure being reeled ({rod.State})");
+        if (rod.State is RodState.Nibble or RodState.Bite)
+            rod.TryHook();
+        t.Check(rod.State == RodState.Fight && !rod.Bobber.TerminalVisible, $"struck (or hooked by itself) it fights, the lure in its mouth ({rod.State})");
+        rod.PredatorTakes();
+        t.Check(rod.State == RodState.Fight && rod.PreyTakenBy != null && rod.PreyTakenBy != "Szczupak"
+                && rod.CurrentSpecies?.SpeciesName == rod.PreyTakenBy && Core.Methods.PreyAttack.IsPrey("Płoć", 0.1f),
+            $"a predator can grab the fish on the line and the fight goes on with it ({rod.PreyTakenBy})");
+        rod.ReelOverride = false;
+        rod.ResetToIdle();
+
+        // The float's depth setting.
+        loadout.Index[(int)TackleSlot.Rod] = rodBefore;
+        loadout.Index[(int)TackleSlot.Bait] = BaitIndex("worm");
+        loadout.BaitCounts["worm"] = 10;
+        rod.ApplyTackle();
+        rod.ResetToIdle();
+        rod._UnhandledInput(Key(Godot.Key.Bracketright));
+        float setDepth = rod.FloatDepth;
+        rod.SetFloatDepth(0.3f);
+        float bleakHigh = rod.BiteChances(3f).First(c => c.Species.SpeciesName == "Leszcz").Weight;
+        rod.SetFloatDepth(3f);
+        float breamDeep = rod.BiteChances(3f).First(c => c.Species.SpeciesName == "Leszcz").Weight;
+        t.Check(MathF.Abs(setDepth - 1.3f) < 0.01f && breamDeep > bleakHigh * 3f,
+            $"] sets the float deeper ({setDepth:0.0} m); bream want the bait on the bottom ({bleakHigh:0.000} -> {breamDeep:0.000})");
+        rod.SetFloatDepth(6f);
+        rod.DevInstantBite = false;
+        rod.CastNow(0.5f);
+        await WaitForState(t, rod, RodState.Waiting, 6);
+        await t.Seconds(0.5);
+        t.Check(rod.OverDepth && rod.Bobber.Tilt > 0.9f, $"set deeper than the water ({rod.CurrentDepth():0.0} m) the float lies flat");
+        t.Check(rod.Bobber.ShowHook && MathF.Abs(rod.Bobber.HangDepth - (rod.CurrentDepth() - 0.02f)) < 0.05f,
+            $"the baited hook lies on the bottom under it ({rod.Bobber.HangDepth:0.0} m down)");
+        rod._UnhandledInput(Key(Godot.Key.Bracketleft));
+        t.Check(MathF.Abs(rod.FloatDepth - 6f) < 0.01f, "the depth cannot be changed with the line out");
+        t.Check(rod.BaitOnHook && rod.BaitFreshness > 0.95f, "a fresh worm goes on with the cast");
+        rod.AgeBait(600f);
+        t.Check(rod.BaitOnHook && rod.BaitFreshness == 0f, "a worm left ten minutes is spent but stays on");
+        int wormsLeft = loadout.BaitCount;
+        t.Check(!rod.LooseFeed() && loadout.BaitCount == wormsLeft, "worms are not thrown in by hand");
+        loadout.Index[(int)TackleSlot.Bait] = BaitIndex("maggot");
+        loadout.BaitCounts["maggot"] = 20;
+        float heatBefore = rod.GroundbaitHeat;
+        t.Check(rod.LooseFeed() && rod.LooseFeed() && loadout.BaitCounts["maggot"] == 20 - 2 * FishingRod.LooseFeedPieces
+                && rod.GroundbaitHeat > heatBefore + 0.5f, $"G throws handfuls of maggots round the float (heat {heatBefore:0.0} -> {rod.GroundbaitHeat:0.0})");
+        loadout.Index[(int)TackleSlot.Bait] = BaitIndex("worm");
+        rod.Groundbait.Clear();
+        rod.ResetToIdle();
+        rod.SetFloatDepth(1.2f);
+
+        // A float: LMB draws it over the water all the way in until it comes out of the water.
+        loadout.Index[(int)TackleSlot.Rod] = rodBefore;
+        loadout.Index[(int)TackleSlot.Bait] = BaitIndex("worm");
+        loadout.BaitCounts["worm"] = 10;
+        rod.ApplyTackle();
+        rod.DevInstantBite = false;
+        rod.DevSpeciesIndex = -1;
+        rod.CastNow(0.5f);
+        await WaitForState(t, rod, RodState.Waiting, 6);
+        float floatOut = rod.LineOut;
+        rod.ReelOverride = true;
+        rod.FastReelOverride = true;
+        waited = 0;
+        while (rod.State == RodState.Waiting && waited < 60)
+        {
+            await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+            waited += 1.0 / Engine.PhysicsTicksPerSecond;
+        }
+        rod.ReelOverride = false;
+        rod.FastReelOverride = false;
+        t.Check(rod.State == RodState.Idle && rod.BannerText.Contains("wyjęty"),
+            $"LMB draws the float in from {floatOut:0} m until it comes out of the water ({rod.State}, {waited:0} s)");
+
+        // Bottom: the feeder, the baited spot, the rod rest.
+        loadout.BaitCounts["worm"] = 10;
+        loadout.Index[(int)TackleSlot.Rod] = RodIndex("grabowy_gruntowy");
+        loadout.Index[(int)TackleSlot.Bait] = BaitIndex("worm");
+        rod.ApplyTackle();
+        t.Check(rod.Method == FishingSim.Core.Methods.FishingMethod.Bottom, "bait on a bottom rod lies on the bottom");
+        rod.DevSpeciesIndex = -1;
+        rod.DevInstantBite = true;
+        rod.Groundbait.Clear();
+        int worms = loadout.BaitCount;
+        rod.CastNow(0.8f);
+        await WaitForState(t, rod, RodState.Waiting, 6);
+        t.Check(rod.State == RodState.Waiting && rod.FeederLoaded && loadout.BaitCount == worms - 1,
+            $"the feeder takes one worm as groundbait ({worms} -> {loadout.BaitCount})");
+        bool rested = rod.PutOnRest();
+        t.Check(rested && rod.OnRest && main.Player.Rig.GetParent() is RodRest && rod.NearRest,
+            $"Z lays the rod on a rest in front of the angler ({rod.BannerText})");
+        rod.ReelOverride = true;
+        await t.NextFrame();
+        await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+        t.Check(!rod.Reeling, "a rod on its rest is not reeled");
+        rod.ReelOverride = false;
+        waited = 0;
+        while (!rod.RigSettled && waited < 8)
+        {
+            await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+            waited += 1.0 / Engine.PhysicsTicksPerSecond;
+        }
+        t.Check(rod.RigSettled && rod.Bobber.GlobalPosition.Y < -0.3f && rod.GroundbaitHeat > 0.5f,
+            $"the feeder sinks to the bottom (y {rod.Bobber.GlobalPosition.Y:0.0}) and baits the spot ({rod.GroundbaitHeat:0.00})");
+        await WaitForState(t, rod, RodState.Bite, 10);
+        t.Check(rod.State == RodState.Bite && rod.OnRest, $"a bite shows on the rod lying on its rest ({rod.State})");
+        rod.TryHook();
+        t.Check(rod.State == RodState.Fight && !rod.OnRest && main.Player.Rig.GetParent() == main.Player.Camera,
+            "RMB from close by picks the rod up and strikes");
+        rod.ResetToIdle();
+        // The feeder dragged over the bottom all the way out.
+        rod.DevInstantBite = false;
+        rod.CastNow(0.4f);
+        await WaitForState(t, rod, RodState.Waiting, 6);
+        waited = 0;
+        while (!rod.RigSettled && waited < 8)
+        {
+            await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+            waited += 1.0 / Engine.PhysicsTicksPerSecond;
+        }
+        rod.ReelOverride = true;
+        rod.FastReelOverride = true;
+        waited = 0;
+        // A fish may take the dragged bait on the way: the missed bite passes and the drag goes on.
+        while (rod.State is RodState.Waiting or RodState.Nibble or RodState.Bite && waited < 90)
+        {
+            await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+            waited += 1.0 / Engine.PhysicsTicksPerSecond;
+        }
+        rod.ReelOverride = false;
+        rod.FastReelOverride = false;
+        t.Check(rod.State == RodState.Idle && rod.BannerText.Contains("wyjęty"), $"LMB drags the feeder over the bottom until it is out ({rod.State}, {waited:0} s)");
+        rod.ResetToIdle();
+        rod.DevInstantBite = false;
+        rod.DevSpeciesIndex = -1;
+        loadout.Index[(int)TackleSlot.Rod] = rodBefore;
+        loadout.Index[(int)TackleSlot.Bait] = baitBefore;
+        rod.ApplyTackle();
+    }
+
     private static async Task WaitForState(TestContext t, FishingRod rod, RodState wanted, double maxSeconds = 25)
     {
         double elapsed = 0;
@@ -129,6 +328,185 @@ public sealed class GameSuite : ITestSuite
                 && MathF.Abs(Minimap.ToMap(mc + new Vector2(Minimap.ViewMetres / 2f, 0f), mc).X - Minimap.MapDiameter) < 0.01f,
             $"the minimap is centred on the angler and shows {Minimap.ViewMetres:0} m across");
 
+        t.Check(main.Scenery.WeedBeds.Count > 5 && ReferenceEquals(rod.WeedBeds, main.Scenery.WeedBeds)
+                && main.Scenery.WeedBeds.Any(b => rod.StructureAt(b.X, b.Z).Cover == 1f),
+            $"the lake's plant beds are known to the rod ({main.Scenery.WeedBeds.Count})");
+        t.Check(main.Scenery.SunkenWood.Count > 3 && ReferenceEquals(rod.SunkenWood, main.Scenery.SunkenWood)
+                && main.Scenery.SunkenWood.All(w => rod.Lake.DepthAt(w.X, w.Z) > 0.3f),
+            $"trees lie sunk off the wooded banks, in the water ({main.Scenery.SunkenWood.Count})");
+
+        t.Section("collisions on the map");
+        var space = main.Player.GetWorld3D().DirectSpaceState;
+        int solidCount = main.Scenery.Solids.Count;
+        t.Check(solidCount > 200, $"tree trunks, boulders, fires and props are solid ({solidCount} shapes)");
+        // A capsule as big as the angler, standing where something solid is, must touch it.
+        var probe = new CapsuleShape3D { Radius = 0.3f, Height = 1.8f };
+        bool Blocked(Vector3 foot)
+        {
+            var q = new PhysicsShapeQueryParameters3D { Shape = probe, CollisionMask = 1, Transform = new Transform3D(Basis.Identity, foot + new Vector3(0f, 1.0f, 0f)) };
+            foreach (var hit in space.IntersectShape(q, 8))
+                if (hit["collider"].AsGodotObject() == main.Scenery.Solids)
+                    return true;
+            return false;
+        }
+        var shapes = main.Scenery.Solids.GetChildren().OfType<CollisionShape3D>().ToList();
+        var trunk = shapes.First(c => c.Shape is CylinderShape3D cy && cy.Height >= 3f);
+        var trunkFoot = trunk.Position - new Vector3(0f, 1.5f, 0f) + new Vector3(0f, 0.3f, 0f);
+        t.Check(Blocked(trunkFoot), $"the angler cannot stand inside a tree trunk ({trunkFoot})");
+        t.Check(Blocked(main.Scenery.Campfires[0].GlobalPosition), "nor in a campfire");
+        // Sitting villagers touch their logs: the log's top lies just above their seat.
+        foreach (var npc in main.Scenery.FindChildren("*", "Node3D", true, false).OfType<Npc>())
+        {
+            var parent = npc.GetParent();
+            var hipsAt = npc.Position + npc.Basis * new Vector3(0f, 0f, -npc.Seat.Back);
+            // The log the villager sits on: the one nearest the hips.
+            var log = parent?.GetChildren().OfType<Node3D>().Where(c => c.Name.ToString().Contains("SeatLog"))
+                .OrderBy(c => new Vector2(c.Position.X - hipsAt.X, c.Position.Z - hipsAt.Z).Length()).FirstOrDefault();
+            if (log == null || npc.Seat.Height <= 0f)
+                continue;
+            var mesh = log.GetChildren().OfType<MeshInstance3D>().First().Mesh.GetAabb();
+            float top = log.Position.Y + mesh.End.Y * log.Scale.Y;
+            float gap = top - npc.Seat.Height;
+            var hips = log.Transform.AffineInverse() * (npc.Position + npc.Basis * new Vector3(0f, 0f, -npc.Seat.Back));
+            t.Check(gap > 0f && gap < 0.05f && MathF.Abs(hips.Z) < 0.05f && MathF.Abs(hips.X) < mesh.Size.X / 2f,
+                $"{npc.Name} sits on the log, not above it (log top {top:0.000} m, seat {npc.Seat.Height:0.000} m, hips {hips.Z:0.00} m off its axis)");
+        }
+        t.Check(main.Scenery.Anglers.Count >= 2 && ReferenceEquals(rod.OtherAnglers, main.Scenery.Anglers)
+                && main.Scenery.Anglers.All(a => rod.Lake.DepthAt(a.Seat.X, a.Seat.Z) <= 0f && rod.Lake.DepthAt(a.Float.X, a.Float.Z) > 0.5f),
+            $"local anglers sit on the bank with their floats in the water ({main.Scenery.Anglers.Count})");
+        var theirs = main.Scenery.Anglers[0].Float;
+        float loadBefore = rod.Swim.Load(theirs.X, theirs.Z, profile.Clock);
+        int landedByThem = 0;
+        Action<int> counter = _ => landedByThem++;
+        main.Scenery.AnglerCaught += counter;
+        for (int i = 0; i < 6; i++)
+            rod.World.Advance(1f);
+        main.Scenery.AnglerCaught -= counter;
+        t.Check(rod.Swim.Load(theirs.X, theirs.Z, profile.Clock) > loadBefore && landedByThem >= 6,
+            $"they catch fish ({landedByThem} in 6 h): their swim gets fished");
+
+        rod.World.Hour = 23f;
+        rod._Process(0.016);
+        float darkTip = rod.Bobber.TipGlow;
+        var glowStick = rod.Gear!.Items(GearSlot.Accessory).First(i => i.ItemId == "swietlik");
+        profile.Money += 100;
+        t.Check(rod.Gear.Buy(GearSlot.Accessory, glowStick) == null, "a glow tip can be bought");
+        rod._Process(0.016);
+        t.Check(darkTip < 0.1f && rod.Bobber.TipGlow > 3f, $"at night the float's tip shows only with a glow tip ({darkTip:0.00} -> {rod.Bobber.TipGlow:0.0})");
+        rod.World.Hour = 12f;
+        rod._Process(0.016);
+
+        t.Section("line twist");
+        string lineId = rod.Loadout.Line.ItemId;
+        profile.LineTwist[lineId] = LineTwist.Max;
+        bool tangled = false;
+        for (int i = 0; i < 12 && !tangled; i++)
+        {
+            rod.ResetToIdle();
+            rod.CastNow(0.8f);
+            tangled = rod.LastCastTangled;
+        }
+        t.Check(tangled && profile.LineTwist.GetValueOrDefault(lineId) <= LineTwist.Max * 0.5f + 0.01f,
+            "a badly twisted line ends a cast in a bird's nest, cut out with half the twist");
+        profile.LineTwist.Remove(lineId);
+        rod.ResetToIdle();
+        rod.CastNow(0.8f);
+        t.Check(!rod.LastCastTangled, "an untwisted line casts cleanly");
+        rod.ResetToIdle();
+
+        t.Section("rising fish");
+        int risen = 0;
+        for (int i = 0; i < 40; i++)
+            if (main.Rises.Spawn())
+                risen++;
+        t.Check(risen > 0 && main.Rises.Count >= risen, $"surface feeders leave rings on the water ({risen} of 40 tries)");
+        var spot = new Vector2(3f, 20f);
+        float bleakBefore = rod.BiteChances(2f, spot).FirstOrDefault(c => c.Species.SpeciesName == "Ukleja").Weight;
+        rod.NoteRise("Ukleja", spot.X, spot.Y);
+        float bleakAfter = rod.BiteChances(2f, spot).FirstOrDefault(c => c.Species.SpeciesName == "Ukleja").Weight;
+        t.Check(bleakBefore <= 0f || bleakAfter > bleakBefore * 1.8f, $"a bait at a fresh bleak rise tempts bleak ({bleakBefore:0.000} -> {bleakAfter:0.000})");
+
+        t.Section("three rods");
+        var rods = main.Rods;
+        var tools = main.Tools;
+        rod.ResetToIdle();
+        rod.DevSpeciesIndex = -1;
+        int Ix(TackleLoadout lo, TackleSlot slot, string id) => lo.Items(slot).ToList().FindIndex(i => i.ItemId == id);
+        foreach (var (kind, id) in new[] { ("rod", "teleskop"), ("rod", "karpiowka"), ("reel", "mlynek3000"), ("reel", "freerunner") })
+            if (!profile.Owned[kind].Contains(id))
+                profile.Owned[kind].Add(id);
+        profile.BaitCounts["worm"] = 40;
+        var rod2 = rods.Get(1);
+        var rod3 = rods.Get(2);
+        rod2.Loadout.Index[(int)TackleSlot.Rod] = Ix(rod2.Loadout, TackleSlot.Rod, loadout.Rod.ItemId);
+        rod2.Loadout.SyncToProfile();
+        t.Check(!rod2.Loadout.Ready && !rods.Active.Equals(rod2), "a second rod needs a rod and a reel of its own (not the first rod's)");
+        rod2.Loadout.Index[(int)TackleSlot.Rod] = Ix(rod2.Loadout, TackleSlot.Rod, "teleskop");
+        rod2.Loadout.Index[(int)TackleSlot.Reel] = Ix(rod2.Loadout, TackleSlot.Reel, "mlynek3000");
+        rod2.Loadout.Index[(int)TackleSlot.Bait] = Ix(rod2.Loadout, TackleSlot.Bait, "worm");
+        rod2.Loadout.SyncToProfile();
+        rod2.ApplyTackle();
+        rod3.Loadout.Index[(int)TackleSlot.Rod] = Ix(rod3.Loadout, TackleSlot.Rod, "karpiowka");
+        rod3.Loadout.Index[(int)TackleSlot.Reel] = Ix(rod3.Loadout, TackleSlot.Reel, "freerunner");
+        rod3.Loadout.Index[(int)TackleSlot.Bait] = Ix(rod3.Loadout, TackleSlot.Bait, "worm");
+        rod3.Loadout.SyncToProfile();
+        rod3.ApplyTackle();
+        var saved3 = ProfileSerializer.FromJson(ProfileSerializer.ToJson(profile).ToJsonString());
+        t.Check(rod2.Loadout.Ready && rod3.Loadout.Ready && saved3.EquippedFor(1).GetValueOrDefault("rod") == "teleskop"
+                && saved3.EquippedFor(2).GetValueOrDefault("reel") == "freerunner",
+            "rods 2 and 3 get their own rod and reel, and the profile keeps them");
+        loadout.Index[(int)TackleSlot.Bait] = Ix(loadout, TackleSlot.Bait, "worm");
+        rod.ApplyTackle();
+        rod.DevInstantBite = true;
+        rod.CastNow(0.5f);
+        await WaitForState(t, rod, RodState.Waiting, 6);
+        t.Check(tools.SelectRod(1) && rod.OnRest && RodSet.InWater(rod) && rods.Active == rod2 && rod2.InHands && FishingRod.ActiveRod == rod2
+                && main.Player.Rig == rod2.Rig && rod2.Rig.Visible,
+            "key 2: the first rod goes onto a rest with its float in the water, the second comes into the hands");
+        rod2.CastNow(0.5f);
+        await WaitForState(t, rod2, RodState.Waiting, 6);
+        t.Check(tools.SelectRod(2) && rod2.OnRest && rods.Active == rod3, "key 3: the second rod onto its rest, the third in hand");
+        rod3.CastNow(0.5f);
+        await WaitForState(t, rod3, RodState.Waiting, 6);
+        t.Check(rods.InWaterCount() == 3 && rod.RestPosition?.DistanceTo(rod2.RestPosition ?? Vector3.Zero) > 0.5f,
+            $"three rods fish at once, their rests side by side ({rods.InWaterCount()} in the water)");
+        // A rod on its rest is solid: an angler-sized capsule cannot stand where it lies.
+        var restSolid = rod.RestPosition!.Value;
+        var restBody = main.Player.GetWorld3D().DirectSpaceState;
+        var restProbe = new PhysicsShapeQueryParameters3D
+        {
+            Shape = new CapsuleShape3D { Radius = 0.2f, Height = 1.6f }, CollisionMask = 1,
+            Transform = new Transform3D(Basis.Identity, restSolid + new Vector3(0f, 0.95f, 0f)),
+        };
+        bool hitsRod = restBody.IntersectShape(restProbe, 8).Any(h => h["collider"].AsGodotObject() is Node n && n.Name.ToString() == "RodSolid");
+        t.Check(hitsRod, "a rod lying on its rest is solid");
+        double bitWait = 0;
+        while (rod.State == RodState.Waiting && bitWait < 12)
+        {
+            await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+            bitWait += 1.0 / Engine.PhysicsTicksPerSecond;
+        }
+        t.Check(rod.State is RodState.Nibble or RodState.Bite, $"a rod on its rest gets bites while another is in hand ({rod.State})");
+        rod.DevInstantBite = false;
+        t.Check(tools.SelectRod(0) && rods.Active == rod && !rod.OnRest && rod3.OnRest, "key 1: back to the first rod (the third goes onto its rest)");
+        rod.ResetToIdle();
+        t.Check(tools.SelectRod(0) && tools.Current == HandTool.None && !rod.Rig.Visible, "pressing the key of the idle rod in hand puts it into the backpack");
+        t.Check(tools.SelectRod(0) && tools.Current == HandTool.Rod && rod.Rig.Visible, "and again takes it out");
+        rods.ResetAll();
+        t.Check(rods.InWaterCount() == 0 && rods.Active == rod && !rod2.Rig.Visible && !rod3.Rig.Visible, "a reset puts every rod back (the first in hand)");
+
+        t.Section("hook point");
+        string hookId = rod.Loadout.Hook.ItemId;
+        profile.AddHookDull(hookId, 0.4f);
+        rod.ResetToIdle();
+        bool hadHone = rod.Gear!.Has(AccessoryKind.HookHone);
+        t.Check(hadHone || !rod.SharpenHook(), "no sharpening without a hone");
+        var hone = rod.Gear.Items(GearSlot.Accessory).First(i => i.ItemId == "oselka");
+        profile.Money += 100;
+        if (!hadHone)
+            rod.Gear.Buy(GearSlot.Accessory, hone);
+        t.Check(rod.HookDullNow > 0.3f && rod.SharpenHook() && rod.HookDullNow == 0f, "K with a hone sharpens a blunt hook");
+
         t.Section("pause menu");
         pause.Open();
         t.Check(t.Host.GetTree().Paused && rod.InputBlocked && pause.Visible, "Esc menu pauses the game and blocks fishing");
@@ -151,17 +529,19 @@ public sealed class GameSuite : ITestSuite
         t.Check(MathF.Abs(back.X - 12.5f) < 0.01f && MathF.Abs(back.Y + 40f) < 0.01f, "map: world -> pixel -> world round trip");
         t.Check(ui.MapArea.HasPoint(Vector2.Zero) && ui.MapArea.HasPoint(new Vector2(0, 6)), "map frames the pier");
 
-        t.Section("gear keys");
-        loadout.Index[(int)TackleSlot.Rod] = 0;
-        profile.Owned["rod"].Add("teleskop");
-        rod._UnhandledInput(Key(Godot.Key.Key1));
-        t.Check(loadout.Rod.ItemId == "teleskop", "key 1 cycles to the next owned rod");
-        rod._UnhandledInput(Key(Godot.Key.Key1, shift: true));
-        t.Check(loadout.Rod.ItemId == "junior", "Shift+1 goes back");
-        rod.CastNow(0.4f);
-        rod._UnhandledInput(Key(Godot.Key.Key1));
-        t.Check(loadout.Rod.ItemId == "junior", "gear cannot change while a line is out");
-        rod.ResetToIdle();
+        // Hovering the water lists the fish; the long readout must not stretch the page or the map.
+        ui.Open(1);
+        for (int i = 0; i < 3; i++)
+            await t.NextFrame();
+        var mapSize = ui.MapShownSize;
+        var pageSize = ui.GetChildren().OfType<Control>().Where(c => c.Visible).Select(c => c.Size).FirstOrDefault();
+        ui.HoverMap(ui.WorldToPixel(0f, LakeBed.PierEndZ - 6f, Vector2.One));
+        for (int i = 0; i < 3; i++)
+            await t.NextFrame();
+        var pageAfter = ui.GetChildren().OfType<Control>().Where(c => c.Visible).Select(c => c.Size).FirstOrDefault();
+        t.Check(ui.MapInfoText.Contains("Na obecny zestaw") && mapSize.Y > 100f && ui.MapShownSize == mapSize && pageAfter == pageSize,
+            $"map: hovering the water lists the fish without resizing the map ({mapSize} -> {ui.MapShownSize}, page {pageSize} -> {pageAfter})");
+        ui.Close();
 
         t.Section("bite chances in the game");
         var live = Array.FindIndex(loadout.Items(TackleSlot.Bait).ToArray(), i => i.ItemId == "livebait");
@@ -212,7 +592,22 @@ public sealed class GameSuite : ITestSuite
         await WaitForState(t, rod, RodState.Nibble, 6);
         t.Check(rod.State == RodState.Nibble, "a nibble follows");
         await WaitForState(t, rod, RodState.Bite, 6);
-        t.Check(rod.State == RodState.Bite, "then the real bite");
+        t.Check(rod.State == RodState.Bite && rod.StateName == "Czekanie na branie", "then the real bite (the HUD does not give it away)");
+        if (!rod.StrikeReady)
+        {
+            rod.TryHook();
+            t.Check(rod.State == RodState.Waiting && rod.BannerText.Contains("Za wcześnie"), "striking before the float is right under is too early");
+            if (!rod.BaitOnHook)
+            {
+                // The fish took the bait: a bare hook catches nothing, so cast again with a new one.
+                rod.ResetToIdle();
+                rod.CastNow(0.4f);
+            }
+            await WaitForState(t, rod, RodState.Bite, 12);
+        }
+        for (int i = 0; i < 240 && rod.State == RodState.Bite && !rod.StrikeReady; i++)
+            await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+        t.Check(rod.StrikeReady, $"the float goes right under (submerged {rod.Bobber.Submerged:0.00})");
         int baitBefore = loadout.BaitCount;
         ui.Open(1);
         rod._UnhandledInput(Key(Godot.Key.Space));
@@ -270,6 +665,8 @@ public sealed class GameSuite : ITestSuite
         shop.Toggle();
         t.Check(!shop.Visible && !rod.InputBlocked, "closing the shop re-enables input");
 
+        await SpinningAndBottom(t, main);
+
         t.Section("broken gear and the free kit");
         rod.DevUnbreakable = false;
         string inHand = loadout.Rod.ItemId;
@@ -293,7 +690,7 @@ public sealed class GameSuite : ITestSuite
 
         t.Section("camp life: shovel, insect net, campfire");
         rod.ResetToIdle();
-        var tools = main.Tools;
+        tools = main.Tools;
         t.Check(!tools.Select(HandTool.Shovel) && tools.Current == HandTool.Rod, "without a shovel there is nothing to switch to");
         profile.Money = 1000;
         foreach (var id in new[] { "lopata", "siatka_na_owady", "garnek" })

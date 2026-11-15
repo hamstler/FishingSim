@@ -227,7 +227,7 @@ public partial class SkyController : Node
         _sun.Visible = el > -0.12f;
 
         _moon.RotationDegrees = new Vector3(elDeg, 150f, 0f);
-        _moon.LightEnergy = 0.25f * Math.Clamp(-el * 2.5f, 0f, 1f) * (1f - _cloud * 0.6f);
+        _moon.LightEnergy = 0.25f * (0.2f + 0.8f * Core.Methods.Moon.Illumination(World.MoonPhase)) * Math.Clamp(-el * 2.5f, 0f, 1f) * (1f - _cloud * 0.6f);
 
         if (Bed != null)
             Bed.Daylight = day * (1f - _cloud * 0.85f);

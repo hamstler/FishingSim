@@ -12,3 +12,5 @@ Stretch = 0.05
 Price = 70
 RequiredLevel = 2
 Description = "Tania i mocna, ale gruba i dobrze widoczna."
+Diameter = 0.4
+LineColor = Color(0.6, 0.58, 0.4, 1)

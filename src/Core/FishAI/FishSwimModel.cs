@@ -150,6 +150,17 @@ public sealed class FishSwimModel
     /// </summary>
     private readonly Dictionary<int, List<FishAgent>> _bySchool = new();
 
+    /// <summary>A splash or a thrashing fish at a point: the fish within the radius take fright (the nearer, the longer).</summary>
+    public void Scare(Vector2 at, float radius, float seconds)
+    {
+        foreach (var a in _agents)
+        {
+            float d = Vector2.Distance(a.Position, at);
+            if (!a.Hooked && d < radius)
+                a.Fear = MathF.Max(a.Fear, 0.5f + seconds * (1f - d / radius));
+        }
+    }
+
     public void Step(float dt, Vector2 threat, float threatSpeed)
     {
         if (dt <= 0f)

@@ -160,6 +160,10 @@ public partial class FishPopulation : Node3D
         _model.Interest = interest == null ? null : a => SpeciesOf(a) is FishSpecies sp ? interest(sp) : 0f;
     }
 
+    /// <summary>A splash at a point: the fish you can see near it dart away.</summary>
+    public void Scare(Vector3 at, float radius, float seconds) =>
+        _model?.Scare(new System.Numerics.Vector2(at.X, at.Z), radius, seconds);
+
     /// <summary>The fish near the bait that takes it, weighted by how much each species wants this bait; null = none.</summary>
     public FishAgent? PickBiter(Vector3 at, float radius, Func<FishSpecies, float> weight) =>
         _model?.PickNear(new System.Numerics.Vector2(at.X, at.Z), radius, a => SpeciesOf(a) is FishSpecies sp ? weight(sp) : 0f);

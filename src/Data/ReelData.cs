@@ -13,4 +13,10 @@ public partial class ReelData : TackleItem
 
     /// <summary>Metres of line on the spool.</summary>
     [Export] public float LineCapacity { get; set; } = 100f;
+
+    /// <summary>Housing colour of the reel.</summary>
+    [Export] public Color BodyColor { get; set; } = new(0.2f, 0.21f, 0.23f);
+
+    /// <summary>Trim (rotor ring, spool lip, drag knob) colour.</summary>
+    [Export] public Color TrimColor { get; set; } = new(0.62f, 0.52f, 0.3f);
 }

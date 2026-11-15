@@ -15,18 +15,20 @@ public sealed class TackleLoadout
     // The first items of each list keep their places (saves and tests refer to them by index); new ones follow.
     private static readonly string[] RodPaths = Paths("rods",
         "junior", "teleskop", "karpiowka", "wierzbowa_splawikowa", "cisowy_spinning", "grabowy_gruntowy",
-        "trzcinowa_odleglosciowa", "jesionowy_spinning", "sumowy_kij", "wedka_mistrza");
+        "trzcinowa_odleglosciowa", "jesionowy_spinning", "sumowy_kij", "wedka_mistrza",
+        "ostoja_picker", "kaminari_ul_trout", "kaminari_jig", "borealis_heavy_feeder", "ironwood_musky");
     private static readonly string[] ReelPaths = Paths("reels",
-        "mlynek1000", "mlynek3000", "freerunner", "szpula_lipowa", "orzechowy_lekki", "mosiezny_hamulec", "beben_sumowy");
+        "mlynek1000", "mlynek3000", "freerunner", "szpula_lipowa", "orzechowy_lekki", "mosiezny_hamulec", "beben_sumowy",
+        "hokuto_kaiten2500", "fjordline_freespool6000");
     private static readonly string[] LinePaths = Paths("lines",
-        "zylka016", "zylka025", "plecionka030", "jelito_cienkie", "jelito_mocne", "jedwab_skrecany",
-        "plecionka_konopna", "plecionka_jedwabna", "plecionka_smolowana");
+        new[] { "zylka016", "zylka025", "plecionka030", "jelito_cienkie", "jelito_mocne", "jedwab_skrecany",
+            "plecionka_konopna", "plecionka_jedwabna", "plecionka_smolowana" }.Concat(GeneratedTackle.Lines).ToArray());
     private static readonly string[] HookPaths = Paths("hooks", "hak2", "hak5", "hak8", "hak1", "hak3", "hak6", "hak10");
     private static readonly string[] BaitPaths = Paths("baits",
-        "worm", "corn", "bread", "boilie", "livebait", "maggot", "insect",
-        "rosowka", "ochotka", "chrabaszcz", "martwa_rybka", "ciasto", "groch", "kasza", "konopie", "kulka_czosnkowa",
-        "kulka_plywajaca", "blystka_obrotowa", "blystka_mosiezna", "rybka_kora", "rybka_drewniana", "piorko_olowiane",
-        "skorka_wegorza", "mucha_kogut", "mucha_zajac", "blystka_srebrna", "jetka", "pedrak");
+        new[] { "worm", "corn", "bread", "boilie", "livebait", "maggot", "insect",
+            "rosowka", "ochotka", "chrabaszcz", "martwa_rybka", "ciasto", "groch", "kasza", "konopie", "kulka_czosnkowa",
+            "kulka_plywajaca", "blystka_obrotowa", "blystka_mosiezna", "rybka_kora", "rybka_drewniana", "piorko_olowiane",
+            "skorka_wegorza", "mucha_kogut", "mucha_zajac", "blystka_srebrna", "jetka", "pedrak" }.Concat(GeneratedTackle.Lures).ToArray());
     private static readonly string[] LeaderPaths = Paths("leaders",
         TackleSlotExtensions.NoLeader, "przypon_wlosie", "przypon_jelito", "przypon_mosiezny", "przypon_stalowy",
         "przypon_jedwab_drut");
@@ -70,14 +72,29 @@ public sealed class TackleLoadout
 
     public TackleItem Selected(TackleSlot slot) => _items[(int)slot][Index[(int)slot]];
 
+    /// <summary>Which rod slot (0..2) this loadout is: slot 0 is the profile's Equipped, 1 and 2 its RodSlots.</summary>
+    public int RodSlot { get; private set; }
+
+    private Dictionary<string, string> EquippedHere => Profile!.EquippedFor(RodSlot);
+
     /// <summary>Links the loadout to a profile: shares its bait stock and restores the equipped items.</summary>
-    public void Attach(Profile profile)
+    public void Attach(Profile profile) => Attach(profile, RodSlot);
+
+    /// <summary>Links the loadout to a profile's rod slot.</summary>
+    public void Attach(Profile profile, int rodSlot)
     {
         Profile = profile;
+        RodSlot = rodSlot;
         BaitCounts = profile.BaitCounts;
+        var equipped = profile.EquippedFor(rodSlot);
+        // A new rod slot starts from the first slot's line, hook, bait and leader (its rod and reel are its own).
+        if (rodSlot > 0 && equipped.Count == 0)
+            foreach (var key in new[] { "line", "hook", "bait", "leader" })
+                if (profile.Equipped.TryGetValue(key, out var id))
+                    equipped[key] = id;
         for (int s = 0; s < TackleSlotExtensions.Count; s++)
         {
-            string wanted = profile.Equipped.GetValueOrDefault(((TackleSlot)s).Key(), "");
+            string wanted = equipped.GetValueOrDefault(((TackleSlot)s).Key(), "");
             var list = _items[s];
             for (int i = 0; i < list.Count; i++)
                 if (list[i].ItemId == wanted)
@@ -92,10 +109,12 @@ public sealed class TackleLoadout
             Attach(Profile);
     }
 
-    /// <summary>Rod, reel, line and hook in use are all owned: the angler can fish.</summary>
+    /// <summary>Rod, reel, line and hook in use are all owned (and the rod and reel are this slot's own): the angler can fish.</summary>
     public bool Ready =>
-        Profile == null || new[] { TackleSlot.Rod, TackleSlot.Reel, TackleSlot.Line, TackleSlot.Hook }
-            .All(s => Profile.Owns(s, Selected(s).ItemId));
+        Profile == null || (new[] { TackleSlot.Rod, TackleSlot.Reel, TackleSlot.Line, TackleSlot.Hook }
+            .All(s => Profile.Owns(s, Selected(s).ItemId))
+            && (RodSlot == 0 || EquippedHere.GetValueOrDefault("rod", "") != "" && EquippedHere.GetValueOrDefault("reel", "") != "")
+            && !Profile.InUseElsewhere(TackleSlot.Rod, Rod.ItemId, RodSlot) && !Profile.InUseElsewhere(TackleSlot.Reel, Reel.ItemId, RodSlot));
 
     /// <summary>The cheapest item of each missing kind the angler may buy at their level (the cost of fishing again).</summary>
     public int CostOfMissing()
@@ -120,7 +139,10 @@ public sealed class TackleLoadout
             // Never mark a destroyed (no longer owned) item as equipped again.
             if ((TackleSlot)s != TackleSlot.Bait && !Profile.Owns((TackleSlot)s, _items[s][Index[s]].ItemId))
                 continue;
-            Profile.Equipped[((TackleSlot)s).Key()] = _items[s][Index[s]].ItemId;
+            // A rod or reel already mounted on another rod is not taken off it.
+            if (Profile.InUseElsewhere((TackleSlot)s, _items[s][Index[s]].ItemId, RodSlot))
+                continue;
+            EquippedHere[((TackleSlot)s).Key()] = _items[s][Index[s]].ItemId;
         }
     }
 
@@ -131,7 +153,7 @@ public sealed class TackleLoadout
         var item = _items[(int)slot][i];
         if (slot == TackleSlot.Bait)
             return BaitCounts.GetValueOrDefault(item.ItemId) > 0 || i == Index[(int)slot];
-        return Profile.Owns(slot, item.ItemId);
+        return Profile.Owns(slot, item.ItemId) && !Profile.InUseElsewhere(slot, item.ItemId, RodSlot);
     }
 
     /// <summary>Moves to the next (or previous) owned item; does nothing when there is no other.</summary>

@@ -273,9 +273,9 @@ public static partial class BuildingFactory
         return mi;
     }
 
-    private static void Collider(Node3D parent, Vector3 size, Vector3 pos)
+    private static void Collider(Node3D parent, Vector3 size, Vector3 pos, Vector3? rotDeg = null)
     {
-        var body = new StaticBody3D { CollisionLayer = 1, Position = pos };
+        var body = new StaticBody3D { CollisionLayer = 1, Position = pos, RotationDegrees = rotDeg ?? Vector3.Zero };
         body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = size } });
         parent.AddChild(body);
     }

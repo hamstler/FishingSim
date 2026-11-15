@@ -53,7 +53,8 @@ public partial class Player : CharacterBody3D
 
     /// <summary>True while a tool is being used: the angler stands still.</summary>
     public bool Busy { get; set; }
-    public RodRig Rig { get; private set; } = null!;
+    /// <summary>The rig of the rod in the hands (the rod set's active one).</summary>
+    public RodRig Rig { get; set; } = null!;
     public Node3D RodTip => Rig.Tip;
 
     public override void _Ready()
@@ -122,12 +123,21 @@ public partial class Player : CharacterBody3D
         var p = Position;
         p.X = Math.Clamp(p.X, -BoundsX, BoundsX);
         p.Z = Math.Clamp(p.Z, BoundsZMin, BoundsZMax);
-        // Deep water is a wall: step back to the last place that was fine (the pier counts as fine).
+        // Deep water and the edge of the map are walls: the angler slides along them (keeping the part of the step
+        // that stays on walkable ground) instead of stopping dead; if neither part does, he stays where he was.
         if (Bed != null && !Bed.IsWalkable(p.X, p.Z))
         {
-            p.X = _lastValid.X;
-            p.Z = _lastValid.Z;
+            if (Bed.IsWalkable(p.X, _lastValid.Z))
+                p.Z = _lastValid.Z;
+            else if (Bed.IsWalkable(_lastValid.X, p.Z))
+                p.X = _lastValid.X;
+            else
+            {
+                p.X = _lastValid.X;
+                p.Z = _lastValid.Z;
+            }
             Velocity = new Vector3(0f, Velocity.Y, 0f);
+            _lastValid = p;
         }
         else
         {

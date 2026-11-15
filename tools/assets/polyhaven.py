@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fetch CC0 textures from Poly Haven (https://polyhaven.com, public domain: free for any use, also commercial).
 
-    python3 -I tools/assets/polyhaven.py [--res 2k] [--disp] [--grey] id [id ...]
+    python3 -I tools/assets/polyhaven.py [--res 4k] [--disp] [--grey] id [id ...]
     python3 -I tools/assets/polyhaven.py --model [--res 1k] id [id ...]
 
 For every id writes assets/textures/<id>/diff.webp (colour), nor.webp (OpenGL normal map), with --disp also
@@ -55,9 +55,9 @@ def fetch(tid, res, disp, grey):
         g = ImageOps.grayscale(diff)
         lo, hi = g.getextrema()
         diff = Image.merge("RGB", (g, g, g))
-    save_webp(diff, os.path.join(out, "diff.webp"), 88)
+    save_webp(diff, os.path.join(out, "diff.webp"), 80)
     nor = Image.open(io.BytesIO(get(files["nor_gl"][res]["jpg"]["url"]))).convert("RGB")
-    save_webp(nor, os.path.join(out, "nor.webp"), 90)
+    save_webp(nor, os.path.join(out, "nor.webp"), 75)
     if disp:
         d = Image.open(io.BytesIO(get(files["Displacement"]["1k"]["jpg"]["url"]))).convert("L")
         save_webp(Image.merge("RGB", (d, d, d)), os.path.join(out, "disp.webp"), 90)
@@ -144,14 +144,14 @@ def write_credits():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("ids", nargs="+")
-    ap.add_argument("--res", default="2k")
+    ap.add_argument("--res", default="4k")
     ap.add_argument("--disp", action="store_true")
     ap.add_argument("--grey", action="store_true")
     ap.add_argument("--model", action="store_true")
     a = ap.parse_args()
     if a.model:
         for mid in a.ids:
-            m = fetch_model(mid, a.res if a.res != "2k" else "1k")
+            m = fetch_model(mid, a.res if a.res != "4k" else "1k")
             print(f"{mid}: {m['name']} {m['size_m']} m, {os.path.getsize(os.path.join(MODELS, mid + '.glb')) / 1e6:.1f} MB", flush=True)
         write_credits()
         return

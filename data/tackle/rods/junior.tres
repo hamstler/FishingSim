@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Leszczynowy kij 2 m"
+DisplayName = "Ostoja Junior · leszczynowy kij 2 m"
 CastMult = 0.75
 MaxLoad = 2.4
 ShockAbsorb = 0.3
@@ -13,3 +13,6 @@ RequiredLevel = 1
 Action = 0.15
 Kind = 0
 Description = "Prosty kij z leszczyny: wygina się sama szczytówka. Na płocie i okonie."
+BlankColor = Color(0.32, 0.2, 0.1, 1)
+WhipColor = Color(0.8, 0.75, 0.6, 1)
+FoamGrip = false

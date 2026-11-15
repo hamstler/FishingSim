@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AccessoryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/AccessoryData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Świetlik na spławik i szczytówkę"
+Kind = 12
+Power = 1.0
+Description = "Zielona świecąca końcówka: po zmroku widać spławik i szczytówkę, bez niej nocą widać je tylko w świetle latarni."
+Price = 25
+RequiredLevel = 1

@@ -6,6 +6,140 @@ Wolna gra na licencji **GNU GPL 3.0 lub nowszej**: możesz ją kopiować, zmieni
 
 **Doba:** dzień (06:00-18:00) trwa 40 minut, noc 20 minut czasu rzeczywistego (`src/Core/DayClock.cs`). W prawym górnym rogu jest minimapa (120 m wokół gracza) i zegar z tarczą dnia i nocy, pogodą i czasem do zmroku lub świtu.
 
+**Metody połowu:** metodę wyznacza zestaw.
+- **Spławik:** przynęta naturalna na wędce spławikowej.
+- **Spinning:** przynęta sztuczna na dowolnej wędce, najlepiej na spinningowej. Na linie wisi wtedy prawdziwa przynęta:
+  obrotówka z wirującym skrzydełkiem, kołysząca się wahadłówka, wobler ze sterem, guma na główce z machającym
+  ogonkiem albo mucha. Każda prowadzi się inaczej:
+  - obrotówka tonie powoli i wypływa przy szybkim zwijaniu;
+  - wahadłówka tonie szybko i chodzi głęboko;
+  - wobler unosi się, gdy stoi, a nurkuje tym głębiej, im szybciej się go zwija;
+  - guma spada prosto na dno i bierze „na opadzie” albo tuż po poderwaniu (metoda stop and go);
+  - mucha płynie po powierzchni.
+
+  LPM zwija (Shift szybciej), puszczona przynęta opada, PPM to podszarpnięcie (przynęta odskakuje i błyska). Pasek stanu
+  pokazuje rodzaj przynęty, jej głębokość nad dnem i ocenę prowadzenia (za wolno, dobre prowadzenie, za szybko, stoi,
+  opada). Od jakości prowadzenia zależy tempo brań. Drapieżnik uderzający w zwijaną przynętę często sam się zacina
+  (szczupak, boleń), a po uderzeniu na zacięcie jest mniej czasu niż przy spławiku. Przynęta wleczona po dnie może
+  złapać zaczep: PPM szarpie (co trzeci raz puszcza, czasem zrywa linkę), LPM ciągnie (po 4 s linka pęka, przynęta
+  przepada).
+- **Grunt:** przynęta naturalna na wędce gruntowej lub karpiowej. Leci koszyczek zanętowy: jeśli przynęty jest więcej
+  niż jedna sztuka, jedna idzie do koszyczka jako zanęta. Koszyczek opada na dno, linka się napina, a brania widać na
+  jaskrawej szczytówce: najpierw drgania, potem wyraźne ściągnięcie. Na zacięcie jest więcej czasu niż przy spławiku.
+  Zanęta z koszyczka nęci miejsce: kolejne rzuty w to samo miejsce (do 5 m) przyspieszają brania nawet prawie
+  trzykrotnie, a ryby zbierają się nad zanętą. Nęcone miejsce słabnie w ciągu paru godzin gry. LPM powoli przeciąga
+  zestaw po dnie.
+- **Podpórka (Z):** wędkę spławikową lub gruntową z zarzuconym zestawem odkłada się na podpórkę. Bez zakupu jest to
+  rozwidlony patyk z leszczyny, a z „Podpórką z dzwoneczkiem” metalowa podpórka z dzwonkiem, który dzwoni i kołysze
+  się przy braniu. Ręce są wtedy wolne i można się oddalić, ale zaciąć (PPM) da się tylko z bliska (do 3,5 m): wędka
+  wraca wtedy do rąk. Z przy podpórce podnosi wędkę.
+
+**Przynęty i żyłki:** kram ma duży katalog przynęt spinningowych (ponad 130) i żyłek (55), każdą w swoim kolorze.
+Generuje go `tools/tackle/generate_tackle.py`.
+- **Obrotówki:** okrągłe, wydłużone, z chwostem i z ołowianą główką, w numerach 1–3. Kolory: srebrne, złote,
+  miedziane, czarne w kropki, srebrne w czerwone kropki i tygrysie fluo.
+- **Wahadłówki:** klasyczne (10, 18, 25 g), wąskie dalekiego rzutu i szerokie płytkie, w kilku kolorach, w tym
+  dwukolorowe i okoniowe.
+- **Woblery:** pływające 5/7/9/11 cm (okoń, płoć, tygrys fluo, pstrąg, czarno-złoty, szczupaczek), głęboko nurkujące
+  z dużym sterem, tonące jerki bez steru i poppery powierzchniowe.
+- **Gumy na główkach:** rippery 5/7/10/14 cm z główkami 5–25 g, twistery, gumowe robaki i raki, w kolorach perłowym,
+  seledynowym fluo, motor oil, różowym, srebrnym brokacie i innych.
+- **Muchy:** suche (pływają), nimfy (toną pod powierzchnię), mokre i streamery.
+
+Każda przynęta ma własny model 3D (kształt, kolory, wzór: kropki, pasy, prążki, połówki, brokat, czerwona główka) i
+rozmiar oraz ikonę w kramie. Ma to znaczenie w łowieniu:
+- waga zmienia zasięg rzutu;
+- rozmiar działa jak większy hak: duża przynęta przyciąga większe ryby, ale rzadziej;
+- wzór pracy decyduje, czy przynęta tonie, wypływa, chodzi płytko, schodzi głęboko, czy zostaje na powierzchni;
+- kolory działają według warunków: fluo, biel i perła w mętnej wodzie i o zmierzchu, kolory naturalne w czystej wodzie
+  w dzień, metal błyska w słońcu, czerń widać nocą. Pasek stanu podpowiada „kolor pasuje” albo „kolor słabo widać”.
+
+Żyłki: przezroczyste, zielone, brązowe i żółte fluo od 0,12 do 0,40 mm; plecionki 8- i 4-splotowe od 0,06 do 0,30 mm
+(zielone, szare, żółte i pomarańczowe fluo, wielokolorowe w metrowe pasy); fluorocarbon od 0,18 do 0,35 mm.
+- Grubsza żyłka jest mocniejsza, ale rzuca się nią bliżej.
+- Plecionka jest kilka razy mocniejsza od żyłki tej samej grubości i się nie rozciąga.
+- Fluorocarbon jest prawie niewidoczny i tonie.
+- W kramie są podkategorie: obrotówki, wahadłówki, woblery, gumy, muchy oraz żyłki, plecionki, fluorocarbon, cienkie
+  i grube.
+
+**Fizyka żyłki:** żyłka to sznur punktów od szczytówki do zestawu, w kolorze i grubości wybranej żyłki.
+- W locie wysnuwa się za zestawem i zwisa łukiem.
+- Po zarzuceniu luz leży na wodzie, a wiatr wygina go w łuk. Żyłka i plecionka pływają, fluorocarbon tonie (nie
+  głębiej niż dno).
+- Zwijanie najpierw wybiera luz, dopiero potem ciągnie zestaw. Pasek stanu pokazuje, ile jest luzu.
+- Przy zamkniętym kabłąku napięta żyłka zatrzymuje spławik.
+- W holu żyłka jest napięta i czerwienieje przy granicy wytrzymałości.
+
+**Ściąganie zestawu (LPM):** spławik przeciąga się po wodzie, przez płyciznę aż do brzegu, a koszyczek po dnie (z
+Shiftem szybciej). Zestaw wychodzi z wody na brzegu albo pod szczytówką.
+
+**Grunt spławika i poziom żerowania:** klawisze `[` i `]` (z Shiftem co 0,5 m, albo Ctrl + kółko) ustawiają przed
+rzutem grunt, czyli głębokość, na której przynęta wisi pod spławikiem. Każdy gatunek żeruje na swoim poziomie: leszcz,
+lin, karp czy węgorz przy dnie, płoć i okoń w toni, ukleja, wzdręga i boleń pod powierzchnią. Przynęta na złym
+poziomie bierze dużo słabiej, w płytkiej wodzie różnica jest mniejsza. Spławik ustawiony głębiej niż woda leży płasko
+(„przegruntowany”): przynęta leży na dnie, ale zacięcia częściej chybiają. To samo dotyczy spinningu (liczy się
+głębokość, na której idzie przynęta) i gruntu (przynęta zawsze na dnie). Pasek stanu pokazuje głębokość wody, grunt
+i wysokość przynęty nad dnem, a mapa (M) liczy szanse brań dla ustawionego gruntu.
+
+**Brania jak u prawdziwych ryb:** leszcz, lin i karasie podnoszą przynętę z dna, więc spławik się wynurza i kładzie;
+karp, szczupak, sandacz czy węgorz odjeżdżają ze spławikiem w bok, zanim go zatopią; drobnica (ukleja, kiełb, płoć)
+szybko podskubuje; reszta klasycznie przytapia. Wiatr powoli znosi spławik, a napięta żyłka prowadzi go po łuku.
+
+**Płoszenie ryb:** hałas przy łowisku odstrasza ryby i na jakiś czas spowalnia brania (spokój wraca po około minucie).
+Płoszy chlupnięcie zestawu (spławik prawie wcale, pełny koszyczek mocno, przynęta tym bardziej, im cięższa; na
+płyciźnie wszystko słychać dalej), bieganie po brzegu i pomoście blisko przynęty, brodzenie w wodzie oraz hol ryby.
+Ryby widoczne w wodzie rozpierzchają się od głośnego chlupnięcia, a pasek stanu pokazuje „ryby spłoszone”.
+
+**Ciśnienie i temperatura wody:** ciśnienie powoli podąża za pogodą (wysokie przy słońcu, niskie w deszczu), a dla ryb
+liczy się jego zmiana: gdy powoli spada przed frontem, biorą najlepiej; gdy rośnie po froncie, żerują słabo; przy
+stałym jest zwyczajnie. Każde łowisko ma własną temperaturę wody (górskie jezioro ok. 11°C, Jezioro Zielone 17°C,
+zatoka 19°C, staw 21°C), cieplejszą po południu i chłodniejszą w deszczu. Ryby zimnolubne (pstrągi, lipień, sieja,
+miętus) żerują najlepiej koło 11°C, ciepłolubne (karp, lin, karasie, sum) koło 22°C, reszta koło 17°C. Tabliczka pod
+tarczą pokazuje ciśnienie z trendem (na zielono, gdy sprzyja, na czerwono, gdy szkodzi) i temperaturę wody.
+
+**Obserwacja brań:** gra nie podpowiada brania napisem. Trzeba patrzeć na spławik, a przy gruncie na jaskrawą
+szczytówkę i pomarańczowy sygnalizator wiszący na żyłce między kołowrotkiem a pierwszą przelotką (przy skubnięciach
+drga, przy odjeździe ryby podjeżdża pod wędkę); z podpórką z dzwoneczkiem słychać też dzwonek. Przy spławiku zacina
+się dopiero, gdy spławik całkiem zniknie pod wodą (przy braniu z podnoszeniem: gdy położy się płasko). Zacięcie
+wcześniej wyrywa przynętę rybie („Za wcześnie!”), a okno na zacięcie liczy się od pełnego zanurzenia.
+
+**Pod wodą:** wędkarz nie widzi pod powierzchnię dalej, niż pozwala woda: przynęta i koszyczek są widoczne tylko tam,
+gdzie widać by było rybę (płytko, blisko, w czystej wodzie, mniej pod odblaskiem; więcej w okularach
+polaryzacyjnych), a haczyka pod spławikiem z brzegu nie widać wcale.
+
+**Spinanie się ryby:** ryba na luźnej żyłce potrząsa łbem i może wypluć haczyk. Czasem w czasie holu robi krótki
+zryw prosto do wędkarza; wtedy trzeba szybko zwijać, bo pasek stanu krzyczy „LUZ! zwijaj”. Im lepiej wbity haczyk
+(rozmiar dobrany do pyska, zacięcie od razu, a nie pod koniec chwili na zacięcie, plecionka, naostrzony grot), tym
+dłużej trzyma; ryba, która zacięła się sama na przynęcie, trzyma się płycej. Spięta ryba ucieka, ale sprzęt zostaje.
+
+**Zużycie przynęty:** przynęta naturalna na haczyku słabnie w wodzie: chleb rozmięka i spada po ok. 3 minutach,
+ciasto po 4, białe robaki i owady po 5–6, robak po 9, żywiec po 12, kukurydza po 20, kulki proteinowe po 30.
+Zużyta przynęta wabi trzy razy słabiej. Ryba, przy której zacięcie chybiło (za wcześnie, za późno, spadła z haka),
+zwykle zjada przynętę: na pustym haczyku nic nie bierze, trzeba zwinąć i zarzucić od nowa. Pasek stanu mówi,
+kiedy przynęta słabnie, jest zużyta albo haczyk jest pusty. Przynęty sztuczne się nie zużywają.
+
+**Zużycie żyłki:** żyłka przeciera się w użyciu: każdy hol, który obciąża ją powyżej połowy wytrzymałości,
+szarpanie i ciągnięcie zaczepu oraz każda wyholowana ryba. Przetarta żyłka (do 60% słabsza) pęka wcześniej; zużycie
+jest zapisywane, widać je w opisie sprzętu (Tab) i na karcie w kramie. W kramie przy przetartej żyłce w użyciu jest
+przycisk „Nawiń nową”, który za cenę żyłki przywraca jej pełną wytrzymałość.
+
+**Rzut:** zestaw nie leci idealnie tam, gdzie celujesz: im mocniejszy zamach, tym większy rozrzut na boki (do kilku
+stopni) i zmienność odległości. W locie wiatr znosi zestaw na bok: lekki spławik i mucha mocno, lekka obrotówka
+średnio, ciężka wahadłówka i koszyczek prawie wcale.
+
+**Kryjówki i spady:** ryby trzymają się miejsc. Szczupak, lin, okoń, karasie, wzdręga, karp i amur biorą lepiej przy
+płatach grążeli i zielska (do 4 m od nich), a sandacz, sum, miętus, jazgarz, węgorz, leszcz i okoń na spadach dna.
+Mapa (M) podpowiada pod kursorem, gdzie są rośliny i spady, i liczy szanse brań dla tego miejsca. W holu ryba, która
+wpłynie w zielsko, po 2,5 s zaplącze żyłkę i urwie zestaw, chyba że podniesiesz wędkę (PPM) i wyciągniesz ją z roślin;
+pasek stanu ostrzega „W ZIELSKU!”.
+
+**Żerowanie falami:** ryby nie biorą równo przez cały dzień: przez kilka godzin gry brania przychodzą falami
+(chwila wzmożonego żerowania, potem cisza, tempo od mniej więcej połowy do półtora raza). Fale są inne każdego dnia
+i na każdym łowisku, a gra ich nie zdradza: trzeba to wyczuć samemu.
+
+**Grafika na laptopie:** przy pierwszym uruchomieniu na zintegrowanej grafice gra sama ustawia jakość Niską, bliski
+zasięg widzenia i 3D w 70% (FSR). Wszystko to można zmienić w menu pauzy. Na Niskiej nie ma też poświaty (bloom).
+
 **Ryby:** 66 gatunków (rodzime i zadomowione), każdy z nazwą łacińską i opisem. Skóry są malowane w kodzie piksel po pikselu: łuski z ciemnymi krawędziami, linia boczna, pokrywa skrzelowa, plamki z obwódkami, pręgi, marmurkowanie, lustra karpia, tarczki jesiotra, plus mapa normalnych. Ryba na haku, na panelu połowu i w atlasie dostaje skórę 4096×2048 (2048×1024 na niskiej jakości), ryby w wodzie 512×256. **Atlas ryb** jest w menu głównym i w menu pauzy: obracający się model 3D, opis, wagi, cena, przynęty, głębokość, pora i łowiska, wyszukiwarka i filtr łowiska.
 
 **Hol:** ryba ma prawdziwą pozycję, kierunek i prędkość: płynie najwyżej z prędkością zrywu wynikającą z długości ciała (płoć ok. 1 m/s, duży karp czy szczupak 3 m/s), skręca z ograniczoną szybkością i kołysze się na napiętej lince jak wahadło, zamiast przeskakiwać. Linkę zabiera tylko wtedy, gdy przeciąga hamulec, a wędkarz zyskuje linkę powoli, póki ryba ciągnie. Walka zaczyna się od pierwszego odjazdu zaraz po zacięciu, wędka szarpie przy każdym zrywie, a zmęczenie zależy od tego, jak mocno ryba walczy z hamulcem. Płoć to ok. pół minuty, karp 12 kg ok. 2 minuty na sprzęcie karpiowym (na teleskopie wyciąga całą linkę). Startowy zestaw jest słaby (kij 2,4 kg, hamulec 2 kg).
@@ -81,6 +215,14 @@ bez znaczników; litery kompasu kręcą się na drewnianej obręczy. Wokół bie
 (złoty dzień, niebieska noc) ze słońcem albo księżycem na aktualnej godzinie; medalion pokazuje pogodę i siłę wiatru,
 a tabliczka pod spodem godzinę, czas do zmroku lub świtu, pogodę i nazwę łowiska (okrągła tarcza zastąpiła kwadratową
 minimapę). Tarcza jest mała (ok. 120 px średnicy), a napisy rysują się ostro w docelowym rozmiarze.
+
+**Mapa łowiska (M):** duża mapa topograficzna malowana w tle zaraz po wejściu na łowisko: rzeźba terenu cieniowana od
+północnego zachodu, poziomice co 2 m (co 10 m grubsze), las ciemniejszą zielenią, ścieżki i udeptane place jasnymi
+pasami, plaże piaskiem, a na jeziorze linie głębokości co metr (co 5 m grubsze), więc widać spady, górki i rynny.
+Pomost jest brązową kładką; kramy i miejsca mają kwadraty z podpisami, które nie zachodzą na siebie (w tłoku podpis
+znika, a nazwę pokazuje kursor). W rogach są podziałka i strzałka północy. Pod kursorem: nazwa miejsca, na lądzie
+rodzaj terenu (łąka, las, ścieżka, plaża, brzeg, skały) i wysokość nad wodą, na wodzie głębokość, odległość, zasięg
+rzutu i szanse brań na obecny zestaw (lista przewija się w ramce, mapa nie zmienia rozmiaru).
 
 **Płynność:** w menu pauzy obok jakości grafiki jest **zasięg widzenia** (Bliski, Średni, Daleki, Bardzo daleki).
 Ustala, jak daleko rysuje się las aż po góry (dalekie drzewa łagodnie zanikają), szczegółowe drzewa, rośliny i trawa,
@@ -189,7 +331,7 @@ repozytorium, więc lepiej przebudowywać tylko zmienione gatunki. Opis całego 
 | E przy ognisku | panel ogniska: rozpalenie i gotowanie ryb z siatki (i grzybów ze spiżarni) |
 | E przy grzybach / jagodach | zbieranie do spiżarni |
 | E przy wędzarni / tablicy ogłoszeń | wędzenie ryb z siatki / zlecenia mieszkańców |
-| 1-6 (Shift = wstecz) | wędka, kołowrotek, żyłka, hak, przynęta, przypon (tylko przed rzutem) |
+| 1-9 (pasek na dole ekranu) | 1-3 - wędki (do trzech łowi naraz), 4 - łopata, 5 - siatka na owady, 6 - podrywka, 7-9 wolne. Wybranie innej wędki odkłada tę w ręku: zarzuconą na podpórkę (dalej łowi), zwiniętą do plecaka. Ten sam klawisz chowa wędkę lub narzędzie do plecaka (wolne ręce). Do wędki na podpórce trzeba podejść |
 | I / M / J / T | ekwipunek, mapa, dziennik, turnieje |
 | E | wejście do kramu, gildii, na targ lub na postój wozów (przy drzwiach budynku) |
 | Shift | bieg |
@@ -198,6 +340,9 @@ repozytorium, więc lepiej przebudowywać tylko zmienione gatunki. Opis całego 
 | H | sterowanie |
 | F1 | konsola deweloperska: F2 natychmiastowe branie, F3 nieśmiertelna żyłka, F4 gatunek, F5 reset rzutu, F6 przynęty, F7 +3 godz., F8 pogoda, F9 reset postępu, F10 +1000 gr |
 | F11 | licznik wydajności (FPS, CPU, GPU, pamięć, najwolniejsze systemy) |
+| Z | wędka na podpórkę / podnieś (spławik, grunt) |
+| [ / ] | grunt spławika płycej / głębiej (Shift: co 0,5 m; także Ctrl + kółko) |
+| Shift + LPM | szybkie zwijanie (przynęta, spławik, koszyczek) |
 
 ## Świat
 - **Cała mapa jest do chodzenia:** brzeg, wzgórza, wioska. Wchodzić można tylko w płytką wodę (do 0,5 m), a pomost jest jednym z miejsc do łowienia. Łowić można z dowolnego miejsca na brzegu.
@@ -249,6 +394,33 @@ Przy dodawaniu: nowa ryba = plik w `data/fish/`, wpis w `SpeciesCatalog.Paths` i
 ## Jak działa hol i branie
 - **Hol** (`FightModel`, w kg-sile): ryba ciągnie z siłą zależną od gatunku i wagi. Hamulec puszcza żyłkę tylko wtedy, gdy ciągnięcie przekracza jego ustawienie. Napięcie to limit hamulca plus 25% nadwyżki (pomniejszone o amortyzację wędki), więc zrywy mogą przeciążyć żyłkę. Zbyt wysoki hamulec zrywa żyłkę, zbyt niski oddaje rybie całą szpulę. Im dłużej trwa hol, tym szybciej ryba traci siły.
 - **Branie** (`BiteModel`): szansa gatunku = rzadkość x przynęta x dopasowanie haka x liczebność na łowisku x głębokość x pora dnia x pogoda. Ekran ekwipunku (I) pokazuje te szanse dla każdej głębokości.
+- **Noc i świetlik**: po zmroku spławik, szczytówka i sygnalizator brania gasną razem ze światłem dnia, więc w nocy trudno je dostrzec. Świetlik z akcesoriów (25 monet) zakłada zielone światełko na antenę spławika i na szczytówkę wędki gruntowej.
+- **Nawietrzny brzeg**: wiatr spycha ciepłą wodę powierzchniową, owady i pokarm na brzeg, na który wieje, a ryby idą za nim. Przynęta do 40 m przed takim brzegiem dostaje szybsze brania (do +35% przy silnym wietrze); przy lekkim wietrze różnica jest niewielka.
+- **Skręcanie żyłki**: obrotówka (i słabiej wahadłówka) skręca żyłkę z każdym zwiniętym metrem. Skręcona żyłka przy rzucie wyskakuje ze szpuli pętlami i czasem kończy rzut „brodą”: rzut jest krótki, brodę trzeba wyciąć. Krętlik z agrafką (8 monet) zabiera prawie cały skręt, hol ryby trochę go zdejmuje, a nowa żyłka w kramie usuwa go całkiem. Plecionka prawie nie robi pętli, sztywny fluorocarbon najczęściej. HUD dopisuje przy żyłce „skręcona”.
+- **Księżyc**: fazy trwają 29,5 dnia gry (nów, kwadry, pełnia), a w nocy tarcza pokazuje fazę. Przy pełni noc jest jaśniejsza. Nocne drapieżniki (sum, sumiki, węgorz, sandacz, miętus) najlepiej biorą w ciemne noce przy nowiu i są ostrożne w jasne noce, pozostałe ryby żerują przy pełni nieco chętniej. Chmury i deszcz zasłaniają księżyc.
+- **Siatka w ciepłej wodzie**: ryby w siatce tracą kondycję szybciej, gdy woda jest ciepła, bo jest w niej mniej tlenu. Pstrągi, sieje i miętusy męczą się najszybciej, a karpie, liny i karasie prawie wcale.
+- **Wyławianie miejsca**: każda ryba wyjęta z jednego miejsca (w promieniu 15 m) spowalnia tam brania: ryb jest mniej, a reszta jest ostrożniejsza. Wypuszczona ryba liczy się jak pół zatrzymanej. Miejsce odżywa w ciągu kilku godzin gry. Gdy brania wyraźnie słabną, HUD podpowiada „miejsce wyłowione”, więc warto przejść kilkadziesiąt metrów dalej.
+- **Widoczność żyłki**: w przejrzystej wodzie i w pełnym słońcu ryby widzą grubą lub błyszczącą żyłkę, więc cienki przypon z fluorocarbonu wyraźnie skraca czekanie na branie. W mętnej wodzie, o zmierzchu i w nocy różnica prawie znika.
+- **Zmęczenie ryby**: długi hol (ponad 20 s) i trzymanie ryby na powietrzu ponad 20 s obniżają jej kondycję. Taka ryba trafia do siatki słabsza i jest tańsza na targu. Panel połowu ostrzega, gdy ryba jest za długo bez wody.
+- **Deszcz i fale tłumią hałas**: bębnienie deszczu i fale od wiatru zagłuszają kroki wędkarza i plusk zestawu. W deszczu przy silnym wietrze ryby płoszą się o ponad połowę słabiej niż w ciszy.
+- **Nęcenie z ręki** (G): przy spławiku można wrzucać garści drobnej przynęty (białe robaki, kukurydza, kasza, konopie, groch, chleb, ochotka), po 3 sztuki na garść. Garść ląduje w pobliżu spławika, im dalej, tym większy rozrzut. Ryby schodzą się na nęcone miejsce jak przy koszyczku, a HUD pokazuje jego siłę kropkami.
+- **Skoki ryby**: szczupak, boleń, pstrąg i łosoś wyskakują w holu i w powietrzu potrząsają łbem. Jeśli w tym momencie trzymasz wędkę w górze (PPM) na napiętej żyłce, często wyrywają haczyk. Gdy HUD pokazuje „SKOK! opuść wędkę”, puść PPM. Dobrze wbity haczyk trzyma lepiej.
+- **Tępienie haczyka**: każda wyholowana ryba (większa bardziej) i każdy zaczep tępią grot, a tępy haczyk gorzej zacina, nawet o jedną trzecią. HUD dopisuje przy haczyku „stępiony” albo „tępy”. Z osełką klawisz K ostrzy haczyk, gdy zestaw jest wyjęty z wody. W kramie można też kupić nowy haczyk tego samego rodzaju.
+- **Ławice**: płoć, leszcz, krąp, ukleja, wzdręga, okoń, karasie, jaź, kleń i inne ryby ławicowe pływają stadami. Po złowieniu jednej przez mniej więcej godzinę gry w promieniu 12 m częściej biorą ryby tego samego gatunku, a HUD pokazuje „ławica w pobliżu”. Samotnicy, jak szczupak, sum czy karp, tego nie robią. Ławica i wyławianie miejsca działają razem: najpierw kilka szybkich ryb, potem brania słabną.
+- **Kręgi na wodzie**: ryby żerujące przy powierzchni (ukleja, wzdręga, boleń, kleń, pstrągi i inne) zbierają owady i zostawiają rozchodzące się kręgi. Najwięcej ich rano i wieczorem przy spokojnej wodzie, mało w południe, w deszczu i przy wietrze. Kręgi pokazują, gdzie ryby żerują wysoko: przynęta podana do 6 m od świeżego kręgu (najlepiej w pierwszej minucie) dużo bardziej kusi rybę tego gatunku, a HUD pokazuje wtedy „przy kręgu”.
+- **Dobowa wędrówka**: o świcie, o zmierzchu, nocą i pod grubymi chmurami ryby wchodzą na płyciznę (do ok. 4 m) i tam lepiej biorą. W jasne południe schodzą głębiej, więc wtedy opłaca się łowić na spadach i w głębszej wodzie.
+- **Połknięty haczyk**: przy spławiku i gruncie spóźnione zacięcie daje rybie czas, żeby połknęła przynętę. Haczyk siedzi wtedy głęboko: trzyma w holu, ale wyjmowanie trwa długo (ryba jest bez wody) i rani rybę. Wypychacz (6 monet) robi to szybko i delikatnie. Przynęty sztuczne rzadko są połykane.
+- **Zatopione drzewa**: przy brzegach, zwłaszcza zalesionych, leżą w wodzie zwalone drzewa, a ich szare gałęzie wystają nad powierzchnię. Kryją się przy nich szczupaki, okonie, liny i karpie, ale przynęta prowadzona przy dnie łapie tam zaczep kilka razy częściej. Ryba wpuszczona w gałęzie owija żyłkę szybciej niż w zielsku („W GAŁĘZIACH!”: podnieś wędkę). Koszyczek ciągnięty po dnie (LPM) przez gałęzie też potrafi w nich utknąć i urwać przypon. Mapa (M) podpisuje takie miejsca.
+- **Warstwy temperatury**: wierzchnie 1,5 m wody jest wymieszane, a głębiej woda chłodnieje o około 0,9°C na metr. Liczy się temperatura tam, gdzie jest przynęta. W ciepłym jeziorze pstrągi i sieje biorą na głębokości, a karpie i liny bliżej powierzchni. W zimnej wodzie ryby biorą ostrożnie i szybko wypuszczają przynętę (na zacięcie jest nawet o 30% mniej czasu), a w ciepłej trzymają ją dłużej.
+- **Wielkość przynęty**: duży kąsek (żywiec, martwa rybka, rosówka, kulka proteinowa) działa jak większy haczyk: drobnica go omija, a biorą większe ryby. Szczypta ochotki czy białych robaków daje dużo brań, głównie małych ryb. Tak samo działa rozmiar przynęt sztucznych.
+- **Inni wędkarze**: na brzegu każdego łowiska siedzi dwóch lub trzech miejscowych wędkarzy z wędką na podpórce i spławikiem na wodzie. Łowią średnio około ryby na godzinę gry: ich spławik znika pod wodą, wędkarz wstaje, wyciąga rybę i po chwili znów zarzuca. Woda przed nimi jest przez to wyłowiona. Rzut tuż obok czyjegoś spławika (bliżej niż 8 m) płoszy ryby i kończy się upomnieniem, a HUD pokazuje „łowisko innego wędkarza”.
+- **Mętna woda po deszczu**: deszcz mąci wodę (ok. +0,18 na godzinę gry), a potem woda się klaruje (połowa mętności znika co 8 godzin). W mętnej wodzie żyłka mniej płoszy, kolory przynęt słabiej działają i widać płycej. Tarcza dopisuje przy temperaturze „lekko mętna” albo „mętna”.
+- **Limity dzienne**: jak w regulaminach łowisk, niektóre gatunki można zatrzymać tylko w ograniczonej liczbie na dzień gry: 2 szczupaki, 2 sandacze, 2 bolenie, 1 sum, 2 węgorze, 3 pstrągi, 2 karpie, 3 liny i inne. Rybę ponad limit trzeba wypuścić, a panel połowu o tym mówi. Liczenie zaczyna się od nowa każdego dnia.
+- **Zacięcie na odległość**: rozciągliwa żyłka na dalekim rzucie (powyżej 15 m, najmocniej od 65 m) „zjada” część zacięcia, a luz leżący na wodzie trzeba wybrać, zanim haczyk się ruszy. Plecionka przenosi zacięcie prawie w całości, dlatego daleko łowi się lepiej na plecionkę i z napiętą żyłką. Hamulec ustawiony za luźno (poniżej ok. 1 kg) puszcza żyłkę przy zacięciu i haczyk ledwo się rusza.
+- **Przynęta a temperatura**: w zimnej wodzie (np. w górskim jeziorze albo głęboko) lepiej działają przynęty zwierzęce: robaki, białe robaki, ochotka. Przynęty roślinne (kukurydza, chleb, kasza) i kulki proteinowe rozkręcają się w ciepłej wodzie, gdy karpiowate żerują najmocniej. Liczy się temperatura tam, gdzie leży przynęta.
+- **Drapieżnik na holu**: drobna ryba (do 0,3 kg: płotka, ukleja, okonek...) szarpiąca się na żyłce to łatwy posiłek. Czasem w trakcie holu porywa ją szczupak, okoń, sandacz, boleń albo sum i dalej holujesz już drapieżnika. Trzyma on rybkę w pysku, a nie haczyk, więc łatwo ją puszcza, gdy dostanie luz.
+- **Kolizje**: drzewa, głazy przy brzegu, ogniska i kłody wokół nich, łódki, tablica ogłoszeń, stojaki, sznury na pranie, grobla na stawie i inne obiekty zatrzymują wędkarza tak jak budynki. Przy brzegu wody i na krawędzi mapy wędkarz ślizga się wzdłuż przeszkody zamiast stawać w miejscu. Siedzący ludzie (przy ognisku, wędkarze na brzegu) siedzą na kłodach dopasowanych do wysokości siedzenia, z biodrami nad środkiem kłody, a wędkarze wybierają płaskie miejsca na brzegu.
+- **Trzy wędki naraz**: każda z wędek 1-3 ma własny zestaw: wędzisko, kołowrotek, żyłkę, haczyk, przynętę i przypon. Druga i trzecia potrzebują własnego wędziska i kołowrotka, bo jedna wędka nie może być w dwóch miejscach. Zestaw ustawia się w kramie dla wędki trzymanej w ręku, a tytuł kramu mówi, która to. Zarzucona wędka (spławik albo grunt) odłożona klawiszem innej wędki ląduje na podpórce obok poprzednich i dalej łowi: branie widać na spławiku i szczytówce, a dzwonek dzwoni, jeśli masz podpórkę z dzwoneczkiem. Spinning łowi się tylko z ręki. Wędki na podpórkach mają kolizję. Pasek 1-9 pokazuje, gdzie jest każda wędka: w ręku, w wodzie, na podpórce, w plecaku.
 - **Turnieje** (T): wpisowe, dojazd na łowisko, wynik to suma N najcięższych ryb, rywale to boty o różnych umiejętnościach. Nagrody (pieniądze i XP) według miejsca, historia w zapisie.
 
 ## Zapis gry
@@ -293,6 +465,11 @@ Zmian, których nie rozpowszechniasz (np. własna wersja do grania w domu), nie 
 
 **Wkład w projekt:** wysyłając zmiany (pull request), zgadzasz się, że są one udostępniane na tej samej licencji
 (GPL 3.0 lub nowszej).
+
+**Marki sprzętu w grze są zmyślone.** Nazwy producentów wędek, kołowrotków, żyłek i przynęt (Loirette, Nordvik,
+Saimaa Craft, Kawase, Bayou Bill, Highland Fly Co., Vistula, Kraken, Glasswater, Ostoja, Kaminari, Borealis, Ironwood,
+Hokuto, Fjordline) zostały wymyślone na potrzeby gry: przypominają styl i pochodzenie prawdziwego sprzętu, ale nie są
+znakami towarowymi żadnej firmy ani ich przeróbkami. Ewentualna zbieżność z istniejącą nazwą jest przypadkowa.
 
 ### Elementy i materiały innych autorów
 - **Silnik Godot** (licencja MIT, © Juan Linietsky, Ariel Manzur i współtwórcy Godot Engine) i **.NET** (licencja MIT,

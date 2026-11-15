@@ -303,12 +303,12 @@ public static class CampProps
     }
 
     /// <summary>A short split log to sit on (lying along X, resting on y = 0).</summary>
-    public static Node3D SeatLog(float length = 1.4f, int seed = 0, float radius = 0.17f)
+    public static Node3D SeatLog(float length = 1.4f, int seed = 0, float radius = 0.17f, bool even = false)
     {
         var root = new Node3D { Name = "SeatLog" };
         var st = new SurfaceTool();
         st.Begin(Mesh.PrimitiveType.Triangles);
-        Shapes.Log(st, new Vector3(0f, radius, 0f), Vector3.Right, length, radius, seed);
+        Shapes.Log(st, new Vector3(0f, radius, 0f), Vector3.Right, length, radius, seed, even);
         st.GenerateNormals();
         root.AddChild(new MeshInstance3D { Mesh = st.Commit(), MaterialOverride = Bark });
         return root;

@@ -26,16 +26,26 @@ public partial class Main : Node3D
     private Water _water = null!;
     private SkyController _sky = null!;
     private WorldState _world = null!;
+    private float _appliedMurk;
     private LakeBed _lake = null!;
     private TackleLoadout _loadout = null!;
     private GearCatalog _gear = null!;
 
-    public FishingRod Rod { get; private set; } = null!;
+    private FishingRod _firstRod = null!;
+
+    /// <summary>The rod in use (the rod set's active one; the first rod until the set is made).</summary>
+    public FishingRod Rod => Rods?.Active ?? _firstRod;
+
+    /// <summary>The angler's rods (hotbar slots 1-3; up to three fishing at once).</summary>
+    public RodSet Rods { get; private set; } = null!;
     public Player Player { get; private set; } = null!;
     public TournamentManager Tournaments { get; private set; } = null!;
     public Scenery Scenery { get; private set; } = null!;
     public InteractionManager Interactions { get; private set; } = null!;
     public FishPopulation Fish { get; private set; } = null!;
+
+    /// <summary>Rings of fish rising to the surface.</summary>
+    public RiseRings Rises { get; private set; } = null!;
     public GearCatalog Gear => _gear;
     public HandTools Tools { get; private set; } = null!;
     public CookingPanel Cooking { get; private set; } = null!;
@@ -90,13 +100,14 @@ public partial class Main : Node3D
         _gear.Attach(_profile);
 
         var species = LoadSpecies();
-        Rod = new FishingRod();
+        _firstRod = new FishingRod();
         Player.AddChild(Rod);
         Rod.Setup(new RodDependencies(
             Player.Camera, Player.RodTip, Player.Rig, bobber, species, _loadout, _profile, _world, _lake, WaterY, _gear));
         Player.ActionSource = () => ActionFor(Rod.State);
         Player.Body.RaiseSource = () => Rod.Lifting && Rod.State is RodState.Nibble or RodState.Bite or RodState.Fight or RodState.Close or RodState.Waiting ? 1f : 0f;
         Player.Body.ReelingSource = () => Rod.Reeling && Rod.State is RodState.Waiting or RodState.Fight or RodState.Nibble or RodState.Bite;
+        Player.Body.RigOnRest = () => Rod.OnRest;
 
         // Camp life: the shovel and the insect net (Q), the holes they leave, the mayflies over the shore at dusk.
         Swarms = new InsectSwarms();
@@ -120,6 +131,31 @@ public partial class Main : Node3D
         Fish.Setup(_lake, Player, species, WaterY);
         AddChild(Fish);
         Rod.Population = Fish;
+        Rises = new RiseRings();
+        Rises.Setup(Fish, _world, Player, WaterY);
+        AddChild(Rises);
+        Rises.Risen += Rod.NoteRise;
+        Rod.WeedBeds = Scenery.WeedBeds;
+        Rod.SunkenWood = Scenery.SunkenWood;
+        Rod.OtherAnglers = Scenery.Anglers;
+        // Rain muddies the water: refresh the water and the fish's visibility when the murk has changed noticeably.
+        _world.HoursAdvanced += _ =>
+        {
+            if (MathF.Abs(_world.Murk - _appliedMurk) > 0.05f)
+                ApplyGearEffects();
+        };
+        // The other anglers catch a fish now and then: the water in front of them gets fished.
+        var anglerLuck = new Random(77);
+        _world.HoursAdvanced += hours =>
+        {
+            for (int i = 0; i < Scenery.Anglers.Count; i++)
+                if (anglerLuck.NextDouble() < Core.Methods.OtherAnglers.CatchesPerHour * hours)
+                {
+                    var at = Scenery.Anglers[i].Float;
+                    Rod.Swim.Add(at.X, at.Z, _profile.Clock);
+                    Scenery.AnglerCatches(i);
+                }
+        };
         AddChild(new Graphics.Gulls { Daylight = () => _world.Daylight });
 
         var sound = new Audio.SoundEngine();
@@ -127,6 +163,7 @@ public partial class Main : Node3D
         AddChild(sound);
         _gear.GearChanged += ApplyGearEffects;
         ApplyGearEffects();
+        _profile.WaterTempNow = () => Rod.WaterTemp;
         _world.HoursAdvanced += _profile.PassTime;
 
         Tournaments = new TournamentManager();
@@ -174,13 +211,54 @@ public partial class Main : Node3D
         AddChild(Board);
         // Picked mushrooms and berries grow back a day later.
         _world.HoursAdvanced += _ => Scenery.RegrowForage(_profile.Clock);
+        // The moon's phase follows the profile's clock.
+        _world.MoonPhase = Core.Methods.Moon.Phase(_profile.Clock);
+        _world.HoursAdvanced += _ => _world.MoonPhase = Core.Methods.Moon.Phase(_profile.Clock);
 
         Interactions.Activated += spot => OnInteract(spot, shop, gameUi, Cooking);
 
         // The mood of the map (water colour, mist) follows the location; a new map also means a new start on the pier.
         ApplyMood();
         _lake.Rebuilt += ApplyMood;
+        _lake.Rebuilt += _firstRod.Groundbait.Clear;
+        _lake.Rebuilt += _firstRod.Disturbance.Clear;
+        _lake.Rebuilt += _firstRod.Swim.Clear;
+        _lake.Rebuilt += _firstRod.Shoal.Clear;
         _lake.Rebuilt += RespawnPlayer;
+
+        // The rod set: rods 2 and 3 are made when first taken out (keys 2 and 3); they share the swim's state with the
+        // first (groundbait, disturbance, fished-out spots, shoals) and have their own rig, float and tackle.
+        Rods = new RodSet(_firstRod, Player, slot =>
+        {
+            var bob = new Bobber { WaterY = WaterY, WaterHeight = _water.HeightAt };
+            AddChild(bob);
+            var rig = new RodRig { Visible = false };
+            Player.Camera.AddChild(rig);
+            rig.Transform = _firstRod.Rig.Transform;
+            var loadout = new TackleLoadout();
+            loadout.Attach(_profile, slot);
+            var extra = new FishingRod { Active = false };
+            Player.AddChild(extra);
+            extra.Setup(new RodDependencies(Player.Camera, rig.Tip, rig, bob, species, loadout, _profile, _world, _lake, WaterY, _gear));
+            extra.InHands = false;
+            extra.Population = Fish;
+            extra.WeedBeds = Scenery.WeedBeds;
+            extra.SunkenWood = Scenery.SunkenWood;
+            extra.OtherAnglers = Scenery.Anglers;
+            extra.Swim = _firstRod.Swim;
+            extra.Shoal = _firstRod.Shoal;
+            extra.Disturbance = _firstRod.Disturbance;
+            extra.Groundbait = _firstRod.Groundbait;
+            return extra;
+        });
+        Rods.Made += extra =>
+        {
+            sound.Track(extra);
+            Tournaments.Track(extra);
+            Rises.Risen += extra.NoteRise;
+        };
+        Tools.Rods = Rods;
+        _lake.Rebuilt += Rods.ResetAll;
         _lake.Rebuilt += ReleaseLoadingGarbage;
         _profile.Changed += Save;
         Input.MouseMode = Input.MouseModeEnum.Captured;
@@ -244,7 +322,8 @@ public partial class Main : Node3D
         if (Rod.State == RodState.Idle)
             Rod.ApplyTackle();     // reel grease and the like change the tackle's numbers
         var glasses = _gear.Accessory(AccessoryKind.PolarizedGlasses);
-        float clarity = _lake.Location.WaterClarity;
+        float clarity = Rod.ClarityNow;
+        _appliedMurk = _world.Murk;
         Fish.VisibleRange = FishPopulation.BaseVisibleRange + (glasses?.Power ?? 0f);
         Fish.VisibleDepth = clarity * 0.6f + (glasses != null ? 1.2f : 0f);
         Fish.Clarity = clarity;
@@ -360,8 +439,13 @@ public partial class Main : Node3D
     {
         _profile.Changed -= Save;
         _world.HoursAdvanced -= _profile.PassTime;
+        _profile.WaterTempNow = null;
         _gear.GearChanged -= ApplyGearEffects;
         _lake.Rebuilt -= RespawnPlayer;
+        _lake.Rebuilt -= _firstRod.Groundbait.Clear;
+        _lake.Rebuilt -= _firstRod.Disturbance.Clear;
+        _lake.Rebuilt -= _firstRod.Swim.Clear;
+        _lake.Rebuilt -= _firstRod.Shoal.Clear;
         _lake.Rebuilt -= ReleaseLoadingGarbage;
         _lake.Rebuilt -= ApplyMood;
     }

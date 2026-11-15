@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
@@ -96,6 +97,7 @@ public static class ProfileSerializer
             ["owned"] = owned,
             ["bait_counts"] = FromMap(p.BaitCounts, v => v),
             ["equipped"] = FromMap(p.Equipped, v => v),
+            ["rod_slots"] = new JsonArray(p.RodSlots.Select(d => (JsonNode)FromMap(d, v => v)).ToArray()),
             ["gear"] = new JsonObject
             {
                 ["owned"] = FromMap(p.Gear.Owned, ids =>
@@ -112,6 +114,11 @@ public static class ProfileSerializer
                 ["saturation"] = FromMap(p.Market.Saturation, v => v),
             },
             ["pantry"] = FromMap(p.Pantry, v => v),
+            ["line_wear"] = FromMap(p.LineWear, v => v),
+            ["line_twist"] = FromMap(p.LineTwist, v => v),
+            ["hook_dull"] = FromMap(p.HookDull, v => v),
+            ["kept_today"] = FromMap(p.KeptToday, v => v),
+            ["kept_day"] = p.KeptDay,
             ["smoked"] = smoked,
             ["smokery"] = smokery,
             ["notices"] = new JsonObject { ["day"] = p.NoticesDay, ["place"] = p.NoticesPlace, ["list"] = notices },
@@ -193,6 +200,11 @@ public static class ProfileSerializer
                 if (ReadFish(n) is { } c)
                     p.Smokery.Add(new SmokingLot(c, Float(n!["started_at"], 0f)));
         ReadMap(d["pantry"], p.Pantry, n => Int(n, 0));
+        ReadMap(d["line_wear"], p.LineWear, n => Float(n, 0f));
+        ReadMap(d["line_twist"], p.LineTwist, n => Float(n, 0f));
+        ReadMap(d["hook_dull"], p.HookDull, n => Float(n, 0f));
+        ReadMap(d["kept_today"], p.KeptToday, n => Int(n, 0));
+        p.KeptDay = Int(d["kept_day"], -1);
         if (d["notices"] is JsonObject board && board["list"] is JsonArray noticeList)
         {
             p.NoticesDay = Int(board["day"], -1);
@@ -250,6 +262,9 @@ public static class ProfileSerializer
             p.BaitCounts.Clear();
             ReadMap(baits, p.BaitCounts, n => Int(n, 0));
         }
+        if (d["rod_slots"] is JsonArray slots)
+            for (int k = 0; k < slots.Count && k < 2; k++)
+                ReadMap(slots[k], p.EquippedFor(k + 1), n => n?.GetValue<string>() ?? "");
         if (d["equipped"] is JsonObject eq)
         {
             foreach (var (k, v) in eq)
