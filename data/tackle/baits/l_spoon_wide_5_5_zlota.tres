@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Wahadłówka szeroka 8 g, złota"
+DisplayName = "Nordvik Brede · Wahadłówka szeroka 8 g, złota"
 Kind = 3
 AffinityAs = "spoon"
 AffinityScale = 1

@@ -77,15 +77,15 @@ public partial class RodRig : Node3D
         Position = new Vector3(0.3f, -0.35f, -0.4f);
         RotationDegrees = new Vector3(-80f, 0f, 0f);
 
-        var cork = Mat(new Color(0.72f, 0.56f, 0.38f), 0.85f);        // cork grips
+        var cork = _cork = Mat(new Color(0.72f, 0.56f, 0.38f), 0.85f);        // cork grips
         var corkDark = Mat(new Color(0.55f, 0.4f, 0.26f), 0.9f);      // filler rings in the cork
         var rubber = Mat(new Color(0.12f, 0.11f, 0.1f), 0.7f);         // butt cap
         var seat = Mat(new Color(0.16f, 0.16f, 0.17f), 0.45f, 0.3f);   // graphite reel seat
         var chrome = Mat(new Color(0.72f, 0.72f, 0.74f), 0.25f, 0.9f); // hoods, guides, bail
-        var blank = Mat(new Color(0.24f, 0.12f, 0.09f), 0.35f, 0.15f); // lacquered blank
-        var whip = Mat(new Color(0.75f, 0.62f, 0.3f), 0.5f, 0.2f);     // gold thread whippings
-        var reelBody = Mat(new Color(0.2f, 0.21f, 0.23f), 0.4f, 0.5f); // reel housing
-        var reelTrim = Mat(new Color(0.62f, 0.52f, 0.3f), 0.3f, 0.8f); // champagne trim
+        var blank = _blank = Mat(new Color(0.24f, 0.12f, 0.09f), 0.35f, 0.15f); // lacquered blank
+        var whip = _whip = Mat(new Color(0.75f, 0.62f, 0.3f), 0.5f, 0.2f);     // gold thread whippings
+        var reelBody = _reelBody = Mat(new Color(0.2f, 0.21f, 0.23f), 0.4f, 0.5f); // reel housing
+        var reelTrim = _reelTrim = Mat(new Color(0.62f, 0.52f, 0.3f), 0.3f, 0.8f); // champagne trim
         var line = Mat(new Color(0.82f, 0.86f, 0.78f), 0.5f);          // line on the spool
         var knob = Mat(new Color(0.32f, 0.2f, 0.12f), 0.55f);          // wooden knob
 
@@ -149,6 +149,7 @@ public partial class RodRig : Node3D
         parent.AddChild(top);
         Tip = new Node3D { Position = new Vector3(0, SegmentLength, 0) };
         parent.AddChild(Tip);
+        SetLook(_lookRod, _lookReel);
     }
 
     private Node3D? _indicator, _bobbin;
@@ -184,6 +185,31 @@ public partial class RodRig : Node3D
 
     private readonly List<MeshInstance3D> _blankMeshes = new();
     private Material? _blankMaterial;
+    private Data.RodData? _lookRod;
+    private Data.ReelData? _lookReel;
+    private StandardMaterial3D? _cork, _blank, _whip, _reelBody, _reelTrim;
+
+    /// <summary>Dresses the rig in the maker's colours of a rod and reel (blank lacquer, whippings, cork or foam
+    /// grips, reel housing and trim).</summary>
+    public void SetLook(Data.RodData? rod, Data.ReelData? reel)
+    {
+        _lookRod = rod ?? _lookRod;
+        _lookReel = reel ?? _lookReel;
+        if (_blank == null)
+            return;
+        if (rod != null)
+        {
+            _blank.AlbedoColor = rod.BlankColor;
+            _whip!.AlbedoColor = rod.WhipColor;
+            _cork!.AlbedoColor = rod.FoamGrip ? new Color(0.09f, 0.09f, 0.1f) : new Color(0.72f, 0.56f, 0.38f);
+            _cork.Roughness = rod.FoamGrip ? 0.95f : 0.85f;
+        }
+        if (reel != null)
+        {
+            _reelBody!.AlbedoColor = reel.BodyColor;
+            _reelTrim!.AlbedoColor = reel.TrimColor;
+        }
+    }
     private Material? _quiverMaterial;
 
     /// <summary>After dark the quiver tip and the bite indicator fade, unless a glow tip (świetlik) is fitted.</summary>

@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Streamer 6 cm, żółty"
+DisplayName = "Highland Fly Co. · Streamer 6 cm, żółty"
 Kind = 3
 AffinityAs = "fly"
 AffinityScale = 1.1

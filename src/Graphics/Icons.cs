@@ -245,7 +245,7 @@ public static class Icons
             "junior" => C(0.78f, 0.58f, 0.32f), "karpiowka" => C(0.45f, 0.29f, 0.16f), "wierzbowa_splawikowa" => C(0.82f, 0.78f, 0.5f),
             "cisowy_spinning" => C(0.66f, 0.32f, 0.2f), "grabowy_gruntowy" => C(0.72f, 0.68f, 0.6f), "trzcinowa_odleglosciowa" => C(0.9f, 0.8f, 0.48f),
             "jesionowy_spinning" => C(0.8f, 0.66f, 0.4f), "sumowy_kij" => C(0.32f, 0.2f, 0.12f), "wedka_mistrza" => C(0.6f, 0.38f, 0.2f),
-            _ => C(0.86f, 0.74f, 0.46f),
+            _ => r.BlankColor.Lightened(0.25f),     // the makers' lacquered blanks
         };
         var shade = wood.Darkened(0.3f);
         // Spinning rods are short and stiff, float rods long.
@@ -261,8 +261,8 @@ public static class Icons
                 c.Line(10 + (tipX - 10) * t, 56 - (56 - tipY) * t, 10 + (tipX - 10) * (t + 0.08f), 56 - (56 - tipY) * (t + 0.08f), 2.2f, C(0.9f, 0.8f, 0.55f));
         if (r.ItemId == "sumowy_kij")                        // horn tip
             c.Line(10 + (tipX - 10) * 0.85f, 56 - (56 - tipY) * 0.85f, tipX - 1, tipY - 1, 2.6f, C(0.92f, 0.88f, 0.78f));
-        c.Line(6, 60, 20, 45, 5f, C(0.36f, 0.22f, 0.13f));                      // leather grip
-        c.Line(6, 59, 19, 45, 3f, C(0.5f, 0.32f, 0.18f));
+        c.Line(6, 60, 20, 45, 5f, r.FoamGrip ? C(0.06f, 0.06f, 0.07f) : C(0.36f, 0.22f, 0.13f));   // foam or leather grip
+        c.Line(6, 59, 19, 45, 3f, r.FoamGrip ? C(0.16f, 0.16f, 0.18f) : C(0.5f, 0.32f, 0.18f));
         foreach (float t in new[] { 0.35f, 0.55f, 0.72f, 0.86f })
             c.Disc(10 + (tipX - 10) * t + 1.5f, 56 - (56 - tipY) * t + 1.5f, 1.4f, 1.4f, C(0.75f, 0.6f, 0.3f));   // brass guides
         c.Disc(23, 41, 2.2f, 2.2f, C(0.85f, 0.8f, 0.6f));                                   // twine wrap
@@ -275,7 +275,7 @@ public static class Icons
         {
             "mlynek1000" => C(0.55f, 0.36f, 0.2f), "mlynek3000" => C(0.5f, 0.52f, 0.56f), "szpula_lipowa" => C(0.86f, 0.74f, 0.52f),
             "orzechowy_lekki" => C(0.42f, 0.27f, 0.16f), "mosiezny_hamulec" => C(0.8f, 0.62f, 0.28f), "beben_sumowy" => C(0.3f, 0.3f, 0.33f),
-            _ => C(0.85f, 0.66f, 0.25f),
+            _ => r.BodyColor.Lightened(0.2f),
         };
         float rr = 14f + 5f * Math.Clamp(r.LineCapacity / 220f, 0f, 1f);
         c.Rect(28, 8, 34, 20, C(0.32f, 0.22f, 0.14f));                                   // foot
@@ -283,6 +283,8 @@ public static class Icons
         c.Disc(30, 36, rr * 0.6f, rr * 0.6f, C(0.85f, 0.78f, 0.6f), C(0.7f, 0.62f, 0.45f));          // line on the spool
         if (r.ItemId == "mosiezny_hamulec" || r.ItemId == "freerunner")
             c.Ring(30, 36, rr - 1.5f, 1.5f, C(1f, 0.86f, 0.5f));                        // brass rim
+        else if (body == r.BodyColor.Lightened(0.2f))
+            c.Ring(30, 36, rr - 1.5f, 1.5f, r.TrimColor.Lightened(0.15f));               // the maker's trim
         c.Disc(30, 36, 4, 4, body.Darkened(0.4f));
         c.Line(30, 36, 50, 50, 3f, body.Darkened(0.2f));                                // handle arm
         c.Disc(52, 52, 4.5f, 4.5f, C(0.3f, 0.2f, 0.12f), C(0.2f, 0.13f, 0.08f));       // knob
@@ -334,6 +336,86 @@ public static class Icons
             c.Line(x, y, x + 6, y + 7, 1.5f, iron);
             c.Line(x, y, x + 6, y - 7, 1.5f, iron);
             c.Line(x, y, x + 8, y, 1.5f, iron);
+        }
+        var eye = C(0.95f, 0.8f, 0.15f);
+        var pupil = C(0.05f, 0.05f, 0.05f);
+        switch (shape)
+        {
+            case "jig":          // casting jig: a long metal slab
+                c.Disc(32, 32, 24, 6, main, main.Darkened(0.3f));
+                c.Disc(32, 29, 21, 3, acc, acc.Darkened(0.2f));
+                c.Line(16, 30, 44, 30, 1f, main.Lightened(0.5f));
+                c.Disc(13, 31, 1.8f, 1.8f, eye);
+                Treble(56, 32);
+                c.Ring(6, 32, 2.5f, 1.2f, iron);
+                return c;
+            case "vib":          // lipless vibration: a tall flat body, the eye on its back
+                c.Disc(32, 32, 16, 11, main, main.Darkened(0.25f));
+                c.Disc(32, 36, 15, 6, acc, acc.Darkened(0.2f));
+                c.Disc(21, 30, 2.4f, 2.4f, eye);
+                c.Disc(21, 30, 1.2f, 1.2f, pupil);
+                c.Ring(26, 20, 2.2f, 1.1f, iron);
+                Treble(30, 44);
+                Treble(46, 40);
+                return c;
+            case "pencil":       // topwater walker: a long cigar
+                c.Disc(32, 32, 26, 6, main, main.Darkened(0.25f));
+                c.Disc(32, 34, 24, 3.5f, acc, acc.Darkened(0.2f));
+                c.Disc(10, 31, 2f, 2f, eye);
+                c.Disc(10, 31, 1f, 1f, pupil);
+                Treble(28, 39);
+                Treble(58, 32);
+                return c;
+            case "shad":
+                c.Disc(32, 32, 17, 11, main, main.Darkened(0.25f));
+                c.Disc(32, 36, 16, 6, acc, acc.Darkened(0.2f));
+                c.Disc(19, 29, 2.4f, 2.4f, eye);
+                c.Disc(19, 29, 1.2f, 1.2f, pupil);
+                c.Line(15, 36, 9, 41, 2.5f, C(0.85f, 0.88f, 0.92f));
+                Treble(30, 44);
+                Treble(49, 32);
+                return c;
+            case "swimbait":     // two jointed halves and a tail
+                c.Disc(22, 32, 13, 9, main, main.Darkened(0.25f));
+                c.Disc(42, 32, 11, 7.5f, main, main.Darkened(0.25f));
+                c.Disc(22, 35, 12, 5, acc, acc.Darkened(0.2f));
+                c.Disc(42, 35, 10, 4, acc, acc.Darkened(0.2f));
+                c.Line(32, 25, 32, 39, 1.2f, dark);
+                c.Disc(56, 32, 3, 8, dark);
+                c.Disc(14, 30, 2.4f, 2.4f, eye);
+                c.Disc(14, 30, 1.2f, 1.2f, pupil);
+                return c;
+            case "spinnerbait":  // the bent wire, a blade up top, a skirted head below
+                c.Line(8, 34, 30, 14, 1.4f, iron);
+                c.Line(8, 34, 26, 38, 1.4f, iron);
+                c.Disc(36, 12, 8, 4, main.Lightened(0.2f), main.Darkened(0.2f));
+                c.Disc(28, 38, 5, 5, main, main.Darkened(0.3f));
+                for (int k = 0; k < 7; k++)
+                    c.Line(31, 38, 54, 31 + k * 2.4f, 1.6f, k % 3 == 0 ? main : acc);
+                return c;
+            case "tailspinner":  // a lead fish with a blade behind
+                c.Disc(26, 32, 15, 8, main, main.Darkened(0.25f));
+                c.Disc(26, 35, 14, 4.5f, acc, acc.Darkened(0.2f));
+                c.Disc(15, 30, 2f, 2f, pupil);
+                c.Line(41, 32, 47, 32, 1.4f, iron);
+                c.Disc(53, 32, 7, 4, C(0.88f, 0.88f, 0.9f), C(0.6f, 0.6f, 0.62f));
+                Treble(24, 41);
+                return c;
+            case "frog":
+                c.Disc(30, 32, 15, 11, main, main.Darkened(0.3f));
+                c.Disc(30, 36, 13, 6, acc, acc.Darkened(0.2f));
+                c.Disc(20, 24, 3, 3, eye);
+                c.Disc(20, 24, 1.4f, 1.4f, pupil);
+                c.Disc(30, 22, 3, 3, eye);
+                c.Disc(30, 22, 1.4f, 1.4f, pupil);
+                foreach (int dy in new[] { -6, 0, 6 })
+                    c.Line(44, 32, 58, 32 + dy * 1.4f, 1.6f, acc);
+                return c;
+            case "stick":
+                c.Line(12, 32, 54, 32, 7.5f, main);
+                c.Line(14, 30, 52, 30, 1.2f, main.Lightened(0.3f));
+                c.Line(18, 26, 22, 20, 1.5f, iron);
+                return c;
         }
         switch (Core.Methods.Method.FamilyOf(b.AffinityAs))
         {

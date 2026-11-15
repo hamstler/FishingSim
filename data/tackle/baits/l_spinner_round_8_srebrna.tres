@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Obrotówka okrągła nr 3, srebrna"
+DisplayName = "Loirette Ronde · Obrotówka okrągła nr 3, srebrna"
 Kind = 3
 AffinityAs = "spinner"
 AffinityScale = 1

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ReelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/ReelData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Fjordline Freespool 6000 · wolny bieg szpuli"
+DragMax = 10.0
+ReelSpeed = 3.0
+LineCapacity = 250.0
+Price = 520
+RequiredLevel = 4
+Description = "Duża szpula i mocny hamulec na długie odjazdy karpi i amurów z dalekich łowisk."
+BodyColor = Color(0.1, 0.14, 0.1, 1)
+TrimColor = Color(0.78, 0.6, 0.3, 1)

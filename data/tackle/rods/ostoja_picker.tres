@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Ostoja Picker 2,7 m · lekki gruntowy"
+Kind = 2
+CastMult = 1.0
+MaxLoad = 4.0
+ShockAbsorb = 0.28
+Action = 0.7
+Price = 140
+RequiredLevel = 1
+Description = "Lekka gruntówka z miękką szczytówką: drobne leszcze, płocie i krąpie na koszyczek przy brzegu."
+BlankColor = Color(0.18, 0.22, 0.14, 1)
+WhipColor = Color(0.75, 0.62, 0.3, 1)
+FoamGrip = false

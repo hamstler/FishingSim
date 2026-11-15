@@ -4,10 +4,12 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Lekki kołowrotek z orzecha"
+DisplayName = "Fjordline Lett 2000 · lekki kołowrotek z orzecha"
 DragMax = 3.0
 ReelSpeed = 3.6
 LineCapacity = 80.0
 Price = 140
 RequiredLevel = 2
 Description = "Lekki i szybki: do zwijania sztucznych przynęt."
+BodyColor = Color(0.35, 0.22, 0.12, 1)
+TrimColor = Color(0.75, 0.62, 0.3, 1)

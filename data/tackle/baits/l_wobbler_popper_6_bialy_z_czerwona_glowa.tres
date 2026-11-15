@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Popper powierzchniowy 6 cm, biały z czerwoną głową"
+DisplayName = "Bayou Bill Chug · Popper powierzchniowy 6 cm, biały z czerwoną głową"
 Kind = 3
 AffinityAs = "wobbler"
 AffinityScale = 1

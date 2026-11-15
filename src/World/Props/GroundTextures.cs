@@ -35,8 +35,10 @@ public static class GroundTextures
     /// </summary>
     private static readonly string[] Photos = { "leafy_grass", "forrest_ground_01", "damp_beach_sand", "rocky_trail", "dry_river_pebbles", "rock_face_04", "snow_02" };
 
-    public const int PhotoSize = 2048;
-    private const int PhotoVersion = 1;
+    /// <summary>The photographed grounds and barks at full 4K (2048 px per metre); TextureStore.MaxSize reads them
+    /// smaller on the lower quality settings (the top mipmap levels are skipped).</summary>
+    public const int PhotoSize = 4096;
+    private const int PhotoVersion = 2;
 
     private static bool UsePhotos => Array.TrueForAll(Photos, Graphics.PhotoTextures.Has);
 

@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Dębowa tyka na karpie"
+DisplayName = "Kaminari Carp Hunter 3,6 m · dębowa karpiówka"
 CastMult = 1.15
 MaxLoad = 12.0
 ShockAbsorb = 0.12
@@ -13,3 +13,6 @@ RequiredLevel = 5
 Action = 0.9
 Kind = 3
 Description = "Sztywna i mocna, pracuje całym blankiem: na karpie i amury."
+BlankColor = Color(0.05, 0.05, 0.05, 1)
+WhipColor = Color(0.08, 0.08, 0.08, 1)
+FoamGrip = true

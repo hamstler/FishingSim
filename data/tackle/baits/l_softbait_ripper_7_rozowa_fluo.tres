@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Ripper 7 cm, główka 10 g, różowa fluo"
+DisplayName = "Bayou Bill Paddle · Ripper 7 cm, główka 10 g, różowa fluo"
 Kind = 3
 AffinityAs = "softbait"
 AffinityScale = 1

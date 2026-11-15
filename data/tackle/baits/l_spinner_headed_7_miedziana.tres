@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Obrotówka z ołowianą główką, miedziana"
+DisplayName = "Loirette Plombée · Obrotówka z ołowianą główką, miedziana"
 Kind = 3
 AffinityAs = "spinner"
 AffinityScale = 1.05

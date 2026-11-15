@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Ironwood Esox Magnum 2,4 m · ciężki spinning"
+Kind = 1
+CastMult = 1.15
+MaxLoad = 14.0
+ShockAbsorb = 0.08
+Action = 0.25
+Price = 700
+RequiredLevel = 6
+Description = "Kij do wielkich przynęt (swimbaity, duże jerki i żaby): wytrzyma największego szczupaka i niejednego suma."
+BlankColor = Color(0.25, 0.08, 0.06, 1)
+WhipColor = Color(0.08, 0.08, 0.08, 1)
+FoamGrip = true

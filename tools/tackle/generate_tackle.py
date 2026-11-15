@@ -71,12 +71,30 @@ def col(c):
 
 LURES = []
 
+# Invented makers (no real trademarks): each evokes a style and an origin, not a real company's name.
+BRANDS = {
+    ("spinner", "round"): "Loirette Ronde", ("spinner", "long"): "Loirette Saule", ("spinner", "tail"): "Loirette Plumet",
+    ("spinner", "headed"): "Loirette Plombée", ("spinner", "tailspinner"): "Loirette Comète",
+    ("spinner", "spinnerbait"): "Bayou Bill Reed Blade",
+    ("spoon", "classic"): "Nordvik Fjell", ("spoon", "narrow"): "Nordvik Sild", ("spoon", "wide"): "Nordvik Brede",
+    ("spoon", "jig"): "Nordvik Stål Jig",
+    ("wobbler", "minnow"): "Saimaa Craft Salmi", ("wobbler", "crank"): "Saimaa Craft Syvä",
+    ("wobbler", "jerk"): "Saimaa Craft Hauki Jerk", ("wobbler", "shad"): "Saimaa Craft Kuha Shad",
+    ("wobbler", "popper"): "Bayou Bill Chug", ("wobbler", "vib"): "Kawase Shindō Vib",
+    ("wobbler", "pencil"): "Kawase Kaze Walker", ("wobbler", "swimbait"): "Kawase Nami Swim",
+    ("softbait", "ripper"): "Bayou Bill Paddle", ("softbait", "twister"): "Bayou Bill Curly",
+    ("softbait", "worm"): "Bayou Bill Crawler", ("softbait", "craw"): "Bayou Bill Mud Craw",
+    ("softbait", "stick"): "Bayou Bill Stik", ("softbait", "frog"): "Bayou Bill Lily Frog",
+    ("fly", "dry"): "Highland Fly Co.", ("fly", "nymph"): "Highland Fly Co.", ("fly", "wet"): "Highland Fly Co.",
+    ("fly", "streamer"): "Highland Fly Co.",
+}
+
 
 def lure(family, shape, title, colour, size_cm, weight_g, price, level, desc, sink_scale=1.0, sink_offset=0.0,
          depth_scale=1.0, depth_offset=0.0, affinity=1.0):
     name, main, accent, pattern, metal = colour
     ident = "l_" + slug(f"{family}_{shape}_{num(size_cm if family != 'spinner' else weight_g)}_{name}")
-    LURES.append(dict(id=ident, family=family, shape=shape, name=f"{title}, {name}", main=main, accent=accent,
+    LURES.append(dict(id=ident, family=family, shape=shape, name=f"{BRANDS[(family, shape)]} · {title}, {name}", main=main, accent=accent,
                       pattern=pattern, metal=metal, size=size_cm, weight=weight_g, price=price, level=level,
                       desc=desc, sink_scale=sink_scale, sink_offset=sink_offset, depth_scale=depth_scale,
                       depth_offset=depth_offset, affinity=affinity))
@@ -161,6 +179,49 @@ for c in [BROWN, GREEN]:
 lure("softbait", "ripper", "Ripper szczupakowy 14 cm, główka 25 g", PEARL, 14, 25, 45, 4,
      "Duża guma na szczupaki i sandacze z głębokiej wody.", sink_scale=1.8)
 
+# ---------------------------------------------------------------- newer shapes
+for g, cm, price, lvl in [(10, 6.0, 48, 2), (20, 7.5, 62, 3)]:
+    for c in [SILVER, GOLD, BLUE_HERRING]:
+        lure("spinner", "tailspinner", f"Obrotówka z ołowianym korpusem {num(g)} g", c, cm, g, price, lvl,
+             "Ciężki ołowiany korpus i skrzydełko na ogonie: rzuca się jak wahadłówką, tonie szybko, na bolenie i okonie z głębi.",
+             sink_scale=2.0, depth_scale=1.8, affinity=1.05)
+for g, cm, c, price, lvl in [(14, 9.0, WHITE_RED, 70, 3), (14, 9.0, CHARTREUSE, 70, 3)]:
+    lure("spinner", "spinnerbait", f"Spinnerbait {num(g)} g", c, cm, g, price, lvl,
+         "Ramię z dwoma skrzydełkami nad główką ze spódniczką: przechodzi przez zielsko bez zaczepów. Na szczupaki.",
+         sink_scale=1.2, depth_scale=1.0, affinity=1.1)
+for g, cm, price, lvl in [(20, 6.0, 40, 2), (40, 8.0, 55, 3)]:
+    for c in [SILVER, PERCH_SPOON]:
+        lure("spoon", "jig", f"Pilker {num(g)} g", c, cm, g, price, lvl,
+             "Ciężka, smukła blacha do łowienia pionowego i dalekich rzutów: opada jak kamień, podrywana błyska przy dnie.",
+             sink_scale=2.2, depth_scale=1.4)
+for cm, g, price, lvl in [(5, 9, 75, 2), (7, 18, 95, 3)]:
+    for c in [SILVER, FIRETIGER, PERCH]:
+        lure("wobbler", "vib", f"Cykada-wibrator {num(cm)} cm", c, cm, g, price, lvl,
+             "Bezsterowy, tonący wibrator: drży przy każdym zwijaniu i rzuca się bardzo daleko. Sandacze i okonie w toni.",
+             sink_offset=0.6, depth_scale=0.9)
+for c in [WHITE_RED, ROACH, BLACK_GOLD]:
+    lure("wobbler", "pencil", "Pencil walker 9 cm", c, 9, 11, 85, 3,
+         "Ołówek bez steru prowadzony zygzakiem po powierzchni (podszarpnięcia PPM): bolenie i szczupaki o świcie.",
+         depth_scale=0.0)
+for cm, g, depth, price, lvl in [(8, 12, 1.4, 95, 3), (12, 25, 2.0, 135, 4)]:
+    for c in [PERCH, ROACH, TROUT]:
+        lure("wobbler", "shad", f"Wobler shad {num(cm)} cm", c, cm, g, price, lvl,
+             "Wysoka, krępa rybka ze średnim sterem: mocna praca, schodzi do ok. " + num(round(0.8 * depth, 1)) + " m.",
+             depth_scale=depth)
+for c in [TROUT, PIKE, ROACH]:
+    lure("wobbler", "swimbait", "Swimbait łamany 16 cm", c, 16, 45, 180, 5,
+         "Trzyczęściowa rybka na zawiasach płynie esowato jak prawdziwa: duże szczupaki i sumy.",
+         sink_offset=0.2, depth_scale=1.2, affinity=1.15)
+for cm, g, price, lvl in [(10, 5, 20, 2), (13, 7, 26, 3)]:
+    for c in [MOTOR_OIL, GREEN, BLACK_SOFT]:
+        lure("softbait", "stick", f"Gumowy stick {num(cm)} cm, obciążenie {num(g)} g", c, cm, g, price, lvl,
+             "Prosty, ciężki wałek bez ogonka: opada drżąc, na zestawie bez zaczepów. Okonie i klenie przy zielsku.",
+             sink_scale=0.5 + g / 15.0)
+for c in [FROG, BLACK, YELLOW]:
+    lure("softbait", "frog", "Żaba pływająca 6 cm", c, 6, 14, 48, 3,
+         "Pusta guma z ukrytymi hakami ślizga się po liściach grążeli: szczupaki w płyciznach z zielskiem.",
+         sink_scale=0.0, depth_scale=0.0, affinity=1.1)
+
 # ---------------------------------------------------------------- flies (muchy)
 for title, c in [("jętka", ("jasna", (0.85, 0.82, 0.6), (0.7, 0.65, 0.5), "plain", False)),
                  ("chruścik", ("brązowy", (0.45, 0.3, 0.15), (0.6, 0.45, 0.25), "plain", False)),
@@ -195,7 +256,7 @@ def line(kind, diameter, colour_name, colour, level):
         strength = 105 * d * d
         visibility = {"przezroczysta": 0.85, "zielona": 0.8, "brązowa": 0.82, "żółta fluo": 1.15}[colour_name] + d * 0.5
         stretch = 0.55
-        title = f"Żyłka {num(d)} mm, {colour_name}"
+        title = f"Vistula Mono {num(d)} mm, {colour_name}"
         price = int(8 + strength * 4)
         desc = "Rozciągliwa żyłka pochłania zrywy ryby i unosi się lekko na wodzie."
         ident = f"g_zylka_{int(round(d * 100)):03d}_{slug(colour_name)}"
@@ -206,7 +267,7 @@ def line(kind, diameter, colour_name, colour, level):
                       "wielokolorowa": 1.25}[colour_name] + d * 0.5
         stretch = 0.05
         splot = "8-splotowa" if d <= 0.12 else "4-splotowa"
-        title = f"Plecionka {splot} {num(d)} mm, {colour_name}"
+        title = f"Kraken Braid X{8 if d <= 0.12 else 4} {num(d)} mm, {colour_name}"
         price = int(20 + strength * 6)
         desc = "Bardzo mocna jak na swoją grubość i nierozciągliwa: daleki rzut i pewne zacięcie, ale zrywy idą prosto w wędkę."
         ident = f"g_plecionka_{int(round(d * 100)):03d}_{slug(colour_name)}"
@@ -215,7 +276,7 @@ def line(kind, diameter, colour_name, colour, level):
         strength = 90 * d * d
         visibility = 0.62 + d * 0.4
         stretch = 0.4
-        title = f"Fluorocarbon {num(d)} mm"
+        title = f"Glasswater Fluorocarbon {num(d)} mm"
         price = int(30 + strength * 9)
         desc = "Prawie niewidoczny w wodzie, twardy i tonący: dla płochliwych ryb."
         ident = f"g_fluorocarbon_{int(round(d * 100)):03d}"

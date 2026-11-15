@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Jerk tonący 10 cm, okoń"
+DisplayName = "Saimaa Craft Hauki Jerk · Jerk tonący 10 cm, okoń"
 Kind = 3
 AffinityAs = "wobbler"
 AffinityScale = 1

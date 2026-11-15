@@ -466,6 +466,11 @@ Zmian, których nie rozpowszechniasz (np. własna wersja do grania w domu), nie 
 **Wkład w projekt:** wysyłając zmiany (pull request), zgadzasz się, że są one udostępniane na tej samej licencji
 (GPL 3.0 lub nowszej).
 
+**Marki sprzętu w grze są zmyślone.** Nazwy producentów wędek, kołowrotków, żyłek i przynęt (Loirette, Nordvik,
+Saimaa Craft, Kawase, Bayou Bill, Highland Fly Co., Vistula, Kraken, Glasswater, Ostoja, Kaminari, Borealis, Ironwood,
+Hokuto, Fjordline) zostały wymyślone na potrzeby gry: przypominają styl i pochodzenie prawdziwego sprzętu, ale nie są
+znakami towarowymi żadnej firmy ani ich przeróbkami. Ewentualna zbieżność z istniejącą nazwą jest przypadkowa.
+
 ### Elementy i materiały innych autorów
 - **Silnik Godot** (licencja MIT, © Juan Linietsky, Ariel Manzur i współtwórcy Godot Engine) i **.NET** (licencja MIT,
   © .NET Foundation): wbudowane w zbudowaną grę. Licencja MIT jest zgodna z GPL. Rozpowszechniając zbudowaną grę,

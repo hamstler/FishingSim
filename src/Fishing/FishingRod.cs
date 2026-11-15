@@ -526,6 +526,7 @@ public partial class FishingRod : Node3D
         _bendModel = new Core.Physics.RodBendModel(RodRig.Joints * RodRig.SegmentLength, rod.MaxLoad, rod.Action);
         // Bottom and carp rods have a bright quiver tip that shows the bites.
         _rig?.SetQuiverTip(rod.Kind is RodKind.Bottom or RodKind.Carp);
+        _rig?.SetLook(rod, reel);
         // The line floats (monofilament, braid) or sinks (fluorocarbon).
         var (sink, floats) = Core.Physics.LineRope.Behaviour((int)line.Kind);
         _rope.SinkSpeed = sink;

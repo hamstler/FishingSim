@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Nimfa: złotogłówka, zajęcza"
+DisplayName = "Highland Fly Co. · Nimfa: złotogłówka, zajęcza"
 Kind = 3
 AffinityAs = "fly"
 AffinityScale = 1

@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Gumowy robak 8 cm, główka 5 g, brązowy"
+DisplayName = "Bayou Bill Crawler · Gumowy robak 8 cm, główka 5 g, brązowy"
 Kind = 3
 AffinityAs = "softbait"
 AffinityScale = 1

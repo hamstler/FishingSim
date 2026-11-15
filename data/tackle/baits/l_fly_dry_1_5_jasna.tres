@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Mucha sucha: jętka, jasna"
+DisplayName = "Highland Fly Co. · Mucha sucha: jętka, jasna"
 Kind = 3
 AffinityAs = "fly"
 AffinityScale = 1

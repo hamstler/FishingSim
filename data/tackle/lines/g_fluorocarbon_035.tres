@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Fluorocarbon 0,35 mm"
+DisplayName = "Glasswater Fluorocarbon 0,35 mm"
 Kind = 2
 Strength = 11
 Visibility = 0.76

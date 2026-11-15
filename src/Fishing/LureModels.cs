@@ -10,8 +10,9 @@ namespace FishingSim.Fishing;
 /// colours, pattern (dots, stripes, bars, halves, glitter, red head), metal or paint, and size. Nose towards +Z, the
 /// line's eye at the origin. Spinners: round, long, with a hair tail, with a lead head (the blade turns on a node
 /// returned as <c>spin</c>); spoons: classic, narrow, wide; wobblers: minnow, crank (big lip), jerk (no lip), popper
-/// (cupped face); soft baits on a jig head: ripper, twister, worm, craw (the tail wags on <c>tail</c>); flies: dry,
-/// nymph, wet, streamer.
+/// (cupped face), vib (lipless vibration), pencil (topwater walker), shad, swimbait (jointed); spinnerbait and tail
+/// spinner; casting jig (a spoon); soft baits on a jig head: ripper, twister, worm, craw, stick, and the hollow frog
+/// (the tail wags on <c>tail</c>); flies: dry, nymph, wet, streamer.
 /// </summary>
 public static class LureModels
 {
@@ -34,15 +35,15 @@ public static class LureModels
         switch (family)
         {
             case LureFamily.Spoon:
-                nominal = 6f;
+                nominal = shape == "jig" ? 7f : 6f;
                 Spoon(root, shape, look);
                 break;
             case LureFamily.Wobbler:
-                nominal = shape == "jerk" ? 7f : 5.6f;
+                nominal = shape switch { "jerk" => 7f, "pencil" => 7.5f, "swimbait" => 9f, "vib" => 5f, _ => 5.6f };
                 Wobbler(root, shape, look);
                 break;
             case LureFamily.Softbait:
-                nominal = shape == "worm" ? 8f : 6f;
+                nominal = shape switch { "worm" => 8f, "stick" => 9f, "frog" => 5.5f, _ => 6f };
                 tail = Softbait(root, shape, look);
                 break;
             case LureFamily.Fly:
@@ -50,7 +51,7 @@ public static class LureModels
                 Fly(root, shape, look);
                 break;
             default:
-                nominal = 5f;
+                nominal = shape switch { "spinnerbait" => 6f, "tailspinner" => 5f, _ => 5f };
                 spin = Spinner(root, shape, look);
                 break;
         }
@@ -127,6 +128,10 @@ public static class LureModels
     // ------------------------------------------------------------------ spinners
     private static Node3D Spinner(Node3D root, string shape, Look look)
     {
+        if (shape == "spinnerbait")
+            return Spinnerbait(root, look);
+        if (shape == "tailspinner")
+            return TailSpinner(root, look);
         // The wire shaft, beads and the body, a treble at the back.
         Part(root, Rod(0.0007f, 0.06f, 4), Wire, new Vector3(0f, 0f, -0.03f), AlongZ);
         var bodyMat = look.Metal ? look.Body : Metallic(new Color(0.85f, 0.66f, 0.3f));
@@ -169,9 +174,63 @@ public static class LureModels
         return spin;
     }
 
+    /// <summary>A spinnerbait: a bent safety-pin wire, the blade on the upper arm, a skirted jig on the lower one.</summary>
+    private static Node3D Spinnerbait(Node3D root, Look look)
+    {
+        // The wire: from the eye at the bend, one arm up and back to the blade, one straight back to the head.
+        Part(root, Rod(0.0006f, 0.034f, 4), Wire, new Vector3(0f, 0.009f, -0.016f), new Vector3(Mathf.Pi / 2f - 0.55f, 0f, 0f));
+        Part(root, Rod(0.0006f, 0.018f, 4), Wire, new Vector3(0f, -0.002f, -0.008f), new Vector3(Mathf.Pi / 2f + 0.2f, 0f, 0f));
+        var spin = new Node3D { Position = new Vector3(0f, 0.018f, -0.03f) };
+        root.AddChild(spin);
+        var blade = new Node3D { Position = new Vector3(0.004f, 0f, -0.012f), Rotation = new Vector3(0f, 0.25f, 0f) };
+        spin.AddChild(blade);
+        Part(blade, Ball, look.Metal ? look.Body : Metallic(new Color(0.9f, 0.75f, 0.35f)), Vector3.Zero, null, new Vector3(0.009f, 0.0016f, 0.024f));
+        // The lead head, painted, with an eye; the skirt flaring behind it over the hook.
+        Part(root, Ball, Paint(look.Main, 0.35f), new Vector3(0f, -0.004f, -0.017f), null, new Vector3(0.009f, 0.01f, 0.012f));
+        Part(root, Ball, EyeYellow, new Vector3(0.0038f, -0.002f, -0.014f), null, new Vector3(0.003f, 0.003f, 0.003f));
+        var skirt = Paint(look.Accent, 0.8f);
+        for (int i = 0; i < 14; i++)
+        {
+            float a = i / 14f * Mathf.Tau;
+            Part(root, new BoxMesh { Size = new Vector3(0.0012f, 0.0004f, 0.03f) }, i % 3 == 0 ? Paint(look.Main, 0.8f) : skirt,
+                new Vector3(MathF.Cos(a) * 0.003f, -0.004f + MathF.Sin(a) * 0.003f, -0.036f), new Vector3(MathF.Sin(a) * 0.18f, 0f, a));
+        }
+        Part(root, Rod(0.0007f, 0.03f, 4), Steel, new Vector3(0f, -0.004f, -0.035f), AlongZ);
+        return spin;
+    }
+
+    /// <summary>A tail spinner: a heavy lead body like a little fish, the blade turning behind it.</summary>
+    private static Node3D TailSpinner(Node3D root, Look look)
+    {
+        Part(root, Ball, Paint(look.Main, 0.35f), new Vector3(0f, 0f, -0.018f), null, new Vector3(0.011f, 0.016f, 0.034f));
+        Part(root, Ball, Paint(look.Accent, 0.35f), new Vector3(0f, -0.003f, -0.018f), null, new Vector3(0.0115f, 0.009f, 0.03f));
+        foreach (float x in new[] { -0.0052f, 0.0052f })
+            Part(root, Ball, EyeBlack, new Vector3(x, 0.002f, -0.008f), null, new Vector3(0.0028f, 0.0028f, 0.0028f));
+        Treble(root, new Vector3(0f, -0.009f, -0.02f), 0.009f);
+        Part(root, Rod(0.0006f, 0.014f, 4), Wire, new Vector3(0f, 0f, -0.04f), AlongZ);
+        var spin = new Node3D { Position = new Vector3(0f, 0f, -0.04f) };
+        root.AddChild(spin);
+        var blade = new Node3D { Position = new Vector3(0.005f, 0f, -0.01f), Rotation = new Vector3(0f, 0.3f, 0f) };
+        spin.AddChild(blade);
+        Part(blade, Ball, look.Metal ? look.Body : Metallic(new Color(0.88f, 0.88f, 0.9f)), Vector3.Zero, null, new Vector3(0.008f, 0.0016f, 0.015f));
+        return spin;
+    }
+
     // ------------------------------------------------------------------ spoons
     private static void Spoon(Node3D root, string shape, Look look)
     {
+        if (shape == "jig")
+        {
+            // A casting jig: a heavy slab of metal, a lure-coloured flank, an assist hook at the nose.
+            Part(root, Ball, look.Body, new Vector3(0f, 0f, -0.032f), null, new Vector3(0.009f, 0.013f, 0.062f));
+            Part(root, Ball, Paint(look.Accent, 0.3f), new Vector3(0f, 0.004f, -0.032f), null, new Vector3(0.0092f, 0.006f, 0.056f));
+            foreach (float x in new[] { -0.0044f, 0.0044f })
+                Part(root, Ball, EyeYellow, new Vector3(x, 0.001f, -0.008f), null, new Vector3(0.0034f, 0.0034f, 0.0034f));
+            Part(root, new TorusMesh { InnerRadius = 0.003f, OuterRadius = 0.0036f, Rings = 10, RingSegments = 4 }, Steel,
+                new Vector3(0f, -0.006f, -0.006f), new Vector3(0f, Mathf.Pi / 2f, 0f), new Vector3(1f, 1f, 0.5f));
+            Treble(root, new Vector3(0f, 0f, -0.066f), 0.01f);
+            return;
+        }
         var size = shape switch
         {
             "narrow" => new Vector3(0.012f, 0.005f, 0.06f),
@@ -210,8 +269,16 @@ public static class LureModels
     // ------------------------------------------------------------------ wobblers
     private static void Wobbler(Node3D root, string shape, Look look)
     {
+        if (shape == "swimbait")
+        {
+            Swimbait(root, look);
+            return;
+        }
         var body = shape switch
         {
+            "vib" => new Vector3(0.008f, 0.026f, 0.05f),
+            "pencil" => new Vector3(0.012f, 0.013f, 0.075f),
+            "shad" => new Vector3(0.012f, 0.024f, 0.048f),
             "crank" => new Vector3(0.017f, 0.022f, 0.042f),
             "jerk" => new Vector3(0.014f, 0.02f, 0.07f),
             "popper" => new Vector3(0.016f, 0.017f, 0.045f),
@@ -257,6 +324,11 @@ public static class LureModels
                     new Vector3(0f, 0f, -0.0025f), AlongZ);
                 break;
             case "jerk":
+            case "vib":
+            case "pencil":
+                break;     // no lip: the vibration's line eye sits on its back, the pencil walks on the surface
+            case "shad":
+                Part(root, new BoxMesh { Size = new Vector3(0.01f, 0.0012f, 0.014f) }, clear, new Vector3(0f, -0.007f, 0.004f), new Vector3(0.5f, 0f, 0f));
                 break;
             default:
                 Part(root, new BoxMesh { Size = new Vector3(0.012f, 0.0012f, 0.016f) }, clear, new Vector3(0f, -0.006f, 0.004f), new Vector3(0.6f, 0f, 0f));
@@ -266,9 +338,39 @@ public static class LureModels
         Treble(root, new Vector3(0f, -body.Y * 0.1f, -0.004f - body.Z), 0.009f);
     }
 
+    /// <summary>A jointed swimbait: a fish in two halves on a hinge, the tail paddle at the back, a small lip.</summary>
+    private static void Swimbait(Node3D root, Look look)
+    {
+        var front = new Vector3(0.016f, 0.024f, 0.034f);
+        Part(root, Ball, Paint(look.Main, 0.3f), new Vector3(0f, 0f, -0.018f), null, front);
+        Part(root, Ball, Paint(look.Accent, 0.3f), new Vector3(0f, -0.004f, -0.018f), null, new Vector3(0.0165f, 0.015f, 0.031f));
+        foreach (float x in new[] { -0.0076f, 0.0076f })
+        {
+            Part(root, Ball, EyeYellow, new Vector3(x, 0.003f, -0.007f), null, new Vector3(0.0048f, 0.0048f, 0.0048f));
+            Part(root, Ball, EyeBlack, new Vector3(x * 1.06f, 0.003f, -0.007f), null, new Vector3(0.0028f, 0.0028f, 0.0028f));
+        }
+        var back = new Node3D { Position = new Vector3(0f, 0f, -0.035f) };
+        root.AddChild(back);
+        Part(back, Ball, Paint(look.Main, 0.3f), new Vector3(0f, 0f, -0.016f), null, new Vector3(0.014f, 0.02f, 0.032f));
+        Part(back, Ball, Paint(look.Accent, 0.3f), new Vector3(0f, -0.004f, -0.016f), null, new Vector3(0.0145f, 0.012f, 0.029f));
+        Part(back, new BoxMesh { Size = new Vector3(0.002f, 0.02f, 0.01f) }, Paint(look.Dark, 0.4f), new Vector3(0f, 0f, -0.035f));
+        if (look.Pattern == "bars")
+            for (int i = 0; i < 3; i++)
+                Part(root, new BoxMesh { Size = new Vector3(0.017f, 0.012f, 0.003f) }, Paint(look.Dark, 0.3f), new Vector3(0f, 0.004f, -0.01f - i * 0.008f));
+        var clear = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(0.9f, 0.95f, 1f, 0.45f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, Roughness = 0.05f,
+        };
+        Part(root, new BoxMesh { Size = new Vector3(0.012f, 0.0012f, 0.012f) }, clear, new Vector3(0f, -0.008f, 0.003f), new Vector3(0.6f, 0f, 0f));
+        Treble(root, new Vector3(0f, -0.012f, -0.022f), 0.01f);
+        Treble(back, new Vector3(0f, -0.01f, -0.02f), 0.01f);
+    }
+
     // ------------------------------------------------------------------ soft baits on a jig head
     private static Node3D Softbait(Node3D root, string shape, Look look)
     {
+        if (shape == "frog")
+            return Frog(root, look);
         // The jig head: lead, or red with a red-head pattern; an eye; the hook's point standing up out of the back.
         Part(root, Ball, look.Pattern == "redhead" ? Paint(new Color(0.8f, 0.1f, 0.08f), 0.4f) : Lead, new Vector3(0f, 0f, -0.005f), null,
             new Vector3(0.0136f, 0.0136f, 0.0136f));
@@ -304,6 +406,16 @@ public static class LureModels
                     new Vector3(0f, 0f, -0.008f), new Vector3(-Mathf.Pi / 2f, 0f, 0f));
                 break;
             }
+            case "stick":
+            {
+                // A soft stick worm: a plain thick cigar of plastic that wobbles slowly as it falls.
+                Part(root, new CylinderMesh { TopRadius = 0.0048f, BottomRadius = 0.004f, Height = 0.07f, RadialSegments = 10, Rings = 4 }, soft,
+                    new Vector3(0f, 0f, -0.045f), new Vector3(-Mathf.Pi / 2f, 0f, 0f));
+                tail = new Node3D { Position = new Vector3(0f, 0f, -0.08f) };
+                root.AddChild(tail);
+                Part(tail, Ball, soft, new Vector3(0f, 0f, -0.002f), null, new Vector3(0.008f, 0.008f, 0.008f));
+                break;
+            }
             case "craw":
             {
                 Part(root, Ball, soft, new Vector3(0f, 0f, -0.024f), null, new Vector3(0.011f, 0.008f, 0.03f));
@@ -333,6 +445,31 @@ public static class LureModels
         }
         if (look.Pattern == "glitter")
             Dots(root, look, new Vector3(0f, 0f, -0.032f), new Vector3(0.004f, 0.004f, 0.018f), 14, 9, 0.0012f);
+        return tail;
+    }
+
+    /// <summary>A hollow soft frog for the lily pads: two upturned hooks along its back, legs of rubber strands.</summary>
+    private static Node3D Frog(Node3D root, Look look)
+    {
+        var skin = Paint(look.Main, 0.55f);
+        Part(root, Ball, skin, new Vector3(0f, 0f, -0.02f), null, new Vector3(0.022f, 0.014f, 0.034f));
+        Part(root, Ball, Paint(look.Accent, 0.55f), new Vector3(0f, -0.004f, -0.02f), null, new Vector3(0.021f, 0.008f, 0.03f));
+        foreach (float x in new[] { -0.007f, 0.007f })
+        {
+            Part(root, Ball, EyeYellow, new Vector3(x, 0.006f, -0.01f), null, new Vector3(0.006f, 0.006f, 0.006f));
+            Part(root, Ball, EyeBlack, new Vector3(x, 0.0085f, -0.0105f), null, new Vector3(0.003f, 0.003f, 0.003f));
+            // Double hook points riding on its back.
+            Part(root, Rod(0.0006f, 0.012f, 4), Steel, new Vector3(x * 0.6f, 0.008f, -0.03f), new Vector3(Mathf.Pi / 2f - 0.5f, 0f, 0f));
+        }
+        if (look.Pattern == "dots")
+            Dots(root, look, new Vector3(0f, 0.004f, -0.022f), new Vector3(0.007f, 0.002f, 0.012f), 8, 21, 0.0035f);
+        var tail = new Node3D { Position = new Vector3(0f, 0f, -0.036f) };
+        root.AddChild(tail);
+        var legs = Paint(look.Accent, 0.7f);
+        foreach (float side in new[] { -1f, 1f })
+            for (int i = 0; i < 3; i++)
+                Part(tail, new BoxMesh { Size = new Vector3(0.0012f, 0.0006f, 0.03f) }, legs,
+                    new Vector3(side * (0.004f + i * 0.0015f), 0f, -0.014f), new Vector3(0f, side * (0.15f + i * 0.08f), 0f));
         return tail;
     }
 

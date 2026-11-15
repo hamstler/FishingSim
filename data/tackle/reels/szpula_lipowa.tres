@@ -4,10 +4,12 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Szpula z lipy"
+DisplayName = "Ostoja Classic · szpula z lipy"
 DragMax = 1.5
 ReelSpeed = 1.6
 LineCapacity = 50.0
 Price = 20
 RequiredLevel = 1
 Description = "Najtańsza szpula z lipowego drewna."
+BodyColor = Color(0.55, 0.4, 0.25, 1)
+TrimColor = Color(0.7, 0.55, 0.3, 1)

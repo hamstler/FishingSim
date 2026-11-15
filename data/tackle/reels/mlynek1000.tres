@@ -4,10 +4,12 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Drewniany kołowrotek"
+DisplayName = "Hokuto Sora 1000 · drewniany kołowrotek"
 DragMax = 2.0
 ReelSpeed = 1.9
 LineCapacity = 60.0
 Price = 35
 RequiredLevel = 1
 Description = "Prosty kołowrotek z drewna na małe ryby."
+BodyColor = Color(0.25, 0.25, 0.27, 1)
+TrimColor = Color(0.6, 0.6, 0.62, 1)

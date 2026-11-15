@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Wobler głęboko nurkujący 5 cm, tygrys fluo"
+DisplayName = "Saimaa Craft Syvä · Wobler głęboko nurkujący 5 cm, tygrys fluo"
 Kind = 3
 AffinityAs = "wobbler"
 AffinityScale = 1

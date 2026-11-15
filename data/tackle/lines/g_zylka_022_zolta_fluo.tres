@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Żyłka 0,22 mm, żółta fluo"
+DisplayName = "Vistula Mono 0,22 mm, żółta fluo"
 Kind = 0
 Strength = 5.1
 Visibility = 1.26

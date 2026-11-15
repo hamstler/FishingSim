@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BaitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/BaitData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Bayou Bill Stik · Gumowy stick 10 cm, obciążenie 5 g, zielony"
+Kind = 3
+AffinityAs = "softbait"
+AffinityScale = 1
+Reusable = true
+StartCount = 1
+PackSize = 1
+Price = 20
+RequiredLevel = 2
+Description = "Prosty, ciężki wałek bez ogonka: opada drżąc, na zestawie bez zaczepów. Okonie i klenie przy zielsku."
+Shape = "stick"
+LureColor = Color(0.3, 0.42, 0.18, 1)
+AccentColor = Color(0.15, 0.2, 0.08, 1)
+Pattern = "plain"
+Metallic = false
+SizeCm = 10
+WeightG = 5
+SinkScale = 0.833
+SinkOffset = 0
+DepthScale = 1
+DepthOffset = 0
