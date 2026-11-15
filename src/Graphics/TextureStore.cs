@@ -71,13 +71,7 @@ public static class TextureStore
     /// Bigger pictures lose their top mipmap levels as they are read (a quarter of the memory per level; nothing is
     /// repainted). Takes effect for textures loaded after a change (restart for the whole world).
     /// </summary>
-    public static int MaxSize => GraphicsQuality.Level switch
-    {
-        QualityLevel.Low => 1024,
-        QualityLevel.Medium => 2048,
-        QualityLevel.High => 2048,
-        _ => 4096,
-    };
+    public static int MaxSize => GraphicsQuality.TextureLimit;
 
     /// <summary>How many top mipmap levels to drop from a picture of this size (0 = keep it whole).</summary>
     private static int Limit(int w, int h, bool mips)

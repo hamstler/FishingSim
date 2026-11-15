@@ -183,6 +183,22 @@ public sealed class ProgressSuite : ITestSuite
         t.Check(ll.LureOn && ll.BaitCount == 2, "a bite does not use a lure up");
         ll.LoseLure();
         t.Check(ll.BaitCount == 1, "a lure is lost with the hook");
+
+        t.Section("graphics settings");
+        var gq = typeof(FishingSim.Graphics.GraphicsQuality);
+        FishingSim.Graphics.GraphicsQuality.Set(FishingSim.Graphics.QualityLevel.High);
+        t.Check(!FishingSim.Graphics.GraphicsQuality.Custom && FishingSim.Graphics.GraphicsQuality.TextureLimit == 2048, "the High preset: 2K textures, not custom");
+        FishingSim.Graphics.GraphicsQuality.SetStep(FishingSim.Graphics.GraphicsQuality.Shadows, 0);
+        t.Check(FishingSim.Graphics.GraphicsQuality.Custom, "changing one setting makes the preset custom");
+        FishingSim.Graphics.GraphicsQuality.SetStep(FishingSim.Graphics.GraphicsQuality.Shadows, 99);
+        t.Check(FishingSim.Graphics.GraphicsQuality.Shadows.Value == FishingSim.Graphics.GraphicsQuality.Shadows.Steps.Length - 1, "a step is clamped at the last one");
+        FishingSim.Graphics.GraphicsQuality.Set(FishingSim.Graphics.QualityLevel.Ultra);
+        t.Check(FishingSim.Graphics.GraphicsQuality.TextureLimit == 4096 && FishingSim.Graphics.GraphicsQuality.WaterReflectionSteps == 32 && !FishingSim.Graphics.GraphicsQuality.Custom,
+            "Ultra: 4K textures, full water reflections");
+        FishingSim.Graphics.GraphicsQuality.Set(FishingSim.Graphics.QualityLevel.Low);
+        t.Check(FishingSim.Graphics.GraphicsQuality.GrassRadius == 0f && FishingSim.Graphics.GraphicsQuality.TextureLimit == 1024, "Low: no grass blades, 1K textures");
+        FishingSim.Graphics.GraphicsQuality.Set(FishingSim.Graphics.QualityLevel.High);
+        _ = gq;
         return Task.CompletedTask;
     }
 }

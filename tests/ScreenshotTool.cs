@@ -294,6 +294,22 @@ public partial class ScreenshotTool : Node
             GetTree().Quit();
             return;
         }
+        if (mode == 34)
+        {
+            // The graphics settings screen over the login form (arg 1: one step down from the preset with the arrow).
+            var menu = GD.Load<PackedScene>("res://menu.tscn").Instantiate<Menu>();
+            GetTree().Root.AddChild(menu);
+            await NextFrame();
+            if (arg == 1)
+                FishingSim.Graphics.GraphicsQuality.SetStep(FishingSim.Graphics.GraphicsQuality.Shadows, 1);
+            menu.OpenGraphics();
+            for (int i = 0; i < 10; i++)
+                await NextFrame();
+            GetViewport().GetTexture().GetImage().SavePng(output);
+            GD.Print($"saved {output}");
+            GetTree().Quit();
+            return;
+        }
         if (mode == 19)
         {
             // The fish atlas with one species on the turntable (arg = index in the catalogue).

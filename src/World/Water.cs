@@ -43,13 +43,7 @@ public partial class Water : MeshInstance3D
     }
 
     /// <summary>Screen-space reflection steps by the graphics quality (Low: the sky's reflection only).</summary>
-    private void ApplyQuality() => _material.SetShaderParameter("ssr_steps", Graphics.GraphicsQuality.Level switch
-    {
-        Graphics.QualityLevel.Low => 0,
-        Graphics.QualityLevel.Medium => 12,
-        Graphics.QualityLevel.High => 20,
-        _ => 32,
-    });
+    private void ApplyQuality() => _material.SetShaderParameter("ssr_steps", Graphics.GraphicsQuality.WaterReflectionSteps);
 
     /// <summary>How high the swells run: a calm lake a centimetre or two, a windy one about ten.</summary>
     public float Amplitude => Mathf.Lerp(0.015f, 0.1f, Wind);

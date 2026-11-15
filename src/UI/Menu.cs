@@ -37,6 +37,7 @@ public partial class Menu : Control
         GetTree().Paused = false;
         UserStore.EnsureDefault();
         CrashLog.Install();
+        GraphicsQuality.ApplyDisplay();
         // The painted world textures (4096 px) take a minute or two to paint on the very first start: begin while the
         // angler logs in and picks a map. Later starts only read them from the disk cache.
         if (!Renderer.IsHeadless)
@@ -163,7 +164,7 @@ public partial class Menu : Control
     private void BuildLogin()
     {
         var panel = new PanelContainer();
-        Center(panel, 420, 460);
+        Center(panel, 420, 510);
         AddChild(panel);
         _loginBox = panel;
         var margin = new MarginContainer();
@@ -213,6 +214,17 @@ public partial class Menu : Control
         var atlas = new Button { Text = "Atlas ryb", CustomMinimumSize = new Vector2(0, 40) };
         atlas.Pressed += () => OpenAtlas();
         box.AddChild(atlas);
+        var graphics = new Button { Text = "Ustawienia grafiki", CustomMinimumSize = new Vector2(0, 40) };
+        graphics.Pressed += () => OpenGraphics();
+        box.AddChild(graphics);
+    }
+
+    /// <summary>The graphics settings over the menu (before logging in or on the map selection).</summary>
+    public GraphicsPanel OpenGraphics()
+    {
+        var panel = new GraphicsPanel();
+        AddChild(panel);
+        return panel;
     }
 
     /// <summary>The fish atlas over the menu (from the login form or the map selection).</summary>
