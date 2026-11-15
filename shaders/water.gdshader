@@ -90,7 +90,8 @@ void fragment() {
 	vec2 s = gerstner_slope(rest, 0, VERTEX_WAVES).xy + gerstner_slope(rest, VERTEX_WAVES, WAVES).xy * (0.6 + 2.4 * near);
 	vec2 wd = normalize(water_dir);
 	vec2 across = vec2(-wd.y, wd.x);
-	float chop = (0.35 + wind * 1.2) * detail;
+	// A calm evening lake is nearly a mirror; the wind roughens it.
+	float chop = (0.08 + wind * 1.45) * detail;
 	vec2 r1 = ripple_map(wpos.xz / 6.5 + wd * water_time * 0.045);
 	vec2 r2 = ripple_map(wpos.xz / 2.3 - across * water_time * 0.07 + wd * water_time * 0.03);
 	s += (r1 * 0.26 * (0.4 + 0.6 * near) + r2 * 0.17 * near) * chop;
@@ -152,6 +153,31 @@ void fragment() {
 				break;
 			}
 			t *= 1.32;
+		}
+	}
+
+	// Far reflection: where the screen-space march found nothing (the far shore, the sky above it), the mirrored ray
+	// is followed to whatever the screen shows in its direction (two steps to settle on that point's distance): the
+	// twilight sky, the tree line, the lit windows lie mirrored on the water as on a real lake.
+	if (fresnel > 0.02 && hit < 0.99) {
+		vec3 R = reflect(-V, N);
+		float D = 80.0;
+		vec3 sp = vec3(-1.0);
+		for (int k = 0; k < 3; k++) {
+			sp = to_screen(VERTEX + R * D, PROJECTION_MATRIX);
+			if (sp.x < 0.0 || sp.x > 1.0 || sp.y < 0.0 || sp.y > 1.0)
+				break;
+			D = clamp(length(view_at(sp.xy, INV_PROJECTION_MATRIX)), 4.0, 4000.0);
+		}
+		if (sp.x >= 0.0 && sp.x <= 1.0 && sp.y >= 0.0 && sp.y <= 1.0) {
+			// Only what stands above the water is mirrored.
+			vec3 scene_w = (INV_VIEW_MATRIX * vec4(view_at(sp.xy, INV_PROJECTION_MATRIX), 1.0)).xyz;
+			float above_water = smoothstep(wpos.y - 0.05, wpos.y + 0.4, scene_w.y);
+			vec2 edge = smoothstep(0.0, 0.06, sp.xy) * (1.0 - smoothstep(0.94, 1.0, sp.xy));
+			float w_far = edge.x * edge.y * above_water * (1.0 - hit);
+			vec3 far_col = textureLod(screen_tex, sp.xy, 1.5).rgb;
+			reflected = mix(reflected, far_col, w_far / max(hit + w_far, 0.0001));
+			hit = max(hit, w_far);
 		}
 	}
 

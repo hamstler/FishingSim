@@ -120,6 +120,7 @@ public partial class SkyController : Node
     private void BuildStars()
     {
         _starMaterial = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/stars.gdshader"), RenderPriority = -10 };
+        _starMaterial.SetShaderParameter("cloud_noise", _skyMaterial.GetShaderParameter("cloud_noise"));
         _stars = new MeshInstance3D
         {
             Mesh = new SphereMesh { Radius = 900f, Height = 1800f, RadialSegments = 32, Rings = 16 },
@@ -229,6 +230,10 @@ public partial class SkyController : Node
         return e < 0.18f ? horizon.Lerp(golden, e / 0.18f) : golden.Lerp(noon, Math.Clamp((e - 0.18f) / 0.35f, 0f, 1f));
     }
 
+    /// <summary>The twilight's strength by the sun's elevation (sin): 1 just after sunset, 0 at -0.18 and above 0.12.</summary>
+    public static float TwilightAt(float elevation) =>
+        Math.Clamp((elevation + 0.18f) / 0.16f, 0f, 1f) * (1f - Math.Clamp((elevation - 0.02f) / 0.1f, 0f, 1f));
+
     /// <summary>Low mist over the water: thick after a calm dawn, thinner at dusk, gone in wind and rain (0..1).</summary>
     public static float MistAt(float hour, float wind, float rain) =>
         (Bump(hour, 6.5f, 1.2f) + 0.45f * Bump(hour, 19.3f, 0.9f)) * Math.Clamp(1f - wind * 1.1f, 0f, 1f) * (1f - rain * 0.5f);
@@ -263,6 +268,11 @@ public partial class SkyController : Node
         float night = Math.Clamp(-el * 3f, 0f, 1f);
         _skyMaterial.SetShaderParameter("cloud_cover", Math.Clamp(0.22f + _cloud * 0.78f, 0f, 1f));
         _skyMaterial.SetShaderParameter("night", night);
+        // Twilight: from the sun just up (el 0.06) to about 10 degrees under the horizon.
+        float twilight = TwilightAt(el) * (1f - _cloud * 0.7f);
+        _skyMaterial.SetShaderParameter("twilight", twilight);
+        var towardSun = new Basis(Vector3.Up, Mathf.DegToRad(-30f)) * Vector3.Back;     // the sun's azimuth (its light's +Z)
+        _skyMaterial.SetShaderParameter("sun_flat", new Vector3(towardSun.X, 0f, towardSun.Z));
         // Haze: more Mie scattering in rain and mist.
         _skyMaterial.SetShaderParameter("turbidity", 4f + _cloud * 6f + _rain * 20f + FogBoost * 2000f);
 
@@ -303,12 +313,18 @@ public partial class SkyController : Node
         // Long shadows of a low sun are softer; midday ones are crisp.
         _sun.ShadowBlur = Mathf.Lerp(2.4f, 1.1f, Math.Clamp(el * 2.5f, 0f, 1f));
         _env.FogAerialPerspective = 0.55f;
-        _env.FogLightColor = hor.Lerp(new Color(0.55f, 0.66f, 0.74f), 0.4f).Lerp(SunColour(el) * 0.85f, 0.2f * golden);
+        // The haze is lit by the sky: bright by day, a glow at twilight, nearly black at night (a grey fog at night
+        // washed the far forest out and made the mountains brighter than the sky).
+        float hazeLight = Math.Clamp(day + 0.3f * twilight, 0.06f, 1f);
+        _env.FogLightColor = hor.Lerp(new Color(0.55f, 0.66f, 0.74f), 0.4f).Lerp(SunColour(el) * 0.85f, 0.2f * golden) * hazeLight;
+        _env.FogLightEnergy = hazeLight;
         _env.VolumetricFogAlbedo = new Color(0.9f, 0.88f, 0.84f).Lerp(hor, 0.35f);
         // Moonlight: a cold blue-white, brighter under a full moon.
         _moon.LightColor = new Color(0.58f, 0.68f, 1f);
 
-        _starMaterial.SetShaderParameter("night", Math.Clamp(-el * 3f, 0f, 1f) * (1f - _cloud));
+        // Stars come out only once the twilight has faded, and hide behind the clouds (stars.gdshader reads them).
+        _starMaterial.SetShaderParameter("night", Math.Clamp((-el - 0.08f) * 6f, 0f, 1f) * (1f - _cloud * 0.6f));
+        _starMaterial.SetShaderParameter("cloud_cover", Math.Clamp(0.22f + _cloud * 0.78f, 0f, 1f));
         int drops = _rain > 0.02f ? (int)(RainDrops * Math.Clamp(_rain, 0.05f, 1f)) : 0;
         if (drops != _rainFx.Multimesh.VisibleInstanceCount)
         {

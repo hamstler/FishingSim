@@ -374,7 +374,17 @@ public static partial class BuildingFactory
         float wy = 1.9f;
         float[] frontX = s.Windows >= 3 ? new[] { -s.W * 0.31f, s.W * 0.31f } : s.Windows == 2 ? new[] { -s.W * 0.3f, s.W * 0.3f } : new[] { s.W * 0.3f };
         foreach (float x in frontX)
+        {
             Window(b, glass, trim, new Vector3(x, wy, front + 0.02f), 0f);
+            // Candle light spilling out of the window onto the ground and the wall's surroundings at night.
+            var spill = new OmniLight3D
+            {
+                LightColor = new Color(1f, 0.7f, 0.38f), OmniRange = 5.5f, OmniAttenuation = 1.6f, LightEnergy = 0f,
+                ShadowEnabled = false, LightSpecular = 0.3f, Position = new Vector3(x, wy - 0.2f, front + 0.6f),
+            };
+            b.AddChild(spill);
+            b.AddLight(spill, 0.75f);
+        }
         if (s.Windows >= 2)
         {
             Window(b, glass, trim, new Vector3(s.W / 2f + 0.02f + skin, wy, 0f), 90f);

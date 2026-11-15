@@ -20,6 +20,10 @@ uniform float cloud_cover : hint_range(0, 1) = 0.3;
 global uniform float cloud_drift;
 uniform float night : hint_range(0, 1) = 0.0;
 uniform vec3 night_color : source_color = vec3(0.004, 0.006, 0.014);
+/// 0..1: the twilight after sunset (and before sunrise): a glowing horizon, a deep blue zenith.
+uniform float twilight : hint_range(0, 1) = 0.0;
+/// Where the sun is (or was) on the horizon: the warm side of the twilight glow.
+uniform vec3 sun_flat = vec3(0.0, 0.0, -1.0);
 /// Pixel-art style: blend the physical sky towards a clean illustrated gradient (vivid blue overhead, pale at the horizon).
 uniform float stylize = 0.0;
 
@@ -102,6 +106,19 @@ void sky() {
 	}
 	color += night_color * night;
 
+	// Twilight: the sun is just under the horizon (LIGHT0 may already be gone). A deep blue zenith, a horizon glowing
+	// orange on the sun's side and pink-violet round the rest, fading as the sun sinks further.
+	if (twilight > 0.001) {
+		float up_tw = max(EYEDIR.y, 0.0);
+		vec2 flat_eye = normalize(EYEDIR.xz + vec2(0.0001));
+		float toward = max(dot(flat_eye, normalize(sun_flat.xz)), 0.0);
+		float band = exp(-up_tw * 7.0);
+		vec3 horizon_col = mix(vec3(0.34, 0.2, 0.36), vec3(0.85, 0.42, 0.2), toward * toward);
+		vec3 zenith_col = vec3(0.05, 0.08, 0.2);
+		vec3 tw = mix(zenith_col, horizon_col, band) * (0.55 + 0.45 * toward * band);
+		color = max(color, tw * twilight);
+	}
+
 	if (stylize > 0.0) {
 		float up = clamp(EYEDIR.y, 0.0, 1.0);
 		vec3 drawn = mix(vec3(0.42, 0.70, 0.95), vec3(0.16, 0.42, 0.82), pow(up, 0.55));
@@ -137,7 +154,13 @@ void sky() {
 		// Silver lining towards the sun.
 		base += LIGHT0_COLOR * pow(max(cos_theta, 0.0), 8.0) * (1.0 - density) * 1.6 * sun_up;
 		base = mix(base, overcast * 0.9, cloud_cover * 0.6);
-		base *= mix(1.0, 0.04, night);
+		// Twilight lights the cloud bases pink and orange; at night the moon leaves them a dim blue-grey.
+		vec2 flat_c = normalize(EYEDIR.xz + vec2(0.0001));
+		float toward_c = max(dot(flat_c, normalize(sun_flat.xz)), 0.0);
+		vec3 tw_cloud = mix(vec3(0.4, 0.24, 0.36), vec3(0.95, 0.5, 0.28), toward_c) * 0.7;
+		// Never brighter than the glow that lights them: they darken with the twilight.
+		base = mix(base, tw_cloud * (0.15 + 0.85 * twilight), smoothstep(0.0, 0.25, twilight) * (1.0 - sun_up));
+		base = mix(base, vec3(0.05, 0.06, 0.09), night * (1.0 - twilight));
 		// A painted finish: white tops, soft blue-grey shade.
 		vec3 drawn_cloud = mix(vec3(0.68, 0.76, 0.88), vec3(1.0, 0.99, 0.97), through) * mix(0.35, 1.0, sun_up);
 		base = mix(base, drawn_cloud, stylize * 0.6 * smoothstep(0.0, 0.35, sun_dir.y) * (1.0 - cloud_cover * 0.6));

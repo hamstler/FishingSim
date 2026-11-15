@@ -26,7 +26,13 @@ public partial class Building : Node3D
 
     public void AddGlow(StandardMaterial3D material) => _glow.Add(material);
 
-    public void AddLight(OmniLight3D light) => _lights.Add(light);
+    public void AddLight(OmniLight3D light, float weight = 1f)
+    {
+        _lights.Add(light);
+        _weights.Add(weight);
+    }
+
+    private readonly List<float> _weights = new();
 
     /// <summary>Registers a node that turns slowly (windmill blades).</summary>
     public void AddSpinner(Node3D node) => _spinners.Add(node);
@@ -41,8 +47,8 @@ public partial class Building : Node3D
             m.EmissionEnabled = night > 0.02f;
             m.EmissionEnergyMultiplier = 0.2f + night * 2.2f;
         }
-        foreach (var l in _lights)
-            l.LightEnergy = night * 1.1f;
+        for (int i = 0; i < _lights.Count; i++)
+            _lights[i].LightEnergy = night * 1.1f * _weights[i];
     }
 
     private float _night;
@@ -81,7 +87,7 @@ public partial class Building : Node3D
         float flicker = 0.85f + 0.1f * MathF.Sin(t * 13f) + 0.06f * MathF.Sin(t * 29f + 1.3f) + 0.04f * MathF.Sin(t * 7f);
         foreach (var m in _glow)
             m.EmissionEnergyMultiplier = (0.2f + _night * 2.2f) * flicker;
-        foreach (var l in _lights)
-            l.LightEnergy = _night * 1.1f * flicker;
+        for (int i = 0; i < _lights.Count; i++)
+            _lights[i].LightEnergy = _night * 1.1f * flicker * _weights[i];
     }
 }

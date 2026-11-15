@@ -219,9 +219,10 @@ public partial class Scenery : Node3D
     /// </summary>
     private void BuildStringLights(Material wood)
     {
-        foreach (var (x, z, h) in new[] { (-1.42f, -3.7f, 4.4f), (1.42f, -3.7f, 4.4f), (-1.42f, 5.6f, 3.0f) })
+        // The masts stand behind the angler's casting spot (it is at z = -3), not in front of it: they used to frame half the view.
+        foreach (var (x, z, h) in new[] { (-1.42f, -0.4f, 4.4f), (1.42f, -0.4f, 4.4f), (-1.42f, 5.6f, 3.0f) })
             AddBox(new Vector3(x, 1.05f + h / 2f, z), new Vector3(0.1f, h, 0.1f), wood);
-        var tops = new[] { new Vector3(-1.42f, 5.45f, -3.7f), new Vector3(1.42f, 5.45f, -3.7f), new Vector3(1.42f, 3.05f, 5.6f), new Vector3(-1.42f, 4.05f, 5.6f) };
+        var tops = new[] { new Vector3(-1.42f, 5.45f, -0.4f), new Vector3(1.42f, 5.45f, -0.4f), new Vector3(1.42f, 3.05f, 5.6f), new Vector3(-1.42f, 4.05f, 5.6f) };
         var rope = BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = new Color(0.25f, 0.18f, 0.12f) });
         _bulbs = new StandardMaterial3D
         {
