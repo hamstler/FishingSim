@@ -20,6 +20,9 @@ public partial class PerfOverlay : PanelContainer
     /// <summary>Set by the screenshot tool to show the overlay from the start.</summary>
     public static bool ShownByDefault { get; set; }
 
+    /// <summary>The overlay of the running game (the FPS counter setting shows or hides it).</summary>
+    public static PerfOverlay? Current { get; private set; }
+
     private Label _text = null!;
     private Rid _viewport;
     private float _refresh;
@@ -40,12 +43,15 @@ public partial class PerfOverlay : PanelContainer
         _text.AddThemeConstantOverride("line_spacing", 1);
         AddChild(_text);
         _viewport = GetViewport().GetViewportRid();
-        Show(ShownByDefault);
+        Current = this;
+        Show(ShownByDefault || Graphics.GraphicsQuality.FpsCounter.Value >= 2);
     }
+
+
 
     public void Toggle() => Show(!Visible);
 
-    private void Show(bool on)
+    public void Show(bool on)
     {
         Visible = on;
         Perf.Live = on;
@@ -61,6 +67,8 @@ public partial class PerfOverlay : PanelContainer
 
     public override void _ExitTree()
     {
+        if (Current == this)
+            Current = null;
         Perf.Live = false;
         if (_viewport.IsValid)
             RenderingServer.ViewportSetMeasureRenderTime(_viewport, false);

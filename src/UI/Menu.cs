@@ -70,6 +70,31 @@ public partial class Menu : Control
     }
 
     // ------------------------------------------------------------------ layout
+    private static readonly Dictionary<string, ImageTexture> Pictures = new();
+
+    /// <summary>
+    /// A fishery's picture for the menu: a 1920x1080 render of the map (assets/menu/&lt;map&gt;_&lt;hour&gt;.webp, made
+    /// with screenshot FISHSIM_SCENIC), with mipmaps so it stays smooth at any size; the painted postcard if missing.
+    /// </summary>
+    private static ImageTexture Picture(string locationPath, float hour)
+    {
+        string id = System.IO.Path.GetFileNameWithoutExtension(locationPath);
+        string path = $"res://assets/menu/{id}_{(int)hour}.webp";
+        if (Pictures.TryGetValue(path, out var done))
+            return done;
+        ImageTexture texture;
+        var img = new Image();
+        if (FileAccess.FileExists(path) && img.LoadWebpFromBuffer(FileAccess.GetFileAsBytes(path)) == Error.Ok)
+        {
+            img.GenerateMipmaps();
+            texture = ImageTexture.CreateFromImage(img);
+        }
+        else
+            texture = Postcard.For(GD.Load<LocationData>(locationPath), hour);
+        Pictures[path] = texture;
+        return texture;
+    }
+
     private void BuildBackground()
     {
         // A slideshow of painted postcards of the fishing grounds, cross-fading every few seconds.
@@ -78,8 +103,8 @@ public partial class Menu : Control
             var loc = GD.Load<LocationData>(path);
             if (loc == null)
                 continue;
-            _slides.Add(Postcard.For(loc, 10f));
-            _slides.Add(Postcard.For(loc, 18.5f));
+            _slides.Add(Picture(path, 10f));
+            _slides.Add(Picture(path, 17f));
         }
         for (int i = 0; i < 2; i++)
         {
@@ -87,7 +112,7 @@ public partial class Menu : Control
             {
                 ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
                 StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered,
-                TextureFilter = TextureFilterEnum.Nearest,
+                TextureFilter = TextureFilterEnum.LinearWithMipmaps,
                 Texture = _slides.Count > 0 ? _slides[0] : null,
                 Modulate = new Color(1, 1, 1, i == 0 ? 1f : 0f),
             };
@@ -284,6 +309,8 @@ public partial class Menu : Control
             c.QueueFree();
         _mapsBox.Visible = true;
         Center(_mapsBox, 1240, 560);
+        _mapsBox.OffsetTop -= 30f;
+        _mapsBox.OffsetBottom -= 30f;
         _mapsBox.AddThemeConstantOverride("separation", 14);
 
         var profile = Profile.LoadFor(Session.Username);
@@ -328,12 +355,12 @@ public partial class Menu : Control
         margin.AddChild(box);
 
         if (!_previews.ContainsKey(index))
-            _previews[index] = Postcard.For(loc, 10f);
+            _previews[index] = Picture(LakeBed.LocationPaths[index], 10f);
         box.AddChild(new TextureRect
         {
             Texture = _previews[index],
             CustomMinimumSize = new Vector2(270, 152),
-            TextureFilter = TextureFilterEnum.Nearest,
+            TextureFilter = TextureFilterEnum.LinearWithMipmaps,
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered,
             Modulate = locked ? new Color(0.45f, 0.45f, 0.45f) : Colors.White,

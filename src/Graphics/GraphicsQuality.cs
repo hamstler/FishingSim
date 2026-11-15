@@ -16,6 +16,9 @@ public enum ViewDistance { Short, Medium, Long, Extreme }
 public static class GraphicsQuality
 {
     private const string ConfigPath = "user://graphics.cfg";
+
+    /// <summary>Bump when the presets change: older saved effect settings then follow the new preset.</summary>
+    private const int SettingsVersion = 2;
     private static bool _loaded;
     private static QualityLevel _level = QualityLevel.High;
     private static ViewDistance _view = ViewDistance.Long;
@@ -47,11 +50,11 @@ public static class GraphicsQuality
     }
 
     public static readonly Setting Textures = new("textures", "Tekstury", "Rozdzielczość tekstur świata (4K zajmuje 4x więcej pamięci niż 2K). Pełna zmiana po ponownym wczytaniu mapy.",
-        new[] { "1K (niska)", "2K (wysoka)", "4K (ultra)" }, new[] { 0, 1, 1, 2 });
+        new[] { "1K (niska)", "2K (wysoka)", "4K (ultra)" }, new[] { 0, 1, 2, 2 });
     public static readonly Setting Shadows = new("shadows", "Cienie", "Zasięg i ostrość cieni od słońca.",
         new[] { "Wyłączone", "Niskie", "Średnie", "Wysokie", "Ultra" }, new[] { 1, 2, 3, 4 });
     public static readonly Setting AntiAliasing = new("aa", "Wygładzanie krawędzi", "TAA najlepiej wygładza trawę i liście; MSAA ostrzej, ale drożej.",
-        new[] { "Wyłączone", "FXAA", "MSAA 2x", "MSAA 4x", "TAA", "TAA + MSAA 2x" }, new[] { 1, 1, 4, 5 });
+        new[] { "Wyłączone", "FXAA", "MSAA 2x", "MSAA 4x", "TAA", "TAA + MSAA 2x" }, new[] { 1, 2, 5, 5 });
     public static readonly Setting Occlusion = new("ssao", "Cieniowanie otoczenia (SSAO)", "Miękkie cienie w zakamarkach.",
         new[] { "Wyłączone", "Włączone" }, new[] { 0, 1, 1, 1 });
     public static readonly Setting IndirectLight = new("ssil", "Światło odbite (SSIL)", "Kolorowe odbicia światła od otoczenia. Kosztowne.",
@@ -72,9 +75,21 @@ public static class GraphicsQuality
     public static readonly Setting FpsLimit = new("fps", "Limit klatek", "Górna granica FPS (mniej ciepła i hałasu karty).",
         Array.ConvertAll(FpsSteps, f => f == 0 ? "Bez limitu" : $"{f} FPS"), new[] { 0, 0, 0, 0 }, display: true);
 
+    public static readonly float[] UiScales = { 1f, 1.25f, 1.5f, 1.75f, 2f };
+    public static readonly Setting UiScale = new("ui_scale", "Skala interfejsu", "Wielkość napisów i paneli przy 1920x1080 (obraz 3D zawsze w pełnej rozdzielczości).",
+        new[] { "Mała", "Średnia", "Normalna", "Duża", "Bardzo duża" }, new[] { 2, 2, 2, 2 }, display: true);
+    public static readonly Setting FpsCounter = new("fps_counter", "Licznik FPS", "Liczba klatek na sekundę w rogu ekranu; szczegóły = pełny panel wydajności (F11).",
+        new[] { "Wyłączony", "FPS", "FPS + szczegóły" }, new[] { 0, 0, 0, 0 }, display: true);
+    public static readonly Setting FloatPreview = new("float_preview", "Podgląd spławika", "Okienko z bliskim widokiem spławika, gdy trzymasz w ręce wędkę z zarzuconym spławikiem.",
+        new[] { "Wyłączony", "Włączony" }, new[] { 0, 0, 0, 0 }, display: true);
+
     /// <summary>Every setting of the graphics screen, in its order (the view distance and 3D resolution have their own rows).</summary>
     public static readonly Setting[] Settings = { Textures, Shadows, AntiAliasing, Occlusion, IndirectLight, Reflections, Fog, Glow, Plants };
     public static readonly Setting[] DisplaySettings = { WindowMode, VSync, FpsLimit };
+    public static readonly Setting[] InterfaceSettings = { UiScale, FpsCounter, FloatPreview };
+
+    /// <summary>Raised when a display or interface setting changes (the FPS counter and the float preview follow it).</summary>
+    public static event Action? DisplayChanged;
 
     /// <summary>The settings no longer match the last preset.</summary>
     public static bool Custom
@@ -229,6 +244,7 @@ public static class GraphicsQuality
         if (Renderer.IsHeadless || OS.HasEnvironment("FISHSIM_NO_SAVE"))
             return;
         var cfg = new ConfigFile();
+        cfg.SetValue("graphics", "version", SettingsVersion);
         cfg.SetValue("graphics", "quality", (int)_level);
         cfg.SetValue("graphics", "view", (int)_view);
         cfg.SetValue("graphics", "scale", _scale);
@@ -236,6 +252,8 @@ public static class GraphicsQuality
             cfg.SetValue("graphics", st.Key, st.Value);
         foreach (var st in DisplaySettings)
             cfg.SetValue("display", st.Key, st.Value);
+        foreach (var st in InterfaceSettings)
+            cfg.SetValue("interface", st.Key, st.Value);
         cfg.Save(ConfigPath);
     }
 
@@ -265,11 +283,16 @@ public static class GraphicsQuality
         _level = (QualityLevel)Math.Clamp(cfg.GetValue("graphics", "quality", (int)QualityLevel.High).AsInt32(), 0, 3);
         _view = (ViewDistance)Math.Clamp(cfg.GetValue("graphics", "view", (int)ViewDistance.Long).AsInt32(), 0, 3);
         _scale = Math.Clamp(cfg.GetValue("graphics", "scale", 100).AsInt32(), 50, 100);
-        // Settings saved by older versions are missing: they follow the preset.
+        // Settings saved by older versions (missing, or from presets that have changed since) follow the preset.
+        bool current = cfg.GetValue("graphics", "version", 0).AsInt32() >= SettingsVersion;
         foreach (var st in Settings)
-            st.Value = Math.Clamp(cfg.GetValue("graphics", st.Key, st.Preset[(int)_level]).AsInt32(), 0, st.Steps.Length - 1);
+            st.Value = current
+                ? Math.Clamp(cfg.GetValue("graphics", st.Key, st.Preset[(int)_level]).AsInt32(), 0, st.Steps.Length - 1)
+                : st.Preset[(int)_level];
         foreach (var st in DisplaySettings)
             st.Value = Math.Clamp(cfg.GetValue("display", st.Key, st.Preset[0]).AsInt32(), 0, st.Steps.Length - 1);
+        foreach (var st in InterfaceSettings)
+            st.Value = Math.Clamp(cfg.GetValue("interface", st.Key, st.Preset[0]).AsInt32(), 0, st.Steps.Length - 1);
     }
 
     /// <summary>The window mode, vertical sync and frame limit (at start and when changed).</summary>
@@ -295,6 +318,10 @@ public static class GraphicsQuality
             _ => DisplayServer.VSyncMode.Enabled,
         });
         Engine.MaxFps = FpsSteps[Math.Clamp(FpsLimit.Value, 0, FpsSteps.Length - 1)];
+        if (Engine.GetMainLoop() is SceneTree tree)
+            tree.Root.ContentScaleFactor = UiScales[Math.Clamp(UiScale.Value, 0, UiScales.Length - 1)];
+        UI.FpsCounter.Sync();
+        DisplayChanged?.Invoke();
     }
 
     /// <summary>Radius (m) of the dense grass around the player; 0 = no grass blades.</summary>

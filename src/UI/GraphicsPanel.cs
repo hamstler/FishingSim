@@ -71,6 +71,12 @@ public partial class GraphicsPanel : Control
             var s = st;
             Row(grid, s.Name, s.Hint, () => s.Steps[s.Value], () => s.Value, s.Steps.Length, i => GraphicsQuality.SetStep(s, i));
         }
+        Section(grid, "Interfejs");
+        foreach (var st in GraphicsQuality.InterfaceSettings)
+        {
+            var s = st;
+            Row(grid, s.Name, s.Hint, () => s.Steps[s.Value], () => s.Value, s.Steps.Length, i => GraphicsQuality.SetStep(s, i));
+        }
 
         _hint = new Label
         {

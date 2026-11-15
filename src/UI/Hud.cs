@@ -285,6 +285,11 @@ public partial class Hud : CanvasLayer
         _perf = new PerfOverlay();
         Anchor(_perf, 0f, 0f, 12f, 12f, 12f, 12f);
         AddChild(_perf);
+
+        // The float preview window (graphics settings, "Podgląd spławika"), right side above the drag readout.
+        var floatCam = new FloatCam();
+        Anchor(floatCam, 1f, 1f, -364f, -400f, -16f, -166f);
+        AddChild(floatCam);
     }
 
     public override void _UnhandledInput(InputEvent @event)

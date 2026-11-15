@@ -53,6 +53,11 @@ public partial class ScreenshotTool : Node
         // FISHSIM_SCALE=50..100 picks the 3D resolution in per cent (FSR below 100).
         if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_SCALE"), out int scaleSetting))
             FishingSim.Graphics.GraphicsQuality.SetRenderScale(scaleSetting);
+        // FISHSIM_FLOAT_CAM=1 turns the float preview window on; FISHSIM_FPS=1 the FPS counter.
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_FLOAT_CAM") == "1")
+            FishingSim.Graphics.GraphicsQuality.SetStep(FishingSim.Graphics.GraphicsQuality.FloatPreview, 1);
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_FPS") == "1")
+            FishingSim.Graphics.GraphicsQuality.SetStep(FishingSim.Graphics.GraphicsQuality.FpsCounter, 1);
         // FISHSIM_PERF_OVERLAY=1 shows the F11 performance overlay in the shot.
         if (System.Environment.GetEnvironmentVariable("FISHSIM_PERF_OVERLAY") == "1")
             FishingSim.UI.PerfOverlay.ShownByDefault = true;
@@ -465,6 +470,32 @@ public partial class ScreenshotTool : Node
         int frames = 30;
         if (a.Length > 11 && a[11] == "1")
             main.GetChildren().OfType<Hud>().First().Visible = false;
+        // FISHSIM_SCENIC=1: a clean view of the map (no HUD, no rod or hands, no dial): the menu's pictures.
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_SCENIC") == "1")
+        {
+            foreach (var ui in main.FindChildren("*", "CanvasLayer", true, false).OfType<CanvasLayer>())
+                ui.Visible = false;
+            foreach (var c in main.FindChildren("*", "Control", true, false).OfType<Control>())
+                if (c.GetParent() is not Control)
+                    c.Visible = false;
+            main.Tools?.Select(FishingSim.Fishing.HandTool.None);
+            main.Rod.InHands = false;
+            if (main.Rod.Rig != null)
+                main.Rod.Rig.Visible = false;
+            main.Player.Body.Visible = false;
+            foreach (var c in main.Player.Camera.GetChildren().OfType<Node3D>())
+                if (c is not Camera3D)
+                    c.Visible = false;
+        }
+        // FISHSIM_CAM_LIFT=m raises the camera above the angler (a vista over the poles and reeds).
+        if (float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_CAM_LIFT"), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float camLift))
+        {
+            var vista = new Camera3D { Fov = main.Player.Camera.Fov, Far = main.Player.Camera.Far };
+            main.AddChild(vista);
+            vista.GlobalTransform = main.Player.Camera.GlobalTransform.Translated(new Vector3(0f, camLift, 0f));
+            vista.Current = true;
+        }
 
         // FISHSIM_RISES=N: N rise rings spread over the last second before the shot (any mode).
         // FISHSIM_THREE_RODS=1: rods 2 and 3 get their own rod and reel, all three are cast with a worm under a float
@@ -584,6 +615,18 @@ public partial class ScreenshotTool : Node
             }
             main.Player.Rig.Visible = false;
             main.Player.Body.Visible = false;
+            foreach (var c in main.Player.Camera.GetChildren().OfType<Node3D>())
+                if (c is not Camera3D)
+                    c.Visible = false;
+        }
+        // FISHSIM_CAM_LIFT=m raises the camera above the angler (a vista over the poles and reeds).
+        if (float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_CAM_LIFT"), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float camLift2))
+        {
+            var vista = new Camera3D { Fov = main.Player.Camera.Fov, Far = main.Player.Camera.Far };
+            main.AddChild(vista);
+            vista.GlobalTransform = main.Player.Camera.GlobalTransform.Translated(new Vector3(0f, camLift2, 0f));
+            vista.Current = true;
         }
         else if (mode == 13)
         {

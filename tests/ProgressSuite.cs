@@ -187,7 +187,7 @@ public sealed class ProgressSuite : ITestSuite
         t.Section("graphics settings");
         var gq = typeof(FishingSim.Graphics.GraphicsQuality);
         FishingSim.Graphics.GraphicsQuality.Set(FishingSim.Graphics.QualityLevel.High);
-        t.Check(!FishingSim.Graphics.GraphicsQuality.Custom && FishingSim.Graphics.GraphicsQuality.TextureLimit == 2048, "the High preset: 2K textures, not custom");
+        t.Check(!FishingSim.Graphics.GraphicsQuality.Custom && FishingSim.Graphics.GraphicsQuality.TextureLimit == 4096, "the High preset: 4K textures, not custom");
         FishingSim.Graphics.GraphicsQuality.SetStep(FishingSim.Graphics.GraphicsQuality.Shadows, 0);
         t.Check(FishingSim.Graphics.GraphicsQuality.Custom, "changing one setting makes the preset custom");
         FishingSim.Graphics.GraphicsQuality.SetStep(FishingSim.Graphics.GraphicsQuality.Shadows, 99);
