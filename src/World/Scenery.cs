@@ -289,6 +289,7 @@ public partial class Scenery : Node3D
         Markers.Clear();
         WeedBeds.Clear();
         SunkenWood.Clear();
+        _landmarkTrees.Clear();
         Anglers.Clear();
         _anglerParts.Clear();
         Stats.Clear();
@@ -730,6 +731,8 @@ public partial class Scenery : Node3D
             Track(building);
             _buildings.Add(building);
             Count("landmark_" + kind);
+            foreach (var spot in building.TreeSpots)
+                _landmarkTrees.Add(building.Transform * spot);
             // Keep trees, plants and the local anglers off the landmark: a long dike gets a row of circles.
             if (kind == "dike")
             {
@@ -857,6 +860,9 @@ public partial class Scenery : Node3D
     private readonly List<(float X, float Z, string Kind)> _treeSpots = new();
     private readonly List<(float X, float Z)> _allTrees = new();
 
+    /// <summary>Feet of the trees the landmarks ask for (world positions; planted with the forest's trees).</summary>
+    private readonly List<Vector3> _landmarkTrees = new();
+
     /// <summary>The trunk's radius at the foot for a kind of tree at scale 1 (TreeFactory.Get's trunks).</summary>
     private static float TrunkRadius(string kind) => kind switch
     {
@@ -942,6 +948,15 @@ public partial class Scenery : Node3D
                 continue;
             Plant(Choose(weights, pick), x, z, h, s, yaw, tint, true);
             placed++;
+        }
+
+        // Trees the landmarks ask for (the row along the fish-pond dike): tall birches and oaks, the same trees as the
+        // forest's, standing where the landmark says.
+        foreach (var foot in _landmarkTrees)
+        {
+            float pick = rng.Randf();
+            string kind = pick < 0.65f ? "birch" : "oak";
+            Plant(kind, foot.X, foot.Z, foot.Y + 0.1f, rng.RandfRange(1.15f, 1.45f), rng.Randf() * Mathf.Tau, rng.RandfRange(-0.1f, 0.1f), false);
         }
 
         // The forest at the edge of the map: dense at the foot of the mountains, where the angler is stopped (so the

@@ -14,6 +14,10 @@ public partial class Building : Node3D
 
     public BuildingSpec Spec { get; set; } = null!;
 
+    /// <summary>Where real trees should grow on this landmark (local positions of their feet; Scenery plants them with
+    /// the forest's own trees, so they look like every other tree).</summary>
+    public List<Vector3> TreeSpots { get; } = new();
+
     /// <summary>The sign text, or empty for plain scenery.</summary>
     public string Title { get; set; } = "";
 

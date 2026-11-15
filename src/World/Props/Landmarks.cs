@@ -136,8 +136,9 @@ public static partial class BuildingFactory
     // ------------------------------------------------------------------ the fish-pond dike and its sluice (Staw Karpiowy)
     private static void Dike(Building b, float length)
     {
-        var earth = Flat(new Color(0.36f, 0.5f, 0.2f), 1f);
-        var path = Flat(new Color(0.55f, 0.45f, 0.3f), 1f);
+        // Grassy earth on the bank and a gravel cart track on the crown (photographed CC0 sets, painted colour without them).
+        var earth = Photo("leafy_grass", new Color(0.95f, 1f, 0.9f), 0.95f) ?? Flat(new Color(0.36f, 0.5f, 0.2f), 1f);
+        var path = Photo("rocky_trail", Colors.White, 0.95f) ?? Flat(new Color(0.55f, 0.45f, 0.3f), 1f);
         var concrete = Stone(new Color(0.7f, 0.68f, 0.62f));
         var wood = Wood(new Color(0.48f, 0.34f, 0.24f));
         // A long earth bank with sloping sides and a cart track on the crown.
@@ -157,20 +158,15 @@ public static partial class BuildingFactory
         for (int i = 0; i <= posts; i++)
             Box(b, new Vector3(0.14f, 0.9f, 0.14f), new Vector3(-length / 2f + i * length / posts, 1.45f, 1.4f), wood);
         Box(b, new Vector3(length, 0.04f, 0.04f), new Vector3(0, 1.75f, 1.4f), Flat(new Color(0.75f, 0.68f, 0.5f)));
-        // A row of tall poplars along the crown, the mark of an old fish-pond dike seen from across the water.
-        var bark = Flat(new Color(0.42f, 0.36f, 0.3f), 1f);
-        var crown = Flat(new Color(0.2f, 0.38f, 0.14f), 1f);
-        var crownLight = Flat(new Color(0.32f, 0.5f, 0.18f), 1f);
+        // A row of tall trees along the crown, the mark of an old fish-pond dike seen from across the water: real trees
+        // from the forest (Scenery plants them at these spots), on the land side of the track.
         int trees = (int)(length / 8f);
         for (int i = 0; i <= trees; i++)
         {
             float x = -length / 2f + i * length / trees;
             if (MathF.Abs(x) < 4f)
                 continue;   // leave the sluice in the open
-            float h = 9f + (i * 37 % 7) * 0.5f;
-            Cyl(b, 0.12f, 0.2f, 2.4f, new Vector3(x, 2.2f, -0.9f), bark, 6);
-            Cyl(b, 0.25f, 1.25f, h * 0.55f, new Vector3(x, 3.2f + h * 0.275f, -0.9f), crown, 7);
-            Cyl(b, 0f, 0.95f, h * 0.5f, new Vector3(x, 3.2f + h * 0.55f + h * 0.2f, -0.9f), i % 2 == 0 ? crownLight : crown, 7);
+            b.TreeSpots.Add(new Vector3(x, 1.05f, -1.05f));
         }
         Collider(b, new Vector3(1.6f, 3.6f, 1.6f), new Vector3(0, 0.4f, 4.2f));
         // The bank itself is solid: the crown to walk along (the cart track's top at 1.05 m) and the sloping sides to
