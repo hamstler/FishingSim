@@ -18,7 +18,7 @@ public static class GraphicsQuality
     private const string ConfigPath = "user://graphics.cfg";
 
     /// <summary>Bump when the presets change: older saved effect settings then follow the new preset.</summary>
-    private const int SettingsVersion = 2;
+    private const int SettingsVersion = 3;
     private static bool _loaded;
     private static QualityLevel _level = QualityLevel.High;
     private static ViewDistance _view = ViewDistance.Long;
@@ -53,8 +53,9 @@ public static class GraphicsQuality
         new[] { "1K (niska)", "2K (wysoka)", "4K (ultra)" }, new[] { 0, 1, 2, 2 });
     public static readonly Setting Shadows = new("shadows", "Cienie", "Zasięg i ostrość cieni od słońca.",
         new[] { "Wyłączone", "Niskie", "Średnie", "Wysokie", "Ultra" }, new[] { 1, 2, 3, 4 });
-    public static readonly Setting AntiAliasing = new("aa", "Wygładzanie krawędzi", "TAA najlepiej wygładza trawę i liście; MSAA ostrzej, ale drożej.",
-        new[] { "Wyłączone", "FXAA", "MSAA 2x", "MSAA 4x", "TAA", "TAA + MSAA 2x" }, new[] { 1, 2, 5, 5 });
+    // No MSAA: in Godot 4.3 it leaves the depth texture the water reads empty (no refraction, no bottom, no shore).
+    public static readonly Setting AntiAliasing = new("aa", "Wygładzanie krawędzi", "TAA najlepiej wygładza trawę, liście i linkę; FXAA jest najtańsze.",
+        new[] { "Wyłączone", "FXAA", "TAA" }, new[] { 1, 1, 2, 2 });
     public static readonly Setting Occlusion = new("ssao", "Cieniowanie otoczenia (SSAO)", "Miękkie cienie w zakamarkach.",
         new[] { "Wyłączone", "Włączone" }, new[] { 0, 1, 1, 1 });
     public static readonly Setting IndirectLight = new("ssil", "Światło odbite (SSIL)", "Kolorowe odbicia światła od otoczenia. Kosztowne.",
@@ -410,8 +411,8 @@ public static class GraphicsQuality
     public static void ApplyViewport(Viewport vp)
     {
         int aa = V(AntiAliasing);
-        vp.Msaa3D = aa switch { 2 or 5 => Viewport.Msaa.Msaa2X, 3 => Viewport.Msaa.Msaa4X, _ => Viewport.Msaa.Disabled };
-        vp.UseTaa = aa >= 4;
+        vp.Msaa3D = Viewport.Msaa.Disabled;
+        vp.UseTaa = aa >= 2;
         vp.ScreenSpaceAA = aa == 1 ? Viewport.ScreenSpaceAAEnum.Fxaa : Viewport.ScreenSpaceAAEnum.Disabled;
         vp.UseDebanding = V(Glow) > 0 || V(Fog) > 0;
         vp.PositionalShadowAtlasSize = V(Shadows) >= 3 ? 4096 : 2048;

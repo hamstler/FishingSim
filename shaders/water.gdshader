@@ -6,18 +6,14 @@ shader_type spatial;
 // ripples; foam where the water laps the shore; rings where raindrops fall.
 render_mode blend_mix, depth_draw_always, cull_back, diffuse_burley, specular_schlick_ggx;
 
-// Wave constants must match Water.cs (the bobber rides the same waves).
-const vec2 D1 = vec2(0.8, 0.6);
-const vec2 D2 = vec2(-0.5, 0.866);
-const vec2 D3 = vec2(0.9, -0.436);
+// The Gerstner wind waves (shared with the floating plants and the rise rings; mirrored by Water.cs).
+#include "res://shaders/water_waves.gdshaderinc"
 
 uniform sampler2D screen_tex : hint_screen_texture, repeat_disable, filter_linear_mipmap;
 uniform sampler2D depth_tex : hint_depth_texture, repeat_disable, filter_nearest;
 uniform sampler2D depth_map : filter_linear, repeat_disable;
 uniform vec4 map_rect = vec4(-170.0, -200.0, 340.0, 240.0);
 uniform float max_depth = 16.0;
-uniform float wave_time = 0.0;
-uniform float amp = 0.03;
 uniform float wind = 0.3;
 uniform float rain = 0.0;
 /// 0..1: polarized glasses cut the surface glare (you see into the water further out).
@@ -27,31 +23,21 @@ uniform vec3 deep_color : source_color = vec3(0.01, 0.07, 0.11);
 /// Metres of water you can see into (per map).
 uniform float clarity = 2.6;
 uniform sampler2D foam_noise : repeat_enable, filter_linear_mipmap;
+/// Tileable wind-ripple normals (Water.RippleNormals): RG = slope / 2 + 0.5, two drifting readings.
+uniform sampler2D ripple_normals : repeat_enable, filter_linear_mipmap_anisotropic;
+/// How strongly the ripple maps roughen the surface (Water.Detail).
+uniform float detail = 1.0;
 /// Screen-space reflection steps (0 = the sky's reflection only); set by the graphics quality.
 uniform int ssr_steps = 20;
 
 varying vec3 wpos;
 
-// The three swells (also in Water.HeightAt) and their slope.
-float waves(vec2 p) {
-	return 0.5 * sin(dot(p, D1) * 0.9 + wave_time * 1.1)
-		+ 0.3 * sin(dot(p, D2) * 1.7 + wave_time * 1.6)
-		+ 0.2 * sin(dot(p, D3) * 3.1 + wave_time * 2.3);
+// The slope carried by a ripple map at uv.
+vec2 ripple_map(vec2 uv) {
+	return texture(ripple_normals, uv).rg * 2.0 - 1.0;
 }
 
-vec2 wave_slope(vec2 p) {
-	return amp * (D1 * 0.5 * 0.9 * cos(dot(p, D1) * 0.9 + wave_time * 1.1)
-		+ D2 * 0.3 * 1.7 * cos(dot(p, D2) * 1.7 + wave_time * 1.6)
-		+ D3 * 0.2 * 3.1 * cos(dot(p, D3) * 3.1 + wave_time * 2.3));
-}
-
-// The slope of the noise at a point (fine ripples), by differences of the noise texture.
-vec2 ripple_slope(vec2 uv, float texel) {
-	float h = texture(foam_noise, uv).r;
-	float hx = texture(foam_noise, uv + vec2(texel, 0.0)).r;
-	float hz = texture(foam_noise, uv + vec2(0.0, texel)).r;
-	return vec2(hx - h, hz - h) / texel;
-}
+varying float crest;
 
 // Rings spreading where raindrops land (slope of the ring's ripple), in 0.6 m cells near the camera.
 vec2 rain_slope(vec2 p) {
@@ -60,7 +46,7 @@ vec2 rain_slope(vec2 p) {
 	for (int i = 0; i < 4; i++) {
 		vec2 c = cell + vec2(float(i & 1), float(i >> 1)) - 0.5;
 		float rnd = fract(sin(dot(c, vec2(12.9898, 78.233))) * 43758.5453);
-		float phase = fract(wave_time * (0.9 + rnd * 0.6) + rnd * 7.0);
+		float phase = fract(water_time * (0.9 + rnd * 0.6) + rnd * 7.0);
 		vec2 centre = (c + 0.25 + 0.5 * fract(vec2(rnd * 13.1, rnd * 7.7))) * 0.6;
 		vec2 d = p - centre;
 		float r = length(d);
@@ -73,8 +59,12 @@ vec2 rain_slope(vec2 p) {
 
 void vertex() {
 	vec3 w = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	VERTEX.y += amp * waves(w.xz);
-	wpos = w;
+	// The long waves move the mesh: up and down, and round in their orbits (sharper crests, flatter troughs).
+	vec3 d = gerstner(w.xz, 0, VERTEX_WAVES);
+	VERTEX += d;
+	wpos = w + d;
+	// How high this point rides on the swell (0 trough .. 1 crest): white caps break there in a strong wind.
+	crest = clamp(d.y / max(water_amp * 0.9, 0.0001) * 0.5 + 0.5, 0.0, 1.0);
 }
 
 // A view-space point back to the screen.
@@ -91,14 +81,19 @@ vec3 view_at(vec2 uv, mat4 inv_proj) {
 
 void fragment() {
 	float dist = length(VERTEX);
-	// The surface's slope: the swells, the wind's ripples (two sizes, drifting downwind, fading out with distance
-	// so they do not shimmer) and raindrops.
-	vec2 s = wave_slope(wpos.xz);
-	vec2 downwind = vec2(0.8, 0.6) * wave_time;
+	// The surface's slope: every Gerstner wave exactly (the short chop fading out with distance so it does not
+	// shimmer), the wind's ripples from two drifting normal maps (fine near, broad further out) and raindrops.
+	vec2 rest = wpos.xz - gerstner(wpos.xz, 0, VERTEX_WAVES).xz;
 	float near = 1.0 - smoothstep(25.0, 140.0, dist);
-	float chop = (0.25 + wind * 1.1) * near;
-	s += ripple_slope(wpos.xz * 0.11 + downwind * 0.012, 0.004) * 0.010 * chop;
-	s += ripple_slope(wpos.xz * 0.37 - downwind.yx * 0.021, 0.004) * 0.0045 * chop;
+	// The short chop does not move the mesh, so it may be steeper than its share of the swell (lake chop is short
+	// and steep); it fades out with distance so it does not shimmer.
+	vec2 s = gerstner_slope(rest, 0, VERTEX_WAVES).xy + gerstner_slope(rest, VERTEX_WAVES, WAVES).xy * (0.6 + 2.4 * near);
+	vec2 wd = normalize(water_dir);
+	vec2 across = vec2(-wd.y, wd.x);
+	float chop = (0.35 + wind * 1.2) * detail;
+	vec2 r1 = ripple_map(wpos.xz / 6.5 + wd * water_time * 0.045);
+	vec2 r2 = ripple_map(wpos.xz / 2.3 - across * water_time * 0.07 + wd * water_time * 0.03);
+	s += (r1 * 0.26 * (0.4 + 0.6 * near) + r2 * 0.17 * near) * chop;
 	if (rain > 0.01)
 		s += rain_slope(wpos.xz) * (1.0 - smoothstep(6.0, 25.0, dist));
 	vec3 n = normalize(vec3(-s.x, 1.0, -s.y));
@@ -160,15 +155,23 @@ void fragment() {
 		}
 	}
 
-	// Foam where the water laps the shore (a thin, broken edge that comes and goes with the swell).
-	float lap = 0.05 + 0.03 * sin(wave_time * 1.4 + wpos.x * 0.6 + wpos.z * 0.4);
-	float foam = (1.0 - smoothstep(0.0, lap, below)) * smoothstep(0.55, 0.75, texture(foam_noise, wpos.xz * 0.35 + vec2(wave_time * 0.02)).r);
+	// Foam where the water laps the shore: a thin, broken band that runs up and back with the swell.
+	float swash = water_height(wpos.xz) / max(water_amp, 0.0001);
+	float lap = 0.045 + 0.03 * swash * clamp(water_amp * 12.0, 0.2, 1.0);
+	float foam_tex = texture(foam_noise, wpos.xz * 0.35 + vec2(water_time * 0.02)).r;
+	float foam = (1.0 - smoothstep(0.0, max(lap, 0.01), below)) * smoothstep(0.55, 0.75, foam_tex);
 	foam *= step(0.004, below);
+	// White caps on the crests when the wind blows hard, breaking up into streaks downwind.
+	float caps = smoothstep(0.55, 0.95, wind) * smoothstep(0.72, 0.95, crest)
+		* smoothstep(0.62, 0.8, texture(foam_noise, wpos.xz * 0.21 - wd * water_time * 0.05).r) * near;
+	foam = max(foam, caps * 0.8);
+	// Over the last few centimetres the water clears completely, so the shore line is soft, not drawn.
+	float shore = smoothstep(0.0, 0.06, below);
 
-	float transmit = 1.0 - fresnel;
-	ALBEDO = mix(body * (1.0 - seen) * transmit, vec3(0.85, 0.88, 0.88), foam);
-	EMISSION = (refracted * through * transmit + reflected * fresnel * hit) * (1.0 - foam);
-	SPECULAR = 0.25 * (1.0 - hit) * (1.0 - foam);
+	float transmit = 1.0 - fresnel * shore;
+	ALBEDO = mix(body * (1.0 - seen) * transmit * shore, vec3(0.85, 0.88, 0.88), foam);
+	EMISSION = (refracted * mix(vec3(1.0), through, shore) * transmit + reflected * fresnel * hit * shore) * (1.0 - foam);
+	SPECULAR = 0.25 * (1.0 - hit) * (1.0 - foam) * shore;
 	ROUGHNESS = mix(0.035 + wind * 0.06 + rain * 0.08, 0.8, foam);
 	METALLIC = 0.0;
 	ALPHA = 1.0;

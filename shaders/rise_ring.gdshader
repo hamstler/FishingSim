@@ -1,29 +1,18 @@
-// A rise ring (World/RiseRings): a flat quad riding the lake's waves (the wave function and its globals match
-// shaders/water.gdshader and floating.gdshader) whose fragment draws two rings spreading out and fading; instance
+// A rise ring (World/RiseRings): a flat quad riding the lake's waves (the Gerstner waves of
+// shaders/water_waves.gdshaderinc, as on the water) whose fragment draws two rings spreading out and fading; instance
 // uniform age runs 0..1 over the ring's life.
 shader_type spatial;
 render_mode unshaded, cull_disabled, shadows_disabled, depth_draw_never;
 
-global uniform float water_time;
-global uniform float water_amp;
+#include "res://shaders/water_waves.gdshaderinc"
 
 instance uniform float age = 1.0;
 uniform vec3 tint : source_color = vec3(0.7, 0.78, 0.84);
 uniform float light = 1.0;
 
-const vec2 D1 = vec2(0.8, 0.6);
-const vec2 D2 = vec2(-0.5, 0.866);
-const vec2 D3 = vec2(0.9, -0.436);
-
-float waves(vec2 p) {
-	return 0.5 * sin(dot(p, D1) * 0.9 + water_time * 1.1)
-		+ 0.3 * sin(dot(p, D2) * 1.7 + water_time * 1.6)
-		+ 0.2 * sin(dot(p, D3) * 3.1 + water_time * 2.3);
-}
-
 void vertex() {
 	vec3 w = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	float lift = water_amp * (waves(w.xz) + 0.45);
+	float lift = water_height(w.xz) + water_amp * 0.15;
 	float sy = length(MODEL_MATRIX[1].xyz);
 	VERTEX.y += lift / max(sy, 0.0001);
 }

@@ -30,7 +30,7 @@ public partial class FloatCam : PanelContainer
         box.AddChild(container);
         _view = new SubViewport
         {
-            Size = new Vector2I(504, 300), Msaa3D = Viewport.Msaa.Msaa2X, UseTaa = false,
+            Size = new Vector2I(504, 300), Msaa3D = Viewport.Msaa.Disabled, ScreenSpaceAA = Viewport.ScreenSpaceAAEnum.Fxaa, UseTaa = false,
             RenderTargetUpdateMode = SubViewport.UpdateMode.WhenParentVisible,
         };
         container.AddChild(_view);
