@@ -47,6 +47,8 @@ public partial class SkyController : Node
     private float _cloud;
     private float _rain;
     private float _wind = 0.3f;
+    private float _groundWet;
+    private bool _wetStarted;
 
     /// <summary>Extra fog on top of the weather (mist over a marsh, haze in the hills); set per map.</summary>
     public float FogBoost { get; set; }
@@ -181,6 +183,15 @@ public partial class SkyController : Node
             Water.Wind = _wind;
             Water.Rain = _rain;
         }
+        // The ground soaks up rain in a couple of minutes and dries in about ten (a map opened in the rain starts wet).
+        if (!_wetStarted)
+        {
+            _wetStarted = true;
+            _groundWet = World.RainTarget > 0.05f ? Math.Min(1f, World.RainTarget * 1.4f) : 0f;
+        }
+        _groundWet = Mathf.MoveToward(_groundWet, _rain > 0.05f ? Math.Min(1f, _rain * 1.4f) : 0f, (_rain > 0.05f ? 0.01f : 0.0016f) * dt * 60f / 60f);
+        if (Bed != null)
+            Bed.Wetness = _groundWet;
         Apply();
     }
 

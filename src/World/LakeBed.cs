@@ -514,7 +514,10 @@ public partial class LakeBed : Node3D
     /// <summary>0..1 sun light reaching the ground (caustics fade at night); set by the sky.</summary>
     public float Daylight { get; set; } = 1f;
 
-    private float _sentDaylight = -1f;
+    private float _sentDaylight = -1f, _sentWetness = -1f;
+
+    /// <summary>0..1: how wet the ground is from rain (set by the sky; it dries slowly).</summary>
+    public float Wetness { get; set; }
 
     /// <summary>The terrain's daylight follows the sky (only when it changed: the caustics' clock is the global
     /// water_time).</summary>
@@ -525,6 +528,11 @@ public partial class LakeBed : Node3D
         {
             _sentDaylight = Daylight;
             _terrainMaterial.SetShaderParameter("daylight", Daylight);
+        }
+        if (_terrainMaterial != null && MathF.Abs(Wetness - _sentWetness) > 0.01f)
+        {
+            _sentWetness = Wetness;
+            _terrainMaterial.SetShaderParameter("wetness", Wetness);
         }
     }
 
