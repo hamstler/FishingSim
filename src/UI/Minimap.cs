@@ -46,7 +46,9 @@ public partial class Minimap : Control
     private static readonly Color DayGold = new(0.98f, 0.78f, 0.32f);
     private static readonly Color NightBlue = new(0.32f, 0.42f, 0.72f);
 
-    private FishingRod _rod = null!;
+    private FishingRod _rodFixed = null!;
+    /// <summary>The rod in use (the active one of the rod set, Fishing/RodSet).</summary>
+    private FishingRod _rod => FishingRod.ActiveRod ?? _rodFixed;
     private Node3D _player = null!;
     private Scenery _scenery = null!;
     private Data.LocationData? _renderedFor;
@@ -60,7 +62,7 @@ public partial class Minimap : Control
 
     public void Setup(FishingRod rod, Node3D player, Scenery scenery)
     {
-        _rod = rod;
+        _rodFixed = rod;
         _player = player;
         _scenery = scenery;
         MouseFilter = MouseFilterEnum.Ignore;

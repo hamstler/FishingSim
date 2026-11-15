@@ -65,6 +65,31 @@ public sealed class Profile
     public Dictionary<string, int> BaitCounts { get; set; } = new();
     public Dictionary<string, string> Equipped { get; set; } = new();
 
+    /// <summary>The tackle of rod slots 2 and 3 (slot 1 is <see cref="Equipped"/>): slot key -> item id. A slot with
+    /// no rod and reel of its own is not assembled yet (each rod in the water needs its own rod and reel).</summary>
+    public List<Dictionary<string, string>> RodSlots { get; set; } = new() { new(), new() };
+
+    /// <summary>The equipped tackle of rod slot 0..2.</summary>
+    public Dictionary<string, string> EquippedFor(int rodSlot)
+    {
+        if (rodSlot <= 0)
+            return Equipped;
+        while (RodSlots.Count < rodSlot)
+            RodSlots.Add(new());
+        return RodSlots[rodSlot - 1];
+    }
+
+    /// <summary>A rod or a reel is mounted in another rod slot (one rod or reel cannot be in two places).</summary>
+    public bool InUseElsewhere(TackleSlot slot, string id, int rodSlot)
+    {
+        if (slot is not (TackleSlot.Rod or TackleSlot.Reel) || id == "")
+            return false;
+        for (int k = 0; k <= RodSlots.Count; k++)
+            if (k != rodSlot && EquippedFor(k).GetValueOrDefault(slot.Key()) == id)
+                return true;
+        return false;
+    }
+
     /// <summary>The last meal's lasting effect and the game hours it has left (none when null or run out).</summary>
     public Core.Camp.MealBuff? Meal { get; set; }
 
@@ -189,6 +214,7 @@ public sealed class Profile
             ["rod"] = "junior", ["reel"] = "mlynek1000", ["line"] = "zylka025", ["hook"] = "hak5", ["bait"] = "worm",
             ["leader"] = TackleSlotExtensions.NoLeader,
         };
+        RodSlots = new() { new(), new() };
         Gear = new GearInventory();
         Market = new FishMarket();
     }
@@ -415,6 +441,11 @@ public sealed class Profile
             HookDull.Remove(id);
         if (Equipped.GetValueOrDefault(slot.Key()) == id)
             Equipped[slot.Key()] = slot == TackleSlot.Leader ? TackleSlotExtensions.NoLeader : ids.Count > 0 ? ids[0] : "";
+        // The other rod slots lose it too (a destroyed rod or reel leaves its slot unassembled).
+        foreach (var other in RodSlots)
+            if (other.GetValueOrDefault(slot.Key()) == id)
+                other[slot.Key()] = slot == TackleSlot.Leader ? TackleSlotExtensions.NoLeader
+                    : slot is TackleSlot.Rod or TackleSlot.Reel ? "" : ids.Count > 0 ? ids[0] : "";
         Changed?.Invoke();
         return true;
     }

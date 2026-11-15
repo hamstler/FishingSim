@@ -44,9 +44,11 @@ public partial class Shop : CanvasLayer
     private TextureRect _coin = null!;
     private int _shownMoney = -1;
 
-    private FishingRod _rod = null!;
+    private FishingRod _rodFixed = null!;
+    /// <summary>The rod in use (the active one of the rod set, Fishing/RodSet).</summary>
+    private FishingRod _rod => FishingRod.ActiveRod ?? _rodFixed;
     private Profile _profile = null!;
-    private TackleLoadout _loadout = null!;
+    private TackleLoadout _loadout => _rod.Loadout;
     private LakeBed _lake = null!;
     private GearCatalog? _gear;
     private TabContainer _tabs = null!;
@@ -94,9 +96,8 @@ public partial class Shop : CanvasLayer
 
     public void Setup(FishingRod rod)
     {
-        _rod = rod;
+        _rodFixed = rod;
         _profile = rod.Profile;
-        _loadout = rod.Loadout;
         _lake = rod.Lake;
         _gear = rod.Gear;
     }
@@ -515,7 +516,8 @@ public partial class Shop : CanvasLayer
         if (Visible || _rod.State != RodState.Idle)
             return;
         var (title, tabs) = Kinds[kind];
-        _title.Text = title;
+        // Gear is put on the rod in hand: say which of the three it is.
+        _title.Text = tabs.Contains("rod") ? $"{title} · wędka {_loadout.RodSlot + 1}" : title;
         _tackleCounter = tabs.Contains("rod");
         int first = -1;
         for (int i = 0; i < TabDefinitions.Length; i++)
@@ -1110,6 +1112,17 @@ public partial class Shop : CanvasLayer
 
     private void Equip(TackleSlot slot, int index)
     {
+        var wanted = _loadout.Items(slot)[index];
+        if (_profile.InUseElsewhere(slot, wanted.ItemId, _loadout.RodSlot))
+        {
+            _message.Text = $"{wanted.DisplayName} jest już założona na innej wędce (sloty 1-3). Każda wędka w wodzie potrzebuje własnego wędziska i kołowrotka.";
+            return;
+        }
+        if (_rod.State != RodState.Idle)
+        {
+            _message.Text = "Najpierw wyjmij zestaw z wody.";
+            return;
+        }
         _loadout.Index[(int)slot] = index;
         _loadout.SyncToProfile();
         _rod.ApplyTackle();

@@ -12,7 +12,7 @@ using FishingSim.World.Props;
 namespace FishingSim.Fishing;
 
 /// <summary>What the angler holds.</summary>
-public enum HandTool { Rod, Shovel, Net, LiftNet }
+public enum HandTool { Rod, Shovel, Net, LiftNet, None }
 
 /// <summary>
 /// The tools besides the rod: Q switches between the rod, the shovel and the insect net (the ones owned; the rod only
@@ -64,7 +64,9 @@ public partial class HandTools : Node3D
     private static readonly Vector3 DigLean = new(0f, -0.3f, -0.28f), DigHead = new(0f, -0.3f, -0.28f);
 
     private Player _player = null!;
-    private FishingRod _rod = null!;
+    private FishingRod _rodFixed = null!;
+    /// <summary>The rod in use (the active one of the rod set, Fishing/RodSet).</summary>
+    private FishingRod _rod => FishingRod.ActiveRod ?? _rodFixed;
     private GearCatalog _gear = null!;
     private Profile _profile = null!;
     private LakeBed _lake = null!;
@@ -128,7 +130,7 @@ public partial class HandTools : Node3D
         InsectSwarms? swarms, DigMarks? marks)
     {
         _player = player;
-        _rod = rod;
+        _rodFixed = rod;
         _gear = gear;
         _profile = profile;
         _lake = lake;
@@ -184,7 +186,11 @@ public partial class HandTools : Node3D
         _ => "Wędka",
     };
 
-    /// <summary>Takes a tool in hand. False when busy, not owned, or the rod's line is still out.</summary>
+    /// <summary>The angler's rods (hotbar 1-3); null in setups with one rod only.</summary>
+    public RodSet? Rods { get; set; }
+
+    /// <summary>Takes a tool in hand (HandTool.None: empty hands, everything in the backpack). False when busy, not
+    /// owned, or the rod in hand cannot be put down (a fish on, a lure being led).</summary>
     public bool Select(HandTool tool)
     {
         if (Lift != LiftStage.Up)
@@ -194,16 +200,31 @@ public partial class HandTools : Node3D
         }
         if (Working || tool == Current)
             return false;
-        if (!Available().Contains(tool))
+        if (tool != HandTool.None && !Available().Contains(tool))
             return false;
-        if (Current == HandTool.Rod && _rod.State != RodState.Idle)
+        if (Current == HandTool.Rod)
         {
-            _rod.Notify("Najpierw zwiń linkę.", 2f);
-            return false;
+            // The rod in hand goes into the backpack, or onto a rest with its line in the water.
+            string? why = Rods != null ? Rods.PutDownActive() : _rod.State != RodState.Idle ? "Najpierw zwiń linkę." : null;
+            if (why != null)
+            {
+                _rod.Notify(why, 2.5f);
+                return false;
+            }
+        }
+        if (tool == HandTool.Rod && Rods != null)
+        {
+            string? why = Rods.Take(Rods.ActiveSlot);
+            if (why != null)
+            {
+                _rod.Notify(why, 2.5f);
+                return false;
+            }
         }
         Current = tool;
         _rod.Holstered = tool != HandTool.Rod;
-        _player.Rig.Visible = tool == HandTool.Rod;
+        if (!_rod.OnRest || tool == HandTool.Rod)
+            _rod.InHands = tool == HandTool.Rod;
         _shovel.Visible = tool == HandTool.Shovel;
         _net.Visible = tool == HandTool.Net;
         _liftPole.Visible = tool == HandTool.LiftNet;
@@ -212,10 +233,82 @@ public partial class HandTools : Node3D
             HandTool.LiftNet => "Podrywka: LPM opuszcza ją do wody przed tobą, drugie LPM podrywa (żywce). Q zmienia narzędzie.",
             HandTool.Shovel => "Łopata: LPM kopie (robaki w wilgotnej ziemi). Q zmienia narzędzie.",
             HandTool.Net => "Siatka: LPM macha (jętki nad wodą o zmierzchu, koniki na łące). Q zmienia narzędzie.",
-            _ => "Wędka w ręku.",
+            HandTool.None => "Wolne ręce: sprzęt w plecaku. Klawisze 1-9 wyjmują wędki i narzędzia.",
+            _ => Rods != null ? $"Wędka {Rods.ActiveSlot + 1} w ręku." : "Wędka w ręku.",
         }, 3f);
         Changed?.Invoke(tool);
         return true;
+    }
+
+    /// <summary>
+    /// Takes rod slot 0..2 in hand (hotbar 1-3): the rod or tool in hand is put down first (a rod in the water goes onto
+    /// its rest, so up to three can fish at once). Pressing the key of the rod already in hand puts it down.
+    /// </summary>
+    public bool SelectRod(int slot)
+    {
+        if (Rods == null)
+            return slot == 0 && Select(HandTool.Rod);
+        if (Lift != LiftStage.Up || Working)
+            return false;
+        if (Current == HandTool.Rod && Rods.ActiveSlot == slot && !_rod.OnRest)
+            return Select(HandTool.None);
+        if (Current != HandTool.Rod)
+        {
+            // Hands free of the tool first, then the rod.
+            var target = Rods.Get(slot);
+            if (target.OnRest && !target.NearRest)
+            {
+                _rod.Notify($"Podejdź do wędki {slot + 1}, żeby ją podnieść.", 2.5f);
+                return false;
+            }
+            string? why0 = Rods.Take(slot);
+            if (why0 != null)
+            {
+                _rod.Notify(why0, 2.5f);
+                return false;
+            }
+            Current = HandTool.Rod;
+            _rod.Holstered = false;
+            _rod.InHands = true;
+            _shovel.Visible = _net.Visible = _liftPole.Visible = false;
+            _rod.Notify($"Wędka {slot + 1} w ręku.", 2f);
+            Changed?.Invoke(HandTool.Rod);
+            return true;
+        }
+        string? why = Rods.Take(slot);
+        if (why != null)
+        {
+            _rod.Notify(why, 2.5f);
+            return false;
+        }
+        _rod.Holstered = false;
+        _rod.Notify(_rod.Loadout.Ready
+            ? $"Wędka {slot + 1} w ręku."
+            : $"Wędka {slot + 1}: zestaw niekompletny. W kramie wybierz dla niej własne wędzisko i kołowrotek.", 3f);
+        Changed?.Invoke(HandTool.Rod);
+        return true;
+    }
+
+    /// <summary>The hotbar's tool slots (keys 4-9): what each holds.</summary>
+    public static readonly HandTool?[] ToolSlots = { HandTool.Shovel, HandTool.Net, HandTool.LiftNet, null, null, null };
+
+    /// <summary>A hotbar key 1-9 (slot 0-8): rods 1-3, tools 4-6, 7-9 free.</summary>
+    public bool Hotkey(int slot)
+    {
+        if (slot < RodSet.MaxRods)
+            return SelectRod(slot);
+        var tool = ToolSlots[slot - RodSet.MaxRods];
+        if (tool is not HandTool t)
+        {
+            _rod.Notify("Pusty slot.", 1.5f);
+            return false;
+        }
+        if (!Available().Contains(t))
+        {
+            _rod.Notify($"{NameOf(t)}: kupisz w kramie wędkarskim.", 2f);
+            return false;
+        }
+        return Select(Current == t ? HandTool.None : t);
     }
 
     /// <summary>The next (or previous) owned tool.</summary>
@@ -240,6 +333,11 @@ public partial class HandTools : Node3D
             Cycle(k.ShiftPressed ? -1 : 1);
             GetViewport().SetInputAsHandled();
         }
+        else if (e is InputEventKey { Pressed: true, Echo: false } num && num.Keycode >= Godot.Key.Key1 && num.Keycode <= Godot.Key.Key9)
+        {
+            Hotkey((int)(num.Keycode - Godot.Key.Key1));
+            GetViewport().SetInputAsHandled();
+        }
         else if (Current != HandTool.Rod && e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left }
                  && Input.MouseMode == Input.MouseModeEnum.Captured)
         {
@@ -255,7 +353,7 @@ public partial class HandTools : Node3D
     {
         if (Current == HandTool.LiftNet)
             return UseLiftNet();
-        if (Working || Current == HandTool.Rod)
+        if (Working || Current is HandTool.Rod or HandTool.None)
             return false;
         if (Current == HandTool.Shovel)
         {
@@ -703,6 +801,13 @@ public partial class HandTools : Node3D
         // The free left hand hangs at the side, palm in.
         var rest = new FirstPersonBody.HandTarget(body * new Vector3(-0.27f, 0.82f, -0.04f), bodyBasis * new Vector3(0.05f, -1f, -0.1f),
             bodyBasis * new Vector3(1f, 0f, 0.1f), 0.35f, leftPole);
+        if (Current == HandTool.None)
+        {
+            // Empty hands: both arms hang relaxed at the sides.
+            var rightRest = new FirstPersonBody.HandTarget(body * new Vector3(0.27f, 0.82f, -0.04f), bodyBasis * new Vector3(-0.05f, -1f, -0.1f),
+                bodyBasis * new Vector3(-1f, 0f, 0.1f), 0.35f, rightPole);
+            return (rightRest, rest);
+        }
         if (Current == HandTool.Shovel)
         {
             var tr = _shovel.GlobalTransform;

@@ -22,9 +22,11 @@ public partial class GameUI : CanvasLayer
     private const float MapShownWidth = 700f;
     private const float MapShownHeight = 500f;
 
-    private FishingRod _rod = null!;
+    private FishingRod _rodFixed = null!;
+    /// <summary>The rod in use (the active one of the rod set, Fishing/RodSet).</summary>
+    private FishingRod _rod => FishingRod.ActiveRod ?? _rodFixed;
     private Profile _profile = null!;
-    private TackleLoadout _loadout = null!;
+    private TackleLoadout _loadout => _rod.Loadout;
     private LakeBed _lake = null!;
     private Player _player = null!;
     private TournamentManager _tournaments = null!;
@@ -56,9 +58,8 @@ public partial class GameUI : CanvasLayer
     {
         _tournaments = tournaments;
         _scenery = scenery;
-        _rod = rod;
+        _rodFixed = rod;
         _profile = rod.Profile;
-        _loadout = rod.Loadout;
         _lake = rod.Lake;
         _player = player;
     }

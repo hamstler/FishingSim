@@ -17,7 +17,9 @@ namespace FishingSim.UI;
 /// </summary>
 public partial class CookingPanel : Control
 {
-    private FishingRod _rod = null!;
+    private FishingRod _rodFixed = null!;
+    /// <summary>The rod in use (the active one of the rod set, Fishing/RodSet).</summary>
+    private FishingRod _rod => FishingRod.ActiveRod ?? _rodFixed;
     private GearCatalog _gear = null!;
     private IReadOnlyList<FishSpecies> _species = Array.Empty<FishSpecies>();
     private Campfire? _fire;
@@ -34,7 +36,7 @@ public partial class CookingPanel : Control
 
     public void Setup(FishingRod rod, GearCatalog gear, IReadOnlyList<FishSpecies> species)
     {
-        _rod = rod;
+        _rodFixed = rod;
         _gear = gear;
         _species = species;
     }

@@ -447,6 +447,38 @@ public partial class ScreenshotTool : Node
             main.GetChildren().OfType<Hud>().First().Visible = false;
 
         // FISHSIM_RISES=N: N rise rings spread over the last second before the shot (any mode).
+        // FISHSIM_THREE_RODS=1: rods 2 and 3 get their own rod and reel, all three are cast with a worm under a float
+        // and the first two laid on rests (the third stays in the hands).
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_THREE_RODS") == "1")
+        {
+            var pr3 = main.Rod.Profile;
+            foreach (var (kind, id) in new[] { ("rod", "teleskop"), ("rod", "karpiowka"), ("reel", "mlynek3000"), ("reel", "freerunner") })
+                if (!pr3.Owned[kind].Contains(id))
+                    pr3.Owned[kind].Add(id);
+            pr3.BaitCounts["worm"] = 40;
+            int Ix3(TackleLoadout lo, TackleSlot slot, string id) => lo.Items(slot).ToList().FindIndex(i => i.ItemId == id);
+            foreach (var (k, r, reel) in new[] { (1, "teleskop", "mlynek3000"), (2, "karpiowka", "freerunner") })
+            {
+                var lo = main.Rods.Get(k).Loadout;
+                lo.Index[(int)TackleSlot.Rod] = Ix3(lo, TackleSlot.Rod, r);
+                lo.Index[(int)TackleSlot.Reel] = Ix3(lo, TackleSlot.Reel, reel);
+                lo.Index[(int)TackleSlot.Bait] = Ix3(lo, TackleSlot.Bait, "worm");
+                lo.SyncToProfile();
+                main.Rods.Get(k).ApplyTackle();
+            }
+            main.Rod.Loadout.Index[(int)TackleSlot.Bait] = Ix3(main.Rod.Loadout, TackleSlot.Bait, "worm");
+            main.Rod.ApplyTackle();
+            for (int k = 0; k < 3; k++)
+            {
+                if (k > 0)
+                    main.Tools.SelectRod(k);
+                main.Player.RotationDegrees = new Vector3(0, yaw + (k - 1) * 18f, 0);
+                main.Rod.CastNow(0.45f + 0.1f * k);
+                for (int f = 0; f < 240 && main.Rod.State != RodState.Waiting; f++)
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            }
+            main.Player.RotationDegrees = new Vector3(0, yaw, 0);
+        }
         // FISHSIM_RISES_NEAR=1: three rings of different ages a few metres ahead of the camera.
         if (System.Environment.GetEnvironmentVariable("FISHSIM_RISES_NEAR") == "1")
         {

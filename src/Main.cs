@@ -31,7 +31,13 @@ public partial class Main : Node3D
     private TackleLoadout _loadout = null!;
     private GearCatalog _gear = null!;
 
-    public FishingRod Rod { get; private set; } = null!;
+    private FishingRod _firstRod = null!;
+
+    /// <summary>The rod in use (the rod set's active one; the first rod until the set is made).</summary>
+    public FishingRod Rod => Rods?.Active ?? _firstRod;
+
+    /// <summary>The angler's rods (hotbar slots 1-3; up to three fishing at once).</summary>
+    public RodSet Rods { get; private set; } = null!;
     public Player Player { get; private set; } = null!;
     public TournamentManager Tournaments { get; private set; } = null!;
     public Scenery Scenery { get; private set; } = null!;
@@ -94,7 +100,7 @@ public partial class Main : Node3D
         _gear.Attach(_profile);
 
         var species = LoadSpecies();
-        Rod = new FishingRod();
+        _firstRod = new FishingRod();
         Player.AddChild(Rod);
         Rod.Setup(new RodDependencies(
             Player.Camera, Player.RodTip, Player.Rig, bobber, species, _loadout, _profile, _world, _lake, WaterY, _gear));
@@ -214,11 +220,45 @@ public partial class Main : Node3D
         // The mood of the map (water colour, mist) follows the location; a new map also means a new start on the pier.
         ApplyMood();
         _lake.Rebuilt += ApplyMood;
-        _lake.Rebuilt += Rod.Groundbait.Clear;
-        _lake.Rebuilt += Rod.Disturbance.Clear;
-        _lake.Rebuilt += Rod.Swim.Clear;
-        _lake.Rebuilt += Rod.Shoal.Clear;
+        _lake.Rebuilt += _firstRod.Groundbait.Clear;
+        _lake.Rebuilt += _firstRod.Disturbance.Clear;
+        _lake.Rebuilt += _firstRod.Swim.Clear;
+        _lake.Rebuilt += _firstRod.Shoal.Clear;
         _lake.Rebuilt += RespawnPlayer;
+
+        // The rod set: rods 2 and 3 are made when first taken out (keys 2 and 3); they share the swim's state with the
+        // first (groundbait, disturbance, fished-out spots, shoals) and have their own rig, float and tackle.
+        Rods = new RodSet(_firstRod, Player, slot =>
+        {
+            var bob = new Bobber { WaterY = WaterY, WaterHeight = _water.HeightAt };
+            AddChild(bob);
+            var rig = new RodRig { Visible = false };
+            Player.Camera.AddChild(rig);
+            rig.Transform = _firstRod.Rig.Transform;
+            var loadout = new TackleLoadout();
+            loadout.Attach(_profile, slot);
+            var extra = new FishingRod { Active = false };
+            Player.AddChild(extra);
+            extra.Setup(new RodDependencies(Player.Camera, rig.Tip, rig, bob, species, loadout, _profile, _world, _lake, WaterY, _gear));
+            extra.InHands = false;
+            extra.Population = Fish;
+            extra.WeedBeds = Scenery.WeedBeds;
+            extra.SunkenWood = Scenery.SunkenWood;
+            extra.OtherAnglers = Scenery.Anglers;
+            extra.Swim = _firstRod.Swim;
+            extra.Shoal = _firstRod.Shoal;
+            extra.Disturbance = _firstRod.Disturbance;
+            extra.Groundbait = _firstRod.Groundbait;
+            return extra;
+        });
+        Rods.Made += extra =>
+        {
+            sound.Track(extra);
+            Tournaments.Track(extra);
+            Rises.Risen += extra.NoteRise;
+        };
+        Tools.Rods = Rods;
+        _lake.Rebuilt += Rods.ResetAll;
         _lake.Rebuilt += ReleaseLoadingGarbage;
         _profile.Changed += Save;
         Input.MouseMode = Input.MouseModeEnum.Captured;
@@ -402,10 +442,10 @@ public partial class Main : Node3D
         _profile.WaterTempNow = null;
         _gear.GearChanged -= ApplyGearEffects;
         _lake.Rebuilt -= RespawnPlayer;
-        _lake.Rebuilt -= Rod.Groundbait.Clear;
-        _lake.Rebuilt -= Rod.Disturbance.Clear;
-        _lake.Rebuilt -= Rod.Swim.Clear;
-        _lake.Rebuilt -= Rod.Shoal.Clear;
+        _lake.Rebuilt -= _firstRod.Groundbait.Clear;
+        _lake.Rebuilt -= _firstRod.Disturbance.Clear;
+        _lake.Rebuilt -= _firstRod.Swim.Clear;
+        _lake.Rebuilt -= _firstRod.Shoal.Clear;
         _lake.Rebuilt -= ReleaseLoadingGarbage;
         _lake.Rebuilt -= ApplyMood;
     }

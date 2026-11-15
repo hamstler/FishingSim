@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
@@ -96,6 +97,7 @@ public static class ProfileSerializer
             ["owned"] = owned,
             ["bait_counts"] = FromMap(p.BaitCounts, v => v),
             ["equipped"] = FromMap(p.Equipped, v => v),
+            ["rod_slots"] = new JsonArray(p.RodSlots.Select(d => (JsonNode)FromMap(d, v => v)).ToArray()),
             ["gear"] = new JsonObject
             {
                 ["owned"] = FromMap(p.Gear.Owned, ids =>
@@ -260,6 +262,9 @@ public static class ProfileSerializer
             p.BaitCounts.Clear();
             ReadMap(baits, p.BaitCounts, n => Int(n, 0));
         }
+        if (d["rod_slots"] is JsonArray slots)
+            for (int k = 0; k < slots.Count && k < 2; k++)
+                ReadMap(slots[k], p.EquippedFor(k + 1), n => n?.GetValue<string>() ?? "");
         if (d["equipped"] is JsonObject eq)
         {
             foreach (var (k, v) in eq)

@@ -23,7 +23,9 @@ public partial class TournamentManager : Node
     /// <summary>The hour a tournament starts at (a bright morning).</summary>
     public const float StartHour = 6.5f;
 
-    private FishingRod _rod = null!;
+    private FishingRod _rodFixed = null!;
+    /// <summary>The rod in use (the active one of the rod set, Fishing/RodSet).</summary>
+    private FishingRod _rod => FishingRod.ActiveRod ?? _rodFixed;
     private IRng _rng = new SystemRng();
 
     public List<TournamentData> Tournaments { get; } = new();
@@ -37,7 +39,7 @@ public partial class TournamentManager : Node
 
     public void Setup(FishingRod rod, IRng? rng = null)
     {
-        _rod = rod;
+        _rodFixed = rod;
         if (rng != null)
             _rng = rng;
         foreach (var path in TournamentPaths)
@@ -48,6 +50,9 @@ public partial class TournamentManager : Node
         }
         _rod.FishLanded += OnFishLanded;
     }
+
+    /// <summary>Counts the catches of another rod of the set too.</summary>
+    public void Track(FishingRod rod) => rod.FishLanded += OnFishLanded;
 
     public override void _ExitTree()
     {

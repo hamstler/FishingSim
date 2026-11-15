@@ -88,6 +88,9 @@ public partial class FirstPersonBody : Node3D
         _rig = rig;
     }
 
+    /// <summary>The hands take another rod (the rod set's active one).</summary>
+    public void SetRig(RodRig rig) => _rig = rig;
+
     public override void _Ready()
     {
         if (BuildArms())

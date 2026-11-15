@@ -53,7 +53,8 @@ public partial class Player : CharacterBody3D
 
     /// <summary>True while a tool is being used: the angler stands still.</summary>
     public bool Busy { get; set; }
-    public RodRig Rig { get; private set; } = null!;
+    /// <summary>The rig of the rod in the hands (the rod set's active one).</summary>
+    public RodRig Rig { get; set; } = null!;
     public Node3D RodTip => Rig.Tip;
 
     public override void _Ready()

@@ -426,6 +426,75 @@ public sealed class GameSuite : ITestSuite
         float bleakAfter = rod.BiteChances(2f, spot).FirstOrDefault(c => c.Species.SpeciesName == "Ukleja").Weight;
         t.Check(bleakBefore <= 0f || bleakAfter > bleakBefore * 1.8f, $"a bait at a fresh bleak rise tempts bleak ({bleakBefore:0.000} -> {bleakAfter:0.000})");
 
+        t.Section("three rods");
+        var rods = main.Rods;
+        var tools = main.Tools;
+        rod.ResetToIdle();
+        rod.DevSpeciesIndex = -1;
+        int Ix(TackleLoadout lo, TackleSlot slot, string id) => lo.Items(slot).ToList().FindIndex(i => i.ItemId == id);
+        foreach (var (kind, id) in new[] { ("rod", "teleskop"), ("rod", "karpiowka"), ("reel", "mlynek3000"), ("reel", "freerunner") })
+            if (!profile.Owned[kind].Contains(id))
+                profile.Owned[kind].Add(id);
+        profile.BaitCounts["worm"] = 40;
+        var rod2 = rods.Get(1);
+        var rod3 = rods.Get(2);
+        rod2.Loadout.Index[(int)TackleSlot.Rod] = Ix(rod2.Loadout, TackleSlot.Rod, loadout.Rod.ItemId);
+        rod2.Loadout.SyncToProfile();
+        t.Check(!rod2.Loadout.Ready && !rods.Active.Equals(rod2), "a second rod needs a rod and a reel of its own (not the first rod's)");
+        rod2.Loadout.Index[(int)TackleSlot.Rod] = Ix(rod2.Loadout, TackleSlot.Rod, "teleskop");
+        rod2.Loadout.Index[(int)TackleSlot.Reel] = Ix(rod2.Loadout, TackleSlot.Reel, "mlynek3000");
+        rod2.Loadout.Index[(int)TackleSlot.Bait] = Ix(rod2.Loadout, TackleSlot.Bait, "worm");
+        rod2.Loadout.SyncToProfile();
+        rod2.ApplyTackle();
+        rod3.Loadout.Index[(int)TackleSlot.Rod] = Ix(rod3.Loadout, TackleSlot.Rod, "karpiowka");
+        rod3.Loadout.Index[(int)TackleSlot.Reel] = Ix(rod3.Loadout, TackleSlot.Reel, "freerunner");
+        rod3.Loadout.Index[(int)TackleSlot.Bait] = Ix(rod3.Loadout, TackleSlot.Bait, "worm");
+        rod3.Loadout.SyncToProfile();
+        rod3.ApplyTackle();
+        var saved3 = ProfileSerializer.FromJson(ProfileSerializer.ToJson(profile).ToJsonString());
+        t.Check(rod2.Loadout.Ready && rod3.Loadout.Ready && saved3.EquippedFor(1).GetValueOrDefault("rod") == "teleskop"
+                && saved3.EquippedFor(2).GetValueOrDefault("reel") == "freerunner",
+            "rods 2 and 3 get their own rod and reel, and the profile keeps them");
+        loadout.Index[(int)TackleSlot.Bait] = Ix(loadout, TackleSlot.Bait, "worm");
+        rod.ApplyTackle();
+        rod.DevInstantBite = true;
+        rod.CastNow(0.5f);
+        await WaitForState(t, rod, RodState.Waiting, 6);
+        t.Check(tools.SelectRod(1) && rod.OnRest && RodSet.InWater(rod) && rods.Active == rod2 && rod2.InHands && FishingRod.ActiveRod == rod2
+                && main.Player.Rig == rod2.Rig && rod2.Rig.Visible,
+            "key 2: the first rod goes onto a rest with its float in the water, the second comes into the hands");
+        rod2.CastNow(0.5f);
+        await WaitForState(t, rod2, RodState.Waiting, 6);
+        t.Check(tools.SelectRod(2) && rod2.OnRest && rods.Active == rod3, "key 3: the second rod onto its rest, the third in hand");
+        rod3.CastNow(0.5f);
+        await WaitForState(t, rod3, RodState.Waiting, 6);
+        t.Check(rods.InWaterCount() == 3 && rod.RestPosition?.DistanceTo(rod2.RestPosition ?? Vector3.Zero) > 0.5f,
+            $"three rods fish at once, their rests side by side ({rods.InWaterCount()} in the water)");
+        // A rod on its rest is solid: an angler-sized capsule cannot stand where it lies.
+        var restSolid = rod.RestPosition!.Value;
+        var restBody = main.Player.GetWorld3D().DirectSpaceState;
+        var restProbe = new PhysicsShapeQueryParameters3D
+        {
+            Shape = new CapsuleShape3D { Radius = 0.2f, Height = 1.6f }, CollisionMask = 1,
+            Transform = new Transform3D(Basis.Identity, restSolid + new Vector3(0f, 0.95f, 0f)),
+        };
+        bool hitsRod = restBody.IntersectShape(restProbe, 8).Any(h => h["collider"].AsGodotObject() is Node n && n.Name.ToString() == "RodSolid");
+        t.Check(hitsRod, "a rod lying on its rest is solid");
+        double bitWait = 0;
+        while (rod.State == RodState.Waiting && bitWait < 12)
+        {
+            await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
+            bitWait += 1.0 / Engine.PhysicsTicksPerSecond;
+        }
+        t.Check(rod.State is RodState.Nibble or RodState.Bite, $"a rod on its rest gets bites while another is in hand ({rod.State})");
+        rod.DevInstantBite = false;
+        t.Check(tools.SelectRod(0) && rods.Active == rod && !rod.OnRest && rod3.OnRest, "key 1: back to the first rod (the third goes onto its rest)");
+        rod.ResetToIdle();
+        t.Check(tools.SelectRod(0) && tools.Current == HandTool.None && !rod.Rig.Visible, "pressing the key of the idle rod in hand puts it into the backpack");
+        t.Check(tools.SelectRod(0) && tools.Current == HandTool.Rod && rod.Rig.Visible, "and again takes it out");
+        rods.ResetAll();
+        t.Check(rods.InWaterCount() == 0 && rods.Active == rod && !rod2.Rig.Visible && !rod3.Rig.Visible, "a reset puts every rod back (the first in hand)");
+
         t.Section("hook point");
         string hookId = rod.Loadout.Hook.ItemId;
         profile.AddHookDull(hookId, 0.4f);
@@ -473,18 +542,6 @@ public sealed class GameSuite : ITestSuite
         t.Check(ui.MapInfoText.Contains("Na obecny zestaw") && mapSize.Y > 100f && ui.MapShownSize == mapSize && pageAfter == pageSize,
             $"map: hovering the water lists the fish without resizing the map ({mapSize} -> {ui.MapShownSize}, page {pageSize} -> {pageAfter})");
         ui.Close();
-
-        t.Section("gear keys");
-        loadout.Index[(int)TackleSlot.Rod] = 0;
-        profile.Owned["rod"].Add("teleskop");
-        rod._UnhandledInput(Key(Godot.Key.Key1));
-        t.Check(loadout.Rod.ItemId == "teleskop", "key 1 cycles to the next owned rod");
-        rod._UnhandledInput(Key(Godot.Key.Key1, shift: true));
-        t.Check(loadout.Rod.ItemId == "junior", "Shift+1 goes back");
-        rod.CastNow(0.4f);
-        rod._UnhandledInput(Key(Godot.Key.Key1));
-        t.Check(loadout.Rod.ItemId == "junior", "gear cannot change while a line is out");
-        rod.ResetToIdle();
 
         t.Section("bite chances in the game");
         var live = Array.FindIndex(loadout.Items(TackleSlot.Bait).ToArray(), i => i.ItemId == "livebait");
@@ -633,7 +690,7 @@ public sealed class GameSuite : ITestSuite
 
         t.Section("camp life: shovel, insect net, campfire");
         rod.ResetToIdle();
-        var tools = main.Tools;
+        tools = main.Tools;
         t.Check(!tools.Select(HandTool.Shovel) && tools.Current == HandTool.Rod, "without a shovel there is nothing to switch to");
         profile.Money = 1000;
         foreach (var id in new[] { "lopata", "siatka_na_owady", "garnek" })

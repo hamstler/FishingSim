@@ -17,7 +17,9 @@ public partial class CatchPanel : Control
     private const float TurnSpeed = 0.42f;     // rad/s once settled: one turn in about 15 s
     private const float SpinIn = 5.5f;          // rad/s when the card appears
 
-    private FishingRod _rod = null!;
+    private FishingRod _rodFixed = null!;
+    /// <summary>The rod in use (the active one of the rod set, Fishing/RodSet).</summary>
+    private FishingRod _rod => FishingRod.ActiveRod ?? _rodFixed;
     private Control _card = null!, _stage = null!;
     private ColorRect _dim = null!;
     private Label _title = null!, _latin = null!, _status = null!, _warning = null!;
@@ -38,7 +40,7 @@ public partial class CatchPanel : Control
     /// <summary>The fish on the stage, or null.</summary>
     public FishModel? ShownFish => _fish;
 
-    public void Setup(FishingRod rod) => _rod = rod;
+    public void Setup(FishingRod rod) => _rodFixed = rod;
 
     public override void _Ready()
     {

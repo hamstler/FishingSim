@@ -331,7 +331,7 @@ repozytorium, więc lepiej przebudowywać tylko zmienione gatunki. Opis całego 
 | E przy ognisku | panel ogniska: rozpalenie i gotowanie ryb z siatki (i grzybów ze spiżarni) |
 | E przy grzybach / jagodach | zbieranie do spiżarni |
 | E przy wędzarni / tablicy ogłoszeń | wędzenie ryb z siatki / zlecenia mieszkańców |
-| 1-6 (Shift = wstecz) | wędka, kołowrotek, żyłka, hak, przynęta, przypon (tylko przed rzutem) |
+| 1-9 (pasek na dole ekranu) | 1-3 - wędki (do trzech łowi naraz), 4 - łopata, 5 - siatka na owady, 6 - podrywka, 7-9 wolne. Wybranie innej wędki odkłada tę w ręku: zarzuconą na podpórkę (dalej łowi), zwiniętą do plecaka. Ten sam klawisz chowa wędkę lub narzędzie do plecaka (wolne ręce). Do wędki na podpórce trzeba podejść |
 | I / M / J / T | ekwipunek, mapa, dziennik, turnieje |
 | E | wejście do kramu, gildii, na targ lub na postój wozów (przy drzwiach budynku) |
 | Shift | bieg |
@@ -420,6 +420,7 @@ Przy dodawaniu: nowa ryba = plik w `data/fish/`, wpis w `SpeciesCatalog.Paths` i
 - **Przynęta a temperatura**: w zimnej wodzie (np. w górskim jeziorze albo głęboko) lepiej działają przynęty zwierzęce: robaki, białe robaki, ochotka. Przynęty roślinne (kukurydza, chleb, kasza) i kulki proteinowe rozkręcają się w ciepłej wodzie, gdy karpiowate żerują najmocniej. Liczy się temperatura tam, gdzie leży przynęta.
 - **Drapieżnik na holu**: drobna ryba (do 0,3 kg: płotka, ukleja, okonek...) szarpiąca się na żyłce to łatwy posiłek. Czasem w trakcie holu porywa ją szczupak, okoń, sandacz, boleń albo sum i dalej holujesz już drapieżnika. Trzyma on rybkę w pysku, a nie haczyk, więc łatwo ją puszcza, gdy dostanie luz.
 - **Kolizje**: drzewa, głazy przy brzegu, ogniska i kłody wokół nich, łódki, tablica ogłoszeń, stojaki, sznury na pranie, grobla na stawie i inne obiekty zatrzymują wędkarza tak jak budynki. Przy brzegu wody i na krawędzi mapy wędkarz ślizga się wzdłuż przeszkody zamiast stawać w miejscu. Siedzący ludzie (przy ognisku, wędkarze na brzegu) siedzą na kłodach dopasowanych do wysokości siedzenia, z biodrami nad środkiem kłody, a wędkarze wybierają płaskie miejsca na brzegu.
+- **Trzy wędki naraz**: każda z wędek 1-3 ma własny zestaw: wędzisko, kołowrotek, żyłkę, haczyk, przynętę i przypon. Druga i trzecia potrzebują własnego wędziska i kołowrotka, bo jedna wędka nie może być w dwóch miejscach. Zestaw ustawia się w kramie dla wędki trzymanej w ręku, a tytuł kramu mówi, która to. Zarzucona wędka (spławik albo grunt) odłożona klawiszem innej wędki ląduje na podpórce obok poprzednich i dalej łowi: branie widać na spławiku i szczytówce, a dzwonek dzwoni, jeśli masz podpórkę z dzwoneczkiem. Spinning łowi się tylko z ręki. Wędki na podpórkach mają kolizję. Pasek 1-9 pokazuje, gdzie jest każda wędka: w ręku, w wodzie, na podpórce, w plecaku.
 - **Turnieje** (T): wpisowe, dojazd na łowisko, wynik to suma N najcięższych ryb, rywale to boty o różnych umiejętnościach. Nagrody (pieniądze i XP) według miejsca, historia w zapisie.
 
 ## Zapis gry

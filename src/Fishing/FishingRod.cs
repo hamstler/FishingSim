@@ -104,7 +104,7 @@ public partial class FishingRod : Node3D
     private bool _anglerSeen;
 
     /// <summary>How disturbed the fish at the swim are (splashes, steps, a fight); slows the bites while it lasts.</summary>
-    public Disturbance Disturbance { get; } = new();
+    public Disturbance Disturbance { get; set; } = new();
 
     /// <summary>How much of the angler's noise reaches the fish (rain and wind mask it).</summary>
     private float NoiseMasking => Disturbance.Masking(World.Weather, World.WindTarget);
@@ -147,7 +147,7 @@ public partial class FishingRod : Node3D
     private Vector3 _hookedAt;
 
     /// <summary>Shoals found by catching one of them (cleared on a new map).</summary>
-    public Shoals Shoal { get; } = new();
+    public Shoals Shoal { get; set; } = new();
 
     private Func<string, float> ShoalAt(float x, float z)
     {
@@ -198,7 +198,7 @@ public partial class FishingRod : Node3D
     private string? _lastShoalSpecies;
 
     /// <summary>Recent catches round the lake: a spot fished hard bites slower (cleared on a new map).</summary>
-    public SwimPressure Swim { get; } = new();
+    public SwimPressure Swim { get; set; } = new();
 
     /// <summary>How hard the spot at the bait has been fished (read once a second while fishing).</summary>
     public float SwimLoad { get; private set; }
@@ -268,7 +268,7 @@ public partial class FishingRod : Node3D
     public bool FeederLoaded => _feederLoaded;
 
     /// <summary>Baited spots on the bottom (fed by the feeder, fading over game hours).</summary>
-    public GroundbaitSpots Groundbait { get; } = new();
+    public GroundbaitSpots Groundbait { get; set; } = new();
 
     /// <summary>How much groundbait works where the rig lies.</summary>
     public float GroundbaitHeat => _castMethod == FishingMethod.Float
@@ -532,8 +532,25 @@ public partial class FishingRod : Node3D
         _rope.Floats = floats;
         // A snapped rod is gone: nothing left in the hand until a new one is bought or handed out.
         if (_rig != null)
-            _rig.Visible = Loadout.Profile == null || Loadout.Profile.Owns(TackleSlot.Rod, rod.ItemId);
+            _rig.Visible = (InHands || OnRest) && (Loadout.Profile == null || Loadout.Profile.Owns(TackleSlot.Rod, rod.ItemId));
     }
+
+    /// <summary>The rod is in the angler's hands (not in the backpack, not put away for a tool).</summary>
+    public bool InHands
+    {
+        get => _inHands;
+        set
+        {
+            _inHands = value;
+            if (_rig != null && !OnRest)
+                _rig.Visible = value && (Loadout.Profile == null || Loadout.Profile.Owns(TackleSlot.Rod, Loadout.Rod.ItemId));
+        }
+    }
+
+    private bool _inHands = true;
+
+    /// <summary>This rod's rig (in the hands, on its rest or in the backpack).</summary>
+    public RodRig Rig => _rig;
 
     private Core.Physics.RodBendModel? _bendModel;
 
@@ -738,9 +755,19 @@ public partial class FishingRod : Node3D
     /// <summary>True while another tool is in the hands (shovel, insect net): the rod is put away, it does nothing.</summary>
     public bool Holstered { get; set; }
 
+    /// <summary>The rod the angler is using now (the rod set's active one; null before any rod is set up). The HUD and
+    /// the panels follow it.</summary>
+    public static FishingRod? ActiveRod { get; set; }
+
+    /// <summary>This rod takes the angler's input (the one in use). Rods left on their rests keep fishing without it.</summary>
+    public bool Active { get; set; } = true;
+
+    /// <summary>Which rod slot this is (0..2; hotbar keys 1-3).</summary>
+    public int Slot { get; set; }
+
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (Holstered)
+        if (Holstered || !Active)
             return;
         if (InputBlocked)
         {
@@ -871,11 +898,6 @@ public partial class FishingRod : Node3D
                     ShowBanner("Kolejne łowisko odblokujesz na wyższym poziomie");
                 }
                 break;
-            case >= Key.Key1 and <= Key.Key6 when State == RodState.Idle:
-                Loadout.Cycle((TackleSlot)(key.Keycode - Key.Key1), key.ShiftPressed ? -1 : 1);
-                ApplyTackle();
-                Profile.NotifyChanged();
-                break;
         }
     }
 
@@ -886,7 +908,7 @@ public partial class FishingRod : Node3D
         if (_bobber == null)
             return;
         float dt = (float)delta;
-        bool captured = !InputBlocked && !Holstered && Input.MouseMode == Input.MouseModeEnum.Captured;
+        bool captured = Active && !InputBlocked && !Holstered && Input.MouseMode == Input.MouseModeEnum.Captured;
         // A rod on the rest is not in the hands: nothing is reeled or lifted.
         Reeling = !OnRest && (ReelOverride || (captured && Input.IsMouseButtonPressed(MouseButton.Left)));
         Lifting = !OnRest && (LiftOverride || (captured && Input.IsMouseButtonPressed(MouseButton.Right)));
@@ -941,7 +963,7 @@ public partial class FishingRod : Node3D
     /// <summary>While the float is in the water, nearby fish that like this bait (at this depth and hour) swim to it.</summary>
     private void UpdateBaitAttraction(float dt)
     {
-        if (Population == null)
+        if (Population == null || !Active)
             return;
         bool baitIn = State is RodState.Waiting or RodState.Nibble or RodState.Bite;
         if (!baitIn)
@@ -2323,7 +2345,9 @@ public partial class FishingRod : Node3D
         var flat = -eye.Basis.Z;
         flat.Y = 0f;
         flat = flat.LengthSquared() > 1e-4f ? flat.Normalized() : Vector3.Forward;
-        var from = eye.Origin + flat * 0.8f;
+        // Each rod of the set gets its own place: the second rod's rest to the left, the third's to the right.
+        var side = flat.Cross(Vector3.Up);
+        var from = eye.Origin + flat * 0.8f + side * (Slot switch { 1 => -0.7f, 2 => 0.7f, _ => 0f });
         var hit = GetWorld3D().DirectSpaceState.IntersectRay(PhysicsRayQueryParameters3D.Create(from, from + Vector3.Down * 4f, 1));
         if (hit.Count == 0)
         {
@@ -2348,6 +2372,8 @@ public partial class FishingRod : Node3D
         _rig.Reparent(_rest, true);
         _rig.GlobalTransform = new Transform3D(basis, fork - rodDir * 0.45f);
         _rest.PlaceBackRest(fork - rodDir * 0.78f);
+        // Solid from just behind the fork (clear of the angler standing over the butt) to past it.
+        _rest.MakeSolid(fork - rodDir * 0.35f, fork);
         ShowBanner(_rest.HasBell
             ? "Wędka na podpórce z dzwoneczkiem. Z - podnieś, PPM przy braniu - zacięcie"
             : "Wędka na patyku. Z - podnieś, PPM przy braniu - zacięcie (podejdź bliżej)", 3f);

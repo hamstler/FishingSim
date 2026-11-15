@@ -61,6 +61,27 @@ public partial class RodRest : Node3D
         Stake(new Vector3(local.X, 0f, local.Z), height, HasBell ? 0.005f : 0.009f, 0.05f);
     }
 
+    /// <summary>
+    /// The rod lying on the rest is solid: the angler cannot walk through it (a box along the rod from the back rest to
+    /// a metre past the fork, a metre high, so it is not stepped over). <paramref name="butt"/> and <paramref name="fork"/>
+    /// are world points.
+    /// </summary>
+    public void MakeSolid(Vector3 butt, Vector3 fork)
+    {
+        var a = ToLocal(butt) with { Y = 0f };
+        var b = ToLocal(fork) with { Y = 0f };
+        var dir = b - a;
+        float len = dir.Length() + 1f;
+        if (dir.LengthSquared() < 1e-6f)
+            return;
+        dir = dir.Normalized();
+        var body = new StaticBody3D { Name = "RodSolid", CollisionLayer = 1, CollisionMask = 0 };
+        body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(0.22f, 1f, len) } });
+        body.Position = a + dir * (len / 2f) + Vector3.Up * 0.5f;
+        body.Rotation = new Vector3(0f, MathF.Atan2(dir.X, dir.Z), 0f);
+        AddChild(body);
+    }
+
     /// <summary>The bell rings: it swings for a moment.</summary>
     public void Ring()
     {

@@ -10,7 +10,9 @@ namespace FishingSim.UI;
 /// <summary>Esc menu: resume, switch map, log out, quit. Pauses the game while open.</summary>
 public partial class PauseMenu : CanvasLayer
 {
-    private FishingRod _rod = null!;
+    private FishingRod _rodFixed = null!;
+    /// <summary>The rod in use (the active one of the rod set, Fishing/RodSet).</summary>
+    private FishingRod _rod => FishingRod.ActiveRod ?? _rodFixed;
     private readonly List<CanvasLayer> _otherScreens = new();
     private Action _save = () => { };
     private TournamentManager _tournaments = null!;
@@ -18,7 +20,7 @@ public partial class PauseMenu : CanvasLayer
 
     public void Setup(FishingRod rod, TournamentManager tournaments, Action save, params CanvasLayer[] otherScreens)
     {
-        _rod = rod;
+        _rodFixed = rod;
         _tournaments = tournaments;
         _save = save;
         _otherScreens.AddRange(otherScreens);

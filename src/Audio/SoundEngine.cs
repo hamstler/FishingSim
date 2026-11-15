@@ -21,7 +21,9 @@ public partial class SoundEngine : Node
     private float[] _buffer = Array.Empty<float>();
     private const int Chunk = 256;
     private readonly Vector2[] _chunk = new Vector2[Chunk];
-    private FishingRod _rod = null!;
+    private FishingRod _rodFixed = null!;
+    /// <summary>The rod in use (the active one of the rod set, Fishing/RodSet).</summary>
+    private FishingRod _rod => FishingRod.ActiveRod ?? _rodFixed;
     private Player _angler = null!;
     private WorldState _world = null!;
     private LakeBed _lake = null!;
@@ -29,9 +31,12 @@ public partial class SoundEngine : Node
 
     public Synth Synth => _synth;
 
+    /// <summary>Plays the cues of another rod of the set too.</summary>
+    public void Track(FishingRod rod) => rod.SoundCue += (cue, gain) => _synth.Play(cue, gain);
+
     public void Setup(FishingRod rod, Player angler, WorldState world, LakeBed lake)
     {
-        _rod = rod;
+        _rodFixed = rod;
         _angler = angler;
         _world = world;
         _lake = lake;
