@@ -57,6 +57,8 @@ public partial class ArmIK : SkeletonModifier3D
 
         /// <summary>When set (world direction), the thumb lies along it, e.g. on top of a rod's handle.</summary>
         public Vector3? ThumbAlong;
+        /// <summary>A point (world) the thumb's tip should rest on, instead of only pointing along ThumbAlong.</summary>
+        public Vector3? ThumbOn;
 
         internal int Upper = -1, Lower = -1, Hand = -1;
         internal Basis RestFrame;
@@ -265,6 +267,17 @@ public partial class ArmIK : SkeletonModifier3D
         foreach (var chain in arm.Chains)
         {
             var parent = sk.GetBoneGlobalPose(sk.GetBoneParent(chain.Bones[0]));
+            if (chain.Name == "thumb" && arm.ThumbOn is Vector3 on)
+            {
+                // Pointing from its root at the point it rests on (the thumb is straight enough to reach it).
+                var root = (parent * sk.GetBoneRest(chain.Bones[0])).Origin;
+                var dir = toSkeleton * on - root;
+                if (dir.LengthSquared() > 1e-10f)
+                {
+                    LayThumb(sk, chain, parent, dir.Normalized());
+                    continue;
+                }
+            }
             if (chain.Name == "thumb" && arm.ThumbAlong is Vector3 along)
             {
                 LayThumb(sk, chain, parent, (toSkeleton.Basis * along).Normalized());
@@ -323,7 +336,56 @@ public partial class ArmIK : SkeletonModifier3D
                 sk.SetBonePoseRotation(chain.Bones[k], Rotation(sk, chain, k, chain.Shown[k], arm.Splay).GetRotationQuaternion());
             }
             chain.HasShown = true;
+            if (Debug && Engine.GetProcessFrames() % 60 == 0)
+                _report.Append($"{chain.Name} {Gap(sk, chain, parent, chain.Shown, arm.Splay, obstacles, radius) / scale * 1000f:F0}mm c=({chain.Shown[0]:F2},{chain.Shown[1]:F2},{chain.Shown[2]:F2}) ");
         }
+        if (Debug && Engine.GetProcessFrames() % 60 == 0)
+        {
+            // The palm: the middle of the knuckle row and the heel, against the obstacles.
+            int hand = arm.Hand;
+            var hg = sk.GetBoneGlobalPose(hand);
+            int mid = sk.FindBone($"middle_01_{arm.Side}");
+            var knuckle = sk.GetBoneGlobalPose(mid).Origin;
+            var centre = hg.Origin.Lerp(knuckle, 0.6f);
+            float palm = float.MaxValue;
+            foreach (var o in obstacles)
+            {
+                var ab = o.B - o.A;
+                float t = Math.Clamp((centre - o.A).Dot(ab) / MathF.Max(ab.LengthSquared(), 1e-10f), 0f, 1f);
+                palm = MathF.Min(palm, (o.A + ab * t).DistanceTo(centre) - o.Radius);
+            }
+            GD.Print($"GRIP {arm.Side}: palm centre {palm / scale * 1000f:F0}mm from the surface; {_report}");
+            _report.Clear();
+        }
+    }
+
+    private static readonly System.Text.StringBuilder _report = new();
+
+    /// <summary>The smallest clearance (negative = overlap) between a finger at curl <paramref name="c"/> and the obstacles.</summary>
+    private static float Gap(Skeleton3D sk, Chain chain, Transform3D parent, ReadOnlySpan<float> c, float splay,
+        ReadOnlySpan<Capsule> obstacles, float radius)
+    {
+        var g = parent;
+        float best = float.MaxValue;
+        for (int k = 0; k < 3; k++)
+        {
+            g = g * new Transform3D(Rotation(sk, chain, k, c[k], splay), sk.GetBonePosePosition(chain.Bones[k]));
+            best = MathF.Min(best, Clear(g.Origin, obstacles, radius));
+        }
+        best = MathF.Min(best, Clear(g * sk.GetBoneRest(chain.Tip).Origin, obstacles, radius * 0.85f));
+        return best;
+    }
+
+    private static float Clear(Vector3 p, ReadOnlySpan<Capsule> obstacles, float radius)
+    {
+        float best = float.MaxValue;
+        foreach (var o in obstacles)
+        {
+            var ab = o.B - o.A;
+            float t = Math.Clamp((p - o.A).Dot(ab) / MathF.Max(ab.LengthSquared(), 1e-10f), 0f, 1f);
+            best = MathF.Min(best, (o.A + ab * t).DistanceTo(p) - o.Radius - radius);
+        }
+        return best;
     }
 
     /// <summary>
@@ -339,7 +401,7 @@ public partial class ArmIK : SkeletonModifier3D
         var axis = seg.Cross(dir);
         float angle = MathF.Atan2(axis.Length(), Math.Clamp(seg.Dot(dir), -1f, 1f));
         if (axis.LengthSquared() > 1e-8f)
-            global = new Basis(axis.Normalized(), MathF.Min(angle, Mathf.DegToRad(75f))) * global;
+            global = new Basis(axis.Normalized(), MathF.Min(angle, Mathf.DegToRad(85f))) * global;
         sk.SetBonePoseRotation(b0, (parent.Basis.Inverse() * global).GetRotationQuaternion());
         for (int k = 1; k < 3; k++)
             sk.SetBonePoseRotation(chain.Bones[k], Rotation(sk, chain, k, 0.18f, 0f).GetRotationQuaternion());

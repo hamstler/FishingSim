@@ -480,7 +480,7 @@ public partial class ScreenshotTool : Node
             {
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
                 t += 1.0 / 60.0;
-                if (rod.State == RodState.Bite && !hooked)
+                if (rod.State == RodState.Bite && !hooked && rod.StrikeReady)
                 {
                     hooked = true;
                     rod.TryHook();
@@ -1130,7 +1130,8 @@ public partial class ScreenshotTool : Node
                     + $"{Bone("pelvis")}, {Bone("thigh_l")}, {Bone("calf_l")}, {Bone("foot_l")}, {Bone("ball_l")}");
             }
         }
-        // FISHSIM_CLOSEUP = 0 (left, the crank side), 1 (right front), 2 (from below), 3 (over the left shoulder):
+        // FISHSIM_CLOSEUP = 0 (left, the crank side), 1 (right front), 2 (from below), 3 (over the left shoulder),
+        // 4 (from the front, down the rod at the grip: shows whether the palm lies on the handle), 5 (from above):
         // a second camera beside the reel and the hands, in any mode.
         if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_CLOSEUP"), out int close))
         {
@@ -1141,12 +1142,16 @@ public partial class ScreenshotTool : Node
                 1 => rig.GlobalTransform.Basis * new Vector3(0.28f, 0.22f, -0.05f),
                 2 => rig.GlobalTransform.Basis * new Vector3(-0.05f, 0.12f, -0.3f),
                 3 => rig.GlobalTransform.Basis * new Vector3(-0.22f, -0.12f, 0.16f),
+                4 => rig.GlobalTransform.Basis * new Vector3(0.02f, 0.32f, 0.04f),
+                5 => rig.GlobalTransform.Basis * new Vector3(0.0f, 0.0f, 0.3f),
                 _ => rig.GlobalTransform.Basis * new Vector3(-0.3f, 0.05f, -0.06f),
             };
             var cam = new Camera3D { Fov = 40f, Near = 0.01f };
             main.AddChild(cam);
+            if (close >= 4)
+                reel = rig.ToGlobal(FishingSim.Fishing.RodRig.GripPoint);
             cam.GlobalPosition = reel + offset;
-            cam.LookAt(reel, rig.GlobalTransform.Basis * Vector3.Back);
+            cam.LookAt(reel, rig.GlobalTransform.Basis * (close == 5 ? Vector3.Up : Vector3.Back));
             cam.Current = true;
             for (int i = 0; i < 4; i++)
                 await NextFrame();

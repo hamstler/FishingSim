@@ -274,6 +274,7 @@ public partial class FirstPersonBody : Node3D
                     state.Has = false;
                 Apply(arm, target, 0f);
                 arm.ThumbAlong = null;
+                arm.ThumbOn = null;
             }
             return;
         }
@@ -296,6 +297,8 @@ public partial class FirstPersonBody : Node3D
         }
         Apply(ik.Right, seat, 0.11f);
         ik.Right.ThumbAlong = (rodAxis + rigBasis * Vector3.Back * 0.15f).Normalized();
+        // The thumb lies on top of the handle, its tip a few centimetres ahead of the hand.
+        ik.Right.ThumbOn = _rig.ToGlobal(GripHandle + new Vector3(0.002f, 0.075f, RodRig.SeatRadius + 0.009f));
         ik.Right.Obstacles.Clear();
         foreach (var (a, b, r) in RodRig.SeatObstacles())
             ik.Right.Obstacles.Add(new ArmIK.Capsule(_rig.ToGlobal(a), _rig.ToGlobal(b), r));
@@ -307,7 +310,7 @@ public partial class FirstPersonBody : Node3D
         _rig.SetCrank(_crank);
         // The crank's knob is pinched in the fingertips, the hand lying the most natural way round it.
         var pinch = BarGrip(_rig.ToGlobal(RodRig.KnobAt(_crank)), rigBasis * Vector3.Right, 0.0085f, false, leftArm, 0f, Mathf.DegToRad(20f),
-            0f, 0.62f, 0.095f, true, 0.012f, _rodLeft, dt, ToGlobal(new Vector3(-0.55f, -0.6f, 0.3f)));
+            0f, 0.97f, 0.078f, true, 0.012f, _rodLeft, dt, ToGlobal(new Vector3(-0.55f, -0.6f, 0.3f)));
         var held = HeldFishSource?.Invoke();
         _leftOnFish = Mathf.MoveToward(_leftOnFish, held != null ? 1f : 0f, dt * 6f);
         if (held is FishModel fm)
@@ -323,6 +326,7 @@ public partial class FirstPersonBody : Node3D
         var left = Mix(Mix(rest, pinch, onCrank), fish, Smooth01(_leftOnFish));
         Apply(ik.Left, left, 0f);
         ik.Left.ThumbAlong = null;
+        ik.Left.ThumbOn = null;
         // On the crank the fingers close round the knob and stop on it.
         ik.Left.Obstacles.Clear();
         if (_leftOnReel > 0.5f && _leftOnFish < 0.5f)
@@ -425,6 +429,9 @@ public partial class FirstPersonBody : Node3D
         }
     }
 
+    /// <summary>From the middle of the hand (its bone) to the palm's skin, metres (measured with FISHSIM_IK_DEBUG's GRIP line).</summary>
+    public const float PalmDepth = 0.012f;
+
     /// <summary>Two directions square to the bar, fixed to the body (so a way of lying round it keeps its meaning).</summary>
     private static (Vector3 U, Vector3 V) Around(Vector3 a, Vector3 up, Vector3 right)
     {
@@ -441,7 +448,9 @@ public partial class FirstPersonBody : Node3D
         var p = u * MathF.Cos(phi) + v * MathF.Sin(phi);                // the palm faces the bar
         var e2 = right ? p.Cross(a) : a.Cross(p);                       // the fingers' way when the bar lies square across
         var f = (a * MathF.Sin(delta) + e2 * MathF.Cos(delta)).Normalized();
-        var wrist = at + a * slide - p * (radius + 0.025f) - f * along;
+        // The wrist bone runs through the middle of the hand: half the hand's thickness (PalmDepth) above the skin, so
+        // the palm lies on the bar.
+        var wrist = at + a * slide - p * (radius + PalmDepth) - f * along;
         return (wrist, f, p);
     }
 
