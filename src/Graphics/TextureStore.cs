@@ -33,18 +33,37 @@ public static class TextureStore
         prepare?.Invoke(img);
         var mean = MeanOf(img);
         var result = compress ? BlockCompress.Compress(img, kind) : img;
+        if (!ReferenceEquals(result, img))
+            img.Dispose();      // native pixels go now, not when the GC gets round to the wrapper (4K: ~350 MB with mips)
         if (!OS.HasEnvironment("FISHSIM_NO_CACHE"))
         {
             Write(path, result, mean);
             Tidy(name, path);
         }
+        if (result.GetWidth() >= 2048)
+            Collect();
         if (Limit(result.GetWidth(), result.GetHeight(), result.HasMipmaps()) > 0)
         {
             var data = result.GetData();
             if (Shrink(result.GetWidth(), result.GetHeight(), result.GetFormat(), data, out var smaller))
+            {
+                result.Dispose();
                 result = smaller;
+            }
         }
         return (result, mean);
+    }
+
+    /// <summary>
+    /// Frees the big temporary buffers of a 4K picture at once (pixel copies on the large object heap, Godot images
+    /// whose wrappers wait for finalisation). Without it the first start's texture baking piled up several gigabytes.
+    /// </summary>
+    public static void Collect()
+    {
+        System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+        GC.Collect(2, GCCollectionMode.Forced, true, true);
+        GC.WaitForPendingFinalizers();
+        GC.Collect(2, GCCollectionMode.Forced, true, true);
     }
 
     /// <summary>

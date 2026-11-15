@@ -91,4 +91,5 @@ Pure logic in src/Core (injected IRng); data as .tres resources; saves via Syste
 - The .glb models take ~350 MB for all 66 as committed (about 270 MB once rebuilt with the current WebP-85 encoding); main's history already holds every model version up to PR #5 (~1.2 GB of blobs, 742 MB on GitHub). Every full rebuild adds its whole size to the history: rebuild only the species that changed (`tools/fish_model/build_all.sh <ids>`), and before a branch with several full rebuilds is merged, keep only the final models in its history (rewrite the branch-only commits so that assets/fish/models appears in its last commit, then push with --force-with-lease).
 
 ## Known issues
+- The first start bakes the 4K photo sets: TextureStore.Get disposes its intermediate Images and Collect()s after every picture >= 2048 (native pixels otherwise wait for finalisation: the menu peaked at 3.9 GB); dispose Images you only bake. Unhandled .NET exceptions are written to user://logs/crash.txt (CrashLog, installed by the menu); Godot's own log is user://logs/godot.log.
 - Intermittent exit 134 when running several suites in one process.

@@ -85,9 +85,9 @@ public static class GroundTextures
         foreach (var id in new[] { "pine_bark", "bark_brown_02" })
             if (Graphics.PhotoTextures.Has(id))
             {
-                Graphics.TextureStore.Get($"bark_photo_{id}_a", PhotoVersion, Graphics.BlockCompress.Kind.ColourAlpha, () => Graphics.PhotoTextures.AlbedoWithHeight(id, PhotoSize));
+                Graphics.TextureStore.Get($"bark_photo_{id}_a", PhotoVersion, Graphics.BlockCompress.Kind.ColourAlpha, () => Graphics.PhotoTextures.AlbedoWithHeight(id, PhotoSize)).Image.Dispose();
                 Graphics.TextureStore.Get($"bark_photo_{id}_n", PhotoVersion, Graphics.BlockCompress.Kind.TwoChannel, () => Graphics.PhotoTextures.GroundNormal(id, PhotoSize),
-                    normalMap: true);
+                    normalMap: true).Image.Dispose();
             }
             else
                 Bark(false, texturesToo: false);
