@@ -242,6 +242,9 @@ public partial class Menu : Control
         var graphics = new Button { Text = "Ustawienia grafiki", CustomMinimumSize = new Vector2(0, 40) };
         graphics.Pressed += () => OpenGraphics();
         box.AddChild(graphics);
+        var controls = new Button { Text = "Sterowanie", CustomMinimumSize = new Vector2(0, 40) };
+        controls.Pressed += () => AddChild(new ControlsPanel());
+        box.AddChild(controls);
     }
 
     /// <summary>The graphics settings over the menu (before logging in or on the map selection).</summary>
@@ -334,6 +337,9 @@ public partial class Menu : Control
         var atlas = new Button { Text = "Atlas ryb", CustomMinimumSize = new Vector2(160, 40) };
         atlas.Pressed += () => OpenAtlas();
         buttons.AddChild(atlas);
+        var controls = new Button { Text = "Sterowanie", CustomMinimumSize = new Vector2(160, 40) };
+        controls.Pressed += () => AddChild(new ControlsPanel());
+        buttons.AddChild(controls);
         var logout = new Button { Text = "Wyloguj", CustomMinimumSize = new Vector2(160, 40) };
         logout.Pressed += Logout;
         buttons.AddChild(logout);

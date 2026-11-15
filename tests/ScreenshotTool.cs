@@ -1251,6 +1251,30 @@ public partial class ScreenshotTool : Node
             for (int i = 0; i < 4; i++)
                 await NextFrame();
         }
+        // HUD checks: FISHSIM_DRAG=0..1 turns the drag just before the shot (the ring in the middle), FISHSIM_HELP=1
+        // opens the F1 quick help, FISHSIM_CONTROLS=1 the controls screen.
+        if (float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_DRAG"), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float drag))
+        {
+            main.Rod.DragSetting = Mathf.Clamp(drag - 0.1f, 0f, 1f);
+            for (int i = 0; i < 3; i++)
+                await NextFrame();
+            main.Rod.DragSetting = drag;
+            for (int i = 0; i < 6; i++)
+                await NextFrame();
+        }
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_HELP") == "1")
+        {
+            main.GetChildren().OfType<Hud>().First()._UnhandledInput(new InputEventKey { Keycode = Bindings.Of(Act.QuickHelp), Pressed = true });
+            for (int i = 0; i < 6; i++)
+                await NextFrame();
+        }
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_CONTROLS") == "1")
+        {
+            main.AddChild(new ControlsPanel());
+            for (int i = 0; i < 6; i++)
+                await NextFrame();
+        }
         await Save(output);
         GetTree().Quit();
     }

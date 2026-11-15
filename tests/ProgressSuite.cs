@@ -185,6 +185,15 @@ public sealed class ProgressSuite : ITestSuite
         t.Check(ll.BaitCount == 1, "a lure is lost with the hook");
 
         t.Section("graphics settings");
+        // Key bindings (src/Bindings): defaults without a saved file, rebinding swaps a taken key, reserved keys refused.
+        t.Check(Bindings.Of(Act.Interact) == Key.E && Bindings.Of(Act.QuickHelp) == Key.F1, "default keys: E interacts, F1 quick help");
+        t.Check(Bindings.Rebind(Act.LooseFeed, Key.R) && Bindings.Of(Act.LooseFeed) == Key.R && Bindings.Of(Act.Release) == Key.G,
+            "binding a taken key swaps it with the other action");
+        t.Check(Bindings.Is(new InputEventKey { Keycode = Key.R, Pressed = true }, Act.LooseFeed), "the rebound key fires its action");
+        t.Check(!Bindings.Rebind(Act.Map, Key.Escape) && !Bindings.Rebind(Act.Map, Key.Key3), "Esc and the hotbar digits cannot be bound");
+        Bindings.ResetAll();
+        t.Check(Bindings.Of(Act.LooseFeed) == Key.G && Bindings.Of(Act.Release) == Key.R, "reset restores the defaults");
+
         var gq = typeof(FishingSim.Graphics.GraphicsQuality);
         FishingSim.Graphics.GraphicsQuality.Set(FishingSim.Graphics.QualityLevel.High);
         t.Check(!FishingSim.Graphics.GraphicsQuality.Custom && FishingSim.Graphics.GraphicsQuality.TextureLimit == 4096, "the High preset: 4K textures, not custom");

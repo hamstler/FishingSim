@@ -116,6 +116,9 @@ void fragment() {
 	// Refraction: the bottom is seen through the moving surface, shifted more where the water is deeper; a shifted
 	// point that lies in front of the water (a pier post) is not used.
 	vec2 shift = N.xy * 0.045 * clamp(thickness * 0.7, 0.0, 1.0) / (1.0 + dist * 0.03);
+	// Near the screen's edges the shift fades out: a shifted read past the edge repeats the last row as streaks.
+	vec2 border = min(SCREEN_UV, 1.0 - SCREEN_UV);
+	shift *= smoothstep(0.0, 0.07, min(border.x, border.y));
 	vec2 ruv = SCREEN_UV + shift;
 	vec3 rbehind = view_at(ruv, INV_PROJECTION_MATRIX);
 	if (length(rbehind) < dist)

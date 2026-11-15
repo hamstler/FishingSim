@@ -268,7 +268,7 @@ public partial class CookingPanel : Control
     {
         if (!Visible)
             return;
-        if (e.IsActionPressed("ui_cancel") || e is InputEventKey { Pressed: true, Echo: false, Keycode: Godot.Key.E })
+        if (e.IsActionPressed("ui_cancel") || Bindings.Is(e, Act.Interact))
         {
             Close();
             GetViewport().SetInputAsHandled();

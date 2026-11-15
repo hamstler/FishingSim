@@ -48,7 +48,7 @@ public partial class SoundEngine : Node
     {
         var p = _angler.GlobalPosition;
         bool wood = LakeBed.OnPier(p.X, p.Z);
-        _synth.Play(wood ? OneShot.StepWood : OneShot.StepGrass, Input.IsKeyPressed(Key.Shift) ? 1.2f : 0.8f);
+        _synth.Play(wood ? OneShot.StepWood : OneShot.StepGrass, Bindings.Held(Act.Sprint) ? 1.2f : 0.8f);
     }
 
     public override void _Ready()

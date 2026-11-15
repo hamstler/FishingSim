@@ -822,19 +822,19 @@ public partial class FishingRod : Node3D
     {
         switch (key.Keycode)
         {
-            case Key.Space:
+            case var k when k == Bindings.Of(Act.LandingNet):
                 TryNet();
                 break;
-            case Key.Bracketright:
+            case var k when k == Bindings.Of(Act.DepthUp):
                 ChangeFloatDepth(key.ShiftPressed ? 0.5f : 0.1f);
                 break;
-            case Key.Bracketleft:
+            case var k when k == Bindings.Of(Act.DepthDown):
                 ChangeFloatDepth(key.ShiftPressed ? -0.5f : -0.1f);
                 break;
-            case Key.G:
+            case var k when k == Bindings.Of(Act.LooseFeed):
                 LooseFeed();
                 break;
-            case Key.Z:
+            case var k when k == Bindings.Of(Act.RodRest):
                 if (OnRest)
                 {
                     if (NearRest)
@@ -845,10 +845,10 @@ public partial class FishingRod : Node3D
                 else
                     PutOnRest();
                 break;
-            case Key.R when State == RodState.Landed && AwaitingDecision:
+            case var k when k == Bindings.Of(Act.Release) && State == RodState.Landed && AwaitingDecision:
                 ReleaseCatch();
                 break;
-            case Key.E when State == RodState.Landed && AwaitingDecision:
+            case var k when k == Bindings.Of(Act.Interact) && State == RodState.Landed && AwaitingDecision:
                 KeepCatch();
                 break;
             case Key.F2:
@@ -887,10 +887,10 @@ public partial class FishingRod : Node3D
                 Profile.Money += 1000;
                 Profile.NotifyChanged();
                 break;
-            case Key.K:
+            case var k when k == Bindings.Of(Act.Sharpen):
                 SharpenHook();
                 break;
-            case Key.L when State == RodState.Idle:
+            case var k when k == Bindings.Of(Act.NextFishery) && State == RodState.Idle:
                 if (Lake.CycleLocation(Profile.Level))
                 {
                     ShowBanner("Łowisko: " + Lake.Location.DisplayName);
@@ -915,7 +915,7 @@ public partial class FishingRod : Node3D
         // A rod on the rest is not in the hands: nothing is reeled or lifted.
         Reeling = !OnRest && (ReelOverride || (captured && Input.IsMouseButtonPressed(MouseButton.Left)));
         Lifting = !OnRest && (LiftOverride || (captured && Input.IsMouseButtonPressed(MouseButton.Right)));
-        FastReel = FastReelOverride || (captured && Input.IsKeyPressed(Key.Shift));
+        FastReel = FastReelOverride || (captured && Bindings.Held(Act.Sprint));
         // The groundbait on the bottom is eaten up as the game's hours pass.
         float hour = World.Hour;
         if (!float.IsNaN(_lastGroundbaitHour))

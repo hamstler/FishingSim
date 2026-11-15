@@ -112,7 +112,8 @@ public partial class GameUI : CanvasLayer
     {
         if (@event is not InputEventKey { Pressed: true, Echo: false } key)
             return;
-        int tab = key.Keycode switch { Key.I => InventoryTab, Key.M => MapTab, Key.J => JournalTab, Key.T => TournamentTabIndex, _ => -1 };
+        int tab = key.Keycode == Bindings.Of(Act.Inventory) ? InventoryTab : key.Keycode == Bindings.Of(Act.Map) ? MapTab
+            : key.Keycode == Bindings.Of(Act.Journal) ? JournalTab : key.Keycode == Bindings.Of(Act.Tournaments) ? TournamentTabIndex : -1;
         if (key.Keycode == Key.Escape && Visible)
         {
             Close();

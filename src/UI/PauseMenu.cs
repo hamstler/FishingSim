@@ -63,6 +63,8 @@ public partial class PauseMenu : CanvasLayer
         AddButton(box, "Atlas ryb", () => AddChild(new FishAtlas()));
         // Every graphics setting (effects, view distance, 3D resolution, window), each with arrows both ways.
         AddButton(box, "Ustawienia grafiki", () => AddChild(new GraphicsPanel()));
+        // Every key with its action, rebindable; F1 in the game shows the same as a quick card.
+        AddButton(box, "Sterowanie", () => AddChild(new ControlsPanel()));
         AddButton(box, "Wyloguj", Logout);
         AddButton(box, "Wyjdź z gry", Quit);
     }
