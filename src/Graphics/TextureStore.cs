@@ -67,7 +67,7 @@ public static class TextureStore
     }
 
     /// <summary>
-    /// The largest texture side kept in memory by the graphics quality: Low 1024, Medium 2048, High and Ultra 4096.
+    /// The largest texture side kept in memory by the graphics quality: Low 1024, Medium and High 2048, Ultra 4096 (the 4K photo sets cost four times the memory).
     /// Bigger pictures lose their top mipmap levels as they are read (a quarter of the memory per level; nothing is
     /// repainted). Takes effect for textures loaded after a change (restart for the whole world).
     /// </summary>
@@ -75,6 +75,7 @@ public static class TextureStore
     {
         QualityLevel.Low => 1024,
         QualityLevel.Medium => 2048,
+        QualityLevel.High => 2048,
         _ => 4096,
     };
 

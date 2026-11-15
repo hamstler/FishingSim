@@ -13,11 +13,38 @@ public static class CrashLog
 
     public static string Path => ProjectSettings.GlobalizePath("user://logs/crash.txt");
 
+    private static string Flag => ProjectSettings.GlobalizePath("user://running.flag");
+
+    private static void CleanExit()
+    {
+        try { System.IO.File.Delete(Flag); } catch (Exception) { }
+    }
+
     public static void Install()
     {
         if (_installed)
             return;
         _installed = true;
+        // A flag lives while the game runs and goes at a clean exit. Found at start, the last run crashed: its shader
+        // and pipeline caches may be half written (Godot then fails on "Malformed smolv" at every start), so they go.
+        try
+        {
+            if (System.IO.File.Exists(Flag))
+                foreach (var dir in new[] { "user://shader_cache", "user://vulkan" })
+                {
+                    string full = ProjectSettings.GlobalizePath(dir);
+                    if (System.IO.Directory.Exists(full))
+                        System.IO.Directory.Delete(full, true);
+                }
+            System.IO.File.WriteAllText(Flag, DateTime.Now.ToString("u"));
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => CleanExit();
+            if (Engine.GetMainLoop() is SceneTree tree)
+                tree.Root.TreeExiting += CleanExit;
+        }
+        catch (Exception)
+        {
+            // caches stay as they are
+        }
         string path = Path;
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {
