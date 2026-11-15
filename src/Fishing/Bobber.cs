@@ -395,6 +395,8 @@ public partial class Bobber : RigidBody3D
             case LureFamily.Wobbler:
                 roll = MathF.Sin(_time * (4f + 9f * v)) * 0.4f * MathF.Min(v * 1.5f, 1f);
                 yaw = MathF.Sin(_time * (4f + 9f * v) + 1.5f) * 0.12f * MathF.Min(v * 1.5f, 1f);
+                if (_tail != null)      // a jointed swimbait's rear segment swings the other way
+                    _tail.Rotation = new Vector3(0f, MathF.Sin(_time * (4f + 9f * v) + 0.6f) * 0.45f * MathF.Min(v * 1.5f, 1f), 0f);
                 break;
             case LureFamily.Softbait:
                 if (_tail != null)

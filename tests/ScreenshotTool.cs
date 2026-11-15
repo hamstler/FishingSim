@@ -337,10 +337,11 @@ public partial class ScreenshotTool : Node
             // arg 1: only the lures and the lines of the catalogue.
             foreach (FishingSim.Progress.TackleSlot slot in Enum.GetValues(typeof(FishingSim.Progress.TackleSlot)))
                 foreach (var item in loadout.Items(slot))
-                    if (arg != 1 || item is LineData || item is BaitData { Kind: BaitKind.Lure })
+                    if (arg == 0 || (arg == 1 && (item is LineData || item is BaitData { Kind: BaitKind.Lure }))
+                        || (arg == 2 && item is RodData or ReelData or BaitData { Kind: BaitKind.Lure }))
                         icons.Add(FishingSim.Graphics.Icons.For(item));
             var gear = new FishingSim.Progress.GearCatalog();
-            if (arg == 1)
+            if (arg >= 1)
                 gear = null!;
             if (gear != null)
             {
@@ -350,7 +351,10 @@ public partial class ScreenshotTool : Node
                 foreach (var path in FishingSim.Data.SpeciesCatalog.Paths)
                     icons.Add(FishingSim.Graphics.Icons.Fish(GD.Load<FishSpecies>(path)));
             }
-            int cols = arg == 1 ? 18 : 10;
+            // arg 2: the studio photographs of rods, reels and lures (needs a renderer): wait for them.
+            for (int f = 0; f < 20000 && FishingSim.Graphics.IconStudio.Pending > 0; f++)
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            int cols = arg >= 1 ? 14 : 10;
             const int iconPx = FishingSim.Graphics.Icons.TextureSize, cell = iconPx + 8;
             int rows = (icons.Count + cols - 1) / cols;
             var sheet = Image.CreateEmpty(cols * cell, rows * cell, false, Image.Format.Rgba8);

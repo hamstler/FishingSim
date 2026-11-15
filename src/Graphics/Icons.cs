@@ -14,7 +14,7 @@ public static class Icons
     public const int Size = 64;
 
     /// <summary>The finished pictures are this many pixels square.</summary>
-    public const int TextureSize = 128;
+    public const int TextureSize = 256;
     private static readonly Dictionary<string, ImageTexture> Cache = new();
     private static readonly Color Outline = new(0.13f, 0.08f, 0.05f);
 
@@ -224,11 +224,13 @@ public static class Icons
     // ------------------------------------------------------------------ items
     public static ImageTexture For(TackleItem item) => item switch
     {
-        RodData r => Rod(r),
-        ReelData r => Reel(r),
+        RodData r => Photo(Rod(r), "rod:" + r.ItemId, $"{r.BlankColor}{r.WhipColor}{r.FoamGrip}", IconStudio.Shot.Rod, r),
+        ReelData r => Photo(Reel(r), "reel:" + r.ItemId, $"{r.BodyColor}{r.TrimColor}", IconStudio.Shot.Reel, r),
         LineData l => Line(l),
         HookData h => Hook(h),
-        BaitData { Kind: BaitKind.Lure } b => Lure(b),
+        BaitData { Kind: BaitKind.Lure } b => Photo(Lure(b), "lure:" + b.ItemId,
+            $"{b.Shape}{b.LureColor}{b.AccentColor}{b.Pattern}{b.Metallic}{b.SizeCm}{b.AffinityAs}",
+            b.AffinityAs == "spoon" && b.Shape != "jig" ? IconStudio.Shot.Plate : IconStudio.Shot.Lure, b),
         BaitData b => Bait(b.ItemId),
         LeaderData d => Leader(d),
         KeepnetData k => Keepnet(k),
@@ -236,6 +238,13 @@ public static class Icons
         AccessoryData a => Accessory(a),
         _ => Cached("unknown", c => { c.Disc(32, 32, 16, 16, C(0.6f, 0.6f, 0.6f)); return c; }),
     };
+
+    /// <summary>The painted picture now, replaced by a studio photo of the real model when one can be taken.</summary>
+    private static ImageTexture Photo(ImageTexture painted, string key, string signature, IconStudio.Shot shot, object item)
+    {
+        IconStudio.Request(key, signature, painted, shot, item);
+        return painted;
+    }
 
     private static ImageTexture Rod(RodData r) => Cached("rod:" + r.ItemId, c =>
     {
