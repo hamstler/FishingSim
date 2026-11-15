@@ -175,6 +175,12 @@ public sealed class WorldSuite : ITestSuite
         t.Check(rolls.Count == 3, "random weather rolls reach every kind");
         world.Free();
 
+        t.Section("light and mist");
+        var dawnSun = SkyController.SunColour(0.03f);
+        var noonSun = SkyController.SunColour(0.9f);
+        t.Check(dawnSun.G / dawnSun.R < 0.6f && noonSun.G / noonSun.R > 0.9f, "the sun is deep orange on the horizon and white at noon");
+        t.Check(SkyController.MistAt(6.5f, 0.1f, 0f) > 0.8f && SkyController.MistAt(13f, 0.1f, 0f) < 0.05f, "mist lies over the water at dawn, not at noon");
+        t.Check(SkyController.MistAt(6.5f, 0.9f, 0f) < 0.05f, "wind blows the mist away");
         t.Section("waves");
         var water = new Water { Wind = 0.1f };
         float calm = water.Amplitude;
