@@ -100,6 +100,9 @@ Pure logic in src/Core (injected IRng); data as .tres resources; saves via Syste
 ## Repository size
 - The .glb models take ~350 MB for all 66 as committed (about 270 MB once rebuilt with the current WebP-85 encoding); main's history already holds every model version up to PR #5 (~1.2 GB of blobs, 742 MB on GitHub). Every full rebuild adds its whole size to the history: rebuild only the species that changed (`tools/fish_model/build_all.sh <ids>`), and before a branch with several full rebuilds is merged, keep only the final models in its history (rewrite the branch-only commits so that assets/fish/models appears in its last commit, then push with --force-with-lease).
 
+## Benchmarks (screenshot mode 13, High, 1280x720, map 0 at the pier, lavapipe: counts only, no real FPS)
+- Before the RF4 stages (5b2d61f): objects 1786, draw calls 1589, primitives 1.36 M. After stages 1-4 (936fd99): 1864, 1622, 1.51 M (+0.15 M: the 1 m water mesh, 180 k triangles). Water CPU 0.03 ms/frame. Real frame times: ask the user for F11.
+
 ## Known issues
 - The first start bakes the 4K photo sets: TextureStore.Get disposes its intermediate Images and Collect()s after every picture >= 2048 (native pixels otherwise wait for finalisation: the menu peaked at 3.9 GB); dispose Images you only bake. Unhandled .NET exceptions are written to user://logs/crash.txt (CrashLog, installed by the menu); Godot's own log is user://logs/godot.log. CrashLog keeps user://running.flag while the game runs; found at start (the last run crashed), it deletes user://shader_cache and user://vulkan (a crash mid-write left "Malformed smolv" caches that crashed every start). A user's RTX 3080 crashed (signal 11) after glslang failed on a valid built-in shader and RIDs came back null: memory exhaustion; 4K was moved to Ultra, then back to High at the user's request (lower the Textures setting if crashes return).
 - Intermittent exit 134 when running several suites in one process.
