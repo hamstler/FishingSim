@@ -229,8 +229,11 @@ public partial class LakeBed : Node3D
         if (d < -45f)
             return 0f;
         float t = Smooth(-40f, 170f, d);
-        float ridge = 1f - MathF.Abs(_noise.GetNoise2D(x * 0.55f + 77f, z * 0.55f - 31f));
-        float peaks = 0.5f + 0.45f * ridge * ridge + 0.25f * _noise.GetNoise2D(x * 1.7f - 12f, z * 1.7f + 40f);
+        // Rounded ridges (a softened |noise| so the crests are smooth domes, not knife edges) and gentle swells along
+        // them: seen against the sky the rim reads as old wooded mountains, not a saw blade.
+        float n = _noise.GetNoise2D(x * 0.45f + 77f, z * 0.45f - 31f);
+        float ridge = 1f - MathF.Sqrt(n * n + 0.03f);
+        float peaks = 0.5f + 0.45f * ridge * ridge + 0.12f * _noise.GetNoise2D(x * 0.9f - 12f, z * 0.9f + 40f);
         // A steeper bank right at the edge: the ground rises in front of the angler instead of an invisible wall.
         float bank = 5f * Smooth(-14f, 12f, d);
         return loc.RimHeight * MathF.Pow(t, 1.6f) * peaks + bank;

@@ -31,6 +31,9 @@ public partial class Hud : CanvasLayer
     private HBoxContainer _toolbar = null!;
     private Label _meal = null!;
     private string _toolbarKey = "";
+    private float _toolbarShown;
+    /// <summary>The hotbar's opacity while it is not being used.</summary>
+    private const float ToolbarIdleAlpha = 0.3f;
 
     /// <summary>The angler's tools (set by Main), shown as a little bar when more than the rod is owned.</summary>
     public HandTools? Tools { get; set; }
@@ -47,7 +50,15 @@ public partial class Hud : CanvasLayer
         if (Tools == null)
             return;
         _toolbar.Visible = !_helpOpen;
-        _toolbarCheck -= (float)GetProcessDeltaTime();
+        // Like the rest of a light HUD the bar steps back while it is not used: full for a few seconds after a change
+        // (a key 1-9, a rod put on its rest), then faint, so the reel and the water under it show.
+        float dt = (float)GetProcessDeltaTime();
+        _toolbarShown -= dt;
+        float alpha = _toolbarShown > 0f ? 1f : ToolbarIdleAlpha;
+        var m = _toolbar.Modulate;
+        if (Mathf.Abs(m.A - alpha) > 0.005f)
+            _toolbar.Modulate = new Color(1f, 1f, 1f, Mathf.MoveToward(m.A, alpha, dt * 2.5f));
+        _toolbarCheck -= dt;
         if (_toolbarCheck > 0f)
             return;
         _toolbarCheck = 0.15f;
@@ -79,6 +90,7 @@ public partial class Hud : CanvasLayer
         if (key == _toolbarKey)
             return;
         _toolbarKey = key;
+        _toolbarShown = 4f;
         foreach (var c in _toolbar.GetChildren())
             c.QueueFree();
         for (int i = 0; i < 9; i++)
