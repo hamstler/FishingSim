@@ -198,6 +198,26 @@ void fragment() {
 		EMISSION = vec3(0.9, 1.0, 0.95) * caustic * depth_fade * daylight * 0.35 * base;
 	}
 
+	// Far away (over the lake, up the slopes) the forest floor is what shows between the few far tree cards; seen
+	// from afar a forest is a dark, mottled canopy, so paint that there. Far meadows (above the forest, on the
+	// slopes) read as olive heath instead of bright straw.
+	float faraway = smoothstep(90.0, 280.0, length(VERTEX));
+	if (faraway > 0.0) {
+		float cover = smoothstep(0.25, 0.65, macro * 0.55 + mid * 0.45);
+		vec3 canopy = mix(vec3(0.034, 0.055, 0.026), vec3(0.07, 0.095, 0.04), mid * 0.7 + fine * 0.3);
+		base = mix(base, canopy, w[1] * faraway * mix(0.65, 0.95, cover));
+		vec3 heath = mix(vec3(0.085, 0.095, 0.045), vec3(0.15, 0.135, 0.075), macro * 0.6 + fine * 0.4);
+		base = mix(base, heath, w[0] * faraway * 0.6);
+		// Far rock: the painted rock tinted to the map read as a sandy dune from afar. Cool grey stone with dark gullies
+		// down the slope, and patches of heath over its lower part, up to some 20 m above where the rock begins.
+		float gully = smoothstep(0.55, 0.8, texture(noise_tex, vec2(wpos.x * 0.02, wpos.y * 0.004 + wpos.z * 0.02)).r);
+		vec3 stone = mix(vec3(0.16, 0.16, 0.15), vec3(0.24, 0.235, 0.22), macro) * (1.0 - 0.45 * gully);
+		base = mix(base, stone, w[5] * faraway * 0.7);
+		float scrub = smoothstep(0.5, 0.72, macro * 0.6 + fine * 0.4) * (1.0 - smoothstep(rock_line + 4.0, rock_line + 22.0, wpos.y));
+		base = mix(base, heath * 0.8, w[5] * faraway * scrub * 0.85);
+		rough = mix(rough, 0.95, faraway * (w[0] + w[1]));
+	}
+
 	ALBEDO = base;
 	ROUGHNESS = rough;
 	SPECULAR = 0.3;

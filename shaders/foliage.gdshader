@@ -37,13 +37,20 @@ void fragment() {
 	vec4 leaf = texture(leaf_tex, UV);
 	// The vertex colour is the depth shade times the tree's colour: take the shade out, keep a little of it.
 	vec3 tint = srgb_to_linear(COLOR.rgb / max(shade, 0.05));
-	ALBEDO = leaf.rgb * tint * mix(0.72, 1.0, shade);
+	vec3 albedo = leaf.rgb * tint * mix(0.72, 1.0, shade);
+	// Far away a crown is a few big cards: they cannot shade each other, so the whole canopy read lime and flat. Seen
+	// from afar a forest is darker and greyer than its leaves (gaps and the shade under every crown), so blend towards
+	// that with distance.
+	float far = smoothstep(30.0, 220.0, length(VERTEX));
+	float grey = dot(albedo, vec3(0.3, 0.59, 0.11));
+	albedo = mix(albedo, mix(vec3(grey), albedo, 0.68) * 0.66, far);
+	ALBEDO = albedo;
 	ALPHA = leaf.a;
 	// Far crowns cover only a few pixels: accept thinner alpha there so they stay solid instead of fading to sticks.
 	ALPHA_SCISSOR_THRESHOLD = mix(0.5, 0.12, smoothstep(25.0, 110.0, length(VERTEX)));
-	AO = mix(0.4, 1.0, clamp(shade * 1.4 - 0.4, 0.0, 1.0));
-	AO_LIGHT_AFFECT = 0.35;
-	BACKLIGHT = translucency * tint * 1.6;
+	AO = mix(0.4, 1.0, clamp(shade * 1.4 - 0.4, 0.0, 1.0)) * (1.0 - 0.3 * far);
+	AO_LIGHT_AFFECT = 0.35 + 0.25 * far;
+	BACKLIGHT = translucency * tint * 1.6 * (1.0 - 0.75 * far);
 	ROUGHNESS = 0.62;
 	SPECULAR = 0.3;
 }

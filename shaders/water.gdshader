@@ -22,6 +22,9 @@ uniform vec3 shallow_color : source_color = vec3(0.04, 0.26, 0.26);
 uniform vec3 deep_color : source_color = vec3(0.01, 0.07, 0.11);
 /// Metres of water you can see into (per map).
 uniform float clarity = 2.6;
+// How fast red, green and blue go along the path through the water (green = 1), per map: a clear mountain lake loses
+// red and keeps blue, a lowland lake full of humus and plankton loses blue nearly as fast as red and keeps green.
+uniform vec3 extinction_tint = vec3(2.4, 1.0, 0.8);
 uniform sampler2D foam_noise : repeat_enable, filter_linear_mipmap;
 /// Tileable wind-ripple normals (Water.RippleNormals): RG = slope / 2 + 0.5, two drifting readings.
 uniform sampler2D ripple_normals : repeat_enable, filter_linear_mipmap_anisotropic;
@@ -128,7 +131,7 @@ void fragment() {
 	vec3 refracted = textureLod(screen_tex, ruv, 0.0).rgb;
 
 	// Absorption along the path through the water: red goes first, then green; clear lakes let you see further.
-	vec3 extinction = vec3(2.4, 1.0, 0.8) * (1.4 / max(clarity, 0.3));
+	vec3 extinction = extinction_tint * (1.4 / max(clarity, 0.3));
 	vec3 through = exp(-thickness * extinction);
 	float seen = (through.r + through.g + through.b) / 3.0;
 	// The water's own colour (light scattered in it): greener in the shallows, darker blue over the deep.

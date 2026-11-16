@@ -216,6 +216,11 @@ public partial class Water : MeshInstance3D
     {
         _material.SetShaderParameter("shallow_color", shallow);
         _material.SetShaderParameter("deep_color", deep);
+        // The light that reaches the bottom and back is coloured like the water itself: each channel fades as fast as
+        // the shallows' colour lacks it (green = 1; red at most 3.2 times as fast).
+        float g = Math.Max(shallow.G, 0.02f);
+        _material.SetShaderParameter("extinction_tint", new Vector3(
+            Math.Clamp(g / Math.Max(shallow.R, 0.02f), 1.2f, 3.2f), 1f, Math.Clamp(g / Math.Max(shallow.B, 0.02f), 0.6f, 2.2f)));
     }
 
     public void SetBed(LakeBed bed)
