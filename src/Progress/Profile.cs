@@ -27,7 +27,8 @@ public sealed record JournalEntry(
     string? Hour = null);
 
 /// <summary>Optional details recorded with a catch.</summary>
-public sealed record CatchContext(string? Location = null, string? Bait = null, string? Hook = null, float? Depth = null, string? Hour = null);
+public sealed record CatchContext(string? Location = null, string? Bait = null, string? Hook = null, float? Depth = null, string? Hour = null,
+    string? Method = null, bool FromBoat = false);
 
 /// <summary>A finished tournament in the player's history.</summary>
 public sealed record TournamentRecord(string Name, int Rank, int Entrants, float Score, int PrizeMoney, int PrizeXp);
@@ -60,6 +61,73 @@ public sealed class Profile
     public List<JournalEntry> Journal { get; set; } = new();
     public List<TournamentRecord> TournamentHistory { get; set; } = new();
     public Dictionary<string, float> Records { get; set; } = new();
+
+    /// <summary>Challenge progress by id (fish caught, or the weight reached); saved as "challenges".</summary>
+    public Dictionary<string, float> ChallengeProgress { get; set; } = new();
+
+    /// <summary>Species caught towards a "different species" challenge, by challenge id (saved as "challenge_species").</summary>
+    public Dictionary<string, string> ChallengeSpecies { get; set; } = new();
+
+    /// <summary>The challenges and their state for this day and week on a lake (the commoner species pick the daily one's).</summary>
+    public List<(Core.Methods.Challenge Challenge, float Progress, bool Done)> Challenges(int lake, IReadOnlyList<string> commonSpecies)
+    {
+        int day = Market.Day;
+        var list = Core.Methods.Challenges.Daily(day, lake, commonSpecies);
+        list.Add(Core.Methods.Challenges.Weekly(day / 7, lake));
+        var result = new List<(Core.Methods.Challenge, float, bool)>();
+        foreach (var c in list)
+        {
+            float p = ChallengeProgress.GetValueOrDefault(c.Id);
+            result.Add((c, p, p >= c.Target));
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Credits a landed fish to today's and this week's challenges; each one completed now pays its reward. Returns the
+    /// challenges just completed (for a banner).
+    /// </summary>
+    public List<Core.Methods.Challenge> CreditChallenges(string species, float weight, string method, bool fromBoat, int lake,
+        IReadOnlyList<string> commonSpecies)
+    {
+        var done = new List<Core.Methods.Challenge>();
+        foreach (var (c, before, wasDone) in Challenges(lake, commonSpecies))
+        {
+            if (wasDone)
+                continue;
+            float now = before;
+            if (c.Kind == Core.Methods.ChallengeKind.Species)
+            {
+                var seen = new HashSet<string>((ChallengeSpecies.GetValueOrDefault(c.Id) ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries));
+                if (seen.Add(species))
+                    ChallengeSpecies[c.Id] = string.Join("|", seen);
+                now = seen.Count;
+            }
+            else if (c.Kind == Core.Methods.ChallengeKind.CatchHeavy)
+                now = MathF.Max(before, c.Credit(species, weight, method, fromBoat));
+            else
+                now = before + c.Credit(species, weight, method, fromBoat);
+            if (now == before)
+                continue;
+            ChallengeProgress[c.Id] = now;
+            if (now >= c.Target)
+            {
+                Money += c.Money;
+                GainXp(c.Xp);
+                done.Add(c);
+            }
+        }
+        // Old days' and weeks' entries are dropped (the ids carry the day/week).
+        int day = Market.Day;
+        foreach (var id in ChallengeProgress.Keys.ToList())
+            if (int.TryParse(id[1..id.IndexOf('-')], out int n) && (id[0] == 'd' ? n < day - 1 : n < day / 7 - 1))
+            {
+                ChallengeProgress.Remove(id);
+                ChallengeSpecies.Remove(id);
+            }
+        Changed?.Invoke();
+        return done;
+    }
     public Dictionary<string, int> CatchCounts { get; set; } = new();
     public Dictionary<string, List<string>> Owned { get; set; } = new();
     public Dictionary<string, int> BaitCounts { get; set; } = new();

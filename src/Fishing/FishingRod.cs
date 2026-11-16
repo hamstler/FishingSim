@@ -1982,11 +1982,16 @@ public partial class FishingRod : Node3D
         var species = CurrentSpecies!;
         CatchCount++;
         CatchTotalKg += CurrentWeight;
+        string methodName = _castMethod switch { FishingMethod.Bottom => "grunt", FishingMethod.Spinning => "spinning", _ => "spławik" };
+        bool fromBoat = FishingSim.World.Rowboat.Aboard;
         var context = new CatchContext(
             Lake.Location.DisplayName, Loadout.Bait.DisplayName, Loadout.Hook.DisplayName,
-            MathF.Round(CurrentDepth() * 10f) / 10f, World.TimeText);
+            MathF.Round(CurrentDepth() * 10f) / 10f, World.TimeText, methodName, fromBoat);
+        var trophyBefore = Trophies.Of(Profile.Records.GetValueOrDefault(species.SpeciesName), species.MaxWeight);
         // Counts, journal, records and XP now; the keepnet only when the angler chooses (catch panel: E / R).
         var result = Profile.AddCatch(species, CurrentWeight, context, toKeepnet: false);
+        var trophyAfter = Trophies.Of(Profile.Records.GetValueOrDefault(species.SpeciesName), species.MaxWeight);
+        var challengesDone = Profile.CreditChallenges(species.SpeciesName, CurrentWeight, methodName, fromBoat, Lake.LocationIndex, CommonSpecies());
         Profile.AddLineWear(Loadout.Line.ItemId, Core.Methods.LineWear.PerFish);
         Profile.AddHookDull(Loadout.Hook.ItemId, HookWear.PerFish(CurrentWeight));
         // One fish fewer (or one more wary) at the spot where it bit.
@@ -2005,9 +2010,13 @@ public partial class FishingRod : Node3D
         string text = $"Złowiono: {species.SpeciesName}, {CurrentWeight:0.00} kg! +{result.Xp} XP";
         if (result.Record)
             text += "\nNowy rekord gatunku!";
+        if (trophyAfter > trophyBefore)
+            text += $"\n{char.ToUpper(Trophies.Name(trophyAfter)[0])}{Trophies.Name(trophyAfter)[1..]}!";
+        foreach (var ch in challengesDone)
+            text += $"\nWyzwanie ukończone: {ch.Title} (+{ch.Money} gr, +{ch.Xp} XP)";
         if (result.LevelUp)
             text += $"\nAwans na poziom {Profile.Level}!";
-        ShowBanner(text, 4.5f);
+        ShowBanner(text, 4.5f + challengesDone.Count);
         _lineOutOutsideFight = 0f;
         _fight = null;
         _bobber.Stow();
@@ -2016,6 +2025,19 @@ public partial class FishingRod : Node3D
         SetState(RodState.Landed);
         SoundCue?.Invoke(Core.Audio.OneShot.Catch, 1f);
         FishLanded?.Invoke(species, CurrentWeight);
+    }
+
+    /// <summary>The lake's six commonest species (for the daily challenges).</summary>
+    public List<string> CommonSpecies()
+    {
+        var list = new List<(string, float)>();
+        foreach (var key in Lake.Location.Abundance.Keys)
+            list.Add(((string)key, Lake.Location.Abundance[key].AsSingle()));
+        list.Sort((a, b) => b.Item2.CompareTo(a.Item2));
+        var names = new List<string>();
+        for (int i = 0; i < list.Count && i < 6; i++)
+            names.Add(list[i].Item1);
+        return names;
     }
 
     /// <summary>Breaks the tackle as if a fish had done it (tools and tests).</summary>

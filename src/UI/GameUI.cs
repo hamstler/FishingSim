@@ -52,7 +52,7 @@ public partial class GameUI : CanvasLayer
     private int _mapPaintingFor = -1;
     private readonly List<Rect2> _labelRects = new();
     private Label _journalHead = null!;
-    private VBoxContainer _journalList = null!, _speciesList = null!;
+    private VBoxContainer _journalList = null!, _speciesList = null!, _challengeList = null!;
 
     public void Setup(FishingRod rod, Player player, TournamentManager tournaments, Scenery scenery)
     {
@@ -681,6 +681,12 @@ public partial class GameUI : CanvasLayer
 
         var rightBox = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         cols.AddChild(rightBox);
+        var ct = new Label { Text = "Wyzwania" };
+        ct.AddThemeFontSizeOverride("font_size", 20);
+        rightBox.AddChild(ct);
+        _challengeList = new VBoxContainer();
+        _challengeList.AddThemeConstantOverride("separation", 3);
+        rightBox.AddChild(_challengeList);
         var rt = new Label { Text = "Gatunki" };
         rt.AddThemeFontSizeOverride("font_size", 20);
         rightBox.AddChild(rt);
@@ -720,8 +726,34 @@ public partial class GameUI : CanvasLayer
             });
         }
 
+        // Today's and this week's challenges with their progress and reward.
+        ClearChildren(_challengeList);
+        foreach (var (c, progress, done) in _profile.Challenges(_rod.Lake.LocationIndex, _rod.CommonSpecies()))
+        {
+            string amount = c.Kind == FishingSim.Core.Methods.ChallengeKind.CatchHeavy
+                ? (done ? "gotowe" : "jeszcze nie")
+                : $"{MathF.Min(progress, c.Target):0}/{c.Target:0}";
+            _challengeList.AddChild(new Label
+            {
+                Text = $"{(done ? "✔" : c.Weekly ? "★" : "•")} {(c.Weekly ? "Tygodniowe: " : "")}{c.Title}  [{amount}]  +{c.Money} gr, +{c.Xp} XP",
+                Modulate = done ? new Color(0.6f, 0.95f, 0.6f) : Colors.White,
+                AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            });
+        }
+
         ClearChildren(_speciesList);
         int known = _rod.Species.Count(sp => _profile.CatchCounts.GetValueOrDefault(sp.SpeciesName) > 0);
+        int golds = 0, silvers = 0, bronzes = 0;
+        foreach (var sp in _rod.Species)
+        {
+            switch (FishingSim.Core.Methods.Trophies.Of(_profile.Records.GetValueOrDefault(sp.SpeciesName), sp.MaxWeight))
+            {
+                case FishingSim.Core.Methods.TrophyTier.Gold: golds++; break;
+                case FishingSim.Core.Methods.TrophyTier.Silver: silvers++; break;
+                case FishingSim.Core.Methods.TrophyTier.Bronze: bronzes++; break;
+            }
+        }
+        _speciesList.AddChild(new Label { Text = $"Trofea: złote {golds}, srebrne {silvers}, brązowe {bronzes}", Modulate = new Color(1f, 0.85f, 0.5f) });
         _speciesList.AddChild(new Label { Text = $"Atlas ryb: poznane {known} z {_rod.Species.Count} gatunków", Modulate = new Color(1f, 0.85f, 0.5f) });
         foreach (var sp in _rod.Species)
         {
@@ -731,8 +763,10 @@ public partial class GameUI : CanvasLayer
             {
                 string favourite = entries.GroupBy(e => e.Bait ?? "?").OrderByDescending(g => g.Count()).First().Key;
                 float record = _profile.Records.GetValueOrDefault(sp.SpeciesName);
-                label.Text = $"{sp.SpeciesName}\n   w dzienniku: {entries.Count} szt., razem {entries.Sum(e => e.Weight):0.0} kg\n"
-                    + $"   rekord: {record:0.00} kg | najlepsza przynęta: {favourite}\n   {SpeciesTips(sp)}";
+                var tier = FishingSim.Core.Methods.Trophies.Of(record, sp.MaxWeight);
+                string medal = tier == FishingSim.Core.Methods.TrophyTier.None ? "" : $"  ({FishingSim.Core.Methods.Trophies.Name(tier)})";
+                label.Text = $"{sp.SpeciesName}{medal}\n   w dzienniku: {entries.Count} szt., razem {entries.Sum(e => e.Weight):0.0} kg\n"
+                    + $"   rekord: {record:0.00} kg (trofeum od {sp.MaxWeight * 0.4f:0.00} kg) | najlepsza przynęta: {favourite}\n   {SpeciesTips(sp)}";
             }
             else
             {

@@ -90,6 +90,8 @@ public static class ProfileSerializer
             ["level"] = p.Level,
             ["keepnet"] = keepnet,
             ["records"] = FromMap(p.Records, v => v),
+            ["challenges"] = FromMap(p.ChallengeProgress, v => v),
+            ["challenge_species"] = FromMap(p.ChallengeSpecies, v => v),
             ["catch_counts"] = FromMap(p.CatchCounts, v => v),
             ["total_catches"] = p.TotalCatches,
             ["journal"] = journal,
@@ -243,6 +245,8 @@ public static class ProfileSerializer
             }
         }
         ReadMap(d["records"], p.Records, n => Float(n, 0f));
+        ReadMap(d["challenges"], p.ChallengeProgress, n => Float(n, 0f));
+        ReadMap(d["challenge_species"], p.ChallengeSpecies, n => n?.GetValue<string>() ?? "");
         ReadMap(d["catch_counts"], p.CatchCounts, n => Int(n, 0));
         if (d["owned"] is JsonObject owned)
         {
