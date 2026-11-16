@@ -478,6 +478,9 @@ znakami towarowymi żadnej firmy ani ich przeróbkami. Ewentualna zbieżność z
 - **Proporcje ryb** zmierzono na ilustracjach z [AtlasRyb.online](https://atlasryb.online) (licencja CC BY-NC-SA).
   Do projektu trafiły wyłącznie liczby (obrysy ciała, położenie płetw i oka, barwy), nie ilustracje. Źródła każdego
   gatunku są w [`assets/fish/CREDITS.md`](assets/fish/CREDITS.md).
+- **Modele ryb z Meshy AI** (`assets/fish/meshy/<id>.glb`) wygenerował autor projektu w Meshy AI (obraz → 3D) z
+  własnych obrazów; zastępują w grze modele z `assets/fish/models`. Szczegóły i warunki w
+  [`assets/fish/meshy/CREDITS.md`](assets/fish/meshy/CREDITS.md).
 - **Barwy i kształty części gatunków** zmierzono na zdjęciach z Wikimedia Commons na wolnych licencjach. Same zdjęcia
   nie są częścią projektu; autorzy i licencje są w `assets/fish/CREDITS.md` i w atlasie ryb w grze.
 - **Tekstury fotograficzne** (drewno, bale, strzecha, dachówka, gont, tynk, kamień, len, juta, kora, trawa, ściółka,
