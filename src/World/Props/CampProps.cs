@@ -302,15 +302,107 @@ public static class CampProps
         return root;
     }
 
-    /// <summary>A short split log to sit on (lying along X, resting on y = 0).</summary>
+    /// <summary>Pine bark wrapped round a log by its UVs (metres round and along), not projected (that crosses into a grid).</summary>
+    public static Material LogBark => Cached("logbark", () =>
+        BuildingFactory.Photo("pine_bark", new Color(0.62f, 0.58f, 0.55f), 0.95f, triplanar: false)
+        ?? BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = new Color(0.36f, 0.27f, 0.2f), Roughness = 0.95f }));
+
+    /// <summary>The sawn face of a log: pale wood with growth rings, a few radial checks and the dark band of bark.</summary>
+    public static Material EndGrain => Cached("endgrain", () =>
+    {
+        const int n = 256;
+        var img = Image.CreateEmpty(n, n, false, Image.Format.Rgba8);
+        var rng = new RandomNumberGenerator { Seed = 77 };
+        var checks = new float[5];
+        for (int i = 0; i < checks.Length; i++)
+            checks[i] = rng.Randf() * Mathf.Tau;
+        for (int y = 0; y < n; y++)
+            for (int x = 0; x < n; x++)
+            {
+                float dx = (x + 0.5f) / n * 2f - 1f, dy = (y + 0.5f) / n * 2f - 1f;
+                float r = MathF.Sqrt(dx * dx + dy * dy), ang = MathF.Atan2(dy, dx);
+                float wob = 0.012f * MathF.Sin(ang * 5f) + 0.008f * MathF.Sin(ang * 11f + 1.3f);
+                float ring = MathF.Pow(0.5f + 0.5f * MathF.Sin((r + wob) * 70f), 3f);
+                var c = new Color(0.93f, 0.8f, 0.6f).Lerp(new Color(0.74f, 0.56f, 0.36f), ring * 0.5f + r * 0.2f);
+                c = c.Lerp(new Color(0.66f, 0.47f, 0.29f), MathF.Max(0f, 0.12f - r) / 0.12f * 0.6f);      // the heart
+                foreach (float k in checks)
+                {
+                    float da = MathF.Abs(Mathf.Wrap(ang - k, -MathF.PI, MathF.PI));
+                    if (r > 0.25f && r < 0.9f && da < 0.012f / r)
+                        c = c.Darkened(0.55f);                                                          // a drying crack
+                }
+                if (r > 0.95f)
+                    c = new Color(0.3f, 0.22f, 0.16f);
+                else if (r > 0.9f)
+                    c = c.Lerp(new Color(0.55f, 0.38f, 0.24f), (r - 0.9f) / 0.05f);                    // the cambium                                                 // bark
+                img.SetPixel(x, y, c);
+            }
+        img.GenerateMipmaps();
+        return BuildingFactory.Pixel(new StandardMaterial3D { AlbedoTexture = ImageTexture.CreateFromImage(img), Roughness = 0.88f });
+    });
+
+    /// <summary>
+    /// A log to sit on (lying along X, resting on y = 0): a round, slightly uneven trunk with its bark wrapped round it
+    /// and two sawn faces showing the rings.
+    /// </summary>
     public static Node3D SeatLog(float length = 1.4f, int seed = 0, float radius = 0.17f, bool even = false)
     {
         var root = new Node3D { Name = "SeatLog" };
-        var st = new SurfaceTool();
-        st.Begin(Mesh.PrimitiveType.Triangles);
-        Shapes.Log(st, new Vector3(0f, radius, 0f), Vector3.Right, length, radius, seed, even);
-        st.GenerateNormals();
-        root.AddChild(new MeshInstance3D { Mesh = st.Commit(), MaterialOverride = Bark });
+        const int sides = 24, steps = 8;
+        var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 7919 + 13) };
+        float p1 = rng.Randf() * 6f, p2 = rng.Randf() * 6f;
+        float Radius(float ang, float t) => radius * (1f + 0.025f * MathF.Sin(ang * 3f + p1) + 0.015f * MathF.Sin(ang * 7f + p2)
+            + (even ? 0f : 0.03f * MathF.Sin(t * 5f + p1) - 0.04f * t));
+        Vector3 At(float ang, float t, out Vector3 n)
+        {
+            n = new Vector3(0f, MathF.Sin(ang), MathF.Cos(ang));
+            return new Vector3(length * (t - 0.5f), radius, 0f) + n * Radius(ang, t);
+        }
+        var bark = new SurfaceTool();
+        bark.Begin(Mesh.PrimitiveType.Triangles);
+        for (int j = 0; j < steps; j++)
+            for (int i = 0; i < sides; i++)
+            {
+                float a0 = i * Mathf.Tau / sides, a1 = (i + 1) * Mathf.Tau / sides, t0 = j / (float)steps, t1 = (j + 1) / (float)steps;
+                var q00 = At(a0, t0, out var n00); var q10 = At(a1, t0, out var n10);
+                var q01 = At(a0, t1, out var n01); var q11 = At(a1, t1, out var n11);
+                Vector2 Uv(float a, float t) => new(a * radius, t * length);
+                foreach (var (p, nn, uv) in new[] { (q00, n00, Uv(a0, t0)), (q01, n01, Uv(a0, t1)), (q11, n11, Uv(a1, t1)),
+                                                    (q00, n00, Uv(a0, t0)), (q11, n11, Uv(a1, t1)), (q10, n10, Uv(a1, t0)) })
+                {
+                    bark.SetNormal(nn);
+                    bark.SetUV(uv);
+                    bark.AddVertex(p);
+                }
+            }
+        bark.GenerateTangents();
+        var faces = new SurfaceTool();
+        faces.Begin(Mesh.PrimitiveType.Triangles);
+        foreach (float t in new[] { 0f, 1f })
+        {
+            var centre = new Vector3(length * (t - 0.5f), radius, 0f);
+            var en = t > 0.5f ? Vector3.Right : Vector3.Left;
+            for (int i = 0; i < sides; i++)
+            {
+                float a0 = i * Mathf.Tau / sides, a1 = (i + 1) * Mathf.Tau / sides;
+                var q0 = At(a0, t, out _);
+                var q1 = At(a1, t, out _);
+                Vector2 Uv(Vector3 p) => new Vector2(p.Z, p.Y - radius) / (radius * 2.04f) + new Vector2(0.5f, 0.5f);
+                var tri = t > 0.5f ? new[] { centre, q1, q0 } : new[] { centre, q0, q1 };
+                foreach (var p in tri)
+                {
+                    faces.SetNormal(en);
+                    faces.SetUV(Uv(p));
+                    faces.AddVertex(p);
+                }
+            }
+        }
+        var mesh = bark.Commit();
+        faces.Commit(mesh);
+        var mi = new MeshInstance3D { Mesh = mesh };
+        mi.SetSurfaceOverrideMaterial(0, LogBark);
+        mi.SetSurfaceOverrideMaterial(1, EndGrain);
+        root.AddChild(mi);
         return root;
     }
 

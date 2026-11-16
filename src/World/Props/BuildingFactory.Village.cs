@@ -436,8 +436,9 @@ public static partial class BuildingFactory
     {
         var stone = Stone(new Color(0.82f, 0.8f, 0.76f));
         var wood = Wood(new Color(0.6f, 0.46f, 0.32f));
-        Cyl(b, 0.85f, 0.9f, 0.9f, new Vector3(0f, 0.45f, 0f), stone, 18);
-        Cyl(b, 0.7f, 0.7f, 0.02f, new Vector3(0f, 0.86f, 0f), Flat(new Color(0.04f, 0.06f, 0.07f), 0.1f), 18);
+        // The stone ring with a real shaft: the inner wall goes down out of sight to dark water.
+        b.AddChild(new MeshInstance3D { Mesh = WellRing(0.88f, 0.66f, 0.9f, 2.4f), MaterialOverride = stone });
+        Cyl(b, 0.66f, 0.66f, 0.02f, new Vector3(0f, -1.3f, 0f), Flat(new Color(0.02f, 0.03f, 0.035f), 0.05f), 24);
         foreach (float sx in new[] { -0.8f, 0.8f })
             Box(b, new Vector3(0.14f, 2.2f, 0.14f), new Vector3(sx, 1.1f, 0f), wood);
         AddRoof(b, 2f, 1.5f, 2.1f, 0.7f, 0.15f, ShingleRoof(new Color(0.85f, 0.8f, 0.74f)));
@@ -452,6 +453,37 @@ public static partial class BuildingFactory
         else
             Cyl(b, 0.13f, 0.11f, 0.22f, new Vector3(0f, 1.0f, 0f), wood, 10);
         Collider(b, new Vector3(1.8f, 1f, 1.8f), new Vector3(0f, 0.5f, 0f));
+    }
+
+    /// <summary>
+    /// A well's stone ring (round Y): the outer wall from the ground up to <paramref name="height"/>, a flat rim, and the
+    /// inner wall down to <paramref name="depth"/> under the ground, so one looks into a shaft, not onto a lid.
+    /// </summary>
+    private static ArrayMesh WellRing(float outer, float inner, float height, float depth)
+    {
+        const int sides = 32;
+        var st = new SurfaceTool();
+        st.Begin(Mesh.PrimitiveType.Triangles);
+        void Quad(Vector3 a, Vector3 b2, Vector3 c, Vector3 d, Vector3 na, Vector3 nb)
+        {
+            // a-b2 along the bottom edge, c-d the top edge above them; normals per column.
+            foreach (var (p, n) in new[] { (a, na), (c, na), (d, nb), (a, na), (d, nb), (b2, nb) })
+            {
+                st.SetNormal(n);
+                st.AddVertex(p);
+            }
+        }
+        for (int i = 0; i < sides; i++)
+        {
+            float a0 = i * Mathf.Tau / sides, a1 = (i + 1) * Mathf.Tau / sides;
+            var d0 = new Vector3(MathF.Cos(a0), 0f, MathF.Sin(a0));
+            var d1 = new Vector3(MathF.Cos(a1), 0f, MathF.Sin(a1));
+            // Outer wall (facing out), rim (facing up), inner wall (facing in).
+            Quad(d1 * outer, d0 * outer, d1 * outer + Vector3.Up * height, d0 * outer + Vector3.Up * height, d1, d0);
+            Quad(d1 * inner + Vector3.Up * height, d0 * inner + Vector3.Up * height, d1 * outer + Vector3.Up * height, d0 * outer + Vector3.Up * height, Vector3.Up, Vector3.Up);
+            Quad(d0 * inner + Vector3.Down * depth, d1 * inner + Vector3.Down * depth, d0 * inner + Vector3.Up * height, d1 * inner + Vector3.Up * height, -d0, -d1);
+        }
+        return st.Commit();
     }
 
     /// <summary>A stack of split logs between two stakes under a board roof, and a chopping block with its axe.</summary>

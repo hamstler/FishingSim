@@ -1107,8 +1107,11 @@ public partial class ScreenshotTool : Node
         else if (mode == 27)
         {
             // Everyday life: arg 0 = woodcutter, 1 = washing line, 2 = village hearth, 3 = rowboat, 4 = net rack, 5 = tool rack.
-            string[] names = { "ChoppingBlock", "Laundry", "Hearth", "Rowboat", "NetRack", "Tools" };
-            var target = main.Scenery.FindChild(names[Math.Clamp(arg, 0, names.Length - 1)], true, false) as Node3D;
+            string[] names = { "ChoppingBlock", "Laundry", "Hearth", "Rowboat", "NetRack", "Tools", "Well" };
+            // arg 6: the village well (a Building of kind Well).
+            var target = arg == 6
+                ? main.Scenery.FindChildren("*", "Node3D", true, false).OfType<FishingSim.World.Building>().FirstOrDefault(bd => bd.Spec?.Kind == FishingSim.Data.BuildingKind.Well)
+                : main.Scenery.FindChild(names[Math.Clamp(arg, 0, names.Length - 1)], true, false) as Node3D;
             if (target != null)
             {
                 var at = target.GlobalPosition;
