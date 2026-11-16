@@ -328,8 +328,8 @@ public partial class Hud : CanvasLayer
             state = rod.LineOut > 0.5f ? $"{rod.LineOut:0} m" : "";
             if (rod.State == RodState.Fight)
             {
-                string alert = (rod.FightSlack ? "  ·  LUZ!" : "") + (rod.FishInWeeds ? rod.FishInWood ? "  ·  W GAŁĘZIACH!" : "  ·  W ZIELSKU!" : "")
-                    + (rod.FishJumping ? "  ·  SKOK!" : "");
+                // Slack and jumps are read from the line and the water, not from words on the screen.
+                string alert = rod.FishInWeeds ? rod.FishInWood ? "  ·  W GAŁĘZIACH!" : "  ·  W ZIELSKU!" : "";
                 if (alert.Length > 0)
                 {
                     state += alert;
