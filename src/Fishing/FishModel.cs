@@ -597,6 +597,15 @@ public partial class FishModel : Node3D
         _bodyShaderMaterial.SetShaderParameter("metallic", 0.08f + 0.3f * style.Silver);
         _bodyShaderMaterial.SetShaderParameter("roughness", 0.42f);
         _bodyShaderMaterial.SetShaderParameter("clearcoat", 0.3f);
+        if (asset.Foreign)
+        {
+            // A baked skin (Meshy): its UV islands lie side by side, so the blurred reading that softens the painted
+            // scale rims would carry a fin's orange onto the flank. Read it sharp; the colours are final, keep it matt.
+            _bodyShaderMaterial.SetShaderParameter("scale_lines", 1f);
+            _bodyShaderMaterial.SetShaderParameter("metallic", 0.04f + 0.12f * style.Silver);
+            _bodyShaderMaterial.SetShaderParameter("roughness", 0.5f);
+            _bodyShaderMaterial.SetShaderParameter("clearcoat", 0.15f);
+        }
         _skinUpgraded = true;
         float phase = (float)(GD.Randf() * Mathf.Tau);
         void Swimmer(GeometryInstance3D g)
@@ -666,7 +675,9 @@ public partial class FishModel : Node3D
             body.SetShaderParameter("metallic", 0.04f + 0.14f * style.Silver);
             body.SetShaderParameter("roughness", 0.5f);
             body.SetShaderParameter("clearcoat", 0.08f);
-            body.SetShaderParameter("back_shade", style.Silver > 0.5f ? 0.9f : 0.7f);
+            body.SetShaderParameter("back_shade", asset.Foreign ? 0f : style.Silver > 0.5f ? 0.9f : 0.7f);
+            if (asset.Foreign)
+                body.SetShaderParameter("scale_lines", 1f);   // islands side by side: no blurred reading (see BuildAsset)
             // From a little above the middle of the body to the top of the back.
             var box = asset.Body.GetAabb();
             float mid = box.Position.Y + box.Size.Y * 0.5f;
