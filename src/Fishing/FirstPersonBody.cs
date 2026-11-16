@@ -366,7 +366,12 @@ public partial class FirstPersonBody : Node3D
     {
         public float Phi, Delta, Slide, Sign = 1f;
         public bool Has;
+        /// <summary>The best way's turn step last search, and frames since the last full search.</summary>
+        public int BestStep;
+        public int SinceFull;
     }
+
+    private static readonly float[] BothWays = { 1f, -1f }, OneWay = { 1f };
 
     private readonly GripState _rodRight = new(), _rodLeft = new(), _toolRight = new(), _toolLeft = new();
 
@@ -387,12 +392,21 @@ public partial class FirstPersonBody : Node3D
         var a0 = axis.Normalized();
         var up = arm.BodyUp;
         float bestScore = float.MaxValue, bestPhi = 0f, bestDelta = deltaMin, bestSlide = 0f, bestSign = 1f;
-        foreach (float sign in eitherWay ? new[] { 1f, -1f } : new[] { 1f })
+        int bestStep = 0;
+        // Every way round the bar now and then (and at the start); between, only the ways near the last best one, on
+        // the same side: the hand moves little from frame to frame (576 to 1152 tries a hand a frame before).
+        bool full = !state.Has || ++state.SinceFull >= 12;
+        if (full)
+            state.SinceFull = 0;
+        foreach (float sign in eitherWay ? BothWays : OneWay)
         {
+            if (!full && sign != state.Sign)
+                continue;
             var a = a0 * sign;
             var (u, v) = Around(a, up, arm.BodyRight);
-            for (int i = 0; i < 48; i++)
+            for (int n = 0; n < (full ? 48 : 7); n++)
             {
+                int i = full ? n : ((state.BestStep + n - 3) % 48 + 48) % 48;
                 float phi = i / 48f * Mathf.Tau;
                 for (int j = 0; j < 4; j++)
                 {
@@ -408,6 +422,7 @@ public partial class FirstPersonBody : Node3D
                         {
                             bestScore = score;
                             (bestPhi, bestDelta, bestSlide, bestSign) = (phi, delta, slide, sign);
+                            bestStep = i;
                         }
                     }
                 }
@@ -424,6 +439,7 @@ public partial class FirstPersonBody : Node3D
         else
             (state.Phi, state.Delta, state.Slide, state.Sign) = (bestPhi, bestDelta, bestSlide, bestSign);
         state.Has = true;
+        state.BestStep = bestStep;
         {
             var a = a0 * state.Sign;
             var (u, v) = Around(a, up, arm.BodyRight);

@@ -1426,8 +1426,12 @@ public partial class FishingRod : Node3D
         _pulseTimer = 0f;
         if (CurrentSpecies != null)
         {
-            Graphics.FishSkin.Prewarm(CurrentSpecies);     // paint the close-up skin while the float twitches
-            FishAsset.Prefetch(CurrentSpecies);            // and decode the species' model pictures
+            // Decode the species' model pictures while the float twitches; the painted close-up skin (4096 px with a
+            // normal map, on every core) only for a species without a model, which then needs it.
+            if (FishAsset.HasModel(CurrentSpecies))
+                FishAsset.Prefetch(CurrentSpecies);
+            else
+                Graphics.FishSkin.Prewarm(CurrentSpecies);
         }
         if (_castMethod == FishingMethod.Spinning)
         {
