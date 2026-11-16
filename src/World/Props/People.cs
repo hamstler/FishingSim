@@ -149,6 +149,17 @@ public static class People
         };
         bool ranger = role is Role.Hunter or Role.Coachman || role == Role.Camper && variant % 3 == 0;
         string model = (woman ? "female_" : "male_") + (ranger ? "ranger" : "peasant");
+        if (CharacterAsset.Realistic)
+        {
+            // Real-looking people (MakeHuman): the old and the masters in the older man's clothes, people at work in
+            // work clothes, traders and campers in everyday clothes; women young or middle-aged.
+            model = woman ? (role == Role.Elder || variant % 2 == 1 ? "mh_female_middle" : "mh_female_casual")
+                : role is Role.Elder or Role.GuildMaster ? "mh_male_old"
+                : role is Role.Farmer ? "mh_male_worker"
+                : role is Role.Fisherman or Role.Coachman or Role.Hunter or Role.Fishmonger
+                    ? ((variant + (int)role) % 3) switch { 0 => "mh_male_worker", 1 => "mh_male_casual", _ => "mh_male_denim" }
+                : (variant % 3) switch { 0 => "mh_male_casual", 1 => "mh_male_denim", _ => "mh_male_worker" };
+        }
         var hairs = woman ? new[] { "Hair_Long", "Hair_Buns", "Hair_Long", "Hair_Buns", "Hair_BuzzedFemale" }
             : new[] { "Hair_SimpleParted", "Hair_Buzzed", "Hair_SimpleParted", "Hair_Long" };
         var hairColour = role == Role.Elder ? new Color(0.78f, 0.77f, 0.74f) : Pick(HairColours);
@@ -156,6 +167,9 @@ public static class People
             hairColour = hairColour.Lerp(new Color(0.7f, 0.69f, 0.66f), 0.5f);
         bool beard = !woman && (role is Role.Elder or Role.GuildMaster or Role.Hunter || l.Beard);
         bool hood = ranger && (role == Role.Hunter || rng.Randf() < 0.5f);
+        if (model.StartsWith("mh_"))
+            // The MakeHuman worker and the old man have a hat (Head_Hood); the others have none.
+            hood = model is "mh_male_worker" or "mh_male_old" && (role is Role.Fisherman or Role.Coachman or Role.Elder || rng.Randf() < 0.4f);
         float shade = rng.RandfRange(0.9f, 1.04f);
         var look = new Appearance(model, rng.RandiRange(0, 1), Pick(hairs), hairColour, Pick(SkinTints), beard, hood,
             new Color(shade, shade, shade * rng.RandfRange(0.96f, 1.03f)));

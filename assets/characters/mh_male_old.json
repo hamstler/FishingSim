@@ -1,0 +1,68 @@
+{
+ "id": "mh_male_old",
+ "sex": "M",
+ "hair": [
+  "Hair_short01"
+ ],
+ "materials": {
+  "skin": {
+   "roughness_value": 0.55,
+   "albedo": [
+    "mh_male_old_skin_a"
+   ]
+  },
+  "brows": {
+   "roughness_value": 0.9,
+   "albedo": [
+    "mh_male_old_brows_t"
+   ],
+   "alpha": true
+  },
+  "lashes": {
+   "roughness_value": 0.9,
+   "albedo": [
+    "mh_male_old_lashes_t"
+   ],
+   "alpha": true
+  },
+  "hat": {
+   "roughness_value": 0.85,
+   "albedo": [
+    "mh_male_old_hat_a"
+   ],
+   "normal": "mh_male_old_hat_n"
+  },
+  "eye": {
+   "roughness_value": 0.3,
+   "albedo": [
+    "mh_male_old_eye_a"
+   ]
+  },
+  "outfit": {
+   "roughness_value": 0.88,
+   "albedo": [
+    "mh_male_old_outfit_a"
+   ],
+   "normal": "mh_male_old_outfit_n"
+  },
+  "shoes": {
+   "roughness_value": 0.6,
+   "albedo": [
+    "mh_male_old_shoes_a"
+   ]
+  },
+  "hair1": {
+   "roughness_value": 0.75,
+   "albedo": [
+    "mh_male_old_hair1_t"
+   ],
+   "alpha": true
+  }
+ },
+ "author": "MakeHuman community (built with MPFB2)",
+ "licence": "CC0 1.0 (public domain)",
+ "sources": [
+  "https://static.makehumancommunity.org/asset_packs/makehuman_system_assets.html",
+  "https://github.com/makehumancommunity/mpfb2 (LICENSE.ASSETS.md)"
+ ]
+}

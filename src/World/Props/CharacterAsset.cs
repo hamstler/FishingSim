@@ -23,7 +23,11 @@ public static class CharacterAsset
 {
     private const int Version = 1;
 
-    public static readonly string[] Models = { "male_peasant", "female_peasant", "male_ranger", "female_ranger" };
+    public static readonly string[] Models = { "male_peasant", "female_peasant", "male_ranger", "female_ranger",
+        "mh_male_worker", "mh_male_casual", "mh_male_denim", "mh_male_old", "mh_female_casual", "mh_female_middle" };
+
+    /// <summary>The realistic MakeHuman villagers (tools/assets/makehuman_build.py), used when present.</summary>
+    public static bool Realistic => Has("mh_male_worker");
 
     private sealed record Model(PackedScene Scene, JsonObject Info, float Height, bool Male);
 
@@ -52,6 +56,8 @@ public static class CharacterAsset
             return null;
         var root = model.Scene.Instantiate<Node3D>();
         var hair = model.Info["hair"]?.AsArray().Select(h => (string)h!).ToHashSet() ?? new HashSet<string>();
+        // A model that has only its own hairstyle (the MakeHuman ones) shows that one whatever the look asked for.
+        string? hairShown = look.Hair != null && hair.Contains(look.Hair) ? look.Hair : hair.FirstOrDefault();
         foreach (var node in root.FindChildren("*", "MeshInstance3D", true, false))
         {
             var mi = (MeshInstance3D)node;
@@ -59,7 +65,7 @@ public static class CharacterAsset
             if (name == "Hair_Beard")
                 mi.Visible = look.Beard;
             else if (hair.Contains(name))
-                mi.Visible = !look.Hood && name == look.Hair;
+                mi.Visible = !look.Hood && name == hairShown;
             else if (name == "Head_Hood")
                 mi.Visible = look.Hood;
             for (int s = 0; s < mi.Mesh.GetSurfaceCount(); s++)
@@ -116,7 +122,13 @@ public static class CharacterAsset
             if (!FileAccess.FileExists(path))
                 return null;
             bool normal = name.EndsWith("_n");
-            var (img, _) = TextureStore.Get($"char_{name}", Version, normal ? BlockCompress.Kind.TwoChannel : BlockCompress.Kind.Colour, () =>
+            bool alpha = name.EndsWith("_t");     // hair cards, brows, lashes: colour with alpha
+            // The file's size joins the cache key, so a rebuilt picture never meets an old cached one.
+            long bytes;
+            using (var f = FileAccess.Open(path, FileAccess.ModeFlags.Read))
+                bytes = (long)(f?.GetLength() ?? 0);
+            var kind = normal ? BlockCompress.Kind.TwoChannel : alpha ? BlockCompress.Kind.ColourAlpha : BlockCompress.Kind.Colour;
+            var (img, _) = TextureStore.Get($"char_{name}_{bytes}", Version, kind, () =>
             {
                 var image = new Image();
                 image.LoadWebpFromBuffer(FileAccess.GetFileAsBytes(path));
@@ -175,6 +187,12 @@ public static class CharacterAsset
             }
             else
                 m.Roughness = (float?)spec?["roughness_value"] ?? 0.8f;
+            if ((bool?)spec?["alpha"] == true)
+            {
+                // Hair cards, brows and lashes: soft edges blended over what is behind, sorted by a depth pre-pass.
+                m.Transparency = BaseMaterial3D.TransparencyEnum.AlphaDepthPrePass;
+                m.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+            }
             switch (slot)
             {
                 case "skin":

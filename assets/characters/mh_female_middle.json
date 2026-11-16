@@ -1,0 +1,61 @@
+{
+ "id": "mh_female_middle",
+ "sex": "F",
+ "hair": [
+  "Hair_braid01"
+ ],
+ "materials": {
+  "skin": {
+   "roughness_value": 0.55,
+   "albedo": [
+    "mh_female_middle_skin_a"
+   ]
+  },
+  "hair1": {
+   "roughness_value": 0.75,
+   "albedo": [
+    "mh_female_middle_hair1_t"
+   ],
+   "alpha": true
+  },
+  "brows": {
+   "roughness_value": 0.9,
+   "albedo": [
+    "mh_female_middle_brows_t"
+   ],
+   "alpha": true
+  },
+  "lashes": {
+   "roughness_value": 0.9,
+   "albedo": [
+    "mh_female_middle_lashes_t"
+   ],
+   "alpha": true
+  },
+  "outfit": {
+   "roughness_value": 0.88,
+   "albedo": [
+    "mh_female_middle_outfit_a"
+   ],
+   "normal": "mh_female_middle_outfit_n"
+  },
+  "eye": {
+   "roughness_value": 0.3,
+   "albedo": [
+    "mh_female_middle_eye_a"
+   ]
+  },
+  "shoes": {
+   "roughness_value": 0.6,
+   "albedo": [
+    "mh_female_middle_shoes_a"
+   ]
+  }
+ },
+ "author": "MakeHuman community (built with MPFB2)",
+ "licence": "CC0 1.0 (public domain)",
+ "sources": [
+  "https://static.makehumancommunity.org/asset_packs/makehuman_system_assets.html",
+  "https://github.com/makehumancommunity/mpfb2 (LICENSE.ASSETS.md)"
+ ]
+}
