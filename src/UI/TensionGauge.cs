@@ -5,33 +5,51 @@ using FishingSim.Fishing;
 namespace FishingSim.UI;
 
 /// <summary>
-/// The fight bar under the fishing status line: one gradient from red (left, about to break) to green (right, slack)
-/// over four segments 7%, 18%, 25% and 50% wide (0-10%, 10-25%, 25-50%, 50-100% of the tackle's strength in reserve),
-/// with no labels or dividers. A needle shows the current reserve; the ideal spot is the light orange middle.
-/// See <see cref="FightGauge"/>.
+/// The line's load bar at the bottom of the screen, shown whenever the rod is in hand: an empty, see-through bar with a
+/// thin light outline. When a fish pulls, it fills from the left with the load on the tackle (tension over the weakest
+/// link, <see cref="FishingRod.EffectiveLimit"/>): green while there is room, yellow, orange and red as it nears the
+/// breaking point. While a cast is charged it shows the cast's power in gold instead.
 /// </summary>
 public partial class TensionGauge : Control
 {
-    /// <summary>Colour at each segment edge: red, orange, light orange (middle), yellow-green, green.</summary>
+    /// <summary>Fill colour by load: green, yellow-green, yellow, orange, red (at the break).</summary>
     private static readonly Color[] Stops =
     {
-        new(0.86f, 0.14f, 0.1f), new(0.93f, 0.36f, 0.12f), new(0.97f, 0.62f, 0.24f), new(0.95f, 0.8f, 0.4f), new(0.22f, 0.74f, 0.3f),
+        new(0.3f, 0.82f, 0.36f), new(0.66f, 0.84f, 0.3f), new(0.96f, 0.82f, 0.28f), new(0.96f, 0.5f, 0.16f), new(0.9f, 0.14f, 0.1f),
     };
 
-    private float _needle = 0.75f;
+    private static readonly Color PowerColour = new(1f, 0.82f, 0.4f);
+
+    private float _fill;
 
     public FishingRod? Rod { get; set; }
 
-    /// <summary>Smoothed needle position 0..1 (for tests and tools).</summary>
-    public float Needle => _needle;
+    /// <summary>The cast's power 0..1 while charging (Hud sets it), or below 0 for the line's load.</summary>
+    public float Power { get; set; } = -1f;
+
+    /// <summary>Smoothed fill 0..1: the load on the tackle (1 = breaking), or the cast power (tests and tools).</summary>
+    public float Needle => _fill;
+
+    /// <summary>The fill colour for a load 0..1 (1 = the tackle breaks).</summary>
+    public static Color LoadColour(float load)
+    {
+        float x = Mathf.Clamp(load, 0f, 1f) * (Stops.Length - 1);
+        int i = Mathf.Min((int)x, Stops.Length - 2);
+        return Stops[i].Lerp(Stops[i + 1], x - i);
+    }
 
     public override void _Process(double delta)
     {
-        if (Rod == null)
+        if (Rod == null || !Visible)
             return;
-        float target = FightGauge.Position(FightGauge.Reserve(Rod.Tension, Rod.EffectiveLimit));
-        _needle = Mathf.Lerp(_needle, target, Mathf.Min((float)delta * 10f, 1f));
-        QueueRedraw();
+        float target = Power >= 0f ? Power : Mathf.Clamp(Rod.Tension / Mathf.Max(Rod.EffectiveLimit, 0.01f), 0f, 1f);
+        float rate = Power >= 0f ? 30f : 10f;
+        float next = Mathf.Lerp(_fill, target, Mathf.Min((float)delta * rate, 1f));
+        if (Mathf.Abs(next - _fill) > 0.0005f || Mathf.Abs(next - target) > 0.0005f)
+        {
+            _fill = next;
+            QueueRedraw();
+        }
     }
 
     public override void _Draw()
@@ -39,19 +57,17 @@ public partial class TensionGauge : Control
         if (Rod == null)
             return;
         var size = Size;
-        float barH = size.Y;
-        DrawRect(new Rect2(-2, -2, size.X + 4, barH + 4), new Color(0.08f, 0.05f, 0.03f, 0.85f));
-        // One continuous gradient: each segment blends from the colour at its left edge to the one at its right.
-        for (int s = 0; s < FightGauge.Widths.Length; s++)
+        // See-through body with a soft shadow line and a thin light outline.
+        DrawRect(new Rect2(0, 0, size.X, size.Y), new Color(0f, 0f, 0f, 0.16f));
+        if (_fill > 0.002f)
         {
-            float x0 = size.X * FightGauge.SegmentStart(s), x1 = size.X * FightGauge.SegmentStart(s + 1);
-            var pts = new[] { new Vector2(x0, 0), new Vector2(x1, 0), new Vector2(x1, barH), new Vector2(x0, barH) };
-            var cols = new[] { Stops[s], Stops[s + 1], Stops[s + 1], Stops[s] };
-            DrawPolygon(pts, cols);
+            var col = Power >= 0f ? PowerColour : LoadColour(_fill);
+            float w = _fill * (size.X - 2f);
+            DrawRect(new Rect2(1, 1, w, size.Y - 2f), new Color(col, 0.82f));
+            // A lighter top half gives the fill some body.
+            DrawRect(new Rect2(1, 1, w, (size.Y - 2f) * 0.45f), new Color(1f, 1f, 1f, 0.14f));
         }
-        // Needle.
-        float nx = _needle * size.X;
-        DrawRect(new Rect2(nx - 2, -5, 4, barH + 10), new Color(0.06f, 0.04f, 0.02f));
-        DrawRect(new Rect2(nx - 1, -4, 2, barH + 8), Colors.White);
+        DrawRect(new Rect2(-1, -1, size.X + 2, size.Y + 2), new Color(0f, 0f, 0f, 0.35f), false, 1f);
+        DrawRect(new Rect2(0, 0, size.X, size.Y), new Color(1f, 0.97f, 0.9f, 0.7f), false, 1.2f);
     }
 }

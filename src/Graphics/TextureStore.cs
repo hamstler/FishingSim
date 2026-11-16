@@ -33,31 +33,45 @@ public static class TextureStore
         prepare?.Invoke(img);
         var mean = MeanOf(img);
         var result = compress ? BlockCompress.Compress(img, kind) : img;
+        if (!ReferenceEquals(result, img))
+            img.Dispose();      // native pixels go now, not when the GC gets round to the wrapper (4K: ~350 MB with mips)
         if (!OS.HasEnvironment("FISHSIM_NO_CACHE"))
         {
             Write(path, result, mean);
             Tidy(name, path);
         }
+        if (result.GetWidth() >= 2048)
+            Collect();
         if (Limit(result.GetWidth(), result.GetHeight(), result.HasMipmaps()) > 0)
         {
             var data = result.GetData();
             if (Shrink(result.GetWidth(), result.GetHeight(), result.GetFormat(), data, out var smaller))
+            {
+                result.Dispose();
                 result = smaller;
+            }
         }
         return (result, mean);
     }
 
     /// <summary>
-    /// The largest texture side kept in memory by the graphics quality: Low 1024, Medium 2048, High and Ultra 4096.
+    /// Frees the big temporary buffers of a 4K picture at once (pixel copies on the large object heap, Godot images
+    /// whose wrappers wait for finalisation). Without it the first start's texture baking piled up several gigabytes.
+    /// </summary>
+    public static void Collect()
+    {
+        System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+        GC.Collect(2, GCCollectionMode.Forced, true, true);
+        GC.WaitForPendingFinalizers();
+        GC.Collect(2, GCCollectionMode.Forced, true, true);
+    }
+
+    /// <summary>
+    /// The largest texture side kept in memory by the graphics quality: Low 1024, Medium and High 2048, Ultra 4096 (the 4K photo sets cost four times the memory).
     /// Bigger pictures lose their top mipmap levels as they are read (a quarter of the memory per level; nothing is
     /// repainted). Takes effect for textures loaded after a change (restart for the whole world).
     /// </summary>
-    public static int MaxSize => GraphicsQuality.Level switch
-    {
-        QualityLevel.Low => 1024,
-        QualityLevel.Medium => 2048,
-        _ => 4096,
-    };
+    public static int MaxSize => GraphicsQuality.TextureLimit;
 
     /// <summary>How many top mipmap levels to drop from a picture of this size (0 = keep it whole).</summary>
     private static int Limit(int w, int h, bool mips)

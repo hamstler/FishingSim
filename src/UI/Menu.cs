@@ -36,6 +36,8 @@ public partial class Menu : Control
         Input.MouseMode = Input.MouseModeEnum.Visible;
         GetTree().Paused = false;
         UserStore.EnsureDefault();
+        CrashLog.Install();
+        GraphicsQuality.ApplyDisplay();
         // The painted world textures (4096 px) take a minute or two to paint on the very first start: begin while the
         // angler logs in and picks a map. Later starts only read them from the disk cache.
         if (!Renderer.IsHeadless)
@@ -68,6 +70,31 @@ public partial class Menu : Control
     }
 
     // ------------------------------------------------------------------ layout
+    private static readonly Dictionary<string, ImageTexture> Pictures = new();
+
+    /// <summary>
+    /// A fishery's picture for the menu: a 1920x1080 render of the map (assets/menu/&lt;map&gt;_&lt;hour&gt;.webp, made
+    /// with screenshot FISHSIM_SCENIC), with mipmaps so it stays smooth at any size; the painted postcard if missing.
+    /// </summary>
+    private static ImageTexture Picture(string locationPath, float hour)
+    {
+        string id = System.IO.Path.GetFileNameWithoutExtension(locationPath);
+        string path = $"res://assets/menu/{id}_{(int)hour}.webp";
+        if (Pictures.TryGetValue(path, out var done))
+            return done;
+        ImageTexture texture;
+        var img = new Image();
+        if (FileAccess.FileExists(path) && img.LoadWebpFromBuffer(FileAccess.GetFileAsBytes(path)) == Error.Ok)
+        {
+            img.GenerateMipmaps();
+            texture = ImageTexture.CreateFromImage(img);
+        }
+        else
+            texture = Postcard.For(GD.Load<LocationData>(locationPath), hour);
+        Pictures[path] = texture;
+        return texture;
+    }
+
     private void BuildBackground()
     {
         // A slideshow of painted postcards of the fishing grounds, cross-fading every few seconds.
@@ -76,8 +103,8 @@ public partial class Menu : Control
             var loc = GD.Load<LocationData>(path);
             if (loc == null)
                 continue;
-            _slides.Add(Postcard.For(loc, 10f));
-            _slides.Add(Postcard.For(loc, 18.5f));
+            _slides.Add(Picture(path, 10f));
+            _slides.Add(Picture(path, 17f));
         }
         for (int i = 0; i < 2; i++)
         {
@@ -85,7 +112,7 @@ public partial class Menu : Control
             {
                 ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
                 StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered,
-                TextureFilter = TextureFilterEnum.Nearest,
+                TextureFilter = TextureFilterEnum.LinearWithMipmaps,
                 Texture = _slides.Count > 0 ? _slides[0] : null,
                 Modulate = new Color(1, 1, 1, i == 0 ? 1f : 0f),
             };
@@ -162,7 +189,7 @@ public partial class Menu : Control
     private void BuildLogin()
     {
         var panel = new PanelContainer();
-        Center(panel, 420, 460);
+        Center(panel, 420, 510);
         AddChild(panel);
         _loginBox = panel;
         var margin = new MarginContainer();
@@ -212,6 +239,20 @@ public partial class Menu : Control
         var atlas = new Button { Text = "Atlas ryb", CustomMinimumSize = new Vector2(0, 40) };
         atlas.Pressed += () => OpenAtlas();
         box.AddChild(atlas);
+        var graphics = new Button { Text = "Ustawienia grafiki", CustomMinimumSize = new Vector2(0, 40) };
+        graphics.Pressed += () => OpenGraphics();
+        box.AddChild(graphics);
+        var controls = new Button { Text = "Sterowanie", CustomMinimumSize = new Vector2(0, 40) };
+        controls.Pressed += () => AddChild(new ControlsPanel());
+        box.AddChild(controls);
+    }
+
+    /// <summary>The graphics settings over the menu (before logging in or on the map selection).</summary>
+    public GraphicsPanel OpenGraphics()
+    {
+        var panel = new GraphicsPanel();
+        AddChild(panel);
+        return panel;
     }
 
     /// <summary>The fish atlas over the menu (from the login form or the map selection).</summary>
@@ -271,6 +312,8 @@ public partial class Menu : Control
             c.QueueFree();
         _mapsBox.Visible = true;
         Center(_mapsBox, 1240, 560);
+        _mapsBox.OffsetTop -= 30f;
+        _mapsBox.OffsetBottom -= 30f;
         _mapsBox.AddThemeConstantOverride("separation", 14);
 
         var profile = Profile.LoadFor(Session.Username);
@@ -294,6 +337,9 @@ public partial class Menu : Control
         var atlas = new Button { Text = "Atlas ryb", CustomMinimumSize = new Vector2(160, 40) };
         atlas.Pressed += () => OpenAtlas();
         buttons.AddChild(atlas);
+        var controls = new Button { Text = "Sterowanie", CustomMinimumSize = new Vector2(160, 40) };
+        controls.Pressed += () => AddChild(new ControlsPanel());
+        buttons.AddChild(controls);
         var logout = new Button { Text = "Wyloguj", CustomMinimumSize = new Vector2(160, 40) };
         logout.Pressed += Logout;
         buttons.AddChild(logout);
@@ -315,12 +361,12 @@ public partial class Menu : Control
         margin.AddChild(box);
 
         if (!_previews.ContainsKey(index))
-            _previews[index] = Postcard.For(loc, 10f);
+            _previews[index] = Picture(LakeBed.LocationPaths[index], 10f);
         box.AddChild(new TextureRect
         {
             Texture = _previews[index],
             CustomMinimumSize = new Vector2(270, 152),
-            TextureFilter = TextureFilterEnum.Nearest,
+            TextureFilter = TextureFilterEnum.LinearWithMipmaps,
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered,
             Modulate = locked ? new Color(0.45f, 0.45f, 0.45f) : Colors.White,

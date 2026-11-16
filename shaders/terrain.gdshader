@@ -16,9 +16,12 @@ uniform float layer_rough[7];
 uniform vec3 dark_grass_tint = vec3(1.0);
 uniform float tile = 2.0;
 uniform float bump = 1.0;
-// The water's clock (set once per frame by Water as a global): the caustics drift with it.
-global uniform float water_time;
+// The lake's Gerstner waves and clock (globals set by Water): the caustics drift with the clock, and the water's edge
+// runs up and back on the beach with the swell.
+#include "res://shaders/water_waves.gdshaderinc"
 uniform float daylight = 1.0;
+/// 0..1: rain on the ground (darker, glossier; LakeBed.Wetness, eased by the sky: it dries slowly after the rain).
+uniform float wetness = 0.0;
 uniform float water_level = 0.0;
 uniform float snow_line = 26.0;
 uniform float rock_line = 10.5;
@@ -151,6 +154,22 @@ void fragment() {
 	base *= mix(1.0, 0.6, wet);
 	base = mix(base, base * 0.3, clamp(-height / 7.0, 0.0, 1.0));
 	rough = mix(rough, 0.35, wet * (1.0 - step(height, -0.05)));
+	// The swash: the water's edge runs up the gentle beach and back with the swell, leaving a glossy film just above
+	// the water that dries as it drains (low roughness, a little darker).
+	float swell = water_height(wpos.xz);
+	float above = height - swell;
+	float film = (1.0 - smoothstep(0.0, 0.05 + water_amp * 0.6, above)) * step(-0.02, above);
+	base *= 1.0 - 0.12 * film;
+	rough = mix(rough, 0.12, film);
+	// The drift line: a thin, broken band of dark bits (reed stalks, leaves) where the highest waves left them, on
+	// sand and pebbles.
+	float drift_at = 0.16 + 0.05 * sin(wpos.x * 0.7 + mid * 6.0);
+	float drift = smoothstep(0.035, 0.0, abs(height - drift_at)) * smoothstep(0.45, 0.65, finer) * (w[2] + w[4]);
+	base = mix(base, base * vec3(0.42, 0.38, 0.32), clamp(drift, 0.0, 1.0) * 0.8);
+	// Rain: everything above the water darkens and shines while it is wet.
+	float rain_wet = wetness * step(0.0, height) * (1.0 - snow);
+	base *= 1.0 - 0.28 * rain_wet;
+	rough = mix(rough, max(rough * 0.45, 0.2), rain_wet);
 
 	vec3 pn = normalize(n + tilt * bump);
 	NORMAL = normalize((VIEW_MATRIX * vec4(pn, 0.0)).xyz);

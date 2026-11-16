@@ -18,7 +18,7 @@ namespace FishingSim.Fishing;
 public partial class RodRig : Node3D
 {
     private readonly List<Node3D> _segments = new();
-    private Node3D _crank = null!, _rotor = null!;
+    private Node3D _crank = null!, _rotor = null!, _bail = null!;
 
     /// <summary>The end of the blank; the line starts here.</summary>
     public Node3D Tip { get; private set; } = null!;
@@ -77,17 +77,19 @@ public partial class RodRig : Node3D
         Position = new Vector3(0.3f, -0.35f, -0.4f);
         RotationDegrees = new Vector3(-80f, 0f, 0f);
 
-        var cork = _cork = Mat(new Color(0.72f, 0.56f, 0.38f), 0.85f);        // cork grips
-        var corkDark = Mat(new Color(0.55f, 0.4f, 0.26f), 0.9f);      // filler rings in the cork
-        var rubber = Mat(new Color(0.12f, 0.11f, 0.1f), 0.7f);         // butt cap
-        var seat = Mat(new Color(0.16f, 0.16f, 0.17f), 0.45f, 0.3f);   // graphite reel seat
-        var chrome = Mat(new Color(0.72f, 0.72f, 0.74f), 0.25f, 0.9f); // hoods, guides, bail
-        var blank = _blank = Mat(new Color(0.24f, 0.12f, 0.09f), 0.35f, 0.15f); // lacquered blank
-        var whip = _whip = Mat(new Color(0.75f, 0.62f, 0.3f), 0.5f, 0.2f);     // gold thread whippings
-        var reelBody = _reelBody = Mat(new Color(0.2f, 0.21f, 0.23f), 0.4f, 0.5f); // reel housing
-        var reelTrim = _reelTrim = Mat(new Color(0.62f, 0.52f, 0.3f), 0.3f, 0.8f); // champagne trim
-        var line = Mat(new Color(0.82f, 0.86f, 0.78f), 0.5f);          // line on the spool
-        var knob = Mat(new Color(0.32f, 0.2f, 0.12f), 0.55f);          // wooden knob
+        // Procedural materials (shaders/tackle.gdshader): carbon under lacquer, cork granules, brushed metal, the
+        // anodised housing, line cross-wound on the spool, thread whippings; sharp however close the eye is.
+        var cork = _cork = Tackle(1, new Color(0.72f, 0.56f, 0.38f), 0.85f);              // cork grips
+        var corkDark = Tackle(1, new Color(0.55f, 0.4f, 0.26f), 0.9f, shade: 0.2f);        // filler rings in the cork
+        var rubber = Tackle(7, new Color(0.12f, 0.11f, 0.1f), 0.8f);                        // butt cap
+        var seat = Tackle(4, new Color(0.16f, 0.16f, 0.17f), 0.38f, 0.3f);                  // graphite reel seat
+        var chrome = Tackle(3, new Color(0.74f, 0.74f, 0.76f), 0.1f, 1f);                   // hoods, guides, bail
+        var blank = _blank = Tackle(0, new Color(0.24f, 0.12f, 0.09f), 0.32f, 0.1f);       // lacquered carbon blank
+        var whip = _whip = Tackle(6, new Color(0.75f, 0.62f, 0.3f), 0.35f, 0.2f);          // gold thread whippings
+        var reelBody = _reelBody = Tackle(4, new Color(0.2f, 0.21f, 0.23f), 0.34f, 0.55f); // anodised reel housing
+        var reelTrim = _reelTrim = Tackle(3, new Color(0.62f, 0.52f, 0.3f), 0.26f, 0.9f);  // brushed champagne trim
+        var line = Tackle(5, new Color(0.82f, 0.86f, 0.78f), 0.4f);                         // line on the spool
+        var knob = Tackle(7, new Color(0.32f, 0.2f, 0.12f), 0.6f);                          // the crank's knob
 
         // Handle: butt cap, rear cork grip (with a few darker filler rings), reel seat, fore grip, winding check.
         Cyl(this, 0.0155f, 0.016f, 0.03f, new Vector3(0, -0.315f, 0), rubber, 16);
@@ -187,7 +189,23 @@ public partial class RodRig : Node3D
     private Material? _blankMaterial;
     private Data.RodData? _lookRod;
     private Data.ReelData? _lookReel;
-    private StandardMaterial3D? _cork, _blank, _whip, _reelBody, _reelTrim;
+    private ShaderMaterial? _cork, _blank, _whip, _reelBody, _reelTrim;
+
+    private static Shader? _tackleShader;
+
+    /// <summary>A material of shaders/tackle.gdshader: kind (0 blank, 1 cork, 2 foam, 3 metal, 4 housing, 5 spool line,
+    /// 6 whipping, 7 rubber), colour, roughness, metal.</summary>
+    private static ShaderMaterial Tackle(int kind, Color colour, float roughness, float metallic = 0f, float shade = 0f)
+    {
+        _tackleShader ??= GD.Load<Shader>("res://shaders/tackle.gdshader");
+        var m = new ShaderMaterial { Shader = _tackleShader };
+        m.SetShaderParameter("kind", kind);
+        m.SetShaderParameter("base_color", colour);
+        m.SetShaderParameter("roughness_base", roughness);
+        m.SetShaderParameter("metallic_base", metallic);
+        m.SetShaderParameter("shade", shade);
+        return m;
+    }
 
     /// <summary>Dresses the rig in the maker's colours of a rod and reel (blank lacquer, whippings, cork or foam
     /// grips, reel housing and trim).</summary>
@@ -199,15 +217,15 @@ public partial class RodRig : Node3D
             return;
         if (rod != null)
         {
-            _blank.AlbedoColor = rod.BlankColor;
-            _whip!.AlbedoColor = rod.WhipColor;
-            _cork!.AlbedoColor = rod.FoamGrip ? new Color(0.09f, 0.09f, 0.1f) : new Color(0.72f, 0.56f, 0.38f);
-            _cork.Roughness = rod.FoamGrip ? 0.95f : 0.85f;
+            _blank.SetShaderParameter("base_color", rod.BlankColor);
+            _whip!.SetShaderParameter("base_color", rod.WhipColor);
+            _cork!.SetShaderParameter("base_color", rod.FoamGrip ? new Color(0.09f, 0.09f, 0.1f) : new Color(0.72f, 0.56f, 0.38f));
+            _cork.SetShaderParameter("kind", rod.FoamGrip ? 2 : 1);
         }
         if (reel != null)
         {
-            _reelBody!.AlbedoColor = reel.BodyColor;
-            _reelTrim!.AlbedoColor = reel.TrimColor;
+            _reelBody!.SetShaderParameter("base_color", reel.BodyColor);
+            _reelTrim!.SetShaderParameter("base_color", reel.TrimColor);
         }
     }
     private Material? _quiverMaterial;
@@ -294,15 +312,41 @@ public partial class RodRig : Node3D
             float a = i / 18f * Mathf.Pi;
             hoop.Add(new Vector3(MathF.Cos(a) * bailR, bailY + MathF.Sin(a) * 0.006f, -MathF.Sin(a) * bailR));
         }
-        _rotor.AddChild(new MeshInstance3D { Mesh = Shapes.Tube(hoop, 0.0012f, 6), MaterialOverride = metal, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        // The bail turns on pivots at the rotor's arms: closed it guides the line onto the roller; opened for the cast
+        // it swings over to the other side of the spool (SetBail).
+        _bail = new Node3D { Position = new Vector3(0f, 0.022f, 0f) };
+        _rotor.AddChild(_bail);
+        var pivot = new Vector3(0f, 0.022f, 0f);
+        for (int i = 0; i < hoop.Count; i++)
+            hoop[i] -= pivot;
+        _bail.AddChild(new MeshInstance3D { Mesh = Shapes.Tube(hoop, 0.0012f, 6), MaterialOverride = metal, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
         foreach (float side in new[] { -1f, 1f })
-            Strut(_rotor, new Vector3(side * 0.025f, 0.022f, 0f), new Vector3(side * bailR, bailY, 0f), 0.002f, metal);
-        Cyl(_rotor, 0.004f, 0.004f, 0.007f, new Vector3(bailR, bailY, 0f), trim, 10).RotationDegrees = new Vector3(0, 0, 90f);
+        {
+            Strut(_bail, new Vector3(side * 0.025f, 0f, 0f), new Vector3(side * bailR, bailY - 0.022f, 0f), 0.002f, metal);
+            Cyl(_rotor, 0.0032f, 0.0032f, 0.003f, new Vector3(side * 0.0255f, 0.022f, 0f), trim, 12).RotationDegrees = new Vector3(0, 0, 90f);   // pivot caps
+        }
+        Cyl(_bail, 0.004f, 0.004f, 0.007f, new Vector3(bailR, bailY - 0.022f, 0f), trim, 12).RotationDegrees = new Vector3(0, 0, 90f);       // line roller
         var spool = ReelBody + new Vector3(0, 0.066f, 0);
         Cyl(reel, 0.024f, 0.024f, 0.006f, spool + new Vector3(0, -0.012f, 0), trim, 24);     // skirt
         Cyl(reel, 0.0205f, 0.0205f, 0.018f, spool, line, 24);                                // the line
         Cyl(reel, 0.0228f, 0.0228f, 0.004f, spool + new Vector3(0, 0.011f, 0), trim, 24);    // front lip
-        Cyl(reel, 0.0085f, 0.0095f, 0.014f, spool + new Vector3(0, 0.02f, 0), dark, 12);     // drag knob
+        Cyl(reel, 0.0085f, 0.0095f, 0.014f, spool + new Vector3(0, 0.02f, 0), dark, 16);     // drag knob
+        for (int i = 0; i < 10; i++)
+        {
+            // Grip ribs round the drag knob.
+            float a = i / 10f * Mathf.Tau;
+            Box(reel, new Vector3(0.0018f, 0.012f, 0.0018f), spool + new Vector3(MathF.Cos(a) * 0.0093f, 0.02f, MathF.Sin(a) * 0.0093f), dark, 0.0006f);
+        }
+        // The line clip on the spool's skirt, the side cover with its screws, the anti-reverse switch at the back.
+        Box(reel, new Vector3(0.003f, 0.007f, 0.006f), spool + new Vector3(0.0245f, -0.012f, 0f), trim, 0.001f);
+        Cyl(reel, 0.017f, 0.017f, 0.0025f, ReelBody + new Vector3(0.0205f, -0.004f, 0f), trim, 24).RotationDegrees = new Vector3(0, 0, 90f);
+        for (int i = 0; i < 3; i++)
+        {
+            float a = i / 3f * Mathf.Tau + 0.5f;
+            Cyl(reel, 0.0016f, 0.0016f, 0.001f, ReelBody + new Vector3(0.022f, -0.004f + MathF.Sin(a) * 0.012f, MathF.Cos(a) * 0.012f), dark, 8)
+                .RotationDegrees = new Vector3(0, 0, 90f);
+        }
+        Box(reel, new Vector3(0.006f, 0.004f, 0.009f), ReelBody + new Vector3(0f, -0.031f, 0.012f), dark, 0.0015f);
         // The crank on the left: a cap over the axle, the arm, the knob on its end (pointing outwards).
         _crank = new Node3D { Position = CrankAxis };
         reel.AddChild(_crank);
@@ -322,6 +366,13 @@ public partial class RodRig : Node3D
             return;
         _crank.Rotation = new Vector3(angle, 0f, 0f);
         _rotor.Rotation = new Vector3(0f, -angle * 5.2f, 0f);
+    }
+
+    /// <summary>Opens (1) or closes (0) the bail: open for the cast, flipped closed when the reel turns again.</summary>
+    public void SetBail(float open)
+    {
+        if (_bail != null)
+            _bail.Rotation = new Vector3(Math.Clamp(open, 0f, 1f) * 2.7f, 0f, 0f);
     }
 
     /// <summary>Number of bending sections of the blank (matches <see cref="Core.Physics.RodBendModel"/>).</summary>

@@ -4,9 +4,23 @@ using FishingSim.Graphics;
 
 namespace FishingSim.World;
 
-/// <summary>Drives sky colours, sun and moon, fog, stars, clouds (as a mood), rain and wind from <see cref="WorldState"/>.</summary>
+/// <summary>
+/// The sky and lighting controller: drives the sky (shaders/sky.gdshader), sun and moon, exposure, ambient light,
+/// shadows, aerial and volumetric fog, morning mist, stars, clouds (as a mood), rain and wind from
+/// <see cref="WorldState"/>. The light follows the time of day: a deep orange sun on the horizon, a golden hour with
+/// long soft shadows and sun shafts through the mist, a neutral noon, a blue moonlit night.
+/// </summary>
 public partial class SkyController : Node
 {
+    /// <summary>How thick the low mist over the water gets at dawn (and, thinner, at dusk) on a calm day.</summary>
+    [Export(PropertyHint.Range, "0,2")] public float MistStrength { get; set; } = 1f;
+
+    /// <summary>How strongly the sun's rays show in the haze (volumetric fog energy at the golden hour).</summary>
+    [Export(PropertyHint.Range, "0,4")] public float ShaftStrength { get; set; } = 2.2f;
+
+    /// <summary>Height (m above the water) the morning mist reaches.</summary>
+    [Export] public float MistHeight { get; set; } = 2.5f;
+
     // hour, sky top, sky horizon
     private static readonly (float Hour, Color Top, Color Horizon)[] Keys =
     {
@@ -33,6 +47,8 @@ public partial class SkyController : Node
     private float _cloud;
     private float _rain;
     private float _wind = 0.3f;
+    private float _groundWet;
+    private bool _wetStarted;
 
     /// <summary>Extra fog on top of the weather (mist over a marsh, haze in the hills); set per map.</summary>
     public float FogBoost { get; set; }
@@ -104,6 +120,7 @@ public partial class SkyController : Node
     private void BuildStars()
     {
         _starMaterial = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/stars.gdshader"), RenderPriority = -10 };
+        _starMaterial.SetShaderParameter("cloud_noise", _skyMaterial.GetShaderParameter("cloud_noise"));
         _stars = new MeshInstance3D
         {
             Mesh = new SphereMesh { Radius = 900f, Height = 1800f, RadialSegments = 32, Rings = 16 },
@@ -167,6 +184,15 @@ public partial class SkyController : Node
             Water.Wind = _wind;
             Water.Rain = _rain;
         }
+        // The ground soaks up rain in a couple of minutes and dries in about ten (a map opened in the rain starts wet).
+        if (!_wetStarted)
+        {
+            _wetStarted = true;
+            _groundWet = World.RainTarget > 0.05f ? Math.Min(1f, World.RainTarget * 1.4f) : 0f;
+        }
+        _groundWet = Mathf.MoveToward(_groundWet, _rain > 0.05f ? Math.Min(1f, _rain * 1.4f) : 0f, (_rain > 0.05f ? 0.01f : 0.0016f) * dt * 60f / 60f);
+        if (Bed != null)
+            Bed.Wetness = _groundWet;
         Apply();
     }
 
@@ -186,6 +212,31 @@ public partial class SkyController : Node
     }
 
     private (float Hour, float Cloud, float Rain, float Fog) _applied = (float.NaN, 0f, 0f, 0f);
+
+    /// <summary>A bell curve round <paramref name="centre"/> (hours) of the given width.</summary>
+    private static float Bump(float hour, float centre, float width)
+    {
+        float d = (hour - centre) / width;
+        return MathF.Exp(-d * d);
+    }
+
+    /// <summary>The sun's colour by its elevation: deep orange on the horizon, gold low in the sky, white at noon.</summary>
+    public static Color SunColour(float elevation)
+    {
+        var horizon = new Color(1f, 0.42f, 0.18f);
+        var golden = new Color(1f, 0.74f, 0.46f);
+        var noon = new Color(1f, 0.97f, 0.92f);
+        float e = Math.Clamp(elevation, 0f, 1f);
+        return e < 0.18f ? horizon.Lerp(golden, e / 0.18f) : golden.Lerp(noon, Math.Clamp((e - 0.18f) / 0.35f, 0f, 1f));
+    }
+
+    /// <summary>The twilight's strength by the sun's elevation (sin): 1 just after sunset, 0 at -0.18 and above 0.12.</summary>
+    public static float TwilightAt(float elevation) =>
+        Math.Clamp((elevation + 0.18f) / 0.16f, 0f, 1f) * (1f - Math.Clamp((elevation - 0.02f) / 0.1f, 0f, 1f));
+
+    /// <summary>Low mist over the water: thick after a calm dawn, thinner at dusk, gone in wind and rain (0..1).</summary>
+    public static float MistAt(float hour, float wind, float rain) =>
+        (Bump(hour, 6.5f, 1.2f) + 0.45f * Bump(hour, 19.3f, 0.9f)) * Math.Clamp(1f - wind * 1.1f, 0f, 1f) * (1f - rain * 0.5f);
 
     private void Apply()
     {
@@ -217,14 +268,23 @@ public partial class SkyController : Node
         float night = Math.Clamp(-el * 3f, 0f, 1f);
         _skyMaterial.SetShaderParameter("cloud_cover", Math.Clamp(0.22f + _cloud * 0.78f, 0f, 1f));
         _skyMaterial.SetShaderParameter("night", night);
+        // Twilight: from the sun just up (el 0.06) to about 10 degrees under the horizon.
+        float twilight = TwilightAt(el) * (1f - _cloud * 0.7f);
+        _skyMaterial.SetShaderParameter("twilight", twilight);
+        var towardSun = new Basis(Vector3.Up, Mathf.DegToRad(-30f)) * Vector3.Back;     // the sun's azimuth (its light's +Z)
+        _skyMaterial.SetShaderParameter("sun_flat", new Vector3(towardSun.X, 0f, towardSun.Z));
         // Haze: more Mie scattering in rain and mist.
         _skyMaterial.SetShaderParameter("turbidity", 4f + _cloud * 6f + _rain * 20f + FogBoost * 2000f);
 
         // Keep the sun just above the horizon at dusk so the sky shader still gets a sunset; it fades out at night.
         _sun.RotationDegrees = new Vector3(-MathF.Max(elDeg, -4f), -30f, 0f);
-        _sun.LightColor = new Color(1f, 0.5f, 0.26f).Lerp(new Color(1f, 0.95f, 0.88f), Math.Clamp(el * 2.2f, 0f, 1f));
+        _sun.LightColor = SunColour(el);
         _sun.ShadowEnabled = _cloud < 0.75f && day > 0.02f;
         _sun.Visible = el > -0.12f;
+        // For shaders that light themselves (the fishing line's glint): the sun's direction, colour and the daylight.
+        RenderingServer.GlobalShaderParameterSet("sun_dir", _sun.GlobalTransform.Basis.Z.Normalized());
+        RenderingServer.GlobalShaderParameterSet("sun_color", _sun.LightColor);
+        RenderingServer.GlobalShaderParameterSet("daylight", Math.Clamp(day * (1f - _cloud * 0.5f) + 0.15f * Core.Methods.Moon.Illumination(World?.MoonPhase ?? 0f) * (1f - day), 0f, 1f));
 
         _moon.RotationDegrees = new Vector3(elDeg, 150f, 0f);
         _moon.LightEnergy = 0.25f * (0.2f + 0.8f * Core.Methods.Moon.Illumination(World.MoonPhase)) * Math.Clamp(-el * 2.5f, 0f, 1f) * (1f - _cloud * 0.6f);
@@ -233,20 +293,38 @@ public partial class SkyController : Node
             Bed.Daylight = day * (1f - _cloud * 0.85f);
         // Valheim-like light: deep shadows, a strong sun that throws shafts through the fog, haze tinted by the time
         // of day, and moonlit nights (part of the ambient light is a cool blue instead of the near-black night sky).
-        _env.AmbientLightEnergy = Mathf.Lerp(0.75f, 0.72f, day);
-        _env.AmbientLightColor = new Color(0.36f, 0.45f, 0.66f);
+        // Golden hour: the sun low (but up) in a clear sky. Shadows grow long and soft, the shade gets bluer and a
+        // little deeper so the warm light stands out, and the rays show in the haze.
+        float golden = Math.Clamp(1f - MathF.Abs(el - 0.12f) / 0.16f, 0f, 1f) * (1f - _cloud * 0.8f);
+        float mist = MistAt(hour, _wind, _rain) * MistStrength;
+        _env.AmbientLightEnergy = Mathf.Lerp(0.75f, 0.72f, day) * (1f - 0.18f * golden);
+        _env.AmbientLightColor = new Color(0.36f, 0.45f, 0.66f).Lerp(new Color(0.3f, 0.42f, 0.7f), golden);
         _env.AmbientLightSkyContribution = Mathf.Lerp(0.35f, 1f, day);
-        _env.TonemapExposure = Mathf.Lerp(1.9f, 1.05f, day);
-        _env.FogDensity = Mathf.Lerp(0.001f, 0.004f, _cloud) + _rain * 0.006f + FogBoost;
-        _env.VolumetricFogDensity = (0.003f + _cloud * 0.004f) * 0.8f + _rain * 0.01f + FogBoost * 2f;
+        // Exposure: the eye opens up at night and a little in the low light of dusk and dawn.
+        _env.TonemapExposure = Mathf.Lerp(1.9f, 1.05f, day) + 0.12f * golden;
+        _env.FogDensity = Mathf.Lerp(0.001f, 0.004f, _cloud) + _rain * 0.006f + FogBoost + 0.0006f * mist;
+        // The mist lies low over the water: denser below MistHeight (height fog), and in the volumetric fog too.
+        _env.FogHeight = MistHeight;
+        _env.FogHeightDensity = 0.025f * mist;
+        _env.VolumetricFogDensity = (0.003f + _cloud * 0.004f) * 0.8f + _rain * 0.01f + FogBoost * 2f + 0.005f * mist;
         _sun.LightEnergy = 1.9f * day * (1f - _cloud * 0.65f);
-        // A low sun lights the haze less, or it would paint the whole sky red.
-        _sun.LightVolumetricFogEnergy = Mathf.Lerp(0.3f, 1.6f, Math.Clamp(el * 3f, 0f, 1f));
+        // A low sun lights the haze less, or it would paint the whole sky red; at the golden hour the rays come out.
+        _sun.LightVolumetricFogEnergy = Mathf.Lerp(0.3f, 1.6f, Math.Clamp(el * 3f, 0f, 1f)) + ShaftStrength * golden * (0.4f + 0.6f * mist);
+        // Long shadows of a low sun are softer; midday ones are crisp.
+        _sun.ShadowBlur = Mathf.Lerp(2.4f, 1.1f, Math.Clamp(el * 2.5f, 0f, 1f));
         _env.FogAerialPerspective = 0.55f;
-        _env.FogLightColor = hor.Lerp(new Color(0.55f, 0.66f, 0.74f), 0.4f);
+        // The haze is lit by the sky: bright by day, a glow at twilight, nearly black at night (a grey fog at night
+        // washed the far forest out and made the mountains brighter than the sky).
+        float hazeLight = Math.Clamp(day + 0.3f * twilight, 0.06f, 1f);
+        _env.FogLightColor = hor.Lerp(new Color(0.55f, 0.66f, 0.74f), 0.4f).Lerp(SunColour(el) * 0.85f, 0.2f * golden) * hazeLight;
+        _env.FogLightEnergy = hazeLight;
         _env.VolumetricFogAlbedo = new Color(0.9f, 0.88f, 0.84f).Lerp(hor, 0.35f);
+        // Moonlight: a cold blue-white, brighter under a full moon.
+        _moon.LightColor = new Color(0.58f, 0.68f, 1f);
 
-        _starMaterial.SetShaderParameter("night", Math.Clamp(-el * 3f, 0f, 1f) * (1f - _cloud));
+        // Stars come out only once the twilight has faded, and hide behind the clouds (stars.gdshader reads them).
+        _starMaterial.SetShaderParameter("night", Math.Clamp((-el - 0.08f) * 6f, 0f, 1f) * (1f - _cloud * 0.6f));
+        _starMaterial.SetShaderParameter("cloud_cover", Math.Clamp(0.22f + _cloud * 0.78f, 0f, 1f));
         int drops = _rain > 0.02f ? (int)(RainDrops * Math.Clamp(_rain, 0.05f, 1f)) : 0;
         if (drops != _rainFx.Multimesh.VisibleInstanceCount)
         {

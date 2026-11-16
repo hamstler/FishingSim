@@ -106,14 +106,14 @@ public partial class Player : CharacterBody3D
         var dir = Vector2.Zero;
         if (!Busy)
         {
-            if (Input.IsKeyPressed(Key.W)) dir.Y -= 1f;
-            if (Input.IsKeyPressed(Key.S)) dir.Y += 1f;
-            if (Input.IsKeyPressed(Key.A)) dir.X -= 1f;
-            if (Input.IsKeyPressed(Key.D)) dir.X += 1f;
+            if (Bindings.Held(Act.Forward)) dir.Y -= 1f;
+            if (Bindings.Held(Act.Back)) dir.Y += 1f;
+            if (Bindings.Held(Act.Left)) dir.X -= 1f;
+            if (Bindings.Held(Act.Right)) dir.X += 1f;
         }
         var move = (GlobalTransform.Basis * new Vector3(dir.X, 0f, dir.Y)).Normalized();
         var v = Velocity;
-        float speed = Input.IsKeyPressed(Key.Shift) ? SprintSpeed : WalkSpeed;
+        float speed = Bindings.Held(Act.Sprint) ? SprintSpeed : WalkSpeed;
         v.X = move.X * speed;
         v.Z = move.Z * speed;
         v.Y = IsOnFloor() ? 0f : v.Y - Gravity * (float)delta;

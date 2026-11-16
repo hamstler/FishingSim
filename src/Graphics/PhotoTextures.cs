@@ -54,8 +54,8 @@ public static class PhotoTextures
         foreach (var id in dir.GetDirectories())
             if (Has(id))
             {
-                TextureStore.Get($"photo_{id}_a", Version, BlockCompress.Kind.Colour, () => Decode(id, "diff")!);
-                TextureStore.Get($"photo_{id}_n", Version, BlockCompress.Kind.TwoChannel, () => Decode(id, "nor")!, normalMap: true);
+                TextureStore.Get($"photo_{id}_a", Version, BlockCompress.Kind.Colour, () => Decode(id, "diff")!).Image.Dispose();
+                TextureStore.Get($"photo_{id}_n", Version, BlockCompress.Kind.TwoChannel, () => Decode(id, "nor")!, normalMap: true).Image.Dispose();
             }
     }
 
@@ -95,6 +95,8 @@ public static class PhotoTextures
             height.Resize(size, size, Image.Interpolation.Cubic);
         var data = img.GetData();
         var h = height?.GetData();
+        img.Dispose();
+        height?.Dispose();
         for (int i = 0; i < size * size; i++)
             data[i * 4 + 3] = h != null ? h[i * 4] : (byte)((data[i * 4] * 77 + data[i * 4 + 1] * 150 + data[i * 4 + 2] * 29) >> 8);
         return Image.CreateFromData(size, size, false, Image.Format.Rgba8, data);
@@ -110,6 +112,7 @@ public static class PhotoTextures
         if (img.GetWidth() != size)
             img.Resize(size, size, Image.Interpolation.Cubic);
         var data = img.GetData();
+        img.Dispose();
         for (int i = 0; i < size * size; i++)
             data[i * 4 + 1] = (byte)(255 - data[i * 4 + 1]);
         return Image.CreateFromData(size, size, false, Image.Format.Rgba8, data);

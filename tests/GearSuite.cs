@@ -551,7 +551,7 @@ public sealed class GearSuite : ITestSuite
             await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
         }
         t.Check(splashes == 1, "the float lands with a splash sound");
-        t.Check(bells == 1, "the bell rings when the fish touches the bait");
+        t.Check(bells == 0, "a float rod's bite shows on the float: the bell (a bottom-fishing alarm) stays silent");
         t.Check(main.GetChildren().OfType<FishingSim.Audio.SoundEngine>().Any(), "the sound engine runs in the game");
         t.Check(roachAgent != null && rod.Biter == roachAgent && rod.CurrentSpecies?.SpeciesName == "Płoć" && rod.CurrentWeight == roachAgent.Weight,
             "the roach next to the float is the fish that bites (same weight too)");

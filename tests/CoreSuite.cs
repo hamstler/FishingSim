@@ -1112,6 +1112,15 @@ public sealed class CoreSuite : ITestSuite
         t.Check(mono < 0.8f && braid > 0.95f, $"at 60 m a stretchy mono loses the strike ({mono:0.00}), a braid hardly ({braid:0.00})");
         t.Check(Strike.Efficiency(10f, 0.05f, 2f) < 0.7f, "slack on the water eats the strike");
         t.Check(Strike.DragFactor(0.2f) < 0.7f && Strike.DragFactor(1.5f) == 1f, "a drag set too loose slips on the strike");
+
+        // The pre-cast check (Core/Methods/TackleCheck): the drag against the weakest link.
+        t.Check(TackleCheck.Judge(1.5f, 3f, 4f) == TackleVerdict.Good, "a drag at half the line's strength is good");
+        t.Check(TackleCheck.Judge(2.7f, 3f, 4f) == TackleVerdict.Tight, "a drag at 90 % of the line is on the edge");
+        t.Check(TackleCheck.Judge(3.5f, 3f, 4f) == TackleVerdict.TooTight, "a drag stronger than the line breaks it");
+        t.Check(TackleCheck.Judge(2.6f, 6f, 2.4f) == TackleVerdict.TooTight, "a weak rod is the weakest link");
+        t.Check(TackleCheck.Judge(0.3f, 3f, 4f) == TackleVerdict.Loose, "a very loose drag is flagged");
+        t.Check(System.MathF.Abs(TackleCheck.BreakSetting(5f, 3f, 4f) - 0.6f) < 1e-4f, "the break mark sits where the drag holds the line's strength");
+        t.Check(TackleCheck.Describe(3.5f, 3f, 4f).Contains("za mocny"), "the warning says the drag is too strong");
     }
 
     /// <summary>Bait kinds and water temperature (Core/Methods/BaitSeason).</summary>

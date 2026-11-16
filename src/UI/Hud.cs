@@ -31,6 +31,9 @@ public partial class Hud : CanvasLayer
     private HBoxContainer _toolbar = null!;
     private Label _meal = null!;
     private string _toolbarKey = "";
+    private float _toolbarShown;
+    /// <summary>The hotbar's opacity while it is not being used.</summary>
+    private const float ToolbarIdleAlpha = 0.3f;
 
     /// <summary>The angler's tools (set by Main), shown as a little bar when more than the rod is owned.</summary>
     public HandTools? Tools { get; set; }
@@ -47,7 +50,15 @@ public partial class Hud : CanvasLayer
         if (Tools == null)
             return;
         _toolbar.Visible = !_helpOpen;
-        _toolbarCheck -= (float)GetProcessDeltaTime();
+        // Like the rest of a light HUD the bar steps back while it is not used: full for a few seconds after a change
+        // (a key 1-9, a rod put on its rest), then faint, so the reel and the water under it show.
+        float dt = (float)GetProcessDeltaTime();
+        _toolbarShown -= dt;
+        float alpha = _toolbarShown > 0f ? 1f : ToolbarIdleAlpha;
+        var m = _toolbar.Modulate;
+        if (Mathf.Abs(m.A - alpha) > 0.005f)
+            _toolbar.Modulate = new Color(1f, 1f, 1f, Mathf.MoveToward(m.A, alpha, dt * 2.5f));
+        _toolbarCheck -= dt;
         if (_toolbarCheck > 0f)
             return;
         _toolbarCheck = 0.15f;
@@ -79,6 +90,7 @@ public partial class Hud : CanvasLayer
         if (key == _toolbarKey)
             return;
         _toolbarKey = key;
+        _toolbarShown = 4f;
         foreach (var c in _toolbar.GetChildren())
             c.QueueFree();
         for (int i = 0; i < 9; i++)
@@ -128,33 +140,19 @@ public partial class Hud : CanvasLayer
     };
 
     private Label _status = null!, _purse = null!, _tackle = null!, _time = null!, _banner = null!, _prompt = null!, _tournament = null!;
-    private Label _help = null!, _hint = null!, _dev = null!, _drag = null!;
-    private ProgressBar _power = null!;
+    private Label _dev = null!;
+    private QuickHelp _quickHelp = null!;
+    private DragRing _dragRing = null!;
     private TensionGauge _gauge = null!;
-    private bool _dragBesideGauge = true;
+    private Color _statusColour = Ink;
 
     private const float GaugeHalfWidth = 240f, GaugeTop = -78f, GaugeHeight = 14f;
 
     /// <summary>The gap between the status line and the bar, reused between the bar and the drag reading.</summary>
     private const float GaugeGap = 8f;
 
-    private void PlaceDrag(bool besideGauge)
-    {
-        _dragBesideGauge = besideGauge;
-        if (besideGauge)
-        {
-            _drag.HorizontalAlignment = HorizontalAlignment.Left;
-            float mid = GaugeTop + GaugeHeight / 2f;
-            Anchor(_drag, 0.5f, 1f, GaugeHalfWidth + GaugeGap, mid - 13f, GaugeHalfWidth + GaugeGap + 220f, mid + 13f);
-        }
-        else
-        {
-            _drag.HorizontalAlignment = HorizontalAlignment.Right;
-            Anchor(_drag, 1f, 1f, -300, -38, -16, -12);
-        }
-    }
     private bool _devOpen, _helpOpen;
-    private float _purseFlash, _tackleFlash, _hintTime = 10f;
+    private float _purseFlash, _tackleFlash;
     private string _lastPurse = "", _lastTackle = "";
 
     private Minimap? _minimap;
@@ -235,8 +233,8 @@ public partial class Hud : CanvasLayer
         Anchor(_prompt, 0.5f, 1f, -400, -170, 400, -140);
 
         // Fishing readout: state, then a thin tension bar with drag and line below it.
-        _status = Text(18, Ink, HorizontalAlignment.Center);
-        Anchor(_status, 0.5f, 1f, -300, -112, 300, -86);
+        _status = Text(17, Ink, HorizontalAlignment.Center);
+        Anchor(_status, 0.5f, 1f, -720, -106, 720, -82);
         // The fight bar sits right under the status line ("Hol · 43 m"); during a fight the drag reading moves to
         // its right, the same gap away.
         _gauge = new TensionGauge { Rod = _rod };
@@ -246,36 +244,20 @@ public partial class Hud : CanvasLayer
         _catchPanel = new CatchPanel();
         _catchPanel.Setup(_rod);
         AddChild(_catchPanel);
-        _power = new ProgressBar { ShowPercentage = false, Theme = UITheme.Make() };
-        Anchor(_power, 0.5f, 1f, -160, -80, 160, -72);
-        AddChild(_power);
-
-        // Drag (mouse wheel) is shown in the bottom-right corner, and next to the fight bar while fighting.
-        _drag = Text(17, Ink, HorizontalAlignment.Right);
-        PlaceDrag(false);
+        // The drag (mouse wheel): a ring in the middle of the screen while it is turned.
+        _dragRing = new DragRing { Rod = _rod };
+        Anchor(_dragRing, 0.5f, 0.5f, -80, -80, 80, 80);
+        AddChild(_dragRing);
         _purse = Text(15, new Color(Ink, 0.9f), HorizontalAlignment.Right);
         Anchor(_purse, 1f, 1f, -560, -92, -16, -40);
         _purse.VerticalAlignment = VerticalAlignment.Bottom;
         _tackle = Text(14, new Color(Ink, 0.85f));
         Anchor(_tackle, 0f, 1f, 16, -100, 520, -14);
 
-        _hint = Text(13, new Color(Ink, 0.5f));
-        _hint.Text = "H - sterowanie";
-        Anchor(_hint, 0f, 1f, 16, -30, 300, -10);
-        _help = Text(14, Ink);
-        Anchor(_help, 0f, 0.5f, 16, -120, 720, 120);
-        _help.Text = "WASD - ruch, Shift - bieg, mysz - rozglądanie\n"
-            + "LPM przytrzymaj i puść - rzut, potem LPM - zwijanie linki\n"
-            + "PPM - podniesienie wędki: zacięcie, pompowanie, wyciągnięcie ryby\n"
-            + "Spacja - kasarek (trzeba go kupić), kółko - hamulec\n"
-            + "Spinning (przynęta sztuczna): LPM prowadzi (Shift szybciej), puszczona opada, PPM podszarpnięcie / zaczep\n"
-            + "Spławik: [ i ] (lub Ctrl + kółko) ustawiają grunt, czyli głębokość przynęty pod spławikiem; G - garść zanęty z ręki\n"
-            + "K - naostrz haczyk osełką (gdy zestaw jest wyjęty z wody)\n"
-            + "Grunt (wędka gruntowa): koszyczek nęci miejsce, brania na szczytówce; Z - wędka na podpórkę / podnieś\n"
-            + "1-3 - wędki (do 3 w wodzie naraz, druga i trzecia na podpórkach), 4-6 - łopata, siatka, podrywka; ten sam klawisz chowa do plecaka\n"
-            + "Zmiana wędziska, przynęty itd.: kram wędkarski (dla wędki w ręku), Tab - stan\n"
-            + "E - wejście | I ekwipunek | M mapa | J dziennik | T turnieje\n"
-            + "Esc - menu | F1 - dev | F11 - wydajność (FPS)";
+        // F1 (Bindings: QuickHelp): the quick instructions with the keys as they are bound now.
+        _quickHelp = new QuickHelp { Visible = false };
+        Anchor(_quickHelp, 0f, 0.5f, 16, -230, 820, 230);
+        AddChild(_quickHelp);
 
         _dev = Text(13, Gold);
         Anchor(_dev, 1f, 0f, -460, Minimap.WidgetHeight + 30f, -16, Minimap.WidgetHeight + 390f);
@@ -285,20 +267,25 @@ public partial class Hud : CanvasLayer
         _perf = new PerfOverlay();
         Anchor(_perf, 0f, 0f, 12f, 12f, 12f, 12f);
         AddChild(_perf);
+
+        // The float preview window (graphics settings, "Podgląd spławika"), right side above the drag readout.
+        var floatCam = new FloatCam();
+        Anchor(floatCam, 1f, 1f, -364f, -400f, -16f, -166f);
+        AddChild(floatCam);
     }
 
     public override void _UnhandledInput(InputEvent @event)
     {
         if (@event is InputEventKey { Pressed: true, Echo: false } key)
         {
-            if (key.Keycode == Key.F1)
+            if (key.Keycode == Bindings.Of(Act.DevConsole))
                 _devOpen = !_devOpen;
-            else if (key.Keycode == Key.F11)
+            else if (key.Keycode == Bindings.Of(Act.Performance))
                 _perf.Toggle();
-            else if (key.Keycode == Key.H)
+            else if (key.Keycode == Bindings.Of(Act.QuickHelp))
             {
                 _helpOpen = !_helpOpen;
-                _hintTime = 0f;
+                _quickHelp.Visible = _helpOpen;
             }
         }
     }
@@ -318,33 +305,49 @@ public partial class Hud : CanvasLayer
             return;
         float dt = (float)delta;
         var rod = _rod;
-        bool details = Input.IsKeyPressed(Key.Tab);
+        bool details = Bindings.Held(Act.Details);
 
-        // Fishing readout only while a line is out (or while casting).
-        bool fishing = rod.State != RodState.Idle;
+        // Over the load bar: before the cast, whether the drag suits the tackle; with the line out, only how far the
+        // end tackle is (and in the fight the moments that need an answer). Tab shows the full readout.
         bool fighting = rod.State is RodState.Fight or RodState.Close;
-        string state = rod.StateName;
-        if (rod.State is RodState.Waiting or RodState.Nibble or RodState.Bite)
-            state += MethodLine(rod);
-        else if (rod.State == RodState.Idle)
-            state += $"  ·  {rod.Method.Title()}" + (rod.Method == FishingMethod.Float ? $", grunt {rod.FloatDepth:0.0} m ([ ])" : "");
-        if (rod.State == RodState.Waiting && rod.World.TimeScale > 1f)
-            state += "  ·  odpoczynek na zydlu";
-        if (rod.State == RodState.Fight)
-            state += $"  ·  {rod.LineOut:0} m{(rod.Lifting ? "  ·  pompowanie" : "")}{(rod.FightSlack ? "  ·  LUZ! zwijaj" : "")}{(rod.FishInWeeds ? rod.FishInWood ? "  ·  W GAŁĘZIACH! podnieś wędkę (PPM)" : "  ·  W ZIELSKU! podnieś wędkę (PPM)" : "")}{(rod.FishJumping ? "  ·  SKOK! opuść wędkę" : "")}";
-        if (rod.State == RodState.Close && rod.HasNet)
-            state += ", Spacja - kasarek";
+        bool inHand = !rod.Holstered && rod.InHands && !rod.OnRest && !_catchPanel.Visible && !_helpOpen;
+        string state;
+        var colour = Ink;
+        if (details)
+            state = FullState(rod);
+        else if (rod.State is RodState.Idle or RodState.Charging)
+        {
+            float dragKg = rod.DragSetting * rod.DragMax;
+            state = TackleCheck.Describe(dragKg, rod.LineStrength, rod.RodMaxLoad);
+            colour = VerdictColour(TackleCheck.Judge(dragKg, rod.LineStrength, rod.RodMaxLoad));
+            if (rod.Method == FishingMethod.Float)
+                state = $"grunt {rod.FloatDepth:0.0} m  ·  " + state;
+        }
+        else
+        {
+            state = rod.LineOut > 0.5f ? $"{rod.LineOut:0} m" : "";
+            if (rod.State == RodState.Fight)
+            {
+                // Slack and jumps are read from the line and the water, not from words on the screen.
+                string alert = rod.FishInWeeds ? rod.FishInWood ? "  ·  W GAŁĘZIACH!" : "  ·  W ZIELSKU!" : "";
+                if (alert.Length > 0)
+                {
+                    state += alert;
+                    colour = new Color(1f, 0.55f, 0.4f);
+                }
+            }
+        }
         SetText(_status, state);
-        Fade(_status, fishing || details, dt);
-        _gauge.Visible = fighting;
-        if (fighting != _dragBesideGauge)
-            PlaceDrag(fighting);
-        _power.Visible = rod.State == RodState.Charging;
-        _power.Value = rod.CastPower * 100f;
-
-        SetText(_drag, $"Hamulec {Mathf.RoundToInt(rod.DragSetting * 100f)}%");
-        // The drag belongs to the rod: not shown with a tool in hand.
-        _drag.Visible = !rod.Holstered;
+        if (colour != _statusColour)
+        {
+            _statusColour = colour;
+            _status.AddThemeColorOverride("font_color", colour);
+        }
+        Fade(_status, (inHand || details) && state.Length > 0, dt);
+        _gauge.Visible = inHand || (fighting && !_catchPanel.Visible);
+        _gauge.Power = rod.State == RodState.Charging ? rod.CastPower : -1f;
+        _dragRing.Rod = rod;
+        _gauge.Rod = rod;
         SetText(_banner, rod.BannerTime > 0f ? rod.BannerText : _banner.Text);
         // While the catch panel is open it says it all.
         Fade(_banner, rod.BannerTime > 0f && !_catchPanel.Visible, dt);
@@ -411,14 +414,33 @@ public partial class Hud : CanvasLayer
         }
         Fade(_tournament, session != null, dt);
 
-        _hintTime -= dt;
-        Fade(_hint, _hintTime > 0f && !_helpOpen, dt);
-        Fade(_help, _helpOpen, dt);
 
         _dev.Visible = _devOpen;
         if (_devOpen)
             SetText(_dev, DevText());
     }
+
+    /// <summary>The full fishing readout (held Tab): the state, the method's line, the fight's warnings.</summary>
+    private static string FullState(FishingRod rod)
+    {
+        string state = rod.StateName;
+        if (rod.State is RodState.Waiting or RodState.Nibble or RodState.Bite)
+            state += MethodLine(rod);
+        else if (rod.State == RodState.Idle)
+            state += $"  ·  {rod.Method.Title()}" + (rod.Method == FishingMethod.Float ? $", grunt {rod.FloatDepth:0.0} m" : "");
+        if (rod.State == RodState.Waiting && rod.World.TimeScale > 1f)
+            state += "  ·  odpoczynek na zydlu";
+        if (rod.State == RodState.Fight)
+            state += $"  ·  {rod.LineOut:0} m{(rod.Lifting ? "  ·  pompowanie" : "")}{(rod.FightSlack ? "  ·  LUZ! zwijaj" : "")}{(rod.FishInWeeds ? rod.FishInWood ? "  ·  W GAŁĘZIACH! podnieś wędkę (PPM)" : "  ·  W ZIELSKU! podnieś wędkę (PPM)" : "")}{(rod.FishJumping ? "  ·  SKOK! opuść wędkę" : "")}";
+        return state + $"  ·  hamulec {Mathf.RoundToInt(rod.DragSetting * 100f)}%";
+    }
+
+    private static Color VerdictColour(TackleVerdict v) => v switch
+    {
+        TackleVerdict.TooTight => new Color(1f, 0.45f, 0.38f),
+        TackleVerdict.Tight or TackleVerdict.Loose => new Color(1f, 0.85f, 0.45f),
+        _ => new Color(0.62f, 0.92f, 0.6f),
+    };
 
     /// <summary>What the line in the water is doing: the float's depth; the lure, how deep it runs over how deep a
     /// bottom and how well it is led; the feeder sinking or on the bottom, the baited spot, the rod on its rest.</summary>
@@ -463,7 +485,7 @@ public partial class Hud : CanvasLayer
         var weights = new List<string>();
         foreach (var sp in rod.Species)
             weights.Add($"{sp.SpeciesName} {rod.BiteWeight(sp):0.00}");
-        return "KONSOLA DEV (F1)\n"
+        return $"KONSOLA DEV ({Bindings.Name(Act.DevConsole)})\n"
             + $"F2 natychmiastowe branie: {(rod.DevInstantBite ? "TAK" : "nie")}\n"
             + $"F3 nieśmiertelna linka: {(rod.DevUnbreakable ? "TAK" : "nie")}\n"
             + $"F4 gatunek: {forced}\nF5 reset rzutu | F6 przynęty\nF7 +3 godz. | F8 pogoda\nF9 reset postępu | F10 +1000 gr\n"

@@ -229,8 +229,11 @@ public partial class LakeBed : Node3D
         if (d < -45f)
             return 0f;
         float t = Smooth(-40f, 170f, d);
-        float ridge = 1f - MathF.Abs(_noise.GetNoise2D(x * 0.55f + 77f, z * 0.55f - 31f));
-        float peaks = 0.5f + 0.45f * ridge * ridge + 0.25f * _noise.GetNoise2D(x * 1.7f - 12f, z * 1.7f + 40f);
+        // Rounded ridges (a softened |noise| so the crests are smooth domes, not knife edges) and gentle swells along
+        // them: seen against the sky the rim reads as old wooded mountains, not a saw blade.
+        float n = _noise.GetNoise2D(x * 0.45f + 77f, z * 0.45f - 31f);
+        float ridge = 1f - MathF.Sqrt(n * n + 0.03f);
+        float peaks = 0.5f + 0.45f * ridge * ridge + 0.12f * _noise.GetNoise2D(x * 0.9f - 12f, z * 0.9f + 40f);
         // A steeper bank right at the edge: the ground rises in front of the angler instead of an invisible wall.
         float bank = 5f * Smooth(-14f, 12f, d);
         return loc.RimHeight * MathF.Pow(t, 1.6f) * peaks + bank;
@@ -514,7 +517,10 @@ public partial class LakeBed : Node3D
     /// <summary>0..1 sun light reaching the ground (caustics fade at night); set by the sky.</summary>
     public float Daylight { get; set; } = 1f;
 
-    private float _sentDaylight = -1f;
+    private float _sentDaylight = -1f, _sentWetness = -1f;
+
+    /// <summary>0..1: how wet the ground is from rain (set by the sky; it dries slowly).</summary>
+    public float Wetness { get; set; }
 
     /// <summary>The terrain's daylight follows the sky (only when it changed: the caustics' clock is the global
     /// water_time).</summary>
@@ -525,6 +531,11 @@ public partial class LakeBed : Node3D
         {
             _sentDaylight = Daylight;
             _terrainMaterial.SetShaderParameter("daylight", Daylight);
+        }
+        if (_terrainMaterial != null && MathF.Abs(Wetness - _sentWetness) > 0.01f)
+        {
+            _sentWetness = Wetness;
+            _terrainMaterial.SetShaderParameter("wetness", Wetness);
         }
     }
 

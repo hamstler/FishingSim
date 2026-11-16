@@ -55,7 +55,7 @@ public partial class InteractionManager : Node
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (@event is InputEventKey { Pressed: true, Echo: false, Keycode: Key.E } && Current != null)
+        if (Bindings.Is(@event, Act.Interact) && Current != null)
         {
             Activated?.Invoke(Current);
             GetViewport().SetInputAsHandled();

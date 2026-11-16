@@ -85,7 +85,7 @@ public partial class FishingRod : Node3D
     private float _lineOutOutsideFight;
     private FightModel? _fight;
     private ImmediateMesh _lineMesh = null!;
-    private StandardMaterial3D _lineMaterial = null!;
+    private ShaderMaterial _lineMaterial = null!;
     private Node3D _fishNode = null!;
     private FishModel? _fishModel;
     private FishModel? _heldFish;
@@ -97,6 +97,7 @@ public partial class FishingRod : Node3D
     private bool _rigSettled;
     private float _rigDepth;
     private bool _feederLoaded;
+    private float _bailOpen;
     private float _bitePull;          // the quiver tip pulled round by a bite on the bottom (0..1)
     private float _lastGroundbaitHour = float.NaN;
     private float _lureAppeal = 1f;
@@ -489,11 +490,8 @@ public partial class FishingRod : Node3D
     public override void _Ready()
     {
         _lineMesh = new ImmediateMesh();
-        _lineMaterial = new StandardMaterial3D
-        {
-            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true,
-            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-        };
+        // shaders/fishing_line.gdshader: the line's colour dimmed at night, the sun glinting along it.
+        _lineMaterial = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/fishing_line.gdshader") };
         AddChild(new MeshInstance3D
         {
             Mesh = _lineMesh,
@@ -572,6 +570,9 @@ public partial class FishingRod : Node3D
         _pluck = MathF.Max(0f, _pluck - dt * 5f);
         // The bite indicator hanging on the line between the reel and the first guide (bottom fishing): plucks
         // twitch it, a run pulls it up to the blank.
+        // The bail opens for the cast and snaps shut when the line lands.
+        _bailOpen = Mathf.MoveToward(_bailOpen, State is RodState.Charging or RodState.Flying ? 1f : 0f, dt * 7f);
+        _rig.SetBail(_bailOpen);
         _rig.SetIndicator(_castMethod == FishingMethod.Bottom && State is RodState.Waiting or RodState.Nibble or RodState.Bite,
             Math.Clamp(_bitePull + 0.35f * _pluck, 0f, 1f));
         float load = State is RodState.Fight or RodState.Close ? Tension
@@ -583,7 +584,8 @@ public partial class FishingRod : Node3D
                     + (_lure?.Snagged == true ? (Reeling ? 0.6f : 0.25f) * EffectiveLimit : 0f),
                 // The line to the feeder is tight; a bite pulls the quiver tip round.
                 FishingMethod.Bottom => (_rigSettled ? 0.22f : 0.1f) + _bitePull * 0.9f,
-                _ => 0.12f + (_bobber.ExtraForce > 0f ? 0.35f : 0f),
+                // Float: a slack line to the float; the bite shows on the float, never on the tip.
+                _ => 0.1f,
             };
         Vector3 target = lineOut ? _bobber.GlobalPosition : _rig.GlobalPosition + Vector3.Down * 10f;
         var straightTip = new Vector3(0f, RodRig.BlankStart + _bendModel.Length, 0f);
@@ -820,19 +822,19 @@ public partial class FishingRod : Node3D
     {
         switch (key.Keycode)
         {
-            case Key.Space:
+            case var k when k == Bindings.Of(Act.LandingNet):
                 TryNet();
                 break;
-            case Key.Bracketright:
+            case var k when k == Bindings.Of(Act.DepthUp):
                 ChangeFloatDepth(key.ShiftPressed ? 0.5f : 0.1f);
                 break;
-            case Key.Bracketleft:
+            case var k when k == Bindings.Of(Act.DepthDown):
                 ChangeFloatDepth(key.ShiftPressed ? -0.5f : -0.1f);
                 break;
-            case Key.G:
+            case var k when k == Bindings.Of(Act.LooseFeed):
                 LooseFeed();
                 break;
-            case Key.Z:
+            case var k when k == Bindings.Of(Act.RodRest):
                 if (OnRest)
                 {
                     if (NearRest)
@@ -843,10 +845,10 @@ public partial class FishingRod : Node3D
                 else
                     PutOnRest();
                 break;
-            case Key.R when State == RodState.Landed && AwaitingDecision:
+            case var k when k == Bindings.Of(Act.Release) && State == RodState.Landed && AwaitingDecision:
                 ReleaseCatch();
                 break;
-            case Key.E when State == RodState.Landed && AwaitingDecision:
+            case var k when k == Bindings.Of(Act.Interact) && State == RodState.Landed && AwaitingDecision:
                 KeepCatch();
                 break;
             case Key.F2:
@@ -885,10 +887,10 @@ public partial class FishingRod : Node3D
                 Profile.Money += 1000;
                 Profile.NotifyChanged();
                 break;
-            case Key.K:
+            case var k when k == Bindings.Of(Act.Sharpen):
                 SharpenHook();
                 break;
-            case Key.L when State == RodState.Idle:
+            case var k when k == Bindings.Of(Act.NextFishery) && State == RodState.Idle:
                 if (Lake.CycleLocation(Profile.Level))
                 {
                     ShowBanner("Łowisko: " + Lake.Location.DisplayName);
@@ -913,7 +915,7 @@ public partial class FishingRod : Node3D
         // A rod on the rest is not in the hands: nothing is reeled or lifted.
         Reeling = !OnRest && (ReelOverride || (captured && Input.IsMouseButtonPressed(MouseButton.Left)));
         Lifting = !OnRest && (LiftOverride || (captured && Input.IsMouseButtonPressed(MouseButton.Right)));
-        FastReel = FastReelOverride || (captured && Input.IsKeyPressed(Key.Shift));
+        FastReel = FastReelOverride || (captured && Bindings.Held(Act.Sprint));
         // The groundbait on the bottom is eaten up as the game's hours pass.
         float hour = World.Hour;
         if (!float.IsNaN(_lastGroundbaitHour))
@@ -1355,7 +1357,7 @@ public partial class FishingRod : Node3D
             _ => _rng.Range(1f, 2.2f),
         };
         // The bell on the rod rest rings when a fish touches the bait.
-        if (Gear?.Has(AccessoryKind.RodPod) == true && _castMethod != FishingMethod.Spinning)
+        if (Gear?.Has(AccessoryKind.RodPod) == true && _castMethod == FishingMethod.Bottom)
         {
             SoundCue?.Invoke(Core.Audio.OneShot.Bell, 1f);
             (_rest as RodRest)?.Ring();
@@ -1412,7 +1414,9 @@ public partial class FishingRod : Node3D
                 SoundCue?.Invoke(Core.Audio.OneShot.Bell, 1f);
                 (_rest as RodRest)?.Ring();
             }
-            Twitch(_castMethod == FishingMethod.Spinning ? 1.8f : 1.2f);
+            // A float rod shows the bite on the float alone: its tip lies still with a slack line to the float.
+            if (_castMethod != FishingMethod.Float)
+                Twitch(_castMethod == FishingMethod.Spinning ? 1.8f : 1.2f);
             float depth = CurrentDepth();
             _windowFactor = WaterTemperature.WindowFactor(WaterTemperature.AtDepth(WaterTemp, depth * (BaitLayerAt(depth) ?? 1f)));
             SetState(RodState.Bite);
@@ -1431,24 +1435,20 @@ public partial class FishingRod : Node3D
             case BiteStyle.Pluck:
                 _pulseTimer = _rng.Range(0.12f, 0.3f);
                 _bobber.ApplyCentralImpulse(Vector3.Down * _bobber.Mass * 0.6f);
-                Twitch(0.3f);
                 break;
             case BiteStyle.Lift:
                 _pulseTimer = _rng.Range(0.5f, 0.9f);
                 _bobber.ExtraForce = -0.45f;
                 _bobber.Tilt = MathF.Min(_bobber.Tilt + 0.25f, 0.6f);
-                Twitch(0.3f);
                 break;
             case BiteStyle.Run:
                 _pulseTimer = _rng.Range(0.4f, 0.8f);
                 _bobber.DriveVelocity = away.Rotated(Vector3.Up, _rng.Range(-0.8f, 0.8f)) * 0.35f;
                 _bobber.ApplyCentralImpulse(Vector3.Down * _bobber.Mass * 0.5f);
-                Twitch(0.5f);
                 break;
             default:
                 _pulseTimer = _rng.Range(0.3f, 0.7f);
                 _bobber.ApplyCentralImpulse(Vector3.Down * _bobber.Mass * 1.2f);
-                Twitch(0.6f);
                 break;
         }
     }
@@ -2403,6 +2403,8 @@ public partial class FishingRod : Node3D
     /// facing the camera, about a pixel wide and a little wider for thicker lines, in the line's colour (a multicoloured
     /// braid in metre bands), reddening as the tension nears the breaking point.
     /// </summary>
+    private Vector3[] _fightLine = System.Array.Empty<Vector3>();
+
     private void UpdateLine(float dt)
     {
         _lineMesh.ClearSurfaces();
@@ -2415,7 +2417,7 @@ public partial class FishingRod : Node3D
         var b = _bobber.GlobalPosition;
         float ratio = Math.Clamp(Tension / EffectiveLimit, 0f, 1f);
         if (State is RodState.Fight or RodState.Close)
-            _lineLength = a.DistanceTo(b) * (1f + 0.012f * (1f - ratio));      // a fish keeps the line tight
+            _lineLength = a.DistanceTo(b) * (1f + 0.004f * (1f - ratio));      // a fish keeps the line tight
         if (!_ropeLive)
         {
             _rope.Reset(a, b);
@@ -2424,6 +2426,26 @@ public partial class FishingRod : Node3D
         _rope.Length = MathF.Max(_lineLength, 0.05f);
         _rope.Wind = WindVelocity;
         _rope.Step(dt, a, b);
+        var pts = _rope.Positions;
+        if (State is RodState.Fight or RodState.Close)
+        {
+            // A hooked fish keeps the line taut from the tip to its mouth, whichever way it runs: the rope's
+            // points (which lag behind a fast run) are pulled onto the straight line, with only a shallow sag
+            // under gravity while the tension is low.
+            int n = pts.Length;
+            if (_fightLine.Length != n)
+                _fightLine = new Vector3[n];
+            float dist = a.DistanceTo(b);
+            float sag = dist * 0.008f * (1f - ratio) * (1f - ratio);
+            float hold = 0.92f + 0.08f * ratio;
+            for (int i = 0; i < n; i++)
+            {
+                float t = i / (float)(n - 1);
+                var straight = a.Lerp(b, t) + Vector3.Down * (sag * 4f * t * (1f - t));
+                _fightLine[i] = pts[i].Lerp(straight, hold);
+            }
+            pts = _fightLine;
+        }
 
         var line = Loadout.Line;
         bool multi = line.ItemId.Contains("wielokolorowa");
@@ -2431,7 +2453,6 @@ public partial class FishingRod : Node3D
         float d = line.Diameter;
         // The ribbon faces whichever camera draws the frame.
         var eye = (GetViewport()?.GetCamera3D() ?? _camera).GlobalPosition;
-        var pts = _rope.Positions;
         _lineMesh.SurfaceBegin(Mesh.PrimitiveType.TriangleStrip, _lineMaterial);
         float along = 0f;
         for (int i = 0; i < pts.Length; i++)
@@ -2448,9 +2469,13 @@ public partial class FishingRod : Node3D
             {
                 0 => new Color(0.9f, 0.25f, 0.2f), 1 => new Color(0.95f, 0.85f, 0.2f), 2 => new Color(0.25f, 0.5f, 0.9f), _ => new Color(0.3f, 0.75f, 0.3f),
             } : colour;
+            // The normal carries the line's direction for the sun's glint (fishing_line.gdshader).
+            var dirN = tangent.Normalized();
             _lineMesh.SurfaceSetColor(c);
+            _lineMesh.SurfaceSetNormal(dirN);
             _lineMesh.SurfaceAddVertex(p - side * half);
             _lineMesh.SurfaceSetColor(c);
+            _lineMesh.SurfaceSetNormal(dirN);
             _lineMesh.SurfaceAddVertex(p + side * half);
             if (i < pts.Length - 1)
                 along += (pts[i + 1] - p).Length();

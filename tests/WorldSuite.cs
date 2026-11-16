@@ -175,6 +175,12 @@ public sealed class WorldSuite : ITestSuite
         t.Check(rolls.Count == 3, "random weather rolls reach every kind");
         world.Free();
 
+        t.Section("light and mist");
+        var dawnSun = SkyController.SunColour(0.03f);
+        var noonSun = SkyController.SunColour(0.9f);
+        t.Check(dawnSun.G / dawnSun.R < 0.6f && noonSun.G / noonSun.R > 0.9f, "the sun is deep orange on the horizon and white at noon");
+        t.Check(SkyController.MistAt(6.5f, 0.1f, 0f) > 0.8f && SkyController.MistAt(13f, 0.1f, 0f) < 0.05f, "mist lies over the water at dawn, not at noon");
+        t.Check(SkyController.MistAt(6.5f, 0.9f, 0f) < 0.05f, "wind blows the mist away");
         t.Section("waves");
         var water = new Water { Wind = 0.1f };
         float calm = water.Amplitude;
@@ -183,6 +189,21 @@ public sealed class WorldSuite : ITestSuite
         t.Check(stormy > calm * 3f && stormy <= 0.12f, $"wind raises the waves ({calm:0.000} m -> {stormy:0.000} m)");
         float peak = Enumerable.Range(0, 400).Max(i => MathF.Abs(water.HeightAt(i * 0.7f, i * 0.3f)));
         t.Check(peak <= stormy + 1e-5f, "wave height never exceeds the amplitude");
+        // Gerstner waves: the water swings round in orbits, so crests are narrow and troughs wide: fewer points of the
+        // lake stand above the mean level than below it (a sine would split them evenly).
+        var heights = new System.Collections.Generic.List<float>();
+        for (int i = 0; i < 60; i++)
+            for (int j = 0; j < 60; j++)
+                heights.Add(water.HeightAt(i * 0.37f, j * 0.41f));
+        float above = heights.Count(h => h > 0f) / (float)heights.Count;
+        water.Choppiness = 0f;
+        float aboveSine = Enumerable.Range(0, 3600).Count(k => water.HeightAt(k / 60 * 0.37f, k % 60 * 0.41f) > 0f) / 3600f;
+        t.Check(above < aboveSine - 0.005f, $"Gerstner crests are sharper than a sine's ({above:P0} of the surface above the mean, a sine {aboveSine:P0})");
+        water.Choppiness = 1.4f;
+        water.WindDirection = new Vector2(0f, 1f);
+        float turned = water.HeightAt(3f, 5f);
+        water.WindDirection = new Vector2(0.8f, 0.6f);
+        t.Check(MathF.Abs(turned - water.HeightAt(3f, 5f)) > 1e-4f, "the waves follow the wind's direction");
         water.Free();
         return Task.CompletedTask;
     }

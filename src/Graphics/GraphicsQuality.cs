@@ -16,6 +16,9 @@ public enum ViewDistance { Short, Medium, Long, Extreme }
 public static class GraphicsQuality
 {
     private const string ConfigPath = "user://graphics.cfg";
+
+    /// <summary>Bump when the presets change: older saved effect settings then follow the new preset.</summary>
+    private const int SettingsVersion = 3;
     private static bool _loaded;
     private static QualityLevel _level = QualityLevel.High;
     private static ViewDistance _view = ViewDistance.Long;
@@ -26,6 +29,103 @@ public static class GraphicsQuality
 
     public static event Action? Changed;
 
+    // ------------------------------------------------------------------ the individual settings
+    /// <summary>
+    /// One setting of the graphics screen: its name, a hint, the names of its steps and the step in use. A quality
+    /// preset sets them all; changing one afterwards makes the preset "Własne" (custom).
+    /// </summary>
+    public sealed class Setting
+    {
+        public readonly string Key, Name, Hint;
+        public readonly string[] Steps;
+        public readonly int[] Preset;          // the step for Low, Medium, High, Ultra
+        public readonly bool Display;          // a window/display setting (not part of the presets)
+        public int Value;
+
+        public Setting(string key, string name, string hint, string[] steps, int[] preset, bool display = false)
+        {
+            Key = key; Name = name; Hint = hint; Steps = steps; Preset = preset; Display = display;
+            Value = preset[(int)QualityLevel.High];
+        }
+    }
+
+    public static readonly Setting Textures = new("textures", "Tekstury", "Rozdzielczość tekstur świata (4K zajmuje 4x więcej pamięci niż 2K). Pełna zmiana po ponownym wczytaniu mapy.",
+        new[] { "1K (niska)", "2K (wysoka)", "4K (ultra)" }, new[] { 0, 1, 2, 2 });
+    public static readonly Setting Shadows = new("shadows", "Cienie", "Zasięg i ostrość cieni od słońca.",
+        new[] { "Wyłączone", "Niskie", "Średnie", "Wysokie", "Ultra" }, new[] { 1, 2, 3, 4 });
+    // No MSAA: in Godot 4.3 it leaves the depth texture the water reads empty (no refraction, no bottom, no shore).
+    public static readonly Setting AntiAliasing = new("aa", "Wygładzanie krawędzi", "TAA najlepiej wygładza trawę, liście i linkę; FXAA jest najtańsze.",
+        new[] { "Wyłączone", "FXAA", "TAA" }, new[] { 1, 1, 2, 2 });
+    public static readonly Setting Occlusion = new("ssao", "Cieniowanie otoczenia (SSAO)", "Miękkie cienie w zakamarkach.",
+        new[] { "Wyłączone", "Włączone" }, new[] { 0, 1, 1, 1 });
+    public static readonly Setting IndirectLight = new("ssil", "Światło odbite (SSIL)", "Kolorowe odbicia światła od otoczenia. Kosztowne.",
+        new[] { "Wyłączone", "Włączone" }, new[] { 0, 0, 0, 1 });
+    public static readonly Setting Reflections = new("reflections", "Odbicia w wodzie", "Odbicia brzegu i nieba w wodzie (SSR).",
+        new[] { "Tylko niebo", "Niskie", "Średnie", "Wysokie" }, new[] { 0, 1, 2, 3 });
+    public static readonly Setting Fog = new("fog", "Mgła wolumetryczna", "Mgła z promieniami słońca.",
+        new[] { "Wyłączona", "Bliska", "Daleka" }, new[] { 0, 1, 2, 2 });
+    public static readonly Setting Glow = new("glow", "Poświata (bloom)", "Blask jasnych miejsc: słońca na wodzie, latarni.",
+        new[] { "Wyłączona", "Włączona" }, new[] { 0, 1, 1, 1 });
+    public static readonly Setting Plants = new("plants", "Trawa i rośliny", "Gęstość i zasięg trawy, kwiatów i trzcin.",
+        new[] { "Niska", "Średnia", "Wysoka", "Ultra" }, new[] { 0, 1, 2, 3 });
+    public static readonly Setting WindowMode = new("window", "Tryb okna", "",
+        new[] { "Okno", "Okno zmaksymalizowane", "Pełny ekran", "Pełny ekran (wyłączny)" }, new[] { 1, 1, 1, 1 }, display: true);
+    public static readonly Setting VSync = new("vsync", "Synchronizacja pionowa", "Bez rozrywania obrazu; ogranicza FPS do odświeżania monitora.",
+        new[] { "Wyłączona", "Włączona", "Adaptacyjna" }, new[] { 1, 1, 1, 1 }, display: true);
+    public static readonly int[] FpsSteps = { 0, 30, 60, 75, 90, 120, 144, 165, 240 };
+    public static readonly Setting FpsLimit = new("fps", "Limit klatek", "Górna granica FPS (mniej ciepła i hałasu karty).",
+        Array.ConvertAll(FpsSteps, f => f == 0 ? "Bez limitu" : $"{f} FPS"), new[] { 0, 0, 0, 0 }, display: true);
+
+    public static readonly float[] UiScales = { 1f, 1.25f, 1.5f, 1.75f, 2f };
+    public static readonly Setting UiScale = new("ui_scale", "Skala interfejsu", "Wielkość napisów i paneli przy 1920x1080 (obraz 3D zawsze w pełnej rozdzielczości).",
+        new[] { "Mała", "Średnia", "Normalna", "Duża", "Bardzo duża" }, new[] { 2, 2, 2, 2 }, display: true);
+    public static readonly Setting FpsCounter = new("fps_counter", "Licznik FPS", "Liczba klatek na sekundę w rogu ekranu; szczegóły = pełny panel wydajności (F11).",
+        new[] { "Wyłączony", "FPS", "FPS + szczegóły" }, new[] { 0, 0, 0, 0 }, display: true);
+    public static readonly Setting FloatPreview = new("float_preview", "Podgląd spławika", "Okienko z bliskim widokiem spławika, gdy trzymasz w ręce wędkę z zarzuconym spławikiem.",
+        new[] { "Wyłączony", "Włączony" }, new[] { 0, 0, 0, 0 }, display: true);
+
+    /// <summary>Every setting of the graphics screen, in its order (the view distance and 3D resolution have their own rows).</summary>
+    public static readonly Setting[] Settings = { Textures, Shadows, AntiAliasing, Occlusion, IndirectLight, Reflections, Fog, Glow, Plants };
+    public static readonly Setting[] DisplaySettings = { WindowMode, VSync, FpsLimit };
+    public static readonly Setting[] InterfaceSettings = { UiScale, FpsCounter, FloatPreview };
+
+    /// <summary>Raised when a display or interface setting changes (the FPS counter and the float preview follow it).</summary>
+    public static event Action? DisplayChanged;
+
+    /// <summary>The settings no longer match the last preset.</summary>
+    public static bool Custom
+    {
+        get
+        {
+            if (!_loaded)
+                Load();
+            foreach (var st in Settings)
+                if (st.Value != st.Preset[(int)_level])
+                    return true;
+            return false;
+        }
+    }
+
+    /// <summary>Sets one setting's step (clamped) and applies it.</summary>
+    public static void SetStep(Setting setting, int step)
+    {
+        if (!_loaded)
+            Load();
+        setting.Value = Math.Clamp(step, 0, setting.Steps.Length - 1);
+        SaveConfig();
+        if (setting.Display)
+            ApplyDisplay();
+        Changed?.Invoke();
+    }
+
+    private static int V(Setting s)
+    {
+        if (!_loaded)
+            Load();
+        return s.Value;
+    }
+
+    // ------------------------------------------------------------------ presets
     public static QualityLevel Level
     {
         get
@@ -44,10 +144,13 @@ public static class GraphicsQuality
         _ => "Ultra",
     };
 
+    /// <summary>Picks a preset: every setting goes to its step for that preset.</summary>
     public static void Set(QualityLevel level)
     {
         _loaded = true;
         _level = level;
+        foreach (var st in Settings)
+            st.Value = st.Preset[(int)level];
         SaveConfig();
         Changed?.Invoke();
     }
@@ -131,14 +234,27 @@ public static class GraphicsQuality
         _ => 1.3f,
     };
 
+    /// <summary>The largest texture side kept by the Textures setting: 1024, 2048 or 4096.</summary>
+    public static int TextureLimit => 1024 << V(Textures);
+
+    /// <summary>Screen-space reflection steps of the water by the Reflections setting (0 = the sky only).</summary>
+    public static int WaterReflectionSteps => V(Reflections) switch { 0 => 0, 1 => 12, 2 => 20, _ => 32 };
+
     private static void SaveConfig()
     {
         if (Renderer.IsHeadless || OS.HasEnvironment("FISHSIM_NO_SAVE"))
             return;
         var cfg = new ConfigFile();
+        cfg.SetValue("graphics", "version", SettingsVersion);
         cfg.SetValue("graphics", "quality", (int)_level);
         cfg.SetValue("graphics", "view", (int)_view);
         cfg.SetValue("graphics", "scale", _scale);
+        foreach (var st in Settings)
+            cfg.SetValue("graphics", st.Key, st.Value);
+        foreach (var st in DisplaySettings)
+            cfg.SetValue("display", st.Key, st.Value);
+        foreach (var st in InterfaceSettings)
+            cfg.SetValue("interface", st.Key, st.Value);
         cfg.Save(ConfigPath);
     }
 
@@ -152,42 +268,83 @@ public static class GraphicsQuality
         if (cfg.Load(ConfigPath) != Error.Ok)
         {
             // The first start on a laptop's integrated graphics: light effects, a short view and a 70 % 3D image
-            // upscaled by FSR (the angler can raise them in the pause menu). Dedicated cards keep High.
+            // upscaled by FSR (the angler can raise them on the graphics screen). Dedicated cards keep High.
             if (!Renderer.IsHeadless && RenderingServer.GetVideoAdapterType() == RenderingDevice.DeviceType.IntegratedGpu)
             {
                 _level = QualityLevel.Low;
                 _view = ViewDistance.Short;
                 _scale = 70;
                 PickedForIntegratedGpu = true;
-                SaveConfig();
             }
+            foreach (var st in Settings)
+                st.Value = st.Preset[(int)_level];
+            SaveConfig();
             return;
         }
         _level = (QualityLevel)Math.Clamp(cfg.GetValue("graphics", "quality", (int)QualityLevel.High).AsInt32(), 0, 3);
         _view = (ViewDistance)Math.Clamp(cfg.GetValue("graphics", "view", (int)ViewDistance.Long).AsInt32(), 0, 3);
         _scale = Math.Clamp(cfg.GetValue("graphics", "scale", 100).AsInt32(), 50, 100);
+        // Settings saved by older versions (missing, or from presets that have changed since) follow the preset.
+        bool current = cfg.GetValue("graphics", "version", 0).AsInt32() >= SettingsVersion;
+        foreach (var st in Settings)
+            st.Value = current
+                ? Math.Clamp(cfg.GetValue("graphics", st.Key, st.Preset[(int)_level]).AsInt32(), 0, st.Steps.Length - 1)
+                : st.Preset[(int)_level];
+        foreach (var st in DisplaySettings)
+            st.Value = Math.Clamp(cfg.GetValue("display", st.Key, st.Preset[0]).AsInt32(), 0, st.Steps.Length - 1);
+        foreach (var st in InterfaceSettings)
+            st.Value = Math.Clamp(cfg.GetValue("interface", st.Key, st.Preset[0]).AsInt32(), 0, st.Steps.Length - 1);
+    }
+
+    /// <summary>The window mode, vertical sync and frame limit (at start and when changed).</summary>
+    public static void ApplyDisplay()
+    {
+        if (Renderer.IsHeadless)
+            return;
+        if (!_loaded)
+            Load();
+        var mode = WindowMode.Value switch
+        {
+            0 => DisplayServer.WindowMode.Windowed,
+            1 => DisplayServer.WindowMode.Maximized,
+            2 => DisplayServer.WindowMode.Fullscreen,
+            _ => DisplayServer.WindowMode.ExclusiveFullscreen,
+        };
+        if (DisplayServer.WindowGetMode() != mode)
+            DisplayServer.WindowSetMode(mode);
+        DisplayServer.WindowSetVsyncMode(VSync.Value switch
+        {
+            0 => DisplayServer.VSyncMode.Disabled,
+            2 => DisplayServer.VSyncMode.Adaptive,
+            _ => DisplayServer.VSyncMode.Enabled,
+        });
+        Engine.MaxFps = FpsSteps[Math.Clamp(FpsLimit.Value, 0, FpsSteps.Length - 1)];
+        if (Engine.GetMainLoop() is SceneTree tree)
+            tree.Root.ContentScaleFactor = UiScales[Math.Clamp(UiScale.Value, 0, UiScales.Length - 1)];
+        UI.FpsCounter.Sync();
+        DisplayChanged?.Invoke();
     }
 
     /// <summary>Radius (m) of the dense grass around the player; 0 = no grass blades.</summary>
-    public static float GrassRadius => Level switch
+    public static float GrassRadius => V(Plants) switch
     {
-        QualityLevel.Low => 0f,
-        QualityLevel.Medium => 18f,
-        QualityLevel.High => 28f,
+        0 => 0f,
+        1 => 18f,
+        2 => 28f,
         _ => 40f,
     } * Math.Clamp(ViewFactor, 0.75f, 1.2f);
 
     /// <summary>How far the scattered plants (grass tufts, flowers, ferns, reeds, lilies) are drawn, as a share of their full range.</summary>
-    public static float FoliageRange => Level switch
+    public static float FoliageRange => V(Plants) switch
     {
-        QualityLevel.Low => 0.45f,
-        QualityLevel.Medium => 0.7f,
-        QualityLevel.High => 1f,
+        0 => 0.45f,
+        1 => 0.7f,
+        2 => 1f,
         _ => 1.3f,
     };
 
     /// <summary>Distance (m) between grass clumps.</summary>
-    public static float GrassSpacing => Level >= QualityLevel.Ultra ? 0.42f : 0.5f;
+    public static float GrassSpacing => V(Plants) >= 3 ? 0.42f : 0.5f;
 
     /// <summary>
     /// The Nordic (Valheim-like) finish, the game's only look: light-catching fog with sun shafts, bloom on bright
@@ -198,32 +355,31 @@ public static class GraphicsQuality
     /// </summary>
     public static void ApplyEnvironment(Godot.Environment env)
     {
-        var q = Level;
         env.TonemapMode = Godot.Environment.ToneMapper.Aces;
         env.TonemapWhite = 6f;
 
-        env.SsaoEnabled = q >= QualityLevel.Medium;
+        env.SsaoEnabled = V(Occlusion) > 0;
         env.SsaoRadius = 1.8f;
         env.SsaoIntensity = 2.4f;
         env.SsaoPower = 1.4f;
         env.SsaoDetail = 0.5f;
-        env.SsilEnabled = q >= QualityLevel.Ultra;
+        env.SsilEnabled = V(IndirectLight) > 0;
         env.SsilRadius = 4f;
         env.SsilIntensity = 1.1f;
-        env.SsrEnabled = q >= QualityLevel.Ultra;
+        env.SsrEnabled = V(Reflections) >= 3;
         env.SsrMaxSteps = 40;
         env.SdfgiEnabled = false;                       // far too expensive for what it adds outdoors
 
-        env.GlowEnabled = q >= QualityLevel.Medium;     // the blur passes cost integrated graphics dearly
+        env.GlowEnabled = V(Glow) > 0;     // the blur passes cost integrated graphics dearly
         env.GlowIntensity = 0.7f;
         env.GlowStrength = 1f;
         env.GlowBloom = 0.03f;
         env.GlowHdrThreshold = 1.15f;
         env.GlowBlendMode = Godot.Environment.GlowBlendModeEnum.Softlight;
 
-        env.VolumetricFogEnabled = q >= QualityLevel.Medium;
+        env.VolumetricFogEnabled = V(Fog) > 0;
         env.VolumetricFogAnisotropy = 0.82f;
-        env.VolumetricFogLength = q >= QualityLevel.High ? 140f : 90f;
+        env.VolumetricFogLength = V(Fog) >= 2 ? 140f : 90f;
         env.VolumetricFogDetailSpread = 1.5f;
         env.VolumetricFogAlbedo = new Color(0.86f, 0.9f, 0.96f);
         env.VolumetricFogGIInject = 1f;
@@ -254,13 +410,12 @@ public static class GraphicsQuality
 
     public static void ApplyViewport(Viewport vp)
     {
-        var q = Level;
-        // TAA alone smooths edges well at QHD; MSAA on top only on Ultra.
-        vp.Msaa3D = q == QualityLevel.Ultra ? Viewport.Msaa.Msaa2X : Viewport.Msaa.Disabled;
-        vp.UseTaa = q >= QualityLevel.High;
-        vp.ScreenSpaceAA = q <= QualityLevel.Medium ? Viewport.ScreenSpaceAAEnum.Fxaa : Viewport.ScreenSpaceAAEnum.Disabled;
-        vp.UseDebanding = q >= QualityLevel.Medium;
-        vp.PositionalShadowAtlasSize = q >= QualityLevel.High ? 4096 : 2048;
+        int aa = V(AntiAliasing);
+        vp.Msaa3D = Viewport.Msaa.Disabled;
+        vp.UseTaa = aa >= 2;
+        vp.ScreenSpaceAA = aa == 1 ? Viewport.ScreenSpaceAAEnum.Fxaa : Viewport.ScreenSpaceAAEnum.Disabled;
+        vp.UseDebanding = V(Glow) > 0 || V(Fog) > 0;
+        vp.PositionalShadowAtlasSize = V(Shadows) >= 3 ? 4096 : 2048;
         // A lower 3D resolution upscaled by FSR 1 (the interface is drawn at the screen's own resolution on top).
         float scale = RenderScale / 100f;
         vp.Scaling3DMode = scale < 0.999f ? Viewport.Scaling3DModeEnum.Fsr : Viewport.Scaling3DModeEnum.Bilinear;
@@ -269,21 +424,22 @@ public static class GraphicsQuality
 
     public static void ApplySun(DirectionalLight3D sun)
     {
-        var q = Level;
-        // The sun's shadow map: 2048 px on Low (a quarter of the memory), 4096 px otherwise.
-        RenderingServer.DirectionalShadowAtlasSetSize(q == QualityLevel.Low ? 2048 : 4096, true);
-        sun.DirectionalShadowMode = q >= QualityLevel.Ultra
+        int q = V(Shadows);
+        sun.ShadowEnabled = q > 0;
+        // The sun's shadow map: 2048 px on the low steps (a quarter of the memory), 4096 px otherwise.
+        RenderingServer.DirectionalShadowAtlasSetSize(q <= 1 ? 2048 : 4096, true);
+        sun.DirectionalShadowMode = q >= 4
             ? DirectionalLight3D.ShadowMode.Parallel4Splits
             : DirectionalLight3D.ShadowMode.Parallel2Splits;
         sun.DirectionalShadowMaxDistance = q switch
         {
-            QualityLevel.Low => 50f,
-            QualityLevel.Medium => 80f,
-            QualityLevel.High => 120f,
+            <= 1 => 50f,
+            2 => 80f,
+            3 => 120f,
             _ => 200f,
         } * Math.Clamp(ViewFactor, 0.7f, 1.2f);
         sun.ShadowBlur = 1.2f;
         sun.ShadowNormalBias = 1.2f;
-        sun.LightAngularDistance = q >= QualityLevel.Ultra ? 0.5f : 0f;   // contact-hardening shadows on Ultra
+        sun.LightAngularDistance = q >= 4 ? 0.5f : 0f;   // contact-hardening shadows on the top step
     }
 }

@@ -328,7 +328,7 @@ public partial class HandTools : Node3D
     {
         if (_rod == null || _rod.InputBlocked || _rod.AwaitingDecision)
             return;
-        if (e is InputEventKey { Pressed: true, Echo: false, Keycode: Godot.Key.Q } k)
+        if (Bindings.Is(e, Act.CycleTool) && e is InputEventKey k)
         {
             Cycle(k.ShiftPressed ? -1 : 1);
             GetViewport().SetInputAsHandled();

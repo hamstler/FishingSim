@@ -53,6 +53,11 @@ public partial class ScreenshotTool : Node
         // FISHSIM_SCALE=50..100 picks the 3D resolution in per cent (FSR below 100).
         if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_SCALE"), out int scaleSetting))
             FishingSim.Graphics.GraphicsQuality.SetRenderScale(scaleSetting);
+        // FISHSIM_FLOAT_CAM=1 turns the float preview window on; FISHSIM_FPS=1 the FPS counter.
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_FLOAT_CAM") == "1")
+            FishingSim.Graphics.GraphicsQuality.SetStep(FishingSim.Graphics.GraphicsQuality.FloatPreview, 1);
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_FPS") == "1")
+            FishingSim.Graphics.GraphicsQuality.SetStep(FishingSim.Graphics.GraphicsQuality.FpsCounter, 1);
         // FISHSIM_PERF_OVERLAY=1 shows the F11 performance overlay in the shot.
         if (System.Environment.GetEnvironmentVariable("FISHSIM_PERF_OVERLAY") == "1")
             FishingSim.UI.PerfOverlay.ShownByDefault = true;
@@ -294,6 +299,22 @@ public partial class ScreenshotTool : Node
             GetTree().Quit();
             return;
         }
+        if (mode == 34)
+        {
+            // The graphics settings screen over the login form (arg 1: one step down from the preset with the arrow).
+            var menu = GD.Load<PackedScene>("res://menu.tscn").Instantiate<Menu>();
+            GetTree().Root.AddChild(menu);
+            await NextFrame();
+            if (arg == 1)
+                FishingSim.Graphics.GraphicsQuality.SetStep(FishingSim.Graphics.GraphicsQuality.Shadows, 1);
+            menu.OpenGraphics();
+            for (int i = 0; i < 10; i++)
+                await NextFrame();
+            GetViewport().GetTexture().GetImage().SavePng(output);
+            GD.Print($"saved {output}");
+            GetTree().Quit();
+            return;
+        }
         if (mode == 19)
         {
             // The fish atlas with one species on the turntable (arg = index in the catalogue).
@@ -449,6 +470,32 @@ public partial class ScreenshotTool : Node
         int frames = 30;
         if (a.Length > 11 && a[11] == "1")
             main.GetChildren().OfType<Hud>().First().Visible = false;
+        // FISHSIM_SCENIC=1: a clean view of the map (no HUD, no rod or hands, no dial): the menu's pictures.
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_SCENIC") == "1")
+        {
+            foreach (var ui in main.FindChildren("*", "CanvasLayer", true, false).OfType<CanvasLayer>())
+                ui.Visible = false;
+            foreach (var c in main.FindChildren("*", "Control", true, false).OfType<Control>())
+                if (c.GetParent() is not Control)
+                    c.Visible = false;
+            main.Tools?.Select(FishingSim.Fishing.HandTool.None);
+            main.Rod.InHands = false;
+            if (main.Rod.Rig != null)
+                main.Rod.Rig.Visible = false;
+            main.Player.Body.Visible = false;
+            foreach (var c in main.Player.Camera.GetChildren().OfType<Node3D>())
+                if (c is not Camera3D)
+                    c.Visible = false;
+        }
+        // FISHSIM_CAM_LIFT=m raises the camera above the angler (a vista over the poles and reeds).
+        if (float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_CAM_LIFT"), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float camLift))
+        {
+            var vista = new Camera3D { Fov = main.Player.Camera.Fov, Far = main.Player.Camera.Far };
+            main.AddChild(vista);
+            vista.GlobalTransform = main.Player.Camera.GlobalTransform.Translated(new Vector3(0f, camLift, 0f));
+            vista.Current = true;
+        }
 
         // FISHSIM_RISES=N: N rise rings spread over the last second before the shot (any mode).
         // FISHSIM_THREE_RODS=1: rods 2 and 3 get their own rod and reel, all three are cast with a worm under a float
@@ -568,6 +615,18 @@ public partial class ScreenshotTool : Node
             }
             main.Player.Rig.Visible = false;
             main.Player.Body.Visible = false;
+            foreach (var c in main.Player.Camera.GetChildren().OfType<Node3D>())
+                if (c is not Camera3D)
+                    c.Visible = false;
+        }
+        // FISHSIM_CAM_LIFT=m raises the camera above the angler (a vista over the poles and reeds).
+        if (float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_CAM_LIFT"), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float camLift2))
+        {
+            var vista = new Camera3D { Fov = main.Player.Camera.Fov, Far = main.Player.Camera.Far };
+            main.AddChild(vista);
+            vista.GlobalTransform = main.Player.Camera.GlobalTransform.Translated(new Vector3(0f, camLift2, 0f));
+            vista.Current = true;
         }
         else if (mode == 13)
         {
@@ -1190,6 +1249,30 @@ public partial class ScreenshotTool : Node
             cam.LookAt(reel, rig.GlobalTransform.Basis * (close == 5 ? Vector3.Up : Vector3.Back));
             cam.Current = true;
             for (int i = 0; i < 4; i++)
+                await NextFrame();
+        }
+        // HUD checks: FISHSIM_DRAG=0..1 turns the drag just before the shot (the ring in the middle), FISHSIM_HELP=1
+        // opens the F1 quick help, FISHSIM_CONTROLS=1 the controls screen.
+        if (float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_DRAG"), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float drag))
+        {
+            main.Rod.DragSetting = Mathf.Clamp(drag - 0.1f, 0f, 1f);
+            for (int i = 0; i < 3; i++)
+                await NextFrame();
+            main.Rod.DragSetting = drag;
+            for (int i = 0; i < 6; i++)
+                await NextFrame();
+        }
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_HELP") == "1")
+        {
+            main.GetChildren().OfType<Hud>().First()._UnhandledInput(new InputEventKey { Keycode = Bindings.Of(Act.QuickHelp), Pressed = true });
+            for (int i = 0; i < 6; i++)
+                await NextFrame();
+        }
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_CONTROLS") == "1")
+        {
+            main.AddChild(new ControlsPanel());
+            for (int i = 0; i < 6; i++)
                 await NextFrame();
         }
         await Save(output);

@@ -61,24 +61,10 @@ public partial class PauseMenu : CanvasLayer
         AddButton(box, "Wznów", Resume);
         AddButton(box, "Zmień mapę", ChangeMap);
         AddButton(box, "Atlas ryb", () => AddChild(new FishAtlas()));
-        var quality = new Button { CustomMinimumSize = new Vector2(0, 46) };
-        void ShowQuality() => quality.Text =
-            $"Grafika: {Graphics.GraphicsQuality.Title(Graphics.GraphicsQuality.Level)}";
-        ShowQuality();
-        quality.Pressed += () => { Graphics.GraphicsQuality.Cycle(); ShowQuality(); };
-        box.AddChild(quality);
-        // How far the world is drawn in detail: shorter = smoother on weaker computers.
-        var view = new Button { CustomMinimumSize = new Vector2(0, 46) };
-        void ShowView() => view.Text = $"Zasięg widzenia: {Graphics.GraphicsQuality.ViewTitle(Graphics.GraphicsQuality.View)}";
-        ShowView();
-        view.Pressed += () => { Graphics.GraphicsQuality.CycleView(); ShowView(); };
-        box.AddChild(view);
-        // The 3D image's resolution: the biggest help when the graphics card is the bottleneck (F11 shows it).
-        var scale = new Button { CustomMinimumSize = new Vector2(0, 46) };
-        void ShowScale() => scale.Text = $"Rozdzielczość 3D: {Graphics.GraphicsQuality.RenderScaleTitle(Graphics.GraphicsQuality.RenderScale)}";
-        ShowScale();
-        scale.Pressed += () => { Graphics.GraphicsQuality.CycleRenderScale(); ShowScale(); };
-        box.AddChild(scale);
+        // Every graphics setting (effects, view distance, 3D resolution, window), each with arrows both ways.
+        AddButton(box, "Ustawienia grafiki", () => AddChild(new GraphicsPanel()));
+        // Every key with its action, rebindable; F1 in the game shows the same as a quick card.
+        AddButton(box, "Sterowanie", () => AddChild(new ControlsPanel()));
         AddButton(box, "Wyloguj", Logout);
         AddButton(box, "Wyjdź z gry", Quit);
     }

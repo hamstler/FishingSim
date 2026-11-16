@@ -17,7 +17,7 @@ namespace FishingSim.Fishing;
 public partial class FirstPersonBody : Node3D
 {
     // The rod in front of the body, a little right of the middle, so the left hand reaches the crank on the reel's left.
-    private static readonly Vector3 RigBasePosition = new(0.1f, -0.25f, -0.33f);
+    private static readonly Vector3 RigBasePosition = new(0.07f, -0.195f, -0.35f);
     private static readonly Vector3 RigBaseRotation = new(Mathf.DegToRad(-78f), 0f, 0f);
     private static readonly Vector3 WristLocal = new(0.055f, 0.03f, -0.01f);
     private static readonly Vector3 LeftRest = new(-0.3f, -0.75f, -0.25f);
@@ -111,7 +111,7 @@ public partial class FirstPersonBody : Node3D
     /// <summary>The villager's arms, if the model can be shown; false leaves the built hands to do.</summary>
     private bool BuildArms()
     {
-        var look = new Appearance("male_peasant", 0, null, Colors.White, new Color(1f, 0.97f, 0.95f), false, false, Colors.White);
+        var look = new Appearance("male_ranger", 0, null, Colors.White, new Color(1f, 0.97f, 0.95f), false, false, Colors.White);
         if (CharacterAsset.Create(look, idle: null) is not { } body || CharacterAsset.SkeletonOf(body) is not { } skeleton)
             return false;
         foreach (var node in body.FindChildren("*", "MeshInstance3D", true, false))
