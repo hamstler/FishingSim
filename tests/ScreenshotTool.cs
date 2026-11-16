@@ -283,11 +283,25 @@ public partial class ScreenshotTool : Node
             for (int i = 0; i < paths.Count; i++)
             {
                 var sp = GD.Load<FishSpecies>(paths[i]);
-                var fish = FishModel.Create(sp, sp.MinWeight + (sp.MaxWeight - sp.MinWeight) * 0.5f);
+                // FISHSIM_LAKE=1: the light copies the lake's fish wear; FISHSIM_TILT=deg tips them towards the camera (a
+                // view from above, as from the pier).
+                FishAsset? lite = null;
+                if (System.Environment.GetEnvironmentVariable("FISHSIM_LAKE") == "1")
+                {
+                    FishAsset.PrefetchLite(sp);
+                    for (int w8 = 0; w8 < 600; w8++)
+                    {
+                        lite = FishAsset.LiteIfReady(sp, out bool pendingLite);
+                        if (!pendingLite)
+                            break;
+                        await NextFrame();
+                    }
+                }
+                var fish = FishModel.Create(sp, sp.MinWeight + (sp.MaxWeight - sp.MinWeight) * 0.5f, System.Environment.GetEnvironmentVariable("FISHSIM_DETAILED") == "1", lite);
                 fish.Wiggle = 0f;
                 float sc = 1f / fish.Length;
                 fish.Scale = new Vector3(sc, sc, sc);
-                fish.RotationDegrees = new Vector3(0, 90, 0);
+                fish.RotationDegrees = new Vector3(float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_TILT"), out float tilt) ? tilt : 0f, 90, 0);
                 fish.Position = new Vector3((i % 4) * 1.25f, -(i / 4) * 0.62f, 0);
                 root3d.AddChild(fish);
                 var label = new Label3D { Text = sp.SpeciesName, FontSize = 40, PixelSize = 0.0022f, Position = fish.Position + new Vector3(0, -0.24f, 0.3f) };
@@ -487,6 +501,26 @@ public partial class ScreenshotTool : Node
             for (int i = 0; i < 20; i++)
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
             yaw = Mathf.RadToDeg(MathF.Atan2(-(w.X - stand.X), -(w.Z - stand.Z)));
+        }
+        // FISHSIM_LOOK_FISH=1: wait for the lake fish to wear their models, then bring a few of them (FISHSIM_FISH_SPECIES =
+        // a species name, else whatever swims) under the end of the pier, half a metre deep; look down at them.
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_LOOK_FISH") == "1")
+        {
+            for (int i = 0; i < 240; i++)
+                await NextFrame();
+            string? wanted = System.Environment.GetEnvironmentVariable("FISHSIM_FISH_SPECIES");
+            var rngF = new RandomNumberGenerator { Seed = 5 };
+            int n = 0;
+            foreach (var agent in main.Fish.Agents)
+            {
+                if (n >= 9 || wanted != null && agent.Species != wanted)
+                    continue;
+                agent.Position = new System.Numerics.Vector2(rngF.RandfRange(-2.2f, 2.2f), -6.5f + rngF.RandfRange(-1.6f, 1.2f));
+                agent.Depth = 0.45f + rngF.RandfRange(0f, 0.3f);
+                n++;
+            }
+            var views = main.Fish.GetChildren().OfType<FishModel>().ToList();
+            GD.Print($"fish brought under the pier: {n}; {views.Count(v => v.OnModel)} of {views.Count} lake fish on their species' model");
         }
         // FISHSIM_BOAT=N: board the rowboat at the pier and row ahead for N physics frames (FISHSIM_BOAT_TURN=-1..1
         // turns while rowing); the yaw is then relative to the bow (0 = looking ahead). FISHSIM_BOAT_VIEW=1 watches the

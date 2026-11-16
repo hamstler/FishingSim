@@ -106,6 +106,13 @@ public partial class FishPopulation : Node3D
         _model.Clear();
         int school = 0;
         Graphics.FishSkin.PrewarmLight(_species.Where(sp => _bed.AbundanceOf(sp.SpeciesName) > 0f));
+        // The species' hand-built models in light copies: decoded in the background, worn as soon as they are ready.
+        _pendingLite.Clear();
+        foreach (var sp in _species.Where(sp => _bed.AbundanceOf(sp.SpeciesName) > 0f))
+        {
+            Fishing.FishAsset.PrefetchLite(sp);
+            _pendingLite.Add(sp);
+        }
         float totalAbundance = _species.Sum(sp => MathF.Max(_bed.AbundanceOf(sp.SpeciesName), 0f));
         foreach (var sp in _species)
         {
@@ -130,7 +137,7 @@ public partial class FishPopulation : Node3D
                     float weight = sp.MinWeight + (sp.MaxWeight - sp.MinWeight) * MathF.Pow(_rng.NextFloat(), 2.2f);
                     float cruise = 0.35f + 0.25f * sp.Aggression;
                     var agent = _model.Spawn(sp.SpeciesName, weight, p, school, sp.MinDepth, sp.MaxDepth, cruise);
-                    var view = FishModel.Create(sp, weight);
+                    var view = FishModel.Create(sp, weight, lite: Fishing.FishAsset.LiteIfReady(sp, out _));
                     view.Scale = Vector3.One * ViewScale;
                     view.Visible = false;
                     AddChild(view);
@@ -196,7 +203,7 @@ public partial class FishPopulation : Node3D
             return;
         float weight = sp.MinWeight + (sp.MaxWeight - sp.MinWeight) * MathF.Pow(_rng.NextFloat(), 2.2f);
         var fresh = _model.Spawn(sp.SpeciesName, weight, spot, agent.School, sp.MinDepth, sp.MaxDepth, agent.CruiseSpeed);
-        var view = FishModel.Create(sp, weight);
+        var view = FishModel.Create(sp, weight, lite: Fishing.FishAsset.LiteIfReady(sp, out _));
         view.Scale = Vector3.One * ViewScale;
         view.Visible = false;
         AddChild(view);
@@ -268,11 +275,47 @@ public partial class FishPopulation : Node3D
     /// The schools swim and their fish are placed once per rendered frame (not on physics ticks: they move smoothly at
     /// any frame rate, and a slow frame is not made slower by catching up several ticks of fish).
     /// </summary>
+    private readonly List<FishSpecies> _pendingLite = new();
+
+    /// <summary>
+    /// One species a frame: when its model's light copy is decoded, its fish change from the lofted shape to the model
+    /// (same place, heading and visibility).
+    /// </summary>
+    private void UpgradeOneSpecies()
+    {
+        for (int i = 0; i < _pendingLite.Count; i++)
+        {
+            var sp = _pendingLite[i];
+            var lite = Fishing.FishAsset.LiteIfReady(sp, out bool pending);
+            if (pending)
+                continue;
+            _pendingLite.RemoveAt(i);
+            if (lite == null)
+                return;
+            foreach (var a in _model.Agents)
+            {
+                if (a.Species != sp.SpeciesName || !_views.TryGetValue(a.Id, out var old))
+                    continue;
+                var view = FishModel.Create(sp, a.Weight, lite: lite);
+                view.Scale = old.Scale;
+                view.Visible = old.Visible;
+                view.Position = old.Position;
+                view.Rotation = old.Rotation;
+                AddChild(view);
+                _views[a.Id] = view;
+                old.QueueFree();
+            }
+            return;
+        }
+    }
+
     public override void _Process(double delta)
     {
         using var perfScope = Graphics.Perf.Scope("fish");
         if (_watcher == null || !IsInstanceValid(_watcher))
             return;
+        if (_pendingLite.Count > 0)
+            UpgradeOneSpecies();
         float dt = MathF.Min((float)delta, 0.05f);
         var w = _watcher.GlobalPosition;
         float speed = dt > 0f ? new Vector2(w.X - _lastWatcher.X, w.Z - _lastWatcher.Z).Length() / dt : 0f;

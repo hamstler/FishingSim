@@ -145,7 +145,7 @@ public sealed class FishAsset
     /// The model's pictures by name, decoded here with their mipmaps: GLTFDocument makes textures without them, and the
     /// fine scales of a 4096-texel skin would shimmer whenever the fish is small on the screen.
     /// </summary>
-    private static Dictionary<string, Image> DecodeImages(byte[] glb)
+    private static Dictionary<string, Image> DecodeImages(byte[] glb, int maxBody = 0, int maxFin = 0)
     {
         var images = new Dictionary<string, Image>();
         int jsonLength = BitConverter.ToInt32(glb, 12);
@@ -173,6 +173,8 @@ public sealed class FishAsset
             bool normal = name.EndsWith("normal");
             // Down to the graphics quality's texture size (Low 1024, Medium 2048): a quarter of the memory per halving.
             int max = Graphics.TextureStore.MaxSize;
+            if (maxBody > 0)
+                max = name.StartsWith("Fin") || name == "iris" ? maxFin : maxBody;
             if (image.GetWidth() > max || image.GetHeight() > max)
             {
                 float k = (float)max / Math.Max(image.GetWidth(), image.GetHeight());
@@ -187,6 +189,66 @@ public sealed class FishAsset
             images[name] = image;
         }
         return images;
+    }
+
+    // ------------------------------------------------------------------ the lake's fish
+    /// <summary>Texture sizes of the light copies the lake's fish wear (body and normal map; fins and iris).</summary>
+    public const int LiteBody = 512, LiteFin = 256;
+
+    private static readonly Dictionary<string, FishAsset?> LiteCache = new();
+    private static readonly Dictionary<string, Task<Dictionary<string, Image>>> LiteDecoding = new();
+
+    /// <summary>
+    /// Starts decoding a light copy of the species' model (small pictures) on a worker thread, for the fish swimming in
+    /// the lake; <see cref="LiteIfReady"/> hands it over once decoded. All the lake's species stay cached (a few hundred
+    /// kilobytes each).
+    /// </summary>
+    public static void PrefetchLite(FishSpecies sp)
+    {
+        string id = FishReference.IdOf(sp);
+        string path = PathOf(id);
+        lock (Gate)
+        {
+            if (id == "" || LiteCache.ContainsKey(id) || LiteDecoding.ContainsKey(id) || !FileAccess.FileExists(path))
+                return;
+            LiteDecoding[id] = Task.Run(() => DecodeImages(FileAccess.GetFileAsBytes(path), LiteBody, LiteFin));
+        }
+    }
+
+    /// <summary>
+    /// The light copy when it is ready (its meshes are read here, on the calling thread); null while it is still being
+    /// decoded (<paramref name="pending"/>) or when the species has no model.
+    /// </summary>
+    public static FishAsset? LiteIfReady(FishSpecies sp, out bool pending)
+    {
+        string id = FishReference.IdOf(sp);
+        Task<Dictionary<string, Image>>? task;
+        lock (Gate)
+        {
+            pending = false;
+            if (LiteCache.TryGetValue(id, out var cached))
+                return cached;
+            if (!LiteDecoding.TryGetValue(id, out task))
+                return null;
+            if (!task.IsCompleted)
+            {
+                pending = true;
+                return null;
+            }
+            LiteDecoding.Remove(id);
+        }
+        FishAsset? asset = null;
+        try
+        {
+            asset = Load(PathOf(id), task.Result);
+        }
+        catch (Exception e)
+        {
+            GD.PushWarning($"fish model {id} (lake copy): {e.Message}");
+        }
+        lock (Gate)
+            LiteCache[id] = asset;
+        return asset;
     }
 
     private static FishAsset? Load(string path, Dictionary<string, Image>? images)

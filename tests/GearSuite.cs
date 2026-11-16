@@ -494,7 +494,9 @@ public sealed class GearSuite : ITestSuite
         t.Check(shown.GlobalPosition.Y < Main.WaterY, "visible fish swim below the water line");
         main.Fish.VisibleRange = 0f;
         await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
-        t.Check(main.Fish.VisibleCount == 0, "fish out of range are hidden");
+        for (int i = 0; i < 4; i++)
+            await t.NextFrame();     // the fish are placed (and hidden) once per drawn frame
+        t.Check(main.Fish.VisibleCount == 0, $"fish out of range are hidden ({main.Fish.VisibleCount} of {main.Fish.Agents.Count} still shown)");
         var eyeAt = new Vector3(0f, 1.6f, 0f);
         t.Check(FishPopulation.Sight(eyeAt, new Vector3(0f, -0.5f, -3f), 0f, 0.5f, 2.6f, 0f) > 0.5f
                 && FishPopulation.Sight(eyeAt, new Vector3(0f, -0.5f, -40f), 0f, 0.5f, 2.6f, 0f) < FishPopulation.MinSight
