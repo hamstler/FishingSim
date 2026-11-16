@@ -36,6 +36,39 @@ public sealed class GearSuite : ITestSuite
         var roach = Species("ploc");
         var all = new[] { roach, Species("leszcz"), carp, Species("szczupak") };
 
+        t.Section("pictures decode on many threads at once");
+        {
+            // A model's WebP pictures decoded on worker threads while others decode too (fish, props, glTF): every one
+            // must come out (a failed decode left a white fish and crashed a player's game).
+            var webps = new List<byte[]>();
+            foreach (var path in new[] { "res://assets/models/tree_stump_01.glb", "res://assets/fish/models/ploc.glb" })
+            {
+                if (!Godot.FileAccess.FileExists(path))
+                    continue;
+                var glb = Godot.FileAccess.GetFileAsBytes(path);
+                int jl = BitConverter.ToInt32(glb, 12);
+                var js = System.Text.Json.Nodes.JsonNode.Parse(System.Text.Encoding.UTF8.GetString(glb, 20, jl))!;
+                foreach (var im in js["images"]!.AsArray())
+                {
+                    var v = js["bufferViews"]![(int)im!["bufferView"]!]!;
+                    int off = 28 + jl + ((int?)v["byteOffset"] ?? 0), len = (int)v["byteLength"]!;
+                    webps.Add(glb[off..(off + len)]);
+                }
+            }
+            int failed = 0, done = 0;
+            var jobs = Enumerable.Range(0, 48).Select(i => Task.Run(() =>
+            {
+                var image = new Image();
+                var err = FishingSim.Graphics.ImageDecode.Webp(image, webps[i % webps.Count]);
+                if (err != Error.Ok || image.IsEmpty())
+                    System.Threading.Interlocked.Increment(ref failed);
+                System.Threading.Interlocked.Increment(ref done);
+                image.Dispose();
+            })).ToArray();
+            await Task.WhenAll(jobs);
+            t.Check(webps.Count > 0 && done == 48 && failed == 0, $"48 WebP pictures decoded on parallel threads, {failed} failed");
+        }
+
         t.Section("66 freshwater species");
         var catalogue = SpeciesCatalog.Paths.Select(p => GD.Load<FishSpecies>(p)).ToList();
         // FISHSIM_DUMP_FISH=<file>: writes every species' build, skin style, iris and mouth as JSON for the model tools

@@ -33,8 +33,11 @@ public static class CrashLog
                 foreach (var dir in new[] { "user://shader_cache", "user://vulkan" })
                 {
                     string full = ProjectSettings.GlobalizePath(dir);
+                    // Only the files: the engine made the cache's folders before this runs and writes into them for
+                    // the rest of the session (removing the folders left every shader unsaved: "_save_to_cache").
                     if (System.IO.Directory.Exists(full))
-                        System.IO.Directory.Delete(full, true);
+                        foreach (string file in System.IO.Directory.EnumerateFiles(full, "*", System.IO.SearchOption.AllDirectories))
+                            try { System.IO.File.Delete(file); } catch (Exception) { }
                 }
             System.IO.File.WriteAllText(Flag, DateTime.Now.ToString("u"));
             AppDomain.CurrentDomain.ProcessExit += (_, _) => CleanExit();

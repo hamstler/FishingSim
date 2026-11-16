@@ -111,7 +111,8 @@ def shrink(glb, size):
     for role, tex in keep.items():
         if tex is None:
             continue
-        im = j["images"][j["textures"][tex]["source"]]
+        t = j["textures"][tex]
+        im = j["images"][t["source"] if "source" in t else t["extensions"]["EXT_texture_webp"]["source"]]
         v = views[im["bufferView"]]
         o = v.get("byteOffset", 0)
         pic = Image.open(io.BytesIO(blob[o:o + v["byteLength"]])).convert("RGB")
