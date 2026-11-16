@@ -332,6 +332,8 @@ public partial class FishPopulation : Node3D
         // (steep views near the bank show them, flat views further out only reflect the sky).
         var cam = GetViewport()?.GetCamera3D();
         var eye = cam != null ? cam.GlobalPosition : w + Vector3.Up * 1.6f;
+        // Of those, only the nearest MaxShown are drawn (a few fish in full detail rather than a crowd of blurs).
+        int shown = 0;
         foreach (var a in _model.Agents)
         {
             if (!_views.TryGetValue(a.Id, out var view))
@@ -339,13 +341,43 @@ public partial class FishPopulation : Node3D
             float dist = new Vector2(a.Position.X - w.X, a.Position.Y - w.Z).Length();
             var at = new Vector3(a.Position.X, _waterY - a.Depth, a.Position.Y);
             bool visible = dist < VisibleRange && a.Depth < VisibleDepth
-                           && Sight(eye, at, _waterY, a.Depth, Clarity, GlareCut) > MinSight;
-            view.Visible = visible;
+                           && Sight(eye, at, _waterY, a.Depth, Clarity, GlareCut) > MinSight
+                           && (view is not FishModel fm || fm.Length * ViewScale >= MinShownLength);
+            if (visible)
+                InsertNearest(dist, view, ref shown);
+            view.Visible = false;
             if (!visible)
                 continue;
             view.Position = at;
             view.Rotation = new Vector3(0f, a.Heading, 0f);
             view.Wiggle = 0.4f + MathF.Min(a.Speed, 2f);
         }
+        for (int i = 0; i < shown; i++)
+            _nearest[i].View.Visible = true;
+    }
+
+    /// <summary>Fry shorter than this (as drawn, m) are not shown: a few centimetres of fish read as specks, not fish.</summary>
+    public float MinShownLength { get; set; } = 0.16f;
+
+    /// <summary>How many fish are drawn at most (the nearest ones the angler can see).</summary>
+    public int MaxShown { get; set; } = 14;
+
+    private (float Dist, Node3D View)[] _nearest = new (float, Node3D)[14];
+
+    /// <summary>Keeps the MaxShown nearest in _nearest, sorted, without allocating.</summary>
+    private void InsertNearest(float dist, Node3D view, ref int count)
+    {
+        int cap = Math.Min(MaxShown, 4096);
+        if (_nearest.Length < cap)
+            _nearest = new (float, Node3D)[cap];
+        if (count == cap && dist >= _nearest[count - 1].Dist)
+            return;
+        int i = count < cap ? count++ : count - 1;
+        while (i > 0 && _nearest[i - 1].Dist > dist)
+        {
+            _nearest[i] = _nearest[i - 1];
+            i--;
+        }
+        _nearest[i] = (dist, view);
     }
 }

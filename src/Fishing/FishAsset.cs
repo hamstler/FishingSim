@@ -193,7 +193,7 @@ public sealed class FishAsset
 
     // ------------------------------------------------------------------ the lake's fish
     /// <summary>Texture sizes of the light copies the lake's fish wear (body and normal map; fins and iris).</summary>
-    public const int LiteBody = 512, LiteFin = 256;
+    public const int LiteBody = 1024, LiteFin = 512;
 
     private static readonly Dictionary<string, FishAsset?> LiteCache = new();
     private static readonly Dictionary<string, Task<Dictionary<string, Image>>> LiteDecoding = new();

@@ -487,12 +487,15 @@ public sealed class GearSuite : ITestSuite
         main.Fish.VisibleDepth = 99f;
         main.Fish.Clarity = 1000f;      // crystal water and polarized glasses: every fish can be seen
         main.Fish.GlareCut = 1f;
+        main.Fish.MaxShown = 4096;
+        main.Fish.MinShownLength = 0f;
         for (int i = 0; i < 3; i++)
             await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
         t.Check(main.Fish.VisibleCount == main.Fish.Agents.Count, "fish in range are drawn under the surface");
         var shown = main.Fish.GetChildren().OfType<FishModel>().First(f => f.Visible);
         t.Check(shown.GlobalPosition.Y < Main.WaterY, "visible fish swim below the water line");
         main.Fish.VisibleRange = 0f;
+        main.Fish.MaxShown = 14;
         await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
         for (int i = 0; i < 4; i++)
             await t.NextFrame();     // the fish are placed (and hidden) once per drawn frame

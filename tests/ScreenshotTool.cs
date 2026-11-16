@@ -513,10 +513,10 @@ public partial class ScreenshotTool : Node
             int n = 0;
             foreach (var agent in main.Fish.Agents)
             {
-                if (n >= 9 || wanted != null && agent.Species != wanted)
+                if (n >= 9 || wanted != null && !wanted.Split(',').Contains(agent.Species) || agent.Weight < 0.15f)
                     continue;
-                agent.Position = new System.Numerics.Vector2(rngF.RandfRange(-2.2f, 2.2f), -6.5f + rngF.RandfRange(-1.6f, 1.2f));
-                agent.Depth = 0.45f + rngF.RandfRange(0f, 0.3f);
+                agent.Position = new System.Numerics.Vector2(rngF.RandfRange(-1.8f, 1.8f), -5.3f + rngF.RandfRange(-1.0f, 0.8f));
+                agent.Depth = 0.35f + rngF.RandfRange(0f, 0.25f);
                 n++;
             }
             var views = main.Fish.GetChildren().OfType<FishModel>().ToList();
