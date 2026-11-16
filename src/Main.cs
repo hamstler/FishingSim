@@ -26,6 +26,8 @@ public partial class Main : Node3D
     private Water _water = null!;
 
     private ulong _rowRefusedAt;
+    private System.Action<string>? _villagerSaid;
+
 
     /// <summary>The echo sounder screen (shown in the boat with the accessory).</summary>
     public UI.EchoSounder Echo { get; private set; } = null!;
@@ -106,6 +108,8 @@ public partial class Main : Node3D
         // The same wind as the rod's (FishingRod.WindVelocity): it drifts an unanchored boat.
         Boat.Wind = () => new Vector2(0.8f, 0.6f) * (_world.WindTarget * 3f);
         Boat.Said += msg => Rod.Notify(msg, 2f);
+        _villagerSaid = msg => Rod.Notify(msg, 5f);
+        World.Props.Wanderer.Said += _villagerSaid;
         _lake.Rebuilt += () =>
         {
             Boat.ResetToMooring();
@@ -492,6 +496,8 @@ public partial class Main : Node3D
 
     public override void _ExitTree()
     {
+        if (_villagerSaid != null)
+            World.Props.Wanderer.Said -= _villagerSaid;
         _profile.Changed -= Save;
         _world.HoursAdvanced -= _profile.PassTime;
         _profile.WaterTempNow = null;

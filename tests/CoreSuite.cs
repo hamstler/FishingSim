@@ -1158,6 +1158,15 @@ public sealed class CoreSuite : ITestSuite
         float pikeLake = PreyAttack.ChancePerSecond(1f);
         t.Check(pikeLake * 20f > 0.1f && pikeLake * 20f < 0.3f && PreyAttack.ChancePerSecond(0f) == 0f,
             $"in a pike lake a twenty-second fight is grabbed now and then ({pikeLake * 20f:0.00}), never without predators");
+
+        t.Section("village talk");
+        var lakeFish = new List<(string, float)> { ("Płoć", 1.2f), ("Okoń", 1.0f), ("Sum", 0.1f) };
+        var dawnTalk = new FishingSim.Core.Camp.TalkContext(6f, FishingSim.Core.Weather.Clear, 0.2f, lakeFish);
+        var tips = Enumerable.Range(0, 40).Select(i => FishingSim.Core.Camp.VillageTalk.Tip(dawnTalk, new SystemRng(i))).ToList();
+        t.Check(tips.All(x => x != null) && tips.Any(x => x!.Contains("świcie")) && tips.Any(x => x!.Contains("płoć") || x!.Contains("okoń")),
+            "villagers' tips follow the hour and name the lake's common fish");
+        var line = FishingSim.Core.Camp.VillageTalk.Line(dawnTalk with { Hour = 20f, Weather = FishingSim.Core.Weather.Rain }, new SystemRng(3));
+        t.Check(line.StartsWith("Dobry wieczór") && line.Length > 20, $"a line greets by the time of day ({line})");
     }
 
     /// <summary>Always returns the same value (deterministic checks).</summary>

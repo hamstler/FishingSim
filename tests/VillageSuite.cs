@@ -284,6 +284,38 @@ public sealed class VillageSuite : ITestSuite
         shop._UnhandledInput(Key(Godot.Key.B));
         t.Check(!shop.Visible, "the old B shortcut is gone: you have to walk to a shop");
 
+        t.Section("villagers walk about");
+        var walkers = main.Scenery.Wanderers;
+        if (walkers.Count > 0)
+        {
+            world.Hour = 12f;
+            var walker = walkers[0];
+            var npcNode = (Node3D)walker.GetParent();
+            var from = npcNode.GlobalPosition;
+            bool walked = false;
+            for (int i = 0; i < 40 && !walked; i++)
+            {
+                await t.Seconds(0.5);
+                walked = npcNode.GlobalPosition.DistanceTo(from) > 0.5f;
+            }
+            float ground = lake.HeightAt(npcNode.GlobalPosition.X, npcNode.GlobalPosition.Z);
+            t.Check(walked && MathF.Abs(npcNode.GlobalPosition.Y - ground) < 0.15f,
+                $"by day a villager walks about the village on the ground ({walkers.Count} walkers, moved {npcNode.GlobalPosition.DistanceTo(from):0.0} m)");
+            world.Hour = 23f;
+            bool home = false;
+            for (int i = 0; i < 120 && !home; i++)
+            {
+                await t.Seconds(0.5);
+                home = walker.Home;
+            }
+            t.Check(home && !npcNode.Visible, "at night they go home and indoors");
+            world.Hour = 12f;
+            await t.Seconds(0.3);
+            t.Check(npcNode.Visible, "in the morning they come out again");
+        }
+        else
+            t.Check(false, "the village has walking villagers");
+
         t.Section("changing maps");
         shop.OpenFor(ShopKind.Travel);
         shop.Close();
