@@ -52,6 +52,7 @@ public sealed class LineRope
         for (int i = 0; i < Points; i++)
             _p[i] = _prev[i] = tip.Lerp(end, i / (float)(Points - 1));
         _started = true;
+        _lastLength = 0f;      // the next step starts from this length, it reels nothing in
     }
 
     /// <summary>One step of the line's motion with the ends where they are now.</summary>
@@ -61,6 +62,12 @@ public sealed class LineRope
             Reset(tip, end);
         dt = Math.Clamp(dt, 1e-4f, 1f / 30f);
         float straight = tip.DistanceTo(end);
+        // Reeled in since the last step: the line goes in through the tip ring, so it is taken from the rod's end of the
+        // rope (the sag in the air rises, the line lying on the water slides towards the rod) and the end tackle stays
+        // where it is until the slack is gone.
+        if (_lastLength > 0f && Length < _lastLength - 1e-4f)
+            ReelIn(_lastLength - Length, tip);
+        _lastLength = Length;
         // Taut (or nearly): the line runs straight between the ends.
         if (Length <= straight * 1.002f)
         {
@@ -130,6 +137,43 @@ public sealed class LineRope
             for (int i = 1; i < Points - 1; i++)
                 _p[i] = Contain(_p[i], _bed[i]);
         }
+    }
+
+    private float _lastLength;
+    private readonly float[] _arc = new float[Points];
+    private readonly Vector3[] _tmp = new Vector3[Points];
+    private readonly Vector3[] _tmpPrev = new Vector3[Points];
+
+    /// <summary>
+    /// Takes <paramref name="metres"/> of line in at the tip: the rope is resampled along its own path starting that far
+    /// from the tip (the points keep their velocities), then the first point is pinned to the tip again.
+    /// </summary>
+    private void ReelIn(float metres, Vector3 tip)
+    {
+        _arc[0] = 0f;
+        for (int i = 1; i < Points; i++)
+            _arc[i] = _arc[i - 1] + _p[i].DistanceTo(_p[i - 1]);
+        float total = _arc[Points - 1];
+        if (total < 1e-4f)
+            return;
+        float start = MathF.Min(metres, total * 0.95f);
+        int j = 0;
+        for (int i = 0; i < Points; i++)
+        {
+            float s = start + (total - start) * i / (Points - 1);
+            while (j < Points - 2 && _arc[j + 1] < s)
+                j++;
+            float span = MathF.Max(_arc[j + 1] - _arc[j], 1e-6f);
+            float t = Math.Clamp((s - _arc[j]) / span, 0f, 1f);
+            _tmp[i] = _p[j].Lerp(_p[j + 1], t);
+            _tmpPrev[i] = _prev[j].Lerp(_prev[j + 1], t);
+        }
+        for (int i = 1; i < Points - 1; i++)
+        {
+            _p[i] = _tmp[i];
+            _prev[i] = _tmpPrev[i];
+        }
+        _p[0] = _prev[0] = tip;
     }
 
     /// <summary>Keeps a point on or above the floating line's surface film and above the bottom.</summary>

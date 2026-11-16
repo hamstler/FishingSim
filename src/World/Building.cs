@@ -61,6 +61,12 @@ public partial class Building : Node3D
 
     public override void _Ready()
     {
+        // The weathered walls (shaders/building.gdshader) measure their damp foot from the building's ground.
+        float ground = GlobalPosition.Y;
+        foreach (var node in FindChildren("*", "GeometryInstance3D", true, false))
+            if (node is GeometryInstance3D g && g is MeshInstance3D { MaterialOverride: ShaderMaterial { Shader: { } sh } }
+                && sh.ResourcePath.StartsWith("res://shaders/building"))
+                g.SetInstanceShaderParameter("base_y", ground);
         // Most buildings have nothing that moves or glows: they take no time each frame at all.
         SetProcess(_spinners.Count > 0 || _glow.Count > 0 || _lights.Count > 0);
     }

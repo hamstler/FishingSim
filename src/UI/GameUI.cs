@@ -278,7 +278,7 @@ public partial class GameUI : CanvasLayer
         ReelData r => $"Hamulec do {r.DragMax:0} kg | zwijanie {r.ReelSpeed:0.0} m/s | szpula {r.LineCapacity:0} m",
         LineData l => $"{(l.Kind == LineKind.Braid ? "Plecionka" : "Żyłka")} {l.Strength:0} kg | widoczność x{l.Visibility:0.00} | "
             + (l.Kind == LineKind.Braid ? "bez rozciągliwości: pewne zacięcie, zrywy idą w wędkę" : "rozciąga się i tłumi zrywy"),
-        HookData h => $"Rozmiar #{Mathf.RoundToInt(h.Size)} | większy hak = większe ryby, ale gorzej bierze drobnica",
+        HookData h => $"Rozmiar {h.Label} (od #24 najmniejszego do 4/0) | wytrzymałość {h.Strength:0.0} kg, {h.WeightG:0.00} g | większy hak = większe ryby, gorzej bierze drobnica",
         LeaderData d when d.ItemId == TackleSlotExtensions.NoLeader => "Linka idzie prosto do haczyka (szczupak może ją przegryźć)",
         LeaderData d => $"Wytrzymałość {d.Strength:0} kg | widoczność x{d.Visibility:0.00} | odporność na zęby {d.BiteProof * 100f:0}%",
         BaitData { Kind: BaitKind.Lure } b => $"Przynęta sztuczna, masz {_profile.BaitCounts.GetValueOrDefault(b.ItemId)} szt. Spinning: prowadź zwijając (LPM, Shift szybciej), PPM podszarpuje.",
@@ -298,7 +298,7 @@ public partial class GameUI : CanvasLayer
             _slotPrev[s].Disabled = !idle;
             _slotNext[s].Disabled = !idle;
         }
-        string weak = _rod.LineStrength > _rod.RodMaxLoad ? "wędka"
+        string weak = _rod.WeakLink == TackleSlot.Rod ? "wędka" : _rod.WeakLink == TackleSlot.Hook ? "haczyk"
             : _loadout.Leader.Strength < _loadout.Line.Strength ? "przypon" : "linka";
         _summary.Text = $"Najsłabsze ogniwo: {weak}, limit {_rod.EffectiveLimit:0.0} kg. Maks. hamulec {_rod.DragMax:0.0} kg. "
             + $"Zasięg rzutu do ok. {_rod.EstimateCastRange():0} m."

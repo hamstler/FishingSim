@@ -937,7 +937,20 @@ public partial class ScreenshotTool : Node
                     await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
                 for (int i = 0; i < 150; i++)
                     await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-                GD.Print($"line: {lo.Line.DisplayName}, slack {rod.Slack:0.0} m, out {rod.LineOut:0.0} m");
+                GD.Print($"line: {lo.Line.DisplayName}, slack {rod.Slack:0.0} m, out {rod.LineOut:0.0} m, rod load {rod.BendLoad() * 1000f:0} g, bend {rod.BendModel!.TotalBend() * 57.3f:0.0} deg");
+                // FISHSIM_REEL_FRAMES=N: reel for N physics frames first (the slack comes in at the tip before the float moves).
+                if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_REEL_FRAMES"), out int reelFrames))
+                {
+                    var floatAt = rod.Bobber.GlobalPosition;
+                    rod.ReelOverride = true;
+                    for (int i = 0; i < reelFrames; i++)
+                        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                    rod.ReelOverride = false;
+                    GD.Print($"reeled {reelFrames} frames: slack {rod.Slack:0.00} m, float moved {floatAt.DistanceTo(rod.Bobber.GlobalPosition):0.00} m");
+                }
+                // FISHSIM_FP=1: keep the angler's own view.
+                if (System.Environment.GetEnvironmentVariable("FISHSIM_FP") == "1")
+                    goto lineShotDone;
                 // A camera off to the side of the line, looking across it.
                 var tipAt = main.Player.RodTip.GlobalPosition;
                 var endAt = rod.Bobber.GlobalPosition;
@@ -949,6 +962,7 @@ public partial class ScreenshotTool : Node
                 main.AddChild(lineCam);
                 lineCam.GlobalPosition = new Vector3(mid.X, 2.2f, mid.Z) + side * 7.5f;
                 lineCam.LookAt(new Vector3(mid.X, 0.6f, mid.Z));
+                lineShotDone:;
             }
             else if (arg == 1)
             {
@@ -1093,8 +1107,11 @@ public partial class ScreenshotTool : Node
         else if (mode == 27)
         {
             // Everyday life: arg 0 = woodcutter, 1 = washing line, 2 = village hearth, 3 = rowboat, 4 = net rack, 5 = tool rack.
-            string[] names = { "ChoppingBlock", "Laundry", "Hearth", "Rowboat", "NetRack", "Tools" };
-            var target = main.Scenery.FindChild(names[Math.Clamp(arg, 0, names.Length - 1)], true, false) as Node3D;
+            string[] names = { "ChoppingBlock", "Laundry", "Hearth", "Rowboat", "NetRack", "Tools", "Well" };
+            // arg 6: the village well (a Building of kind Well).
+            var target = arg == 6
+                ? main.Scenery.FindChildren("*", "Node3D", true, false).OfType<FishingSim.World.Building>().FirstOrDefault(bd => bd.Spec?.Kind == FishingSim.Data.BuildingKind.Well)
+                : main.Scenery.FindChild(names[Math.Clamp(arg, 0, names.Length - 1)], true, false) as Node3D;
             if (target != null)
             {
                 var at = target.GlobalPosition;

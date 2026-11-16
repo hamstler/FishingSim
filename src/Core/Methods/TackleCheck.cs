@@ -29,11 +29,15 @@ public static class TackleCheck
     public const float LooseKg = 0.9f;
 
     /// <summary>The drag's hold (kg) as a share of the breaking load (0 .. any).</summary>
-    public static float Share(float dragKg, float lineKg, float rodKg) => dragKg / MathF.Max(MathF.Min(lineKg, rodKg), 0.01f);
+    public static float Share(float dragKg, float lineKg, float rodKg, float hookKg = float.MaxValue) =>
+        dragKg / MathF.Max(Limit(lineKg, rodKg, hookKg), 0.01f);
 
-    public static TackleVerdict Judge(float dragKg, float lineKg, float rodKg)
+    /// <summary>The weakest link's breaking load (kg).</summary>
+    public static float Limit(float lineKg, float rodKg, float hookKg = float.MaxValue) => MathF.Min(MathF.Min(lineKg, rodKg), hookKg);
+
+    public static TackleVerdict Judge(float dragKg, float lineKg, float rodKg, float hookKg = float.MaxValue)
     {
-        float share = Share(dragKg, lineKg, rodKg);
+        float share = Share(dragKg, lineKg, rodKg, hookKg);
         if (share > 1f)
             return TackleVerdict.TooTight;
         if (share > TightShare)
@@ -44,16 +48,16 @@ public static class TackleCheck
     }
 
     /// <summary>The drag setting (0..1 of the reel's maximum) at which the drag holds as much as the tackle takes.</summary>
-    public static float BreakSetting(float dragMaxKg, float lineKg, float rodKg) =>
-        Math.Clamp(MathF.Min(lineKg, rodKg) / MathF.Max(dragMaxKg, 0.01f), 0f, 1f);
+    public static float BreakSetting(float dragMaxKg, float lineKg, float rodKg, float hookKg = float.MaxValue) =>
+        Math.Clamp(Limit(lineKg, rodKg, hookKg) / MathF.Max(dragMaxKg, 0.01f), 0f, 1f);
 
     /// <summary>One line for the angler, e.g. "Hamulec za mocny: trzyma 3,4 kg, linka pęka przy 3,0 kg".</summary>
-    public static string Describe(float dragKg, float lineKg, float rodKg)
+    public static string Describe(float dragKg, float lineKg, float rodKg, float hookKg = float.MaxValue)
     {
-        string weak = rodKg < lineKg ? "wędka" : "linka";
-        float limit = MathF.Min(lineKg, rodKg);
-        string note = rodKg < lineKg * 0.8f ? " (wędka słabsza od linki)" : "";
-        return Judge(dragKg, lineKg, rodKg) switch
+        float limit = Limit(lineKg, rodKg, hookKg);
+        string weak = limit == rodKg ? "wędka" : limit == hookKg ? "haczyk" : "linka";
+        string note = rodKg < lineKg * 0.8f ? " (wędka słabsza od linki)" : hookKg < lineKg * 0.8f ? " (haczyk słabszy od linki)" : "";
+        return Judge(dragKg, lineKg, rodKg, hookKg) switch
         {
             TackleVerdict.TooTight => $"Hamulec za mocny: trzyma {dragKg:0.0} kg, {weak} pęka przy {limit:0.0} kg. Poluzuj!",
             TackleVerdict.Tight => $"Hamulec na granicy: {dragKg:0.0} z {limit:0.0} kg. Mocny odjazd może zerwać zestaw{note}",

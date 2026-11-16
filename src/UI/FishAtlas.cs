@@ -65,7 +65,7 @@ public partial class FishAtlas : Control
         Theme = UITheme.Make();
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         MouseFilter = MouseFilterEnum.Stop;
-        var shade = new ColorRect { Color = new Color(0.05f, 0.035f, 0.02f, 0.94f), MouseFilter = MouseFilterEnum.Ignore };
+        var shade = new ColorRect { Color = new Color(0.02f, 0.03f, 0.04f, 0.94f), MouseFilter = MouseFilterEnum.Ignore };
         shade.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         AddChild(shade);
 

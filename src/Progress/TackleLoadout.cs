@@ -23,7 +23,8 @@ public sealed class TackleLoadout
     private static readonly string[] LinePaths = Paths("lines",
         new[] { "zylka016", "zylka025", "plecionka030", "jelito_cienkie", "jelito_mocne", "jedwab_skrecany",
             "plecionka_konopna", "plecionka_jedwabna", "plecionka_smolowana" }.Concat(GeneratedTackle.Lines).ToArray());
-    private static readonly string[] HookPaths = Paths("hooks", "hak2", "hak5", "hak8", "hak1", "hak3", "hak6", "hak10");
+    private static readonly string[] HookPaths = Paths("hooks", "hak_24", "hak_22", "hak1", "hak_18", "hak2", "hak3", "hak_12", "hak5", "hak6", "hak_6", "hak8", "hak_2",
+        "hak_1", "hak_1_0", "hak_2_0", "hak_3_0", "hak10");
     private static readonly string[] BaitPaths = Paths("baits",
         new[] { "worm", "corn", "bread", "boilie", "livebait", "maggot", "insect",
             "rosowka", "ochotka", "chrabaszcz", "martwa_rybka", "ciasto", "groch", "kasza", "konopie", "kulka_czosnkowa",

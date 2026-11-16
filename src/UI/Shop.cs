@@ -118,7 +118,7 @@ public partial class Shop : CanvasLayer
     {
         Layer = 10;
         Visible = false;
-        var dim = new ColorRect { Color = new Color(0.03f, 0.02f, 0.01f, 0.62f) };
+        var dim = new ColorRect { Color = new Color(0.02f, 0.03f, 0.04f, 0.62f) };
         dim.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         AddChild(dim);
 
@@ -1137,7 +1137,7 @@ public partial class Shop : CanvasLayer
     private void FishRow(Container list, string species, string title, string details, string? button, Action? onPressed, string? price = null)
     {
         var row = new PanelContainer();
-        row.AddThemeStyleboxOverride("panel", UITheme.Box(new Color(0.25f, 0.17f, 0.1f, 0.8f), new Color(0.45f, 0.3f, 0.16f), 0, 1, 6));
+        row.AddThemeStyleboxOverride("panel", UITheme.Box(new Color(1f, 1f, 1f, 0.05f), new Color(1f, 1f, 1f, 0.12f), 5, 1, 6));
         var h = new HBoxContainer();
         h.AddThemeConstantOverride("separation", 12);
         row.AddChild(h);

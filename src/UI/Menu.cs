@@ -25,6 +25,9 @@ public partial class Menu : Control
     private Button _loginButton = null!;
 
     public bool LoginVisible => _loginBox.Visible;
+
+    /// <summary>The settings gear and the exit door in the top-right corner.</summary>
+    public CornerMenu Corner { get; private set; } = null!;
     public bool MapsVisible => _mapsBox.Visible;
     public string ErrorText => _error.Text;
     public bool LoginLocked => _loginButton.Disabled;
@@ -63,6 +66,23 @@ public partial class Menu : Control
         _loading.OffsetTop = -80f;
         _loading.OffsetBottom = -30f;
         AddChild(_loading);
+        // Top right: the gear (graphics, controls) and the door (quit), above everything else.
+        var corner = new CornerMenu();
+        corner.AnchorLeft = corner.AnchorRight = 1f;
+        corner.OffsetLeft = -120f;
+        corner.OffsetRight = -14f;
+        corner.OffsetTop = 14f;
+        corner.OffsetBottom = 60f;
+        corner.Alignment = BoxContainer.AlignmentMode.End;
+        corner.OpenSettings += which =>
+        {
+            if (which == 0)
+                OpenGraphics();
+            else
+                AddChild(new ControlsPanel());
+        };
+        AddChild(corner);
+        Corner = corner;
         if (Session.IsLoggedIn)
             ShowMaps();
         else
@@ -122,9 +142,9 @@ public partial class Menu : Control
         }
         // Darken the top and bottom a little so the title and the panels read well over the picture.
         var gradient = new Gradient();
-        gradient.SetColor(0, new Color(0.05f, 0.03f, 0.02f, 0.55f));
+        gradient.SetColor(0, new Color(0.02f, 0.03f, 0.04f, 0.55f));
         gradient.AddPoint(0.35f, new Color(0f, 0f, 0f, 0f));
-        gradient.SetColor(gradient.GetPointCount() - 1, new Color(0.05f, 0.03f, 0.02f, 0.7f));
+        gradient.SetColor(gradient.GetPointCount() - 1, new Color(0.02f, 0.03f, 0.04f, 0.72f));
         var shade = new TextureRect
         {
             Texture = new GradientTexture2D { Gradient = gradient, FillFrom = Vector2.Zero, FillTo = new Vector2(0, 1), Width = 4, Height = 256 },
@@ -137,13 +157,13 @@ public partial class Menu : Control
         var title = new Label { Text = "Fishing Sim", HorizontalAlignment = HorizontalAlignment.Center };
         title.AddThemeFontSizeOverride("font_size", 64);
         title.AddThemeColorOverride("font_color", new Color(0.98f, 0.84f, 0.5f));
-        title.AddThemeColorOverride("font_outline_color", new Color(0.12f, 0.07f, 0.03f));
+        title.AddThemeColorOverride("font_outline_color", new Color(0.03f, 0.04f, 0.05f, 0.9f));
         title.AddThemeConstantOverride("outline_size", 8);
         title.SetAnchorsPreset(LayoutPreset.TopWide);
         title.OffsetTop = 30f;
         title.OffsetBottom = 120f;
         AddChild(title);
-        _subtitle = new Label { Text = "średniowieczny symulator wędkarski", HorizontalAlignment = HorizontalAlignment.Center, Modulate = new Color(1, 1, 1, 0.6f) };
+        _subtitle = new Label { Text = "symulator wędkarski", HorizontalAlignment = HorizontalAlignment.Center, Modulate = new Color(1, 1, 1, 0.6f) };
         _subtitle.AddThemeFontSizeOverride("font_size", 18);
         _subtitle.SetAnchorsPreset(LayoutPreset.TopWide);
         _subtitle.OffsetTop = 112f;
@@ -189,7 +209,7 @@ public partial class Menu : Control
     private void BuildLogin()
     {
         var panel = new PanelContainer();
-        Center(panel, 420, 510);
+        Center(panel, 420, 430);
         AddChild(panel);
         _loginBox = panel;
         var margin = new MarginContainer();
@@ -211,7 +231,7 @@ public partial class Menu : Control
             emblem.AddChild(new TextureRect
             {
                 Texture = sp != null ? Icons.Fish(sp) : null,
-                CustomMinimumSize = id == "karp" ? new Vector2(150, 112) : new Vector2(96, 72),
+                CustomMinimumSize = id == "karp" ? new Vector2(110, 70) : new Vector2(72, 46),
                 ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
                 StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
                 TextureFilter = TextureFilterEnum.LinearWithMipmaps,
@@ -230,6 +250,7 @@ public partial class Menu : Control
         _pass.TextSubmitted += text => { _ = TryLogin(); };
         box.AddChild(_pass);
         _loginButton = new Button { Text = "Zaloguj", CustomMinimumSize = new Vector2(0, 44) };
+        UITheme.Primary(_loginButton);
         _loginButton.Pressed += () => { _ = TryLogin(); };
         box.AddChild(_loginButton);
         _error = new Label();
@@ -239,12 +260,7 @@ public partial class Menu : Control
         var atlas = new Button { Text = "Atlas ryb", CustomMinimumSize = new Vector2(0, 40) };
         atlas.Pressed += () => OpenAtlas();
         box.AddChild(atlas);
-        var graphics = new Button { Text = "Ustawienia grafiki", CustomMinimumSize = new Vector2(0, 40) };
-        graphics.Pressed += () => OpenGraphics();
-        box.AddChild(graphics);
-        var controls = new Button { Text = "Sterowanie", CustomMinimumSize = new Vector2(0, 40) };
-        controls.Pressed += () => AddChild(new ControlsPanel());
-        box.AddChild(controls);
+        // The graphics and the controls are in the corner widget (gear), on every menu screen.
     }
 
     /// <summary>The graphics settings over the menu (before logging in or on the map selection).</summary>
@@ -311,18 +327,23 @@ public partial class Menu : Control
         foreach (var c in _mapsBox.GetChildren())
             c.QueueFree();
         _mapsBox.Visible = true;
-        Center(_mapsBox, 1240, 560);
-        _mapsBox.OffsetTop -= 30f;
-        _mapsBox.OffsetBottom -= 30f;
+        // Under the title, down to the bottom edge (the corner widget holds the settings and the exit).
+        _mapsBox.AnchorLeft = _mapsBox.AnchorRight = 0.5f;
+        _mapsBox.AnchorTop = 0f;
+        _mapsBox.AnchorBottom = 1f;
+        _mapsBox.OffsetLeft = -620f;
+        _mapsBox.OffsetRight = 620f;
+        _mapsBox.OffsetTop = 118f;
+        _mapsBox.OffsetBottom = -12f;
         _mapsBox.AddThemeConstantOverride("separation", 14);
 
         var profile = Profile.LoadFor(Session.Username);
         var head = new Label
         {
-            Text = $"Witaj, {Session.Username}  |  poziom {profile.Level}  |  {profile.Money} gr\nWybierz łowisko",
+            Text = $"Witaj, {Session.Username}  ·  poziom {profile.Level}  ·  {profile.Money} gr  ·  wybierz łowisko",
             HorizontalAlignment = HorizontalAlignment.Center,
         };
-        head.AddThemeFontSizeOverride("font_size", 22);
+        head.AddThemeFontSizeOverride("font_size", 19);
         _mapsBox.AddChild(head);
 
         var row = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
@@ -337,9 +358,6 @@ public partial class Menu : Control
         var atlas = new Button { Text = "Atlas ryb", CustomMinimumSize = new Vector2(160, 40) };
         atlas.Pressed += () => OpenAtlas();
         buttons.AddChild(atlas);
-        var controls = new Button { Text = "Sterowanie", CustomMinimumSize = new Vector2(160, 40) };
-        controls.Pressed += () => AddChild(new ControlsPanel());
-        buttons.AddChild(controls);
         var logout = new Button { Text = "Wyloguj", CustomMinimumSize = new Vector2(160, 40) };
         logout.Pressed += Logout;
         buttons.AddChild(logout);
@@ -351,7 +369,7 @@ public partial class Menu : Control
         bool locked = profile.Level < loc.RequiredLevel;
         var panel = new PanelContainer { CustomMinimumSize = new Vector2(292, 0) };
         // A slimmer frame than the big panels, so four ground cards fit side by side.
-        panel.AddThemeStyleboxOverride("panel", UiArt.Nine(UiArt.PanelTexture, 24, 10, tile: true));
+        panel.AddThemeStyleboxOverride("panel", UiArt.Nine(UiArt.PanelTexture, 24, 10));
         var margin = new MarginContainer();
         foreach (var side in new[] { "left", "right", "top", "bottom" })
             margin.AddThemeConstantOverride("margin_" + side, 4);
@@ -400,6 +418,7 @@ public partial class Menu : Control
         else
         {
             button.Text = "Łów tutaj";
+            UITheme.Primary(button);
             button.Pressed += () => { _ = ChooseMap(index); };
         }
         box.AddChild(button);

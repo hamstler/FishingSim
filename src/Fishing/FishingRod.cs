@@ -401,7 +401,32 @@ public partial class FishingRod : Node3D
     public float FishStamina => _fight?.Stamina ?? 1f;
 
     /// <summary>Weakest link of the setup: the line (with its leader) or the rod, whichever gives first.</summary>
-    public float EffectiveLimit => MathF.Min(LineStrength, RodMaxLoad);
+    public float EffectiveLimit => MathF.Min(MathF.Min(LineStrength, RodMaxLoad), HookStrength);
+
+    /// <summary>Load (kg) the hook takes before it opens.</summary>
+    public float HookStrength { get; private set; } = 4f;
+
+    /// <summary>Which part gives first under too much load: the rod, the hook (it opens) or the line.</summary>
+    public TackleSlot WeakLink => RodMaxLoad <= LineStrength && RodMaxLoad <= HookStrength ? TackleSlot.Rod
+        : HookStrength < LineStrength ? TackleSlot.Hook : TackleSlot.Line;
+
+    /// <summary>Breaks the weakest link under an overload: the rod snaps, the hook opens (only the hook is lost) or the
+    /// line parts (the hook stays in the fish).</summary>
+    private void BreakWeakest(string rod, string line)
+    {
+        switch (WeakLink)
+        {
+            case TackleSlot.Rod:
+                BreakLine(rod, TackleSlot.Rod);
+                break;
+            case TackleSlot.Hook:
+                BreakLine("Haczyk się rozgiął i ryba uciekła! Większy hak wytrzyma więcej.", TackleSlot.Hook);
+                break;
+            default:
+                BreakLine(line, TackleSlot.Hook);
+                break;
+        }
+    }
 
     /// <summary>The HUD's line: a bite is not announced, the angler has to see it on the float, the quiver tip or
     /// the bite indicator (or hear the bell).</summary>
@@ -510,6 +535,7 @@ public partial class FishingRod : Node3D
         var line = Loadout.Line;
         var leader = Loadout.Leader;
         RodMaxLoad = rod.MaxLoad;
+        HookStrength = Loadout.Hook.Strength;
         // A stretchy line soaks up part of every surge on top of the rod; a braid passes it all on.
         _rodShock = MathF.Min(rod.ShockAbsorb + 0.12f * line.Stretch, 0.5f);
         _castMin = BaseCastMin * rod.CastMult;
@@ -575,18 +601,7 @@ public partial class FishingRod : Node3D
         _rig.SetBail(_bailOpen);
         _rig.SetIndicator(_castMethod == FishingMethod.Bottom && State is RodState.Waiting or RodState.Nibble or RodState.Bite,
             Math.Clamp(_bitePull + 0.35f * _pluck, 0f, 1f));
-        float load = State is RodState.Fight or RodState.Close ? Tension
-            : !lineOut ? 0.04f
-            : _castMethod switch
-            {
-                // A lure pulls the tip as it is drawn; a snag bends the rod hard while it is pulled on.
-                FishingMethod.Spinning => 0.14f + 0.3f * MathF.Min(_lure?.Speed ?? 0f, 2f)
-                    + (_lure?.Snagged == true ? (Reeling ? 0.6f : 0.25f) * EffectiveLimit : 0f),
-                // The line to the feeder is tight; a bite pulls the quiver tip round.
-                FishingMethod.Bottom => (_rigSettled ? 0.22f : 0.1f) + _bitePull * 0.9f,
-                // Float: a slack line to the float; the bite shows on the float, never on the tip.
-                _ => 0.1f,
-            };
+        float load = BendLoad();
         Vector3 target = lineOut ? _bobber.GlobalPosition : _rig.GlobalPosition + Vector3.Down * 10f;
         var straightTip = new Vector3(0f, RodRig.BlankStart + _bendModel.Length, 0f);
         var dir = (_rig.ToLocal(target) - straightTip).Normalized();
@@ -595,6 +610,45 @@ public partial class FishingRod : Node3D
         var axis = side > 1e-4f ? Vector3.Up.Cross(perp / side) : Vector3.Right;
         _bendModel.Step(dt, load, dir.Y, side);
         _rig.SetJointAngles(_bendModel.Angles, axis);
+    }
+
+    /// <summary>Weight of the end tackle hanging from the line (kg): the lure; the float with its shot, hook and bait;
+    /// the feeder with its load.</summary>
+    public float TackleWeightKg => (Loadout.LureOn ? Loadout.Bait.WeightG
+        : (Method == FishingMethod.Bottom ? FeederGrams : FloatRigGrams) + Loadout.Hook.WeightG) / 1000f;
+
+    /// <summary>A float of a few grams with its split shot; a filled feeder.</summary>
+    private const float FloatRigGrams = 4.5f, FeederGrams = 40f;
+
+    /// <summary>
+    /// What pulls the tip down (kg), from the physics of the line: in the fight the tension; with the end tackle
+    /// hanging under the tip (before the cast) its weight; with the line out only what a tight line carries (a lure
+    /// drawn through the water, the feeder the line was tightened to, a fish pulling the quiver tip, a snag). A slack
+    /// line pulls nothing, so the blank stands straight while the float rides on a slack line.
+    /// </summary>
+    public float BendLoad()
+    {
+        if (State is RodState.Fight or RodState.Close)
+            return Tension;
+        if (State is RodState.Idle or RodState.Charging)
+            return TackleWeightKg;
+        if (State is not (RodState.Waiting or RodState.Nibble or RodState.Bite))
+            return 0f;
+        // Slack: only the line's own short hang from the tip (a few grams) and nothing from the end tackle.
+        float slack = Slack;
+        float taut = Math.Clamp(1f - slack / 0.25f, 0f, 1f);
+        float line = 0.002f;
+        float pull = _castMethod switch
+        {
+            // A lure resists being drawn through the water (more the faster and the bigger it is); a snag holds hard.
+            FishingMethod.Spinning => (_lure?.Snagged == true ? (Reeling ? 0.6f : 0.25f) * EffectiveLimit : 0f)
+                + (Reeling ? TackleWeightKg * 0.6f + 0.05f * MathF.Pow(MathF.Min(_lure?.Speed ?? 0f, 2f), 2f) : 0f),
+            // The line tightened to the feeder on the bottom carries part of its weight; a bite pulls the tip round.
+            FishingMethod.Bottom => (_rigSettled ? TackleWeightKg * 0.6f : TackleWeightKg) + _bitePull * 0.9f,
+            // A float drawn over the water drags a little; left alone it pulls nothing (bites show on the float only).
+            _ => Reeling ? 0.03f : 0f,
+        };
+        return line + pull * taut;
     }
 
     /// <summary>A kick to the blank (bites, the strike, the cast).</summary>
@@ -1708,10 +1762,7 @@ public partial class FishingRod : Node3D
         switch (outcome)
         {
             case FightOutcome.LineBroke:
-                if (RodMaxLoad < LineStrength)
-                    BreakLine("Wędka się złamała!", TackleSlot.Rod);
-                else
-                    BreakLine("Linka pękła! Haczyk został w rybie.", TackleSlot.Hook);
+                BreakWeakest("Wędka się złamała!", "Linka pękła! Haczyk został w rybie.");
                 return;
             case FightOutcome.SpooledOut:
                 BreakLine("Ryba wyciągnęła całą linkę! Żyłka przepadła.", TackleSlot.Line);
@@ -1836,10 +1887,7 @@ public partial class FishingRod : Node3D
         _liftStress = ratio > 1f ? _liftStress + (ratio - 1f) * 3f * dt : MathF.Max(_liftStress - 0.5f * dt, 0f);
         if (!DevUnbreakable && (_liftStress >= 1f || ratio > 1.6f))
         {
-            if (RodMaxLoad < LineStrength)
-                BreakLine("Wędka pękła pod ciężarem ryby!", TackleSlot.Rod);
-            else
-                BreakLine("Linka pękła przy podnoszeniu! Użyj kasarka.", TackleSlot.Hook);
+            BreakWeakest("Wędka pękła pod ciężarem ryby!", "Linka pękła przy podnoszeniu! Użyj kasarka.");
             return;
         }
 

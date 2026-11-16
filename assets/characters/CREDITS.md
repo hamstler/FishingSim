@@ -10,3 +10,7 @@ Mieszkańcy wiosek są złożeni z darmowych (Standard) pakietów Quaterniusa na
 | Universal Animation Library 2 | animacje (założone ręce, oparcie o barierkę, prace w polu, rąbanie drewna, przytaknięcie) | https://quaternius.com/packs/universalanimationlibrary2.html |
 
 Modele połączono, przypięto do szkieletu stroju i przeniesiono na niego animacje narzędziem `tools/assets/quaternius.py`.
+
+## MakeHuman (CC0 1.0)
+
+Realistyczni mieszkańcy (`mh_*.glb`, `textures/mh_*.webp`): bazowa siatka, morfy i szkielet MakeHuman dostarczane z MPFB2 (LICENSE.ASSETS.md: CC0) oraz paczka „makehuman_system_assets” (skóry, oczy, brwi, rzęsy, fryzury, ubrania, buty, kapelusze; CC0) z https://static.makehumancommunity.org/asset_packs/makehuman_system_assets.html. Postacie zbudowano narzędziem `tools/assets/makehuman_build.py` (MPFB2 w Blenderze 4.2 tylko na etapie budowy; jego kod GPL nie trafia do gry), ustawiono w pozie szkieletu Quaternius i przypięto do niego, więc korzystają z tych samych animacji.
