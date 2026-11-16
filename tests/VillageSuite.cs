@@ -247,8 +247,11 @@ public sealed class VillageSuite : ITestSuite
         {
             var board = new Vector2(2.4f, 0.7f);
             float px = FishingSim.World.Props.BuildingFactory.FitPixelSize(text, board);
-            var size = ThemeDB.FallbackFont.GetStringSize(text, HorizontalAlignment.Left, -1, 64) * px;
-            t.Check(size.X <= board.X * 0.8f && size.Y <= board.Y * 0.6f, $"'{text}' fits its sign ({size.X:0.00} x {size.Y:0.00} m on {board.X} x {board.Y} m)");
+            var font = FishingSim.World.Props.BuildingFactory.SignFont;
+            var size = font.GetStringSize(text, HorizontalAlignment.Left, -1, 64) * px;
+            float letter = font.GetHeight(64) * 0.68f * px;
+            t.Check(size.X <= board.X * 0.63f && size.Y <= board.Y * 0.41f && letter <= 0.225f,
+                $"'{text}' fits its sign with a margin ({size.X:0.00} x {size.Y:0.00} m, letters {letter:0.00} m, on {board.X} x {board.Y} m)");
         }
 
         t.Section("shops open by kind");

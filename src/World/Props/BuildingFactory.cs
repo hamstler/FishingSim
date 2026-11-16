@@ -312,32 +312,63 @@ public static partial class BuildingFactory
         parent.AddChild(body);
     }
 
+    /// <summary>A sign's board: dark old planks (the old flat black read as a hole in the wall).</summary>
+    private static Material SignBoard() =>
+        Weathered("weathered_brown_planks", new Color(0.52f, 0.44f, 0.36f), 0.85f, scale: 0.5f, moss: 0f) ?? Flat(new Color(0.16f, 0.12f, 0.09f), 0.9f);
+
     /// <summary>
-    /// Text painted on a sign board of <paramref name="board"/> size (m): the letters are scaled to fit inside it with a
-    /// margin (at most 78% of the width and 55% of the height), whatever the length of the text.
+    /// The lettering of the signs: a bold serif from the player's system (Georgia, Times New Roman, Liberation or DejaVu
+    /// Serif...; nothing shipped), the engine's font when none is found.
     /// </summary>
-    public static float FitPixelSize(string text, Vector2 board, int fontSize = 64)
+    public static Font SignFont => _signFont ??= new SystemFont
     {
-        var size = ThemeDB.FallbackFont.GetStringSize(text, HorizontalAlignment.Left, -1, fontSize);
+        FontNames = new[] { "Georgia", "Cambria", "Times New Roman", "Liberation Serif", "DejaVu Serif", "Noto Serif", "FreeSerif", "serif" },
+        FontWeight = 700,
+        Antialiasing = TextServer.FontAntialiasing.Gray,
+        Fallbacks = new Godot.Collections.Array<Font> { ThemeDB.FallbackFont },
+    };
+
+    private static Font? _signFont;
+
+    /// <summary>
+    /// Text painted on a sign board of <paramref name="board"/> size (m): the letters fit inside it with a wide margin
+    /// (at most 62 % of the width and 40 % of the height) and are never taller than <paramref name="maxLetter"/> m
+    /// (real signs: 15-25 cm letters on a shop, ~10 cm on a signpost), whatever the length of the text.
+    /// </summary>
+    public static float FitPixelSize(string text, Vector2 board, int fontSize = 64, float maxLetter = 0.22f)
+    {
+        var font = SignFont;
+        var size = font.GetStringSize(text, HorizontalAlignment.Left, -1, fontSize);
         if (size.X <= 0f || size.Y <= 0f)
             return 0.01f;
-        return MathF.Min(board.X * 0.78f / size.X, board.Y * 0.55f / size.Y);
+        // The font's height includes the space above and below the letters; capitals are ~0.68 of it.
+        float capHeight = font.GetHeight(fontSize) * 0.68f;
+        return MathF.Min(MathF.Min(board.X * 0.62f / size.X, board.Y * 0.4f / size.Y), maxLetter / capHeight);
     }
 
-    private static void Label(Node3D parent, string text, Vector3 pos, Vector2 board, int fontSize = 64, Color? color = null)
+    /// <summary>
+    /// Painted lettering on a board: lit like the board (it does not glow at night), a thin soft edge of darker paint,
+    /// tilted with the board (<paramref name="tiltDeg"/> about the board's normal).
+    /// </summary>
+    private static void Label(Node3D parent, string text, Vector3 pos, Vector2 board, int fontSize = 64, Color? color = null,
+        float maxLetter = 0.22f, float tiltDeg = 0f)
     {
+        var paint = color ?? new Color(0.9f, 0.82f, 0.62f);
         parent.AddChild(new Label3D
         {
             Text = text,
+            Font = SignFont,
             Position = pos,
-            PixelSize = FitPixelSize(text, board, fontSize),
+            RotationDegrees = new Vector3(0f, 0f, tiltDeg),
+            PixelSize = FitPixelSize(text, board, fontSize, maxLetter),
             FontSize = fontSize,
-            OutlineSize = 3,
-            Modulate = color ?? new Color(0.98f, 0.93f, 0.8f),
-            OutlineModulate = new Color(0.05f, 0.04f, 0.03f),
+            OutlineSize = 2,
+            Modulate = paint,
+            OutlineModulate = new Color(paint.R * 0.45f, paint.G * 0.4f, paint.B * 0.35f, 0.55f),
+            Shaded = true,
             DoubleSided = false,
             AlphaCut = Label3D.AlphaCutMode.Discard,
-            TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
+            TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
         });
     }
 
@@ -441,10 +472,12 @@ public static partial class BuildingFactory
         }
         if (s.Sign != null)
         {
-            float signY = s.Awning ? 3.55f : 3.05f;
-            var board = new Vector2(Math.Min(s.Sign.Length * 0.2f + 0.8f, s.W * 0.7f), 0.7f);
-            Box(b, new Vector3(board.X, board.Y, 0.12f), new Vector3(0, signY, front + 0.12f), Flat(new Color(0.16f, 0.12f, 0.09f), 0.9f));
-            Label(b, s.Sign, new Vector3(0, signY, front + 0.2f), board);
+            // On the wall above the door, under the eaves (higher up the thatch's overhang hid it).
+            float doorTop = DoorHeight + 0.55f, wallTop = s.H + 0.15f;
+            float signY = (doorTop + wallTop) / 2f;
+            var board = new Vector2(Math.Min(s.Sign.Length * 0.16f + 0.7f, s.W * 0.6f), Math.Clamp(wallTop - doorTop - 0.1f, 0.3f, 0.45f));
+            Box(b, new Vector3(board.X, board.Y, 0.12f), new Vector3(0, signY, front + 0.12f), SignBoard());
+            Label(b, s.Sign, new Vector3(0, signY, front + 0.185f), board);
         }
         var lamp = new OmniLight3D
         {
@@ -686,8 +719,8 @@ public static partial class BuildingFactory
                 Scale = new Vector3(0.3f, 1f, 0.5f),
             });
         // sign on the front beam
-        Box(b, new Vector3(3.6f, 0.75f, 0.12f), new Vector3(0, 3.55f, d / 2f + 0.3f), Flat(new Color(0.16f, 0.12f, 0.09f), 0.9f));
-        Label(b, sign, new Vector3(0, 3.55f, d / 2f + 0.38f), new Vector2(3.6f, 0.75f));
+        Box(b, new Vector3(3.6f, 0.75f, 0.12f), new Vector3(0, 3.55f, d / 2f + 0.3f), SignBoard());
+        Label(b, sign, new Vector3(0, 3.55f, d / 2f + 0.365f), new Vector2(3.6f, 0.75f));
         var lamp = new OmniLight3D { LightColor = new Color(1f, 0.78f, 0.45f), OmniRange = 9f, LightEnergy = 0f, Position = new Vector3(0, 2.8f, 2.2f) };
         b.AddChild(lamp);
         b.AddLight(lamp);
@@ -736,7 +769,7 @@ public static partial class BuildingFactory
         // Signpost with the destinations.
         Box(b, new Vector3(0.18f, 3f, 0.18f), new Vector3(2.4f, 1.5f, 1.2f), dark);
         Box(b, new Vector3(1.7f, 0.45f, 0.08f), new Vector3(2.4f, 2.7f, 1.26f), wood);
-        Label(b, "ŁOWISKA", new Vector3(2.4f, 2.7f, 1.32f), new Vector2(1.7f, 0.45f), 64, new Color(0.15f, 0.1f, 0.05f));
+        Label(b, "Łowiska", new Vector3(2.4f, 2.7f, 1.31f), new Vector2(1.7f, 0.45f), 64, new Color(0.17f, 0.12f, 0.07f), 0.12f);
     }
 
     private static void Windmill(Building b)
@@ -831,9 +864,9 @@ public static partial class BuildingFactory
         var wood = Wood(new Color(0.6f, 0.45f, 0.32f));
         Cyl(b, 0.09f, 0.11f, 2.8f, new Vector3(0, 1.4f, 0), wood, 8);
         Box(b, new Vector3(1.7f, 0.4f, 0.07f), new Vector3(0.25f, 2.35f, 0.08f), Painted(new Color(0.85f, 0.8f, 0.65f)), new Vector3(0, 0, 4f));
-        Label(b, "WIOSKA >", new Vector3(0.25f, 2.35f, 0.125f), new Vector2(1.7f, 0.4f), 64, new Color(0.1f, 0.08f, 0.06f));
+        Label(b, "Wioska →", new Vector3(0.25f, 2.35f, 0.118f), new Vector2(1.7f, 0.4f), 64, new Color(0.14f, 0.1f, 0.07f), 0.11f, 4f);
         Box(b, new Vector3(1.7f, 0.4f, 0.07f), new Vector3(-0.25f, 1.8f, 0.08f), Painted(new Color(0.85f, 0.8f, 0.65f)), new Vector3(0, 0, -3f));
-        Label(b, "< POMOST", new Vector3(-0.25f, 1.8f, 0.125f), new Vector2(1.7f, 0.4f), 64, new Color(0.1f, 0.08f, 0.06f));
+        Label(b, "← Pomost", new Vector3(-0.25f, 1.8f, 0.118f), new Vector2(1.7f, 0.4f), 64, new Color(0.14f, 0.1f, 0.07f), 0.11f, -3f);
     }
 
     /// <summary>
