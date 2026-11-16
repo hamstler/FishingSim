@@ -110,6 +110,7 @@ void fragment() {
 	vec3 tilt = vec3(0.0);
 	float rough = 0.0;
 	float total = 0.0;
+	float hgt = 0.0;
 	vec3 grass_tint = mix(layer_tint[0], dark_grass_tint, smoothstep(2.0, 8.0, wpos.y));
 	for (int i = 0; i < 7; i++) {
 		float b = max(s[i] - top + 0.16, 0.0);
@@ -135,6 +136,7 @@ void fragment() {
 		}
 		vec3 tint = i == 0 ? grass_tint : layer_tint[i];
 		base += alb[i].rgb * tint * b;
+		hgt += alb[i].a * b;
 		tilt += t3 * b;
 		rough += layer_rough[i] * b;
 		total += b;
@@ -142,11 +144,23 @@ void fragment() {
 	base /= total;
 	tilt /= total;
 	rough /= total;
+	hgt /= total;
+	// Small shade in the hollows of each ground (between blades, pebbles, clods): the layers' height in the albedo's alpha.
+	base *= mix(0.8, 1.04, smoothstep(0.1, 0.75, hgt));
 
 	// ---- large-scale variation (so the ground is never one flat colour across a field)
-	float green = w[0] + w[1];
+	float green = clamp(w[0] + w[1], 0.0, 1.0);
 	base *= mix(0.86, 1.1, macro);
-	base *= mix(vec3(1.0), mix(vec3(1.06, 1.03, 0.86), vec3(0.9, 1.0, 0.95), mid), clamp(green, 0.0, 1.0));
+	base *= mix(vec3(1.0), mix(vec3(1.06, 1.03, 0.86), vec3(0.9, 1.0, 0.95), mid), green);
+	// Meadows are never one green: sun-dried straw-coloured patches on the rises, lush darker ones in the hollows,
+	// and the whole a little less saturated than a painted lawn.
+	float dry = smoothstep(0.52, 0.78, macro * 0.6 + fine * 0.25 + finer * 0.15) * w[0];
+	float lush = smoothstep(0.55, 0.8, (1.0 - macro) * 0.55 + mid * 0.45) * w[0];
+	base = mix(base, base * vec3(1.18, 1.02, 0.66), dry * 0.55);
+	base = mix(base, base * vec3(0.78, 0.9, 0.74), lush * 0.5);
+	float luma = dot(base, vec3(0.299, 0.587, 0.114));
+	base = mix(base, vec3(luma), 0.22 * green);
+	base *= mix(vec3(1.0), vec3(1.02, 0.95, 0.84), w[0]);       // a real meadow leans olive, not lawn-green
 
 	// ---- water: wet band above the line, darker with depth below it
 	float height = wpos.y - water_level;

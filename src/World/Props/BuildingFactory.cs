@@ -140,21 +140,21 @@ public static partial class BuildingFactory
     }
 
     /// <summary>Round logs (cabins), the tint staining the weathered wood.</summary>
-    private static StandardMaterial3D LogWall(Color tint) => Photo("weathered_brown_planks", Nudge(tint) * 1.45f, 0.88f) ?? Textured(Textures.Logs(), tint, 0.9f);
+    private static Material LogWall(Color tint) => Weathered("weathered_brown_planks", Nudge(tint) * 1.45f, 0.88f, moss: 0.35f) ?? Textured(Textures.Logs(), tint, 0.9f);
 
     /// <summary>Board-and-batten in paint of the given colour (falu red, ochre, white...).</summary>
-    private static StandardMaterial3D BoardWall(Color paint) => Photo("white_planks_clean", paint * 1.45f, 0.75f) ?? Textured(Textures.Boards(), paint, 0.8f);
+    private static Material BoardWall(Color paint) => Weathered("white_planks_clean", paint * 1.45f, 0.75f, weathering: 0.8f, moss: 0.2f) ?? Textured(Textures.Boards(), paint, 0.8f);
 
-    private static StandardMaterial3D ShingleRoof(Color tint)
-    {
-        var m = Photo("roof_slates_02", Nudge(tint), 0.9f, triplanar: false) ?? Textured(Textures.WoodShingles(), tint, 0.9f);
-        m.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
-        return m;
-    }
+    private static Material ShingleRoof(Color tint) =>
+        Weathered("roof_slates_02", Nudge(tint), 0.9f, triplanar: false, moss: 0.55f, twoSided: true, normal: 1.4f)
+        ?? TwoSided(Textured(Textures.WoodShingles(), tint, 0.9f));
 
-    private static StandardMaterial3D TileRoof(Color tint)
+    private static Material TileRoof(Color tint) =>
+        Weathered("clay_roof_tiles_02", Nudge(tint), 0.75f, triplanar: false, moss: 0.45f, twoSided: true, normal: 1.4f)
+        ?? TwoSided(Textured(Textures.Tiles(), tint, 0.7f));
+
+    private static StandardMaterial3D TwoSided(StandardMaterial3D m)
     {
-        var m = Photo("clay_roof_tiles_02", Nudge(tint), 0.75f, triplanar: false) ?? Textured(Textures.Tiles(), tint, 0.7f);
         m.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
         return m;
     }
@@ -197,6 +197,42 @@ public static partial class BuildingFactory
         });
     }
 
+    private static readonly Dictionary<string, ShaderMaterial> WeatheredCache = new();
+    private static Shader? _buildingShader, _buildingShader2;
+
+    /// <summary>
+    /// A photographed CC0 material weathered by shaders/building.gdshader: the same mapping as <see cref="Photo"/>, plus a
+    /// colour wander against tiling, damp and dirt at a wall's foot (from World/Building's base_y), rain streaks and moss
+    /// on faces turned up. Materials are shared by their parameters. Null when the set is missing.
+    /// </summary>
+    internal static Material? Weathered(string id, Color tint, float roughness, bool triplanar = true, float scale = 1f,
+        float weathering = 1f, float moss = 0.3f, bool twoSided = false, float normal = 1.1f)
+    {
+        var p = PhotoTextures.Get(id);
+        if (p == null)
+            return null;
+        string key = $"{id}|{tint.ToHtml()}|{roughness}|{triplanar}|{scale}|{weathering}|{moss}|{twoSided}|{normal}";
+        lock (WeatheredCache)
+        {
+            if (WeatheredCache.TryGetValue(key, out var cached))
+                return cached;
+            _buildingShader ??= GD.Load<Shader>("res://shaders/building.gdshader");
+            _buildingShader2 ??= GD.Load<Shader>("res://shaders/building_two_sided.gdshader");
+            var m = new ShaderMaterial { Shader = twoSided ? _buildingShader2 : _buildingShader };
+            m.SetShaderParameter("albedo_tex", p.Albedo);
+            m.SetShaderParameter("normal_tex", p.Normal);
+            m.SetShaderParameter("tint", new Vector3(tint.R, tint.G, tint.B));
+            m.SetShaderParameter("roughness_base", roughness);
+            m.SetShaderParameter("normal_strength", normal);
+            m.SetShaderParameter("uv_scale", scale / p.Metres);
+            m.SetShaderParameter("triplanar", triplanar);
+            m.SetShaderParameter("weathering", weathering);
+            m.SetShaderParameter("moss", moss);
+            WeatheredCache[key] = m;
+            return m;
+        }
+    }
+
     /// <summary>Photographed colours are real: a tint only nudges them (its hue a quarter of the way, its brightness a little).</summary>
     private static Color Nudge(Color tint)
     {
@@ -207,32 +243,28 @@ public static partial class BuildingFactory
         return Colors.White.Lerp(hue, 0.25f) * (0.82f + 0.18f * MathF.Min(m * 1.4f, 1f));
     }
 
-    private static StandardMaterial3D Painted(Color color) =>
-        Photo("white_planks_clean", color * 1.45f, 0.7f) ?? Textured(Textures.PlanksPainted(), color, 0.85f);
+    private static Material Painted(Color color) =>
+        Weathered("white_planks_clean", color * 1.45f, 0.7f, weathering: 0.7f, moss: 0.15f) ?? Textured(Textures.PlanksPainted(), color, 0.85f);
 
     /// <summary>Lime plaster between the timbers; the house colour only tints it lightly.</summary>
-    private static StandardMaterial3D Plaster(Color tint) =>
-        Photo("medieval_wall_01", Colors.White.Lerp(tint, 0.18f), 0.92f) ?? Textured(Textures.Plaster(), new Color(0.95f, 0.92f, 0.85f).Lerp(tint, 0.3f));
+    private static Material Plaster(Color tint) =>
+        Weathered("medieval_wall_01", Colors.White.Lerp(tint, 0.18f), 0.92f, moss: 0.1f) ?? Textured(Textures.Plaster(), new Color(0.95f, 0.92f, 0.85f).Lerp(tint, 0.3f));
 
-    private static StandardMaterial3D Wood(Color tint) => Photo("weathered_brown_planks", Nudge(tint), 0.85f) ?? Textured(Textures.Planks(), tint);
+    private static Material Wood(Color tint) => Weathered("weathered_brown_planks", Nudge(tint), 0.85f, moss: 0.3f) ?? Textured(Textures.Planks(), tint);
 
     /// <summary>Old oak boards with iron studs: doors and shutters.</summary>
-    private static StandardMaterial3D DoorWood() => Photo("medieval_wood", Colors.White, 0.8f) ?? Wood(new Color(0.8f, 0.64f, 0.5f));
+    private static Material DoorWood() => Weathered("medieval_wood", Colors.White, 0.8f, weathering: 0.7f, moss: 0.1f) ?? Wood(new Color(0.8f, 0.64f, 0.5f));
 
     /// <summary>Dark oak beams of the timber frame.</summary>
-    private static StandardMaterial3D Timber() =>
-        Photo("weathered_brown_planks", new Color(0.72f, 0.66f, 0.6f), 0.85f) ?? Textured(Textures.Planks(), new Color(0.72f, 0.58f, 0.46f));
+    private static Material Timber() =>
+        Weathered("weathered_brown_planks", new Color(0.72f, 0.66f, 0.6f), 0.85f, moss: 0.25f, normal: 1.4f) ?? Textured(Textures.Planks(), new Color(0.72f, 0.58f, 0.46f));
 
     /// <summary>Thatch, straw-gold with a hint of the roof colour.</summary>
-    private static StandardMaterial3D Roof(Color color)
-    {
-        var m = Photo("reed_roof_04", Colors.White.Lerp(color, 0.08f), 1f, triplanar: false)
-                ?? Textured(Textures.Shingles(), new Color(0.86f, 0.74f, 0.5f).Lerp(color, 0.2f), 1f);
-        m.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
-        return m;
-    }
+    private static Material Roof(Color color) =>
+        Weathered("reed_roof_04", Colors.White.Lerp(color, 0.08f) * 0.92f, 1f, triplanar: false, moss: 0.35f, twoSided: true, normal: 2f)
+        ?? TwoSided(Textured(Textures.Shingles(), new Color(0.86f, 0.74f, 0.5f).Lerp(color, 0.2f), 1f));
 
-    private static StandardMaterial3D Stone(Color tint) => Photo("stone_wall", Nudge(tint), 0.95f) ?? Textured(Textures.Stone(), tint, 1f);
+    private static Material Stone(Color tint) => Weathered("stone_wall", Nudge(tint), 0.95f, moss: 0.6f, normal: 1.5f) ?? Textured(Textures.Stone(), tint, 1f);
 
     private static StandardMaterial3D Flat(Color color, float roughness = 0.8f, float metallic = 0f) =>
         Pixel(new StandardMaterial3D { AlbedoColor = color, Roughness = roughness, Metallic = metallic }, metallic > 0.3f);
@@ -424,7 +456,7 @@ public static partial class BuildingFactory
     }
 
     /// <summary>Sill, rail and plate beams on all four walls, posts beside the door, and diagonal braces on the sides.</summary>
-    private static void TimberFrame(Building b, HouseStyle s, StandardMaterial3D timber)
+    private static void TimberFrame(Building b, HouseStyle s, Material timber)
     {
         const float t = 0.2f;
         float hw = s.W / 2f + 0.03f, hd = s.D / 2f + 0.03f;
@@ -454,13 +486,13 @@ public static partial class BuildingFactory
     }
 
     /// <summary>A pair of plank shutters, opened flat against the wall either side of a window.</summary>
-    private static void Shutters(Building b, StandardMaterial3D wood, Vector3 pos)
+    private static void Shutters(Building b, Material wood, Vector3 pos)
     {
         foreach (float sx in new[] { -1f, 1f })
             Box(b, new Vector3(0.55f, 1.15f, 0.06f), pos + new Vector3(sx * 0.95f, 0f, 0f), wood);
     }
 
-    private static void Window(Building b, StandardMaterial3D glass, StandardMaterial3D trim, Vector3 pos, float yawDeg)
+    private static void Window(Building b, StandardMaterial3D glass, Material trim, Vector3 pos, float yawDeg)
     {
         var holder = new Node3D { Position = pos, RotationDegrees = new Vector3(0, yawDeg, 0) };
         b.AddChild(holder);

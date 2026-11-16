@@ -182,13 +182,26 @@ public static class CharacterAsset
                     m.SubsurfScatterEnabled = true;
                     m.SubsurfScatterStrength = 0.25f;
                     m.SubsurfScatterSkinMode = true;
+                    // Skin has a soft sheen (oil, the light grazing the cheek), not chalk.
+                    m.MetallicSpecular = 0.42f;
+                    if (m.RoughnessTexture == null)
+                        m.Roughness = 0.55f;
                     break;
                 case "hair1" or "hair2":
                     m.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+                    // Hair: a faint sheen along the strands.
+                    m.RimEnabled = true;
+                    m.Rim = 0.25f;
+                    m.RimTint = 0.8f;
                     break;
                 case "outfit":
                     // Open collars, cuffs and hems show the cloth's inner side.
                     m.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+                    // Woven cloth catches the light at grazing angles (fibre sheen), so folds and seams read in shade.
+                    m.RimEnabled = true;
+                    m.Rim = 0.35f;
+                    m.RimTint = 0.55f;
+                    m.MetallicSpecular = 0.25f;
                     break;
                 case "eye":
                     m.MetallicSpecular = 0.8f;
