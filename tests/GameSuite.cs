@@ -124,6 +124,17 @@ public sealed class GameSuite : ITestSuite
         var ropePts = rod.Rope.Positions.ToArray();
         t.Check(ropePts.Length == FishingSim.Core.Physics.LineRope.Points && ropePts[0].DistanceTo(main.Player.RodTip.GlobalPosition) < 0.05f
                 && ropePts[^1].DistanceTo(rod.Bobber.GlobalPosition) < 0.05f, "the line runs from the rod tip to the lure");
+        // Reeling on, the line stays tight: no slack opening up by the rod tip's bending or the hands' sway.
+        float worstSlack = 0f;
+        int loose = 0;
+        for (int i = 0; i < 60 && rod.State == RodState.Waiting; i++)
+        {
+            await t.NextFrame();
+            worstSlack = MathF.Max(worstSlack, rod.Slack);
+            if (!rod.DrawnTight)
+                loose++;
+        }
+        t.Check(worstSlack < 0.06f && loose == 0, $"the reeled line stays taut (worst slack {worstSlack * 100f:0.0} cm, {loose} loose frames)");
         rod.ReelOverride = false;
         await t.NextFrame();
         float beforeTwitch = rod.LineOut;

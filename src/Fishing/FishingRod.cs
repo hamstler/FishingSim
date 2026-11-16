@@ -234,6 +234,13 @@ public partial class FishingRod : Node3D
     private float TakeUpSlack(float amount)
     {
         float slack = _lineLength - TipDistance();
+        // A little slack made by the rod tip moving (the blank bending under the pull, the angler's hands) goes onto
+        // the turning spool at once: it never shows as a sagging line while reeling.
+        if (slack > 0.01f && slack < 0.25f && amount > 0f && _drawTight > 0.5f)
+        {
+            _lineLength = TipDistance() + 0.005f;
+            return amount;
+        }
         if (slack > 0.03f && amount > 0f)
         {
             // A slack line offers no resistance: the reel takes it up twice as fast.
@@ -2453,9 +2460,20 @@ public partial class FishingRod : Node3D
     /// </summary>
     private Vector3[] _fightLine = System.Array.Empty<Vector3>();
 
+    /// <summary>
+    /// 0..1: how much the line is drawn tight by reeling the end tackle in without a fish (eased, so it does not flicker
+    /// between a straight and a sagging line when the slack comes and goes by a few centimetres).
+    /// </summary>
+    private float _drawTight;
+
+    /// <summary>The line is held taut by the retrieve (tests).</summary>
+    public bool DrawnTight => _drawTight > 0.5f;
+
     private void UpdateLine(float dt)
     {
         _lineMesh.ClearSurfaces();
+        bool drawing = Reeling && State is RodState.Waiting or RodState.Nibble or RodState.Bite && Slack < 0.08f;
+        _drawTight = Mathf.MoveToward(_drawTight, drawing ? 1f : 0f, dt * (drawing ? 6f : 1.5f));
         if (State is RodState.Idle or RodState.Charging or RodState.Landed or RodState.Broken)
         {
             _ropeLive = false;
@@ -2486,6 +2504,24 @@ public partial class FishingRod : Node3D
             float dist = a.DistanceTo(b);
             float sag = dist * 0.008f * (1f - ratio) * (1f - ratio);
             float hold = 0.92f + 0.08f * ratio;
+            for (int i = 0; i < n; i++)
+            {
+                float t = i / (float)(n - 1);
+                var straight = a.Lerp(b, t) + Vector3.Down * (sag * 4f * t * (1f - t));
+                _fightLine[i] = pts[i].Lerp(straight, hold);
+            }
+            pts = _fightLine;
+        }
+        else if (_drawTight > 0f)
+        {
+            // Reeling the end tackle in: the line runs straight from the tip to it (the lure's or the float's drag
+            // keeps it tight), with the shallow sag of a light line under gravity.
+            int n = pts.Length;
+            if (_fightLine.Length != n)
+                _fightLine = new Vector3[n];
+            float dist = a.DistanceTo(b);
+            float sag = dist * 0.006f;
+            float hold = 0.95f * _drawTight;
             for (int i = 0; i < n; i++)
             {
                 float t = i / (float)(n - 1);
