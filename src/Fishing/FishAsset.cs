@@ -64,7 +64,13 @@ public sealed class FishAsset
             // Decoded pictures wait for their model at most four at a time (browsing the atlas decodes ahead).
             while (Decoding.Count >= 4 && DecodeOrder.First != null)
             {
-                Decoding.Remove(DecodeOrder.First.Value);
+                if (Decoding.Remove(DecodeOrder.First.Value, out var dropped))
+                    dropped.ContinueWith(t =>
+                    {
+                        if (t.IsCompletedSuccessfully)
+                            foreach (var image in t.Result.Values)
+                                image.Dispose();
+                    });
                 DecodeOrder.RemoveFirst();
             }
             Decoding[id] = Task.Run(() => DecodeImages(FileAccess.GetFileAsBytes(path)));
@@ -125,11 +131,33 @@ public sealed class FishAsset
             Touch(id);
             while (Recent.Count > CacheSize)
             {
-                Cache.Remove(Recent.Last!.Value);
+                if (Cache.Remove(Recent.Last!.Value, out var old))
+                    old?.Release();
                 Recent.RemoveLast();
             }
         }
         return asset;
+    }
+
+    /// <summary>
+    /// Lets go of the textures and meshes now (their native and GPU memory otherwise waits for the finaliser; the lake's
+    /// fish load and drop species all the time). Fish still showing them keep them: the engine counts references.
+    /// </summary>
+    private void Release()
+    {
+        BodyAlbedo?.Dispose();
+        BodyNormal?.Dispose();
+        Iris?.Dispose();
+        foreach (var (_, mesh, texture) in Fins)
+        {
+            mesh.Dispose();
+            texture?.Dispose();
+        }
+        foreach (var (mesh, _) in Eyes)
+            mesh.Dispose();
+        foreach (var (mesh, _) in Corneas)
+            mesh.Dispose();
+        Body.Dispose();
     }
 
     private static void Touch(string id)
@@ -262,10 +290,27 @@ public sealed class FishAsset
 
     private static FishAsset? Load(string path, Dictionary<string, Image>? images)
     {
-        images ??= DecodeImages(FileAccess.GetFileAsBytes(path));
+        var glb = FileAccess.GetFileAsBytes(path);
+        images ??= DecodeImages(glb);
+        try
+        {
+            return Load(path, glb, images);
+        }
+        finally
+        {
+            // The textures hold their own copies; the decoded pictures' native memory goes now, not at finalisation.
+            foreach (var image in images.Values)
+                image.Dispose();
+        }
+    }
+
+    private static FishAsset? Load(string path, byte[] glb, Dictionary<string, Image> images)
+    {
         var doc = new GltfDocument();
-        var state = new GltfState { HandleBinaryImage = 0 };    // the pictures are decoded above, with their mipmaps
-        if (doc.AppendFromFile(path, state) != Error.Ok)
+        var state = new GltfState { HandleBinaryImage = 0 };
+        // GLTFDocument decodes every picture in full even when told to discard them (4K WebP on the main thread, and
+        // the memory for it): it is handed the model without its pictures, which are decoded above with their mipmaps.
+        if (doc.AppendFromBuffer(Graphics.ImageDecode.WithoutPictures(glb), path.GetBaseDir(), state) != Error.Ok)
             return null;
         var root = doc.GenerateScene(state) as Node3D;
         if (root == null)

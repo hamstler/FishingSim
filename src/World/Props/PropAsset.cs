@@ -148,7 +148,8 @@ public static class PropAsset
 
         var doc = new GltfDocument();
         var state = new GltfState { HandleBinaryImage = 0 };
-        if (doc.AppendFromFile(path, state) != Error.Ok || doc.GenerateScene(state) is not Node3D root)
+        if (doc.AppendFromBuffer(ImageDecode.WithoutPictures(glb, keepMaterialNames: true), path.GetBaseDir(), state) != Error.Ok
+            || doc.GenerateScene(state) is not Node3D root)
             return null;
         var parts = new List<(Mesh, Transform3D)>();
         var bounds = new Aabb();
