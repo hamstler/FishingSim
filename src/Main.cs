@@ -30,6 +30,9 @@ public partial class Main : Node3D
     /// <summary>The echo sounder screen (shown in the boat with the accessory).</summary>
     public UI.EchoSounder Echo { get; private set; } = null!;
 
+    /// <summary>The game's sound.</summary>
+    public Audio.SoundEngine Sound { get; private set; } = null!;
+
     /// <summary>The angler's rowboat at the pier.</summary>
     public World.Rowboat Boat { get; private set; } = null!;
     private SkyController _sky = null!;
@@ -198,6 +201,9 @@ public partial class Main : Node3D
         var sound = new Audio.SoundEngine();
         sound.Setup(Rod, Player, _world, _lake);
         AddChild(sound);
+        _sky.Lightning += sound.Thunder;
+        Rises.Risen += (_, x, z) => sound.Rise(new Vector2(x - Player.GlobalPosition.X, z - Player.GlobalPosition.Z).Length());
+        Sound = sound;
         _gear.GearChanged += ApplyGearEffects;
         ApplyGearEffects();
         _profile.WaterTempNow = () => Rod.WaterTemp;

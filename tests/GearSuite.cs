@@ -448,6 +448,20 @@ public sealed class GearSuite : ITestSuite
         synth.Levels.Wind = 1f;
         synth.Levels.Birds = 1f;
         t.Check(Energy(synth, 22050) > 1e-5f, "wind and birds make an ambience");
+        foreach (var (name, set) in new (string, Action<FishingSim.Core.Audio.Synth>)[]
+        {
+            ("frogs", sy => sy.Levels.Frogs = 1f), ("reeds", sy => sy.Levels.Reeds = 1f),
+            ("water on the hull", sy => sy.Levels.Hull = 1f), ("the village", sy => sy.Levels.Village = 1f),
+            ("thunder", sy => sy.Play(FishingSim.Core.Audio.OneShot.Thunder)), ("a rising fish", sy => sy.Play(FishingSim.Core.Audio.OneShot.Plop)),
+        })
+        {
+            var sy = new FishingSim.Core.Audio.Synth(22050f);
+            set(sy);
+            var buf = new float[22050 * 4];
+            sy.Generate(buf);
+            float e = buf.Sum(x => x * x) / buf.Length;
+            t.Check(e > 1e-6f && buf.All(x => !float.IsNaN(x) && x is >= -1f and <= 1f), $"{name} can be heard (energy {e:0.0e0}), samples stay in range");
+        }
 
         t.Section("bites from the fish you see");
         var lure = new FishSwimModel(water, new SystemRng(5));

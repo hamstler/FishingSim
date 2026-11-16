@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace FishingSim.Core.Audio;
 
 /// <summary>What a one-shot sound is made of.</summary>
-public enum OneShot { Splash, SmallSplash, StepWood, StepGrass, Strike, Catch, LineSnap, Bell, Coins, Click, Dig, Swish, Ignite, Bubble }
+public enum OneShot { Splash, SmallSplash, StepWood, StepGrass, Strike, Catch, LineSnap, Bell, Coins, Click, Dig, Swish, Ignite, Bubble, Thunder, Plop, Hammer }
 
 /// <summary>Levels of the continuous sounds (0..1), set every frame by the game.</summary>
 public struct AmbientLevels
@@ -17,6 +17,10 @@ public struct AmbientLevels
     public float Reel;      // reel handle turning
     public float Drag;      // drag giving line (the "scream")
     public float Fire;      // a campfire nearby (crackle and hiss)
+    public float Frogs;     // evening and night by the water: croaking frogs
+    public float Reeds;     // wind through the reeds and the grass near the shore
+    public float Hull;      // water slapping a hull or the pier's posts
+    public float Village;   // distant voices and work in the village
 }
 
 /// <summary>
@@ -56,6 +60,11 @@ public sealed class Synth
     }
 
     private float _fireLp, _crackle, _swishLp;
+    private float _frogT = -1f, _frogWait = 1f, _frogF, _frogPhase, _frogLen;
+    private float _reedLp, _reedBp, _reedSway;
+    private float _hullT = -1f, _hullWait = 0.8f, _hullLp;
+    private float _voiceT = -1f, _voiceWait = 2f, _voiceF, _voicePhase, _voiceLen, _voiceLp, _hammerWait = 3f;
+    private float _thunderLp, _thunderLp2;
 
     private float Noise() => (float)_rnd.NextDouble() * 2f - 1f;
 
@@ -76,6 +85,9 @@ public sealed class Synth
             OneShot.Swish => 0.35f,
             OneShot.Ignite => 0.9f,
             OneShot.Bubble => 0.25f,
+            OneShot.Thunder => 4.5f,
+            OneShot.Plop => 0.3f,
+            OneShot.Hammer => 0.2f,
             _ => 0.3f,
         };
         _voices.Add(new Voice { Kind = kind, Length = len, Gain = gain, Pitch = 0.85f + 0.3f * (float)_rnd.NextDouble() });
@@ -178,6 +190,100 @@ public sealed class Synth
                 }
             }
 
+            // Frogs: rattling croaks (a pulsed low tone) now and then, in little runs.
+            if (L.Frogs > 0.01f)
+            {
+                if (_frogT < 0f)
+                {
+                    _frogWait -= dt;
+                    if (_frogWait <= 0f)
+                    {
+                        _frogT = 0f;
+                        _frogLen = 0.25f + 0.35f * (float)_rnd.NextDouble();
+                        _frogF = 260f + 260f * (float)_rnd.NextDouble();
+                        _frogWait = 0.2f + 3.5f * (float)_rnd.NextDouble();
+                    }
+                }
+                else
+                {
+                    float k = _frogT / _frogLen;
+                    _frogPhase += _frogF * dt;
+                    float pulse = MathF.Sin(_frogT * MathF.Tau * 32f) > 0f ? 1f : 0.2f;
+                    s += MathF.Sin(_frogPhase * MathF.Tau) * MathF.Sin(_frogPhase * MathF.Tau * 0.5f) * pulse * MathF.Sin(MathF.PI * k) * L.Frogs * 0.07f;
+                    _frogT += dt;
+                    if (_frogT >= _frogLen)
+                        _frogT = -1f;
+                }
+            }
+
+            // Reeds and grass: a bright, swaying rustle (band-passed noise) that follows the wind.
+            if (L.Reeds > 0.01f)
+            {
+                _reedSway += dt * 0.31f;
+                float n2 = Noise();
+                _reedLp += (n2 - _reedLp) * 0.35f;
+                _reedBp += (_reedLp - _reedBp) * 0.08f;
+                float sway = 0.35f + 0.65f * MathF.Max(MathF.Sin(_reedSway * MathF.Tau) * MathF.Sin(_reedSway * MathF.Tau * 0.37f + 1f), 0f);
+                s += (_reedLp - _reedBp) * L.Reeds * sway * 0.18f;
+            }
+
+            // Water slapping a hull or a post: short hollow knocks at the swell's rhythm.
+            if (L.Hull > 0.01f)
+            {
+                if (_hullT < 0f)
+                {
+                    _hullWait -= dt;
+                    if (_hullWait <= 0f)
+                    {
+                        _hullT = 0f;
+                        _hullWait = 0.6f + 1.6f * (float)_rnd.NextDouble();
+                    }
+                }
+                else
+                {
+                    _hullLp += (Noise() - _hullLp) * 0.12f;
+                    float knock = MathF.Sin(_hullT * MathF.Tau * 110f) * MathF.Exp(-_hullT * 30f);
+                    s += (knock * 0.5f + _hullLp * MathF.Exp(-_hullT * 9f)) * L.Hull * 0.3f;
+                    _hullT += dt;
+                    if (_hullT > 0.4f)
+                        _hullT = -1f;
+                }
+            }
+
+            // The village: murmured voices (vowel-like formant hums) and a hammer now and then, far off.
+            if (L.Village > 0.01f)
+            {
+                if (_voiceT < 0f)
+                {
+                    _voiceWait -= dt;
+                    if (_voiceWait <= 0f)
+                    {
+                        _voiceT = 0f;
+                        _voiceLen = 0.3f + 1.1f * (float)_rnd.NextDouble();
+                        _voiceF = 110f + 120f * (float)_rnd.NextDouble();
+                        _voiceWait = 0.4f + 2.5f * (float)_rnd.NextDouble();
+                    }
+                }
+                else
+                {
+                    float k = _voiceT / _voiceLen;
+                    _voicePhase += _voiceF * (1f + 0.08f * MathF.Sin(_voiceT * 9f)) * dt;
+                    float saw = (_voicePhase - MathF.Floor(_voicePhase)) * 2f - 1f;
+                    _voiceLp += (saw - _voiceLp) * 0.06f;
+                    float syll = 0.5f + 0.5f * MathF.Sin(_voiceT * MathF.Tau * 4.5f);
+                    s += _voiceLp * syll * MathF.Sin(MathF.PI * k) * L.Village * 0.06f;
+                    _voiceT += dt;
+                    if (_voiceT >= _voiceLen)
+                        _voiceT = -1f;
+                }
+                _hammerWait -= dt;
+                if (_hammerWait <= 0f)
+                {
+                    _hammerWait = 4f + 9f * (float)_rnd.NextDouble();
+                    Play(OneShot.Hammer, 0.5f * L.Village);
+                }
+            }
+
             // One-shots.
             for (int v = _voices.Count - 1; v >= 0; v--)
             {
@@ -262,6 +368,20 @@ public sealed class Synth
                 }
                 return s * 0.07f;
             }
+            case OneShot.Thunder:
+            {
+                // A crack, then a long rumble rolling round the hills (low-passed noise twice, swelling and fading).
+                _thunderLp += (Noise() - _thunderLp) * 0.02f;
+                _thunderLp2 += (_thunderLp - _thunderLp2) * 0.05f;
+                float crack = Noise() * MathF.Exp(-v.T * 18f) * 0.6f;
+                float roll = 0.5f + 0.5f * MathF.Sin(v.T * 3.1f) * MathF.Sin(v.T * 1.3f + 0.5f);
+                return (crack + _thunderLp2 * 9f * roll * MathF.Min(v.T * 4f, 1f) * MathF.Exp(-k * 2.2f)) * 0.9f;
+            }
+            case OneShot.Plop:
+                // A fish rising: a small, clean plop.
+                return MathF.Sin(v.T * MathF.Tau * (620f * v.Pitch - 380f * k)) * MathF.Exp(-k * 10f) * 0.3f;
+            case OneShot.Hammer:
+                return (MathF.Sin(v.T * MathF.Tau * 820f * v.Pitch) * 0.6f + Noise() * 0.4f) * MathF.Exp(-k * 14f) * 0.3f;
             case OneShot.Click:
                 return (MathF.Sin(v.T * MathF.Tau * 1800f) * 0.5f + Noise() * 0.5f) * MathF.Exp(-k * 10f) * 0.12f;
             default:
