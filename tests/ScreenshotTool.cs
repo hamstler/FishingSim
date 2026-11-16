@@ -526,6 +526,7 @@ public partial class ScreenshotTool : Node
             var views = main.Fish.GetChildren().OfType<FishModel>().ToList();
             GD.Print($"fish brought under the pier: {n}; {views.Count(v => v.OnModel)} of {views.Count} lake fish on their species' model");
         }
+        // FISHSIM_LIGHTNING=1: a lightning flash just before the shot.
         // FISHSIM_BOAT=N: board the rowboat at the pier and row ahead for N physics frames (FISHSIM_BOAT_TURN=-1..1
         // turns while rowing); the yaw is then relative to the bow (0 = looking ahead). FISHSIM_BOAT_VIEW=1 watches the
         // boat from the pier instead.
@@ -1312,6 +1313,12 @@ public partial class ScreenshotTool : Node
 
         for (int i = 0; i < frames; i++)
             await NextFrame();
+        // FISHSIM_LIGHTNING=1: a lightning flash just before the shot.
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_LIGHTNING") == "1" && main.GetChildren().OfType<SkyController>().FirstOrDefault() is { } skyFlash)
+        {
+            skyFlash.FlashLightning();
+            await NextFrame();
+        }
         // FISHSIM_SIT_PROBE=1: print where each seated villager's hips and thighs are against the ground under them.
         if (System.Environment.GetEnvironmentVariable("FISHSIM_SIT_PROBE") == "1")
         {
