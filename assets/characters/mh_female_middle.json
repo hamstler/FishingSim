@@ -2,7 +2,7 @@
  "id": "mh_female_middle",
  "sex": "F",
  "hair": [
-  "Hair_braid01"
+  "Hair_long01"
  ],
  "materials": {
   "skin": {
@@ -10,13 +10,6 @@
    "albedo": [
     "mh_female_middle_skin_a"
    ]
-  },
-  "hair1": {
-   "roughness_value": 0.75,
-   "albedo": [
-    "mh_female_middle_hair1_t"
-   ],
-   "alpha": true
   },
   "brows": {
    "roughness_value": 0.9,
@@ -38,6 +31,13 @@
     "mh_female_middle_outfit_a"
    ],
    "normal": "mh_female_middle_outfit_n"
+  },
+  "hair1": {
+   "roughness_value": 0.75,
+   "albedo": [
+    "mh_female_middle_hair1_t"
+   ],
+   "alpha": true
   },
   "eye": {
    "roughness_value": 0.3,

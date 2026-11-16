@@ -31,6 +31,7 @@ Wszystkie na licencji CC0 1.0 (domena publiczna): wolno ich używać w każdym c
 
 | id | nazwa | autorzy | licencja | źródło |
 |---|---|---|---|---|
+| dead_tree_trunk | Dead Tree Trunk | Rob Tuytel | CC0 1.0 (public domain) | https://polyhaven.com/a/dead_tree_trunk |
 | stone_fire_pit | Stone Fire Pit | Sebastian Platen | CC0 1.0 (public domain) | https://polyhaven.com/a/stone_fire_pit |
 | tree_stump_01 | Tree Stump 01 | Rob Tuytel | CC0 1.0 (public domain) | https://polyhaven.com/a/tree_stump_01 |
 | wicker_basket_01 | Wicker Basket 01 | Kuutti Siitonen | CC0 1.0 (public domain) | https://polyhaven.com/a/wicker_basket_01 |

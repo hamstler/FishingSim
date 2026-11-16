@@ -52,16 +52,16 @@ CHARACTERS = {
                            skin="young_caucasian_male", eyes="bluegreen", hair="short04",
                            clothes=["male_casualsuit05"], shoes="shoes01", hat=None),
     "mh_male_denim": dict(sex="M", macros=dict(gender=1.0, age=0.5, muscle=0.5, weight=0.55, height=0.52),
-                          skin="young_caucasian_male2", eyes="grey", hair="short03",
+                          skin="young_caucasian_male2", eyes="grey", hair="short01",
                           clothes=["male_casualsuit01"], shoes="shoes04", hat=None),
     "mh_male_old": dict(sex="M", macros=dict(gender=1.0, age=0.88, muscle=0.4, weight=0.62, height=0.45),
-                        skin="old_caucasian_male", eyes="grey", hair="short01",
+                        skin="old_caucasian_male", eyes="grey", hair="short02",
                         clothes=["male_casualsuit03"], shoes="shoes02", hat="fedora_cocked"),
-    "mh_female_casual": dict(sex="F", macros=dict(gender=0.0, age=0.42, muscle=0.45, weight=0.48, height=0.68),
+    "mh_female_casual": dict(sex="F", macros=dict(gender=0.0, age=0.42, muscle=0.45, weight=0.48, height=0.6),
                              skin="young_caucasian_female", eyes="blue", hair="ponytail01",
                              clothes=["male_casualsuit01"], shoes="shoes03", hat=None),
-    "mh_female_middle": dict(sex="F", macros=dict(gender=0.0, age=0.65, muscle=0.4, weight=0.6, height=0.62),
-                             skin="middleage_caucasian_female", eyes="brownlight", hair="braid01",
+    "mh_female_middle": dict(sex="F", macros=dict(gender=0.0, age=0.65, muscle=0.4, weight=0.6, height=0.48),
+                             skin="middleage_caucasian_female", eyes="brownlight", hair="long01",
                              clothes=["female_elegantsuit01"], shoes="shoes03", hat=None),
 }
 
@@ -237,11 +237,29 @@ def bake_pose(rig, meshes):
 
 
 # ------------------------------------------------------------------ pictures
+def neutral_hair(img):
+    """The pack's hair pictures carry their own (dark) colour; the game tints hair per person (People's hair colours,
+    grey for the old), so keep only the strands: luminance normalised round a light grey with its contrast kept,
+    a little brighter towards the tips (alpha), and the see-through pixels filled with the mean (no dark mip fringes)."""
+    import numpy as np
+    from PIL import Image
+    a = np.asarray(img.convert("RGBA")).astype(np.float32) / 255.0
+    lum = a[..., :3] @ np.array([0.3, 0.59, 0.11], np.float32)
+    seen = a[..., 3] > 0.35
+    mean, std = float(lum[seen].mean()), float(lum[seen].std()) + 1e-4
+    grey = np.clip(0.8 + (lum - mean) / std * 0.13, 0.42, 1.0)
+    grey = np.where(a[..., 3] > 0.02, grey, 0.8)
+    out = np.dstack([grey, grey, grey, a[..., 3]])
+    return Image.fromarray((out * 255.0 + 0.5).astype(np.uint8), "RGBA")
+
+
 def save_picture(src, name, normal=False, size=2048):
     from PIL import Image
     os.makedirs(os.path.join(OUT, "textures"), exist_ok=True)
     img = Image.open(src)
     img = img.convert("RGBA" if name.endswith("_t") else "RGB")
+    if "_hair1_" in name:
+        img = neutral_hair(img)
     if max(img.size) > size:
         img.thumbnail((size, size), Image.LANCZOS)
     path = os.path.join(OUT, "textures", f"{name}.webp")
@@ -414,7 +432,7 @@ def write(cid, spec, rig, meshes, eye_mat, bones, g):
         entry = {"roughness_value": rough.get(slot, 0.85)}
         if colour and os.path.exists(colour):
             alpha = slot in ("brows", "lashes", "hair1")
-            entry["albedo"] = [save_picture(colour, f"{cid}_{slot}_{'t' if alpha else 'a'}", size=2048 if slot in ("skin", "outfit") else 1024)]
+            entry["albedo"] = [save_picture(colour, f"{cid}_{slot}_{'t' if alpha else 'a'}", size=2048 if slot in ("skin", "outfit", "hair1") else 1024)]
         if normal and os.path.exists(normal):
             entry["normal"] = save_picture(normal, f"{cid}_{slot}_n", normal=True, size=1024)
         if slot in ("brows", "lashes", "hair1"):
