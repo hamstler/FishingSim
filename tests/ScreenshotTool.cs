@@ -197,6 +197,18 @@ public partial class ScreenshotTool : Node
                 float turn = float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_YAW"), out var y4) ? y4 : 25f;
                 foreach (var f in figures)
                     f.RotationDegrees = new Vector3(0f, turn, 0f);
+                // FISHSIM_HIDE_MESH=Brows,Lashes hides those meshes (finding which one draws over the face).
+                var hide = (System.Environment.GetEnvironmentVariable("FISHSIM_HIDE_MESH") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var f in figures)
+                    foreach (var n in f.FindChildren("*", "MeshInstance3D", true, false))
+                        if (hide.Any(h => n.Name.ToString().StartsWith(h)))
+                            ((MeshInstance3D)n).Visible = false;
+                // Sun from the side and a little behind, so the faces' relief and the ears' glow show.
+                foreach (var l in root3d.GetChildren().OfType<DirectionalLight3D>())
+                {
+                    l.RotationDegrees = new Vector3(-28f, 70f, 0f);
+                    l.ShadowEnabled = System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_NOSHADOW") != "1";
+                }
                 cam.Position = new Vector3(0f, 1.5f, 3.9f);
                 cam.LookAt(new Vector3(0f, 1.42f, 0f));
             }

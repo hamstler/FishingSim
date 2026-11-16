@@ -9,7 +9,9 @@
    "roughness_value": 0.55,
    "albedo": [
     "mh_female_middle_skin_a"
-   ]
+   ],
+   "ao": "mh_female_middle_skin_o",
+   "normal": "mh_female_middle_skin_n"
   },
   "brows": {
    "roughness_value": 0.9,
@@ -30,7 +32,8 @@
    "albedo": [
     "mh_female_middle_outfit_a"
    ],
-   "normal": "mh_female_middle_outfit_n"
+   "normal": "mh_female_middle_outfit_n",
+   "ao": "mh_female_middle_outfit_o"
   },
   "hair1": {
    "roughness_value": 0.75,
@@ -49,9 +52,11 @@
    "roughness_value": 0.6,
    "albedo": [
     "mh_female_middle_shoes_a"
-   ]
+   ],
+   "ao": "mh_female_middle_shoes_o"
   }
  },
+ "pelvis_scale": 0.8944,
  "author": "MakeHuman community (built with MPFB2)",
  "licence": "CC0 1.0 (public domain)",
  "sources": [

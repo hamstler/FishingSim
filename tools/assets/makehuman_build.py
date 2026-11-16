@@ -236,6 +236,92 @@ def bake_pose(rig, meshes):
         mod.object = rig
 
 
+# ------------------------------------------------------------------ ambient occlusion
+AO_SLOTS = ("skin", "outfit", "shoes", "hat")
+
+
+def bake_ao(cid, slot_objects, size=1024, samples=48, distance=0.1):
+    """Bakes each body/clothing mesh's ambient occlusion (Cycles, in the T-pose the meshes now rest in) against the
+    others: folds, seams, the collar on the neck, under the chin, behind the ears, between the fingers. Hair cards,
+    brows and lashes are left out (opaque to the bake, they would shade the forehead). Returns slot -> png path."""
+    scene = bpy.context.scene
+    scene.render.engine = "CYCLES"
+    scene.cycles.device = "CPU"
+    scene.cycles.samples = samples
+    if scene.world is None:
+        scene.world = bpy.data.worlds.new("World")
+    scene.world.light_settings.distance = distance
+    hidden = [o for o in bpy.data.objects if o.type == "MESH" and o not in slot_objects.values()]
+    for o in hidden:
+        o.hide_render = True
+    out = {}
+    for slot, o in slot_objects.items():
+        img = bpy.data.images.new(f"{cid}_{slot}_ao", size, size, alpha=False)
+        img.generated_color = (1, 1, 1, 1)
+        added = []
+        for ms in o.material_slots:
+            if not ms.material or not ms.material.use_nodes:
+                continue
+            nt = ms.material.node_tree
+            n = nt.nodes.new("ShaderNodeTexImage")
+            n.image = img
+            nt.nodes.active = n
+            added.append((nt, n))
+        bpy.ops.object.select_all(action="DESELECT")
+        o.select_set(True)
+        bpy.context.view_layer.objects.active = o
+        bpy.ops.object.bake(type="AO", margin=8, use_clear=True)
+        path = os.path.join(WORK, f"{cid}_{slot}_ao.png")
+        img.filepath_raw = path
+        img.file_format = "PNG"
+        img.save()
+        out[slot] = path
+        for nt, n in added:
+            nt.nodes.remove(n)
+        print(f"  {cid}: baked {slot} AO", flush=True)
+    for o in hidden:
+        o.hide_render = False
+    return out
+
+
+def save_ao(src, name):
+    """The baked occlusion as a grey picture: lifted a little (contact shade, not soot) and the bake's noise softened."""
+    from PIL import Image, ImageFilter
+    img = Image.open(src).convert("L").filter(ImageFilter.GaussianBlur(1.2))
+    img = img.point(lambda v: int(70 + v * (255 - 70) / 255))
+    path = os.path.join(OUT, "textures", f"{name}.webp")
+    img.convert("RGB").save(path, "WEBP", quality=90, method=6)
+    qt.keep(path)
+    return name
+
+
+def skin_normal(src, out, size=2048, seed=7):
+    """The pack's skins have no normal map. Relief from the painted skin: its shading high-passed (lip line, eyelid
+    creases, nostrils, knuckles, the navel; the painting is continuous across the UV seams) plus fine pores, as an
+    OpenGL normal map (the game reads it like the clothes' normals)."""
+    from PIL import Image, ImageFilter
+    img = Image.open(src).convert("L")
+    if max(img.size) > size:
+        img = img.resize((size, size), Image.LANCZOS)
+    w, h = img.size
+    lum = np.asarray(img, np.float32) / 255.0
+    broad = np.asarray(img.filter(ImageFilter.GaussianBlur(10)), np.float32) / 255.0
+    creases = np.clip(lum - broad, -0.25, 0.25)
+    rng = np.random.default_rng(seed)
+    pores = rng.random((h, w), np.float32)
+    pores = np.asarray(Image.fromarray((pores * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.8)), np.float32) / 255.0
+    pores = -np.clip((0.5 - pores) * 4.0, 0.0, 1.0) ** 2           # small pits
+    # No broader noise: it would not match across the UV seams and draw lines over the cheeks.
+    height = creases * 3.0 + pores * 0.3
+    dx = (np.roll(height, -1, 1) - np.roll(height, 1, 1)) * 0.5
+    dy = (np.roll(height, -1, 0) - np.roll(height, 1, 0)) * 0.5
+    strength = 2.2
+    n = np.dstack([-dx * strength, dy * strength, np.ones_like(dx)])
+    n /= np.linalg.norm(n, axis=2, keepdims=True)
+    Image.fromarray(((n * 0.5 + 0.5) * 255 + 0.5).astype(np.uint8), "RGB").save(out)
+    return out
+
+
 # ------------------------------------------------------------------ pictures
 def neutral_hair(img):
     """The pack's hair pictures carry their own (dark) colour; the game tints hair per person (People's hair colours,
@@ -324,6 +410,8 @@ def write(cid, spec, rig, meshes, eye_mat, bones, g):
         for ms in o.material_slots:
             if ms.material:
                 ms.material.name = slot
+    by_slot = {names[o.name]: o for o in meshes if names.get(o.name) in AO_SLOTS}
+    ao = bake_ao(cid, by_slot) if not os.environ.get("MH_NO_AO") else {}
     bpy.ops.object.select_all(action="DESELECT")
     rig.select_set(True)
     for o in meshes:
@@ -424,6 +512,9 @@ def write(cid, spec, rig, meshes, eye_mat, bones, g):
     qt.keep(path)
     # Pictures and the model's description.
     info = {"id": cid, "sex": spec["sex"], "hair": [f"Hair_{spec['hair']}"], "materials": {},
+            # The shared animations move the pelvis as high as the Quaternius legs are long; the game scales that
+            # motion by this (CharacterAsset's PelvisFit) so these legs stand on the ground and sit on the log.
+            "pelvis_scale": round(float(pos["pelvis"][1] / tgt["pelvis"]["pos"][1]), 4),
             "author": "MakeHuman community (built with MPFB2)", "licence": "CC0 1.0 (public domain)",
             "sources": ["https://static.makehumancommunity.org/asset_packs/makehuman_system_assets.html",
                         "https://github.com/makehumancommunity/mpfb2 (LICENSE.ASSETS.md)"]}
@@ -433,10 +524,14 @@ def write(cid, spec, rig, meshes, eye_mat, bones, g):
         if colour and os.path.exists(colour):
             alpha = slot in ("brows", "lashes", "hair1")
             entry["albedo"] = [save_picture(colour, f"{cid}_{slot}_{'t' if alpha else 'a'}", size=2048 if slot in ("skin", "outfit", "hair1") else 1024)]
+        if slot == "skin" and not normal and colour and os.path.exists(colour):
+            normal = skin_normal(colour, os.path.join(WORK, f"{cid}_skin_normal.png"))
         if normal and os.path.exists(normal):
-            entry["normal"] = save_picture(normal, f"{cid}_{slot}_n", normal=True, size=1024)
+            entry["normal"] = save_picture(normal, f"{cid}_{slot}_n", normal=True, size=2048 if slot == "skin" else 1024)
         if slot in ("brows", "lashes", "hair1"):
             entry["alpha"] = True
+        if slot in ao:
+            entry["ao"] = save_ao(ao[slot], f"{cid}_{slot}_o")
         info["materials"][slot] = entry
     with open(os.path.join(OUT, f"{cid}.json"), "w") as f:
         json.dump(info, f, indent=1, ensure_ascii=False)

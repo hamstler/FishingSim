@@ -9,7 +9,9 @@
    "roughness_value": 0.55,
    "albedo": [
     "mh_male_old_skin_a"
-   ]
+   ],
+   "ao": "mh_male_old_skin_o",
+   "normal": "mh_male_old_skin_n"
   },
   "brows": {
    "roughness_value": 0.9,
@@ -30,7 +32,8 @@
    "albedo": [
     "mh_male_old_hat_a"
    ],
-   "normal": "mh_male_old_hat_n"
+   "normal": "mh_male_old_hat_n",
+   "ao": "mh_male_old_hat_o"
   },
   "eye": {
    "roughness_value": 0.3,
@@ -43,13 +46,15 @@
    "albedo": [
     "mh_male_old_outfit_a"
    ],
-   "normal": "mh_male_old_outfit_n"
+   "normal": "mh_male_old_outfit_n",
+   "ao": "mh_male_old_outfit_o"
   },
   "shoes": {
    "roughness_value": 0.6,
    "albedo": [
     "mh_male_old_shoes_a"
-   ]
+   ],
+   "ao": "mh_male_old_shoes_o"
   },
   "hair1": {
    "roughness_value": 0.75,
@@ -59,6 +64,7 @@
    "alpha": true
   }
  },
+ "pelvis_scale": 0.9741,
  "author": "MakeHuman community (built with MPFB2)",
  "licence": "CC0 1.0 (public domain)",
  "sources": [

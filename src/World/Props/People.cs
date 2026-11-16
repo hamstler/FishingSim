@@ -36,7 +36,7 @@ public static class People
         return role switch
         {
             Role.TackleSeller => new Look(new Color(0.3f, 0.36f, 0.24f), new Color(0.28f, 0.24f, 0.2f), skin, hair, HatKind.Cap, new Color(0.24f, 0.26f, 0.2f), new Color(0.24f, 0.4f, 0.22f), true, false, height),
-            Role.BaitSeller => new Look(new Color(0.6f, 0.42f, 0.3f), new Color(0.35f, 0.3f, 0.26f), skin, hair, HatKind.Kerchief, new Color(0.7f, 0.2f, 0.18f), new Color(0.45f, 0.32f, 0.22f), false, true, height - 0.1f),
+            Role.BaitSeller => new Look(new Color(0.6f, 0.42f, 0.3f), new Color(0.35f, 0.3f, 0.26f), skin, hair, HatKind.Kerchief, new Color(0.7f, 0.2f, 0.18f), new Color(0.45f, 0.32f, 0.22f), false, true, height - 0.13f),
             Role.Fishmonger => new Look(new Color(0.5f, 0.56f, 0.62f), new Color(0.22f, 0.24f, 0.28f), skin, hair, HatKind.Cap, new Color(0.9f, 0.9f, 0.88f), new Color(0.92f, 0.92f, 0.9f), rng.Randf() < 0.5f, false, height, null, new Color(0.12f, 0.14f, 0.12f)),
             Role.MarketTrader => new Look(new Color(0.72f, 0.58f, 0.36f), new Color(0.3f, 0.26f, 0.22f), skin, hair, HatKind.Straw, new Color(0.86f, 0.74f, 0.45f), new Color(0.62f, 0.2f, 0.16f), rng.Randf() < 0.4f, rng.Randf() < 0.5f, height, new Color(0.7f, 0.18f, 0.16f)),
             Role.Shopkeeper => new Look(new Color(0.42f, 0.4f, 0.38f), new Color(0.24f, 0.22f, 0.2f), skin, hair, HatKind.None, default, new Color(0.7f, 0.66f, 0.56f), rng.Randf() < 0.6f, false, height),
@@ -45,7 +45,7 @@ public static class People
             Role.Fisherman => new Look(new Color(0.92f, 0.72f, 0.12f), new Color(0.2f, 0.24f, 0.3f), skin, hair, HatKind.Souwester, new Color(0.92f, 0.72f, 0.12f), null, rng.Randf() < 0.7f, false, height, null, new Color(0.12f, 0.14f, 0.12f)),
             Role.Farmer => new Look(new Color(0.52f, 0.46f, 0.36f), new Color(0.3f, 0.36f, 0.5f), skin, hair, HatKind.Straw, new Color(0.85f, 0.72f, 0.42f), null, rng.Randf() < 0.5f, false, height),
             Role.Woman => new Look(new Color(0.38f, 0.28f, 0.42f).Lerp(new Color(0.2f, 0.36f, 0.42f), rng.Randf()), new Color(0.3f, 0.26f, 0.22f), skin, hair, HatKind.Kerchief,
-                new Color(0.86f, 0.82f, 0.7f).Lerp(new Color(0.6f, 0.2f, 0.2f), rng.Randf() * 0.6f), new Color(0.9f, 0.88f, 0.82f), false, true, height - 0.12f),
+                new Color(0.86f, 0.82f, 0.7f).Lerp(new Color(0.6f, 0.2f, 0.2f), rng.Randf() * 0.6f), new Color(0.9f, 0.88f, 0.82f), false, true, height - 0.15f),
             Role.Elder => new Look(new Color(0.34f, 0.3f, 0.26f), new Color(0.28f, 0.26f, 0.24f), skin, new Color(0.86f, 0.86f, 0.84f), HatKind.Cap, new Color(0.3f, 0.27f, 0.24f), null, true, false, height - 0.08f),
             Role.Hunter => new Look(new Color(0.32f, 0.36f, 0.26f), new Color(0.3f, 0.26f, 0.2f), skin, hair, HatKind.Fur, new Color(0.4f, 0.3f, 0.2f), null, true, false, height, new Color(0.5f, 0.15f, 0.12f), new Color(0.2f, 0.14f, 0.1f)),
             _ => new Look(new Color(0.2f, 0.4f, 0.55f).Lerp(new Color(0.7f, 0.35f, 0.15f), rng.Randf()), new Color(0.24f, 0.26f, 0.3f), skin, hair, HatKind.Cap,
@@ -72,10 +72,15 @@ public static class People
         var (appearance, defaultIdle, defaultGestures) = Dress(role, variant, look);
         idle ??= defaultIdle;
         gestures ??= defaultGestures;
+        // Roles drawn by either sex pick a man's height; a woman in one stands 15 cm lower (~1.51-1.73 m, mean 1.62).
+        float height = look.Height;
+        if (appearance.Model.Contains("female") && role is not (Role.Woman or Role.BaitSeller))
+            height -= 0.15f;
         if (CharacterAsset.Create(appearance, idle) is { } model)
         {
-            model.Scale = Vector3.One * (look.Height / CharacterAsset.HeightOf(appearance.Model));
+            model.Scale = Vector3.One * (height / CharacterAsset.HeightOf(appearance.Model));
             npc.ModelScale = model.Scale.X;
+            npc.PelvisScale = CharacterAsset.PelvisScaleOf(appearance.Model);
             npc.AddChild(model);
             npc.Rig(model, Greets(role) && !idle.StartsWith("Sitting"), idle, gestures);
             if (inHand != null && CharacterAsset.SkeletonOf(model) is { } skeleton)
@@ -86,8 +91,8 @@ public static class People
             inHand?.QueueFree();
             Build(npc, look, role);
         }
-        var body = new StaticBody3D { CollisionLayer = 1, Position = new Vector3(0f, look.Height * 0.5f, 0f) };
-        body.AddChild(new CollisionShape3D { Shape = new CapsuleShape3D { Radius = 0.3f, Height = look.Height } });
+        var body = new StaticBody3D { CollisionLayer = 1, Position = new Vector3(0f, height * 0.5f, 0f) };
+        body.AddChild(new CollisionShape3D { Shape = new CapsuleShape3D { Radius = 0.3f, Height = height } });
         npc.AddChild(body);
         return npc;
     }
@@ -386,8 +391,11 @@ public partial class Npc : Node3D
     /// </summary>
     public const float SeatModelHeight = 0.455f, SeatModelBack = 0.334f;
 
+    /// <summary>The model's legs against the animations' (<see cref="CharacterAsset.PelvisScaleOf"/>): the seat follows.</summary>
+    public float PelvisScale { get; set; } = 1f;
+
     /// <summary>The seat's height above the feet and how far behind the origin the hips are (m).</summary>
-    public (float Height, float Back) Seat => (SeatModelHeight * ModelScale, SeatModelBack * ModelScale);
+    public (float Height, float Back) Seat => (SeatModelHeight * ModelScale * PelvisScale, SeatModelBack * ModelScale * PelvisScale);
 
     /// <summary>A log's radius for this sitter: its top 1.5 cm above the seat, so the sitter presses on it lightly.</summary>
     public float SeatLogRadius => (Seat.Height + 0.015f) / 2f;
