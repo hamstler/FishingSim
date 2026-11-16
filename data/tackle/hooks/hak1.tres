@@ -4,8 +4,11 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Kuty haczyk #1 (drobny)"
+DisplayName = "Kaminari Sode #20 · haczyk"
 Size = 1.0
-Price = 8
+RealSize = 20
+Strength = 1.23
+WeightG = 0.023
+Price = 4
 RequiredLevel = 1
-Description = "Mały haczyk na drobnicę."
+Description = "Rozmiar #20, drut 0.22 mm, wytrzymałość 1.2 kg, 0.02 g. Cienki drut na ochotkę, białe robaki i drobnicę."

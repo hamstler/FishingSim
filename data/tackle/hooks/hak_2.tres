@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="HookData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/HookData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Kaminari Iseama #2 · haczyk"
+Size = 8.6
+RealSize = 2
+Strength = 8.53
+WeightG = 0.410
+Price = 15
+RequiredLevel = 2
+Description = "Rozmiar #2, drut 0.68 mm, wytrzymałość 8.5 kg, 0.41 g. Mocny na karpia, lina i większe ryby z dna."

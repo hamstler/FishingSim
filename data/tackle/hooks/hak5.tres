@@ -4,8 +4,11 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Kuty haczyk #5 (średni)"
+DisplayName = "Kaminari Chinu #10 · haczyk"
 Size = 5.0
-Price = 4
+RealSize = 10
+Strength = 3.61
+WeightG = 0.114
+Price = 9
 RequiredLevel = 1
-Description = "Średni haczyk na większość ryb."
+Description = "Rozmiar #10, drut 0.45 mm, wytrzymałość 3.6 kg, 0.11 g. Uniwersalny na płoć, leszcza, karasia i lina."

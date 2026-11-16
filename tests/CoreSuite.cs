@@ -632,6 +632,23 @@ public sealed class CoreSuite : ITestSuite
             air.Step(1f / 60f, tip, new Vector3(0f, 3f, -20f));
         t.Check(air.Positions[FishingSim.Core.Physics.LineRope.Points / 2].Y < 2f, "in the air the slack line hangs under the chord");
         t.Check(slack.Slack(tip, end) > 3f && taut.Length > 0, "the slack is the line paid out beyond the straight distance");
+
+        // Reeling takes the line in through the tip: the sag rises and the line on the water slides towards the rod,
+        // while the end tackle stays put.
+        var reel = Run(24f, 3f, Vector3.Zero);
+        float sagBefore = reel.Positions[2].Y;
+        var mid = reel.Positions[FishingSim.Core.Physics.LineRope.Points / 2];
+        for (int i = 0; i < 90; i++)
+        {
+            reel.Length -= 2.5f / 90f;
+            reel.Step(1f / 60f, tip, end);
+        }
+        var midAfter = reel.Positions[FishingSim.Core.Physics.LineRope.Points / 2];
+        t.Check(reel.Positions[2].Y > sagBefore - 0.01f && midAfter.Z > mid.Z - 0.05f, $"reeling slack takes the line in at the tip (the middle came {midAfter.Z - mid.Z:0.00} m towards the rod)");
+        float arc = 0f;
+        for (int i = 1; i < FishingSim.Core.Physics.LineRope.Points; i++)
+            arc += reel.Positions[i].DistanceTo(reel.Positions[i - 1]);
+        t.Check(arc <= reel.Length + 0.05f && reel.Positions[^1] == end, $"the rope is no longer than the line left out ({arc:0.00} of {reel.Length:0.00} m) and the end did not move");
     }
 
     /// <summary>Feeding levels (the float's depth setting, a lure's depth) and bite styles (Core/Methods/FeedingHabits).</summary>

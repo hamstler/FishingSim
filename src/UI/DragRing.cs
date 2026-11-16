@@ -55,7 +55,7 @@ public partial class DragRing : Control
         var c = Size / 2f;
         float setting = Rod.DragSetting;
         float kg = setting * Rod.DragMax;
-        var verdict = TackleCheck.Judge(kg, Rod.LineStrength, Rod.RodMaxLoad);
+        var verdict = TackleCheck.Judge(kg, Rod.LineStrength, Rod.RodMaxLoad, Rod.HookStrength);
         var col = verdict switch
         {
             TackleVerdict.TooTight => new Color(0.92f, 0.2f, 0.14f),
@@ -70,7 +70,7 @@ public partial class DragRing : Control
             DrawArc(c, Radius, start, start + Mathf.Tau * setting, Mathf.Max(4, (int)(72 * setting)), col, Thickness, true);
         DrawArc(c, Radius + Thickness / 2f + 1f, 0f, Mathf.Tau, 72, new Color(1f, 0.97f, 0.9f, 0.55f), 1.2f, true);
         // Where the drag holds as much as the tackle takes.
-        float br = TackleCheck.BreakSetting(Rod.DragMax, Rod.LineStrength, Rod.RodMaxLoad);
+        float br = TackleCheck.BreakSetting(Rod.DragMax, Rod.LineStrength, Rod.RodMaxLoad, Rod.HookStrength);
         if (br < 0.999f)
         {
             float ang = start + Mathf.Tau * br;

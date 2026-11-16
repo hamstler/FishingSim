@@ -4,8 +4,11 @@
 
 [resource]
 script = ExtResource("1")
-DisplayName = "Kuty hak #10 (sumowy)"
+DisplayName = "Ironwood Offset 4/0 · haczyk"
 Size = 10.0
+RealSize = -4
+Strength = 25.00
+WeightG = 2.040
 Price = 25
 RequiredLevel = 4
-Description = "Duży hak na sumy i największe drapieżniki."
+Description = "Rozmiar 4/0, drut 1.00 mm, wytrzymałość 25.0 kg, 2.04 g. Kuty hak na żywca, szczupaka i suma."

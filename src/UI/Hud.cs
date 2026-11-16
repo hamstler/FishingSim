@@ -318,8 +318,8 @@ public partial class Hud : CanvasLayer
         else if (rod.State is RodState.Idle or RodState.Charging)
         {
             float dragKg = rod.DragSetting * rod.DragMax;
-            state = TackleCheck.Describe(dragKg, rod.LineStrength, rod.RodMaxLoad);
-            colour = VerdictColour(TackleCheck.Judge(dragKg, rod.LineStrength, rod.RodMaxLoad));
+            state = TackleCheck.Describe(dragKg, rod.LineStrength, rod.RodMaxLoad, rod.HookStrength);
+            colour = VerdictColour(TackleCheck.Judge(dragKg, rod.LineStrength, rod.RodMaxLoad, rod.HookStrength));
             if (rod.Method == FishingMethod.Float)
                 state = $"grunt {rod.FloatDepth:0.0} m  ·  " + state;
         }

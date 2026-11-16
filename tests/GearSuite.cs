@@ -552,6 +552,8 @@ public sealed class GearSuite : ITestSuite
         }
         t.Check(splashes == 1, "the float lands with a splash sound");
         t.Check(bells == 0, "a float rod's bite shows on the float: the bell (a bottom-fishing alarm) stays silent");
+        t.Check(rod.State is not (RodState.Waiting or RodState.Nibble or RodState.Bite) || rod.Slack < 0.05f || rod.BendLoad() < 0.01f,
+            $"a float on a slack line does not bend the rod (load {rod.BendLoad() * 1000f:0} g, slack {rod.Slack:0.0} m)");
         t.Check(main.GetChildren().OfType<FishingSim.Audio.SoundEngine>().Any(), "the sound engine runs in the game");
         t.Check(roachAgent != null && rod.Biter == roachAgent && rod.CurrentSpecies?.SpeciesName == "Płoć" && rod.CurrentWeight == roachAgent.Weight,
             "the roach next to the float is the fish that bites (same weight too)");

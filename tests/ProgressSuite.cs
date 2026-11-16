@@ -63,6 +63,23 @@ public sealed class ProgressSuite : ITestSuite
         var pr = new Profile();
         lo.Attach(pr);
         t.Check(lo.Rod.ItemId == "junior", "starts on the Junior rod");
+        // Hooks follow the real scale from #24 (smallest) to 4/0 (largest), stronger and heavier as they grow.
+        var hooks = lo.Items(TackleSlot.Hook).Cast<HookData>().OrderBy(h => h.Size).ToList();
+        t.Check(hooks.Count == 17 && hooks[0].Label == "#24" && hooks[^1].Label == "4/0",
+            $"hooks run from {hooks[0].Label} to {hooks[^1].Label} ({hooks.Count} sizes)");
+        bool rising = true;
+        for (int i = 1; i < hooks.Count; i++)
+            rising &= hooks[i].Strength > hooks[i - 1].Strength && hooks[i].WeightG > hooks[i - 1].WeightG
+                && (hooks[i].RealSize < hooks[i - 1].RealSize);
+        t.Check(rising, "a bigger hook (smaller number, then n/0) is stronger and heavier");
+        // The starter kit is balanced: the line gives first, the reel's drag slips before it.
+        var kitLine = GD.Load<LineData>("res://data/tackle/lines/g_zylka_016_przezroczysta.tres");
+        var kitRod = GD.Load<RodData>("res://data/tackle/rods/junior.tres");
+        var kitHook = GD.Load<HookData>("res://data/tackle/hooks/hak5.tres");
+        var kitReel = GD.Load<ReelData>("res://data/tackle/reels/mlynek1000.tres");
+        t.Check(lo.Line.ItemId == "g_zylka_016_przezroczysta" && kitLine.Strength < kitRod.MaxLoad && kitLine.Strength < kitHook.Strength
+                && kitReel.DragMax < kitLine.Strength && kitHook.Label == "#10",
+            $"starter kit: line {kitLine.Strength} kg is the weakest link (rod {kitRod.MaxLoad}, hook #10 {kitHook.Strength}), drag up to {kitReel.DragMax} kg");
         lo.Cycle(TackleSlot.Rod, 1);
         t.Check(lo.Rod.ItemId == "junior", "cycling stays put with a single owned rod");
         pr.Owned["rod"].Add("karpiowka");

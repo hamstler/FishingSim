@@ -6,7 +6,7 @@
 script = ExtResource("1")
 DisplayName = "Ostoja Junior · leszczynowy kij 2 m"
 CastMult = 0.75
-MaxLoad = 2.4
+MaxLoad = 3.0
 ShockAbsorb = 0.3
 Price = 40
 RequiredLevel = 1

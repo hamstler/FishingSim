@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="HookData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/HookData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Kaminari Sode #24 · haczyk"
+Size = 0.5
+RealSize = 24
+Strength = 0.80
+WeightG = 0.012
+Price = 3
+RequiredLevel = 1
+Description = "Rozmiar #24, drut 0.16 mm, wytrzymałość 0.8 kg, 0.01 g. Cienki drut na ochotkę, białe robaki i drobnicę."

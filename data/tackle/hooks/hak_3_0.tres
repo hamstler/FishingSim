@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="HookData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/HookData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Ironwood Offset 3/0 · haczyk"
+Size = 9.85
+RealSize = -3
+Strength = 20.16
+WeightG = 1.480
+Price = 23
+RequiredLevel = 4
+Description = "Rozmiar 3/0, drut 0.93 mm, wytrzymałość 20.2 kg, 1.48 g. Kuty hak na żywca, szczupaka i suma."
