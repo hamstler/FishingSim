@@ -163,7 +163,7 @@ public partial class Menu : Control
         title.OffsetTop = 30f;
         title.OffsetBottom = 120f;
         AddChild(title);
-        _subtitle = new Label { Text = "średniowieczny symulator wędkarski", HorizontalAlignment = HorizontalAlignment.Center, Modulate = new Color(1, 1, 1, 0.6f) };
+        _subtitle = new Label { Text = "symulator wędkarski", HorizontalAlignment = HorizontalAlignment.Center, Modulate = new Color(1, 1, 1, 0.6f) };
         _subtitle.AddThemeFontSizeOverride("font_size", 18);
         _subtitle.SetAnchorsPreset(LayoutPreset.TopWide);
         _subtitle.OffsetTop = 112f;

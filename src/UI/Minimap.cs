@@ -7,10 +7,10 @@ using FishingSim.World;
 namespace FishingSim.UI;
 
 /// <summary>
-/// The top-right corner of the HUD: one round dial like a brass-rimmed compass. In the middle a round topographic map
+/// The top-right corner of the HUD: one round dial like a compass in graphite glass. In the middle a round topographic map
 /// (120 m across, centred on the angler and turned with him, so ahead is always up; no markers): the land shaded by
-/// its relief with contour lines, the lake with its depth contours, the shore, the float and the angler's arrow. The bezel of dark
-/// wood carries the compass letters (turning with the map). Round it the ring of the day: gold by day, blue by night,
+/// its relief with contour lines, the lake with its depth contours, the shore, the float and the angler's arrow. The graphite bezel (steel
+/// hairline, amber ring round the map) carries the compass letters (turning with the map). Round it the ring of the day: gold by day, blue by night,
 /// noon at the top, with the sun or the moon riding on it at the hour. A medallion on the lower left shows the weather
 /// (sun, moon and stars, clouds, rain) and the wind. Under the dial a plaque: the time, how long until dusk or dawn,
 /// the weather and wind, the fishery's name.
@@ -39,10 +39,10 @@ public partial class Minimap : Control
     private const float PlaqueHeight = 63f;
 
     private static readonly Color Ink = UITheme.Text;
-    private static readonly Color Brass = new(0.86f, 0.68f, 0.34f);
-    private static readonly Color BrassDark = new(0.45f, 0.33f, 0.15f);
-    private static readonly Color Wood = new(0.2f, 0.12f, 0.07f, 0.96f);
-    private static readonly Color WoodLight = new(0.33f, 0.21f, 0.12f, 0.96f);
+    private static readonly Color Brass = new(0.8f, 0.86f, 0.89f);          // hairline rims and letters (steel)
+    private static readonly Color BrassDark = new(0.28f, 0.34f, 0.38f);
+    private static readonly Color Wood = new(0.055f, 0.07f, 0.08f, 0.93f);   // the bezel: graphite glass like the panels
+    private static readonly Color WoodLight = new(0.11f, 0.135f, 0.15f, 0.93f);
     private static readonly Color DayGold = new(0.98f, 0.78f, 0.32f);
     private static readonly Color NightBlue = new(0.32f, 0.42f, 0.72f);
 
@@ -136,12 +136,12 @@ public partial class Minimap : Control
 
         DrawSetTransform(Vector2.Zero, 0f, new Vector2(Scale, Scale));
         DrawDayRing(c);
-        // The bezel: dark wood between two brass rims, with a soft shadow outside.
+        // The bezel: graphite glass with a steel hairline outside and an amber ring round the map, a soft shadow outside.
         DrawCircle(c + new Vector2(3f, 4f), BezelOuter + 2f, new Color(0f, 0f, 0f, 0.35f));
         DrawCircle(c, BezelOuter, Wood);
-        DrawArc(c, BezelOuter - 1.5f, 0f, Mathf.Tau, 96, Brass, 3.2f, true);
+        DrawArc(c, BezelOuter - 1.5f, 0f, Mathf.Tau, 96, new Color(Brass, 0.55f), 1.6f, true);
         DrawArc(c, BezelOuter - 5.5f, 0f, Mathf.Tau, 96, WoodLight, 4f, true);
-        DrawArc(c, MapRadius + 3f, 0f, Mathf.Tau, 96, Brass, 4f, true);
+        DrawArc(c, MapRadius + 3f, 0f, Mathf.Tau, 96, UITheme.Accent, 2.4f, true);
         DrawArc(c, MapRadius + 5.5f, 0f, Mathf.Tau, 96, BrassDark, 2f, true);
 
         DrawMap(c, font);
@@ -220,7 +220,7 @@ public partial class Minimap : Control
         var perp = Vector2.Right;
         var arrow = new[] { c + up * 15f, c - up * 9f + perp * 10f, c - up * 4f, c - up * 9f - perp * 10f };
         DrawColoredPolygon(arrow, new Color(1f, 0.88f, 0.3f));
-        DrawPolyline(new[] { arrow[0], arrow[1], arrow[2], arrow[3], arrow[0] }, new Color(0.1f, 0.06f, 0.03f), 2.6f, true);
+        DrawPolyline(new[] { arrow[0], arrow[1], arrow[2], arrow[3], arrow[0] }, new Color(0.03f, 0.04f, 0.05f), 2.6f, true);
     }
 
     /// <summary>The ring of the day round the bezel: day gold, night blue, noon at the top, the sun or the moon on it.</summary>
@@ -228,10 +228,10 @@ public partial class Minimap : Control
     {
         var world = _rod.World;
         float AngleOf(float hour) => Mathf.Pi / 2f + hour / 24f * Mathf.Tau;   // midnight at the bottom, noon at the top
-        DrawCircle(c, DayRingRadius + 6f, new Color(0.06f, 0.04f, 0.02f, 0.85f));
+        DrawCircle(c, DayRingRadius + 6f, new Color(0.03f, 0.04f, 0.05f, 0.82f));
         DrawArc(c, DayRingRadius, AngleOf(DayClock.DayStart), AngleOf(DayClock.NightStart), 48, new Color(DayGold, 0.9f), 7f, true);
         DrawArc(c, DayRingRadius, AngleOf(DayClock.NightStart), AngleOf(DayClock.DayStart + 24f), 48, new Color(NightBlue, 0.9f), 7f, true);
-        DrawArc(c, DayRingRadius + 5f, 0f, Mathf.Tau, 96, new Color(Brass, 0.8f), 2f, true);
+        DrawArc(c, DayRingRadius + 5f, 0f, Mathf.Tau, 96, new Color(Brass, 0.45f), 1.4f, true);
         float a = AngleOf(world.Hour);
         var at = c + new Vector2(MathF.Cos(a), MathF.Sin(a)) * DayRingRadius;
         bool day = DayClock.IsDaytime(world.Hour);
@@ -249,7 +249,7 @@ public partial class Minimap : Control
         else
         {
             DrawCircle(at, 9.5f, new Color(0.88f, 0.9f, 1f));
-            DrawCircle(at + new Vector2(3.8f, -2.6f), 7.6f, new Color(0.06f, 0.04f, 0.02f, 0.95f));
+            DrawCircle(at + new Vector2(3.8f, -2.6f), 7.6f, new Color(0.03f, 0.04f, 0.05f, 0.95f));
         }
     }
 
@@ -263,7 +263,7 @@ public partial class Minimap : Control
         const float r = 27f;
         DrawCircle(at + new Vector2(1.5f, 2.5f), r + 1f, new Color(0f, 0f, 0f, 0.35f));
         DrawCircle(at, r, Wood);
-        DrawArc(at, r - 1f, 0f, Mathf.Tau, 48, Brass, 2.2f, true);
+        DrawArc(at, r - 1f, 0f, Mathf.Tau, 48, new Color(Brass, 0.6f), 1.4f, true);
         bool day = DayClock.IsDaytime(world.Hour);
         var w = world.Weather;
         var sky = day ? new Color(0.36f, 0.56f, 0.78f) : new Color(0.1f, 0.13f, 0.26f);
@@ -360,6 +360,6 @@ public partial class Minimap : Control
             Fit(font, air, inner, 11), baro.Pace > 1.05f ? new Color(0.6f, 0.95f, 0.6f) : baro.Pace < 0.95f ? new Color(1f, 0.65f, 0.5f) : new Color(Ink, 0.8f));
         string place = _rod.Lake.Location.DisplayName;
         DrawString(font, new Vector2(box.Position.X, box.Position.Y + 44f), place, HorizontalAlignment.Center, box.Size.X,
-            Fit(font, place, inner, 11), new Color(Brass, 0.95f));
+            Fit(font, place, inner, 11), UITheme.Accent);
     }
 }
