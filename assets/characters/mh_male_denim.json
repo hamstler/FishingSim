@@ -2,14 +2,16 @@
  "id": "mh_male_denim",
  "sex": "M",
  "hair": [
-  "Hair_short03"
+  "Hair_short01"
  ],
  "materials": {
   "skin": {
    "roughness_value": 0.55,
    "albedo": [
     "mh_male_denim_skin_a"
-   ]
+   ],
+   "ao": "mh_male_denim_skin_o",
+   "normal": "mh_male_denim_skin_n"
   },
   "brows": {
    "roughness_value": 0.9,
@@ -36,14 +38,16 @@
    "albedo": [
     "mh_male_denim_outfit_a"
    ],
-   "normal": "mh_male_denim_outfit_n"
+   "normal": "mh_male_denim_outfit_n",
+   "ao": "mh_male_denim_outfit_o"
   },
   "shoes": {
    "roughness_value": 0.6,
    "albedo": [
     "mh_male_denim_shoes_a"
    ],
-   "normal": "mh_male_denim_shoes_n"
+   "normal": "mh_male_denim_shoes_n",
+   "ao": "mh_male_denim_shoes_o"
   },
   "hair1": {
    "roughness_value": 0.75,
@@ -53,6 +57,7 @@
    "alpha": true
   }
  },
+ "pelvis_scale": 0.9971,
  "author": "MakeHuman community (built with MPFB2)",
  "licence": "CC0 1.0 (public domain)",
  "sources": [

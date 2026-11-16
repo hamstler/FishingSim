@@ -160,18 +160,21 @@ public partial class ScreenshotTool : Node
                 MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.36f, 0.42f, 0.26f), Roughness = 1f },
             });
             var figures = new List<Node3D>();
-            if (arg == 1)
+            if (arg == 1 || arg == 4)
+            {
                 foreach (var id in FishingSim.World.Props.CharacterAsset.Models)
-                    foreach (int v in new[] { 0, 1 })
+                    if (arg == 1 || id.StartsWith("mh_"))
+                        foreach (int v in arg == 4 ? new[] { 0 } : new[] { 0, 1 })
                         figures.Add(FishingSim.World.Props.CharacterAsset.Create(new FishingSim.World.Props.Appearance(id, v,
                             id.StartsWith("male") ? (v == 0 ? "Hair_SimpleParted" : "Hair_Long") : (v == 0 ? "Hair_Buns" : "Hair_Long"),
                             v == 0 ? new Color(0.45f, 0.3f, 0.18f) : new Color(0.82f, 0.68f, 0.45f), Colors.White, id.StartsWith("male") && v == 1,
                             id.EndsWith("ranger") && v == 0, Colors.White)) ?? new Node3D());
+            }
             else
                 foreach (var role in Enum.GetValues<FishingSim.World.Props.Role>())
                     if (arg != 2 && arg != 3 || figures.Count < (arg == 3 ? 1 : 5))
                         figures.Add(FishingSim.World.Props.People.Create(role, Math.Max(map, 0) + 1));
-            float spacing = 1.05f, width = (figures.Count - 1) * spacing;
+            float spacing = arg == 4 ? 0.62f : 1.05f, width = (figures.Count - 1) * spacing;
             for (int i = 0; i < figures.Count; i++)
             {
                 figures[i].Position = new Vector3(i * spacing - width / 2f, 0f, 0f);
@@ -187,6 +190,27 @@ public partial class ScreenshotTool : Node
                 // Head and shoulders of the first, three-quarter view.
                 cam.Position = new Vector3(0.38f, 1.6f, 0.95f);
                 cam.LookAt(new Vector3(0f, 1.45f, 0f));
+            }
+            else if (arg == 4)
+            {
+                // Heads of the realistic models side by side, a little turned (FISHSIM_SHOT_YAW turns them more: 180 = backs).
+                float turn = float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_YAW"), out var y4) ? y4 : 25f;
+                foreach (var f in figures)
+                    f.RotationDegrees = new Vector3(0f, turn, 0f);
+                // FISHSIM_HIDE_MESH=Brows,Lashes hides those meshes (finding which one draws over the face).
+                var hide = (System.Environment.GetEnvironmentVariable("FISHSIM_HIDE_MESH") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var f in figures)
+                    foreach (var n in f.FindChildren("*", "MeshInstance3D", true, false))
+                        if (hide.Any(h => n.Name.ToString().StartsWith(h)))
+                            ((MeshInstance3D)n).Visible = false;
+                // Sun from the side and a little behind, so the faces' relief and the ears' glow show.
+                foreach (var l in root3d.GetChildren().OfType<DirectionalLight3D>())
+                {
+                    l.RotationDegrees = new Vector3(-28f, 70f, 0f);
+                    l.ShadowEnabled = System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_NOSHADOW") != "1";
+                }
+                cam.Position = new Vector3(0f, 1.5f, 3.9f);
+                cam.LookAt(new Vector3(0f, 1.42f, 0f));
             }
             for (int i = 0; i < 40; i++)
                 await NextFrame();

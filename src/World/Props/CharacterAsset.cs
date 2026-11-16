@@ -44,6 +44,12 @@ public static class CharacterAsset
     public static float HeightOf(string id) => Load(id)?.Height ?? 1.8f;
 
     /// <summary>
+    /// How much this body's pelvis stands lower (below 1) or higher than the animations' (MakeHuman models: its legs'
+    /// length against the Quaternius skeleton the shared animations were made for); 1 for the Quaternius models.
+    /// </summary>
+    public static float PelvisScaleOf(string id) => (float?)Load(id)?.Info["pelvis_scale"] ?? 1f;
+
+    /// <summary>
     /// A new villager, feet at the origin facing +Z, dressed as <paramref name="look"/> says, with an AnimationPlayer
     /// holding the shared library (playing <paramref name="idle"/> from a random point once it enters the tree; no
     /// animations at all when it is null, for a skeleton posed by code). Null when the model is missing or there is no
@@ -74,6 +80,10 @@ public static class CharacterAsset
             mi.VisibilityRangeEndMargin = 10f;
             mi.VisibilityRangeFadeMode = GeometryInstance3D.VisibilityRangeFadeModeEnum.Self;
         }
+        // The shared animations lift the pelvis as high as the Quaternius legs are long: fit that to this body's legs.
+        float pelvis = PelvisScaleOf(look.Model);
+        if (MathF.Abs(pelvis - 1f) > 0.002f && SkeletonOf(root) is { } fitSkeleton)
+            fitSkeleton.AddChild(new PelvisFit { Factor = pelvis });
         if (idle != null && LibraryFor(model.Male) is { } library)
         {
             var player = new AnimationPlayer { Name = "AnimationPlayer" };
@@ -143,6 +153,9 @@ public static class CharacterAsset
         }
     }
 
+    /// <summary>FISHSIM_NPC_PLAIN=1 (screenshots): no baked shade and no skin relief, to compare.</summary>
+    private static readonly bool Plain = System.Environment.GetEnvironmentVariable("FISHSIM_NPC_PLAIN") == "1";
+
     private static Material MaterialFor(Model model, string slot, Appearance look)
     {
         var spec = model.Info["materials"]?[slot] as JsonObject;
@@ -163,7 +176,7 @@ public static class CharacterAsset
             var m = BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = tint, Roughness = 1f, Metallic = 0f }, true);
             if (Picture(albedo) is { } a)
                 m.AlbedoTexture = a;
-            if ((string?)spec?["normal"] is string n && Picture(n) is { } nt)
+            if ((!Plain || slot != "skin") && (string?)spec?["normal"] is string n && Picture(n) is { } nt)
             {
                 m.NormalEnabled = true;
                 m.NormalTexture = nt;
@@ -187,6 +200,15 @@ public static class CharacterAsset
             }
             else
                 m.Roughness = (float?)spec?["roughness_value"] ?? 0.8f;
+            if (!Plain && (string?)spec?["ao"] is string ao && Picture(ao) is { } aot)
+            {
+                // Baked contact shade (MakeHuman models): folds, seams, the collar on the neck, under the chin. It darkens
+                // the sky's light fully and the sun's a little, so creases still read in direct light.
+                m.AOEnabled = true;
+                m.AOTexture = aot;
+                m.AOTextureChannel = BaseMaterial3D.TextureChannel.Red;
+                m.AOLightAffect = 0.45f;
+            }
             if ((bool?)spec?["alpha"] == true)
             {
                 // Hair cards, brows and lashes: soft edges blended over what is behind, sorted by a depth pre-pass.
@@ -196,14 +218,21 @@ public static class CharacterAsset
             switch (slot)
             {
                 case "skin":
-                    // A little light through the skin: ears and fingers glow in the sun instead of going grey.
-                    m.SubsurfScatterEnabled = true;
-                    m.SubsurfScatterStrength = 0.25f;
-                    m.SubsurfScatterSkinMode = true;
+                    // No screen-space subsurface scattering: in Godot 4.3 its blur pulled the background through half the
+                    // face (a see-through "ghost" with straight edges on the shaded cheek). A soft warm sheen at grazing
+                    // angles stands in for the light under the skin.
+                    m.RimEnabled = true;
+                    m.Rim = 0.18f;
+                    m.RimTint = 0.25f;
                     // Skin has a soft sheen (oil, the light grazing the cheek), not chalk.
                     m.MetallicSpecular = 0.42f;
                     if (m.RoughnessTexture == null)
                         m.Roughness = 0.55f;
+                    // The face's folds (eye sockets, under the nose and chin, behind the ears) shade in sunlight too.
+                    if (m.AOEnabled)
+                        m.AOLightAffect = 0.7f;
+                    // Pores and creases (MakeHuman skins: made from the painting by the build), kept faint.
+                    m.NormalScale = 0.6f;
                     break;
                 case "hair1" or "hair2":
                     m.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
@@ -222,7 +251,18 @@ public static class CharacterAsset
                     m.MetallicSpecular = 0.25f;
                     break;
                 case "eye":
+                    // A wet eye: a sharp clear-coat highlight over the iris; the pack's irises are painted bright, so a little
+                    // darker (they glowed turquoise in the sun).
+                    m.AlbedoColor = new Color(0.72f, 0.72f, 0.72f);
                     m.MetallicSpecular = 0.8f;
+                    m.ClearcoatEnabled = true;
+                    m.Clearcoat = 1f;
+                    m.ClearcoatRoughness = 0.04f;
+                    break;
+                case "shoes" or "hat":
+                    m.RimEnabled = true;
+                    m.Rim = 0.2f;
+                    m.RimTint = 0.6f;
                     break;
             }
             Materials[key] = m;
@@ -315,6 +355,28 @@ public static class CharacterAsset
 /// Turns a villager's head (and a little of the neck) towards the camera after the animation has posed the skeleton:
 /// the angler within ten metres in front, otherwise a slow look about. The models face +Z.
 /// </summary>
+/// <summary>
+/// Scales the pelvis's animated position by <see cref="Factor"/>: the shared animations were made for longer (or shorter)
+/// legs, so without it a short-legged villager's feet hang above the ground and its seat floats over the log.
+/// </summary>
+public partial class PelvisFit : SkeletonModifier3D
+{
+    private int _pelvis = -2;
+
+    public float Factor { get; set; } = 1f;
+
+    public override void _ProcessModification()
+    {
+        var sk = GetSkeleton();
+        if (sk == null)
+            return;
+        if (_pelvis == -2)
+            _pelvis = sk.FindBone("pelvis");
+        if (_pelvis >= 0)
+            sk.SetBonePosePosition(_pelvis, sk.GetBonePosePosition(_pelvis) * Factor);
+    }
+}
+
 public partial class HeadLook : SkeletonModifier3D
 {
     private float _yaw;

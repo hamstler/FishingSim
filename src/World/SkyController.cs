@@ -302,7 +302,8 @@ public partial class SkyController : Node
         _env.AmbientLightSkyContribution = Mathf.Lerp(0.35f, 1f, day);
         // Exposure: the eye opens up at night and a little in the low light of dusk and dawn.
         _env.TonemapExposure = Mathf.Lerp(1.9f, 1.05f, day) + 0.12f * golden;
-        _env.FogDensity = Mathf.Lerp(0.001f, 0.004f, _cloud) + _rain * 0.006f + FogBoost + 0.0006f * mist;
+        // A clear day still has haze: the far shore (150-300 m) loses a fifth of its colour to the sky.
+        _env.FogDensity = Mathf.Lerp(0.0016f, 0.004f, _cloud) + _rain * 0.006f + FogBoost + 0.0006f * mist;
         // The mist lies low over the water: denser below MistHeight (height fog), and in the volumetric fog too.
         _env.FogHeight = MistHeight;
         _env.FogHeightDensity = 0.025f * mist;
@@ -312,7 +313,7 @@ public partial class SkyController : Node
         _sun.LightVolumetricFogEnergy = Mathf.Lerp(0.3f, 1.6f, Math.Clamp(el * 3f, 0f, 1f)) + ShaftStrength * golden * (0.4f + 0.6f * mist);
         // Long shadows of a low sun are softer; midday ones are crisp.
         _sun.ShadowBlur = Mathf.Lerp(2.4f, 1.1f, Math.Clamp(el * 2.5f, 0f, 1f));
-        _env.FogAerialPerspective = 0.55f;
+        _env.FogAerialPerspective = 0.75f;
         // The haze is lit by the sky: bright by day, a glow at twilight, nearly black at night (a grey fog at night
         // washed the far forest out and made the mountains brighter than the sky).
         float hazeLight = Math.Clamp(day + 0.3f * twilight, 0.06f, 1f);

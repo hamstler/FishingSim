@@ -348,6 +348,22 @@ public static class CampProps
     public static Node3D SeatLog(float length = 1.4f, int seed = 0, float radius = 0.17f, bool even = false)
     {
         var root = new Node3D { Name = "SeatLog" };
+        // A photoscanned fallen trunk (Poly Haven "dead_tree_trunk", CC0, 3.05 x 0.29 x 0.28 m, lying along X), fitted to
+        // this log's length and so that its top in the middle, where one sits, is at 2 x radius: the sitters' seats are
+        // measured there. The scan is thicker at its ends (root flare, a knot) than in the middle, whose top is only
+        // ScanMiddleTop of the scan standing on the ground; its bed rests 1 cm in the ground.
+        if (PropAsset.Create("dead_tree_trunk") is { } scan)
+        {
+            const float ScanMiddleTop = 0.211f, ScanDepth = 0.278f;
+            var rngScan = new RandomNumberGenerator { Seed = (ulong)(seed * 131 + 7) };
+            scan.Scale = new Vector3(length / 3.051f, (radius * 2f + 0.01f) / ScanMiddleTop, radius * 2.2f / ScanDepth);
+            scan.Position = new Vector3(0f, -0.01f, 0f);
+            // Turned end for end now and then, so two logs by one fire are not twins.
+            if (rngScan.Randf() < 0.5f)
+                scan.RotationDegrees = new Vector3(0f, 180f, 0f);
+            root.AddChild(scan);
+            return root;
+        }
         const int sides = 24, steps = 8;
         var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 7919 + 13) };
         float p1 = rng.Randf() * 6f, p2 = rng.Randf() * 6f;

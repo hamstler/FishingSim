@@ -149,6 +149,8 @@ public partial class GrassField : Node3D
         // thousand single calls into the engine made a hitch at every rebuild. The capacity is rounded up (only the
         // first n are drawn) so the same array serves rebuild after rebuild.
         int n = transforms.Count;
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_GRASS_DEBUG") == "1")
+            GD.Print($"grass: {n} clumps within {radius:0} m of {centre}");
         int capacity = Math.Max(2048, (n + 2047) / 2048 * 2048);
         if (_buffer.Length != capacity * 16)
             _buffer = new float[capacity * 16];
