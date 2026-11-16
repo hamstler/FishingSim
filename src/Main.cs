@@ -27,6 +27,9 @@ public partial class Main : Node3D
 
     private ulong _rowRefusedAt;
 
+    /// <summary>The echo sounder screen (shown in the boat with the accessory).</summary>
+    public UI.EchoSounder Echo { get; private set; } = null!;
+
     /// <summary>The angler's rowboat at the pier.</summary>
     public World.Rowboat Boat { get; private set; } = null!;
     private SkyController _sky = null!;
@@ -97,6 +100,9 @@ public partial class Main : Node3D
         AddChild(Boat);
         Boat.Setup(_lake, _water);
         Scenery.Interactables.Add(Boat.Spot);
+        // The same wind as the rod's (FishingRod.WindVelocity): it drifts an unanchored boat.
+        Boat.Wind = () => new Vector2(0.8f, 0.6f) * (_world.WindTarget * 3f);
+        Boat.Said += msg => Rod.Notify(msg, 2f);
         _lake.Rebuilt += () =>
         {
             Boat.ResetToMooring();
@@ -208,6 +214,14 @@ public partial class Main : Node3D
         var hud = new Hud { Tools = Tools };
         hud.Setup(Rod, Tournaments, Interactions, Player, Scenery);
         AddChild(hud);
+        var echo = new UI.EchoSounder { Boat = Boat, Lake = _lake, Fish = Fish, Gear = _gear, Name = "EchoSounder" };
+        echo.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.CenterLeft);
+        echo.OffsetLeft = 24;
+        echo.OffsetRight = 324;
+        echo.OffsetTop = -95;
+        echo.OffsetBottom = 95;
+        hud.AddChild(echo);
+        Echo = echo;
 
         var shop = new Shop();
         shop.Setup(Rod);

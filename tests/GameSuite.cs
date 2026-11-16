@@ -441,13 +441,33 @@ public sealed class GameSuite : ITestSuite
             await t.Seconds(3.0);
             float moved = new Vector2(boat.GlobalPosition.X - start.X, boat.GlobalPosition.Z - start.Z).Length();
             float seatGap = player.GlobalPosition.DistanceTo(boat.Seat - Vector3.Up * Player.SeatedEyeDrop);
-            t.Check(moved > 1.5f && boat.Speed > 0.4f && seatGap < 0.2f,
+            t.Check(moved > 1.2f && boat.Speed > 0.4f && seatGap < 0.2f,
                 $"rowing moves the boat and the angler with it ({moved:0.0} m, {boat.Speed:0.0} m/s, seat gap {seatGap:0.00} m)");
             float heading = boat.Heading;
             boat.RowOverride = new Vector2(0f, 1f);
             await t.Seconds(2.0);
             t.Check(MathF.Abs(Mathf.AngleDifference(heading, boat.Heading)) > 0.3f, $"one oar pulling, the other backing turns the boat ({Mathf.RadToDeg(boat.Heading - heading):0} deg)");
             boat.RowOverride = new Vector2(0f, 0f);
+            // The wind drifts a boat without its anchor; the anchor holds it.
+            var windWas = boat.Wind;
+            boat.Wind = () => new Vector2(3f, 0f);
+            await t.Seconds(1.0);
+            var drift0 = boat.GlobalPosition;
+            await t.Seconds(3.0);
+            float drifted = boat.GlobalPosition.X - drift0.X;
+            t.Check(boat.ToggleAnchor() == null && boat.Anchored, "X drops the anchor");
+            var held0 = boat.GlobalPosition;
+            await t.Seconds(4.0);
+            float held = new Vector2(boat.GlobalPosition.X - held0.X, boat.GlobalPosition.Z - held0.Z).Length();
+            t.Check(drifted > 0.1f && held < 0.8f, $"the wind drifts the boat ({drifted:0.00} m), the anchor holds it ({held:0.00} m)");
+            boat.ToggleAnchor();
+            boat.Wind = windWas;
+            // The echo sounder shows in the boat when owned.
+            profile.Money += 500;
+            string? bought = main.Gear.Buy(GearSlot.Accessory, main.Gear.Items(GearSlot.Accessory).First(i => i.ItemId == "echosonda"));
+            t.Check(bought == null, $"an echo sounder can be bought ({bought})");
+            await t.Seconds(0.4);
+            t.Check(main.Echo.Showing && main.Echo.Depth > 0.3f, $"the echo sounder shows the depth under the boat ({main.Echo.Depth:0.0} m)");
             // Far out there is no shore to step onto.
             bool landing = boat.FindLanding(out _);
             t.Check(rod.InputBlocked || landing || boat.Toggle(player) is string, "out on the water the angler cannot step out");

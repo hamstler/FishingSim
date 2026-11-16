@@ -8,7 +8,7 @@ namespace FishingSim;
 public enum Act
 {
     Forward, Back, Left, Right, Sprint,
-    LandingNet, DepthUp, DepthDown, LooseFeed, RodRest, Release, Interact, Sharpen, NextFishery, CycleTool,
+    Anchor, LandingNet, DepthUp, DepthDown, LooseFeed, RodRest, Release, Interact, Sharpen, NextFishery, CycleTool,
     Inventory, Map, Journal, Tournaments, Details, QuickHelp, Performance, DevConsole,
 }
 
@@ -30,6 +30,7 @@ public static class Bindings
         new(Act.Right, "W prawo", "Ruch", Key.D),
         new(Act.Sprint, "Bieg / szybsze zwijanie", "Ruch", Key.Shift),
         new(Act.Interact, "Wejście, rozmowa / ryba do siatki", "Ruch", Key.E),
+        new(Act.Anchor, "Kotwica (w łódce)", "Ruch", Key.X),
         new(Act.LandingNet, "Podbierak", "Wędkowanie", Key.Space),
         new(Act.DepthUp, "Grunt głębiej (spławik)", "Wędkowanie", Key.Bracketright),
         new(Act.DepthDown, "Grunt płyciej (spławik)", "Wędkowanie", Key.Bracketleft),

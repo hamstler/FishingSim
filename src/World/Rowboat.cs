@@ -58,6 +58,47 @@ public partial class Rowboat : Node3D
 
     public Node3D? GripR => _oarR?.GetNodeOrNull<Node3D>("Grip") ?? _oarR?.GetChild<Node3D>(0)?.GetNodeOrNull<Node3D>("Grip");
 
+    /// <summary>The wind over the water (m/s, x/z); without the anchor it drifts the boat downwind.</summary>
+    public Func<Vector2>? Wind { get; set; }
+
+    /// <summary>The anchor is down: the boat holds its place (it swings a little on the rope).</summary>
+    public bool Anchored { get; private set; }
+
+    private Node3D? _anchorRope;
+    private Vector3 _anchorAt;
+
+    /// <summary>X in the boat: drops the anchor or weighs it (null = done, else why not).</summary>
+    public string? ToggleAnchor()
+    {
+        if (_rower == null)
+            return "Kotwicę rzuca się z łódki";
+        if (Anchored)
+        {
+            Anchored = false;
+            if (_anchorRope != null)
+                _anchorRope.Visible = false;
+            return null;
+        }
+        var p = GlobalPosition;
+        float depth = _bed.DepthAt(p.X, p.Z);
+        if (depth > 12f)
+            return "Za głęboko na kotwicę (lina 12 m)";
+        Anchored = true;
+        _anchorAt = new Vector3(p.X, Main.WaterY - depth, p.Z);
+        _velocity *= 0.2f;
+        if (_anchorRope == null)
+        {
+            _anchorRope = new MeshInstance3D
+            {
+                Mesh = new CylinderMesh { TopRadius = 0.008f, BottomRadius = 0.008f, Height = 1f, RadialSegments = 6, Rings = 1 },
+                MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.55f, 0.48f, 0.34f), Roughness = 0.95f },
+            };
+            GetParent().AddChild(_anchorRope);
+        }
+        _anchorRope.Visible = true;
+        return null;
+    }
+
     /// <summary>The row input for tests: (ahead -1..1, turn left -1..1); null = the keys.</summary>
     public Vector2? RowOverride { get; set; }
 
@@ -84,6 +125,9 @@ public partial class Rowboat : Node3D
         for (int i = 0; i < 12 && _bed.Location != null && _bed.DepthAt(_mooring.X, _mooring.Z + HalfLength) < MinDepth + 0.2f; i++)
             _mooring.Z -= 1f;
         _mooringHeading = MathF.PI;                     // bow towards -Z (out over the lake)
+        Anchored = false;
+        if (_anchorRope != null)
+            _anchorRope.Visible = false;
         Position = _mooring;
         _heading = _mooringHeading;
         _velocity = Vector2.Zero;
@@ -119,6 +163,9 @@ public partial class Rowboat : Node3D
         player.Velocity = Vector3.Zero;
         _rower = null;
         Aboard = false;
+        Anchored = false;
+        if (_anchorRope != null)
+            _anchorRope.Visible = false;
         Spot.Title = "wsiądź do łódki";
         _rowL = _rowR = 0f;
     }
@@ -181,6 +228,8 @@ public partial class Rowboat : Node3D
         float pushL = Stroke(ref _phaseL, _rowL, hz, dt), pushR = Stroke(ref _phaseR, _rowR, hz, dt);
         float power = 1f + 0.4f * hard;
 
+        if (Anchored)
+            ahead = turn = hard = 0f;
         var fwd = new Vector2(MathF.Sin(_heading), MathF.Cos(_heading));
         var side = new Vector2(fwd.Y, -fwd.X);
         float along = _velocity.Dot(fwd), across = _velocity.Dot(side);
@@ -188,6 +237,18 @@ public partial class Rowboat : Node3D
         across -= across * DragSide * dt;
         _turnRate += ((pushR - pushL) * 0.5f * TurnThrust * power - _turnRate * DragTurn) * dt;
         _velocity = fwd * along + side * across;
+        // The wind pushes the boat downwind (it settles at about a fifth of the wind's speed); the anchor rope holds
+        // it within a metre of where the anchor lies, and it swings slowly bow to the wind.
+        var wind = Wind?.Invoke() ?? Vector2.Zero;
+        if (Anchored)
+        {
+            var off = new Vector2(Position.X - _anchorAt.X, Position.Z - _anchorAt.Z);
+            _velocity += (-off * 0.8f - _velocity * 1.5f) * dt + wind * 0.04f * dt;
+            if (wind.LengthSquared() > 0.01f)
+                _turnRate += Mathf.AngleDifference(_heading, MathF.Atan2(-wind.X, -wind.Y)) * 0.05f * dt;
+        }
+        else if (_rower != null)
+            _velocity += wind * 0.12f * dt;     // the hull's own drag sets the drift speed; a boat left at its berth is tied up
 
         // Move, unless the hull would touch the shallows, the pier or the edge: then it stops (a soft bump back).
         float newHeading = _heading + _turnRate * dt;
@@ -209,6 +270,14 @@ public partial class Rowboat : Node3D
         }
         Float(dt);
         AnimateOars(dt);
+        if (_anchorRope is { Visible: true })
+        {
+            // The rope from the bow down to the anchor.
+            var bow = GlobalTransform * new Vector3(0f, 0.6f, HalfLength - 0.1f);
+            var d = _anchorAt - bow;
+            _anchorRope.GlobalTransform = new Transform3D(Basis.LookingAt(d.Normalized(), MathF.Abs(d.Normalized().Y) > 0.98f ? Vector3.Forward : Vector3.Up)
+                * Basis.FromEuler(new Vector3(MathF.PI / 2f, 0f, 0f)) * Basis.FromScale(new Vector3(1f, d.Length(), 1f)), (bow + _anchorAt) / 2f);
+        }
         if (_rower != null)
         {
             // The angler sits on the thwart and turns with the boat.
@@ -304,6 +373,17 @@ public partial class Rowboat : Node3D
     }
 
     public override void _ExitTree() => Aboard = false;
+
+    /// <summary>A message for the angler (the anchor dropped or why not).</summary>
+    public event Action<string>? Said;
+
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        if (_rower == null || !Bindings.Is(@event, Act.Anchor))
+            return;
+        Said?.Invoke(ToggleAnchor() ?? (Anchored ? "Kotwica rzucona: łódka stoi" : "Kotwica podniesiona"));
+        GetViewport().SetInputAsHandled();
+    }
 
     public override void _Process(double delta)
     {

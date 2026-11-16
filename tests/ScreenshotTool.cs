@@ -534,6 +534,11 @@ public partial class ScreenshotTool : Node
             float turn = float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_BOAT_TURN"), System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out float bt) ? bt : 0f;
             bool watch = System.Environment.GetEnvironmentVariable("FISHSIM_BOAT_VIEW") == "1";
+            if (System.Environment.GetEnvironmentVariable("FISHSIM_ECHO") == "1")
+            {
+                main.Gear.Profile!.Money += 500;
+                main.Gear.Buy(GearSlot.Accessory, GD.Load<TackleItem>("res://data/tackle/accessories/echosonda.tres"));
+            }
             main.Boat.Toggle(main.Player);
             main.Boat.RowOverride = new Vector2(1f, turn);
             for (int i = 0; i < rowFrames; i++)
