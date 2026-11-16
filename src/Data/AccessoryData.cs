@@ -35,6 +35,8 @@ public enum AccessoryKind
     Swivel,
     /// <summary>Wypychacz: takes a swallowed hook out quickly and gently (Core/Methods/Unhooking).</summary>
     Disgorger,
+    /// <summary>Echosonda: in the boat, the depth under it, the bottom's profile and the fish below (UI/EchoSounder).</summary>
+    EchoSounder,
 }
 
 /// <summary>Any other accessory. Owning one is enough for it to work (they are not equipped in a slot).</summary>

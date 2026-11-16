@@ -24,6 +24,19 @@ public partial class Main : Node3D
 
     private Profile _profile = null!;
     private Water _water = null!;
+
+    private ulong _rowRefusedAt;
+    private System.Action<string>? _villagerSaid;
+
+
+    /// <summary>The echo sounder screen (shown in the boat with the accessory).</summary>
+    public UI.EchoSounder Echo { get; private set; } = null!;
+
+    /// <summary>The game's sound.</summary>
+    public Audio.SoundEngine Sound { get; private set; } = null!;
+
+    /// <summary>The angler's rowboat at the pier.</summary>
+    public World.Rowboat Boat { get; private set; } = null!;
     private SkyController _sky = null!;
     private WorldState _world = null!;
     private float _appliedMurk;
@@ -87,6 +100,23 @@ public partial class Main : Node3D
         Player = new Player { Position = Player.SpawnPoint, Bed = _lake };
         AddChild(Player);
 
+        // The rowboat at the pier (E boards it): its E spot joins the scenery's after every rebuild.
+        Boat = new World.Rowboat { Name = "Rowboat" };
+        AddChild(Boat);
+        Boat.Setup(_lake, _water);
+        Scenery.Interactables.Add(Boat.Spot);
+        // The same wind as the rod's (FishingRod.WindVelocity): it drifts an unanchored boat.
+        Boat.Wind = () => new Vector2(0.8f, 0.6f) * (_world.WindTarget * 3f);
+        Boat.Said += msg => Rod.Notify(msg, 2f);
+        _villagerSaid = msg => Rod.Notify(msg, 5f);
+        World.Props.Wanderer.Said += _villagerSaid;
+        _lake.Rebuilt += () =>
+        {
+            Boat.ResetToMooring();
+            if (!Scenery.Interactables.Contains(Boat.Spot))
+                Scenery.Interactables.Add(Boat.Spot);
+        };
+
         _sky = new SkyController { World = _world, Water = _water, Follow = Player.Camera, Bed = _lake };
         AddChild(_sky);
 
@@ -120,6 +150,20 @@ public partial class Main : Node3D
         Tools = new HandTools();
         Player.AddChild(Tools);
         Tools.Setup(Player, Rod, _gear, _profile, _lake, _world, Swarms, marks);
+        // Rowing takes both hands: an idle rod goes into the backpack; one fishing keeps the boat where it is.
+        Boat.HandsFree = () =>
+        {
+            if (Tools.Current == HandTool.None)
+                return true;
+            if (Tools.Current == HandTool.Rod && Rod.State == RodState.Idle && Tools.Select(HandTool.None))
+                return true;
+            if (_rowRefusedAt + 3000 < Time.GetTicksMsec())
+            {
+                Rod.Notify(Rod.State == RodState.Idle ? "Odłóż narzędzie (Q), żeby wiosłować" : "Zwiń zestaw, żeby wiosłować", 2.5f);
+                _rowRefusedAt = Time.GetTicksMsec();
+            }
+            return false;
+        };
         Player.Body.ToolPose = Tools.HandPose;
         Player.Body.ToolBodyFrame = Tools.BodyFrame;
 
@@ -161,6 +205,9 @@ public partial class Main : Node3D
         var sound = new Audio.SoundEngine();
         sound.Setup(Rod, Player, _world, _lake);
         AddChild(sound);
+        _sky.Lightning += sound.Thunder;
+        Rises.Risen += (_, x, z) => sound.Rise(new Vector2(x - Player.GlobalPosition.X, z - Player.GlobalPosition.Z).Length());
+        Sound = sound;
         _gear.GearChanged += ApplyGearEffects;
         ApplyGearEffects();
         _profile.WaterTempNow = () => Rod.WaterTemp;
@@ -177,6 +224,14 @@ public partial class Main : Node3D
         var hud = new Hud { Tools = Tools };
         hud.Setup(Rod, Tournaments, Interactions, Player, Scenery);
         AddChild(hud);
+        var echo = new UI.EchoSounder { Boat = Boat, Lake = _lake, Fish = Fish, Gear = _gear, Name = "EchoSounder" };
+        echo.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.CenterLeft);
+        echo.OffsetLeft = 24;
+        echo.OffsetRight = 324;
+        echo.OffsetTop = -95;
+        echo.OffsetBottom = 95;
+        hud.AddChild(echo);
+        Echo = echo;
 
         var shop = new Shop();
         shop.Setup(Rod);
@@ -369,6 +424,10 @@ public partial class Main : Node3D
         switch (spot.Kind)
         {
             case InteractKind.Forage when spot.Target is World.Props.ForagePatch patch: Pick(patch); break;
+            case InteractKind.Boat when spot.Target is World.Rowboat boat:
+                if (boat.Toggle(Player) is string why)
+                    Rod.Notify(why, 2.5f);
+                break;
             case InteractKind.Smokehouse: Smokehouse.Open(); break;
             case InteractKind.NoticeBoard: Board.Open(); break;
             case InteractKind.Campfire when spot.Target is World.Props.Campfire fire: cooking.Open(fire); break;
@@ -437,6 +496,8 @@ public partial class Main : Node3D
 
     public override void _ExitTree()
     {
+        if (_villagerSaid != null)
+            World.Props.Wanderer.Said -= _villagerSaid;
         _profile.Changed -= Save;
         _world.HoursAdvanced -= _profile.PassTime;
         _profile.WaterTempNow = null;

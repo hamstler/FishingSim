@@ -26,6 +26,15 @@ public partial class FishModel : Node3D
     private Vector3 _eyeScale = Vector3.One;
     private float _widthK = 1f;
     private bool _detailed;
+
+    /// <summary>A lake fish wearing the species' hand-built model in its light copy (FishAsset.LiteIfReady).</summary>
+    private FishAsset? _lite;
+
+    /// <summary>The fish wears a hand-built species model (not the lofted shape).</summary>
+    public bool OnModel => _detailed || _lite != null;
+
+    /// <summary>The lake's fish share their materials per species (the swimming phase is an instance uniform).</summary>
+    private static readonly System.Collections.Generic.Dictionary<string, (ShaderMaterial Body, System.Collections.Generic.Dictionary<string, ShaderMaterial> Fins, ShaderMaterial[] Eyes)> LakeMaterials = new();
     private FishSpecies? _species;
     private StandardMaterial3D? _bodyMaterial;
     private bool _skinUpgraded;
@@ -52,9 +61,9 @@ public partial class FishModel : Node3D
     /// the high-resolution painted skin; fish swimming in the lake use the light version. The weight sets the size and
     /// the build: young fish are slim with big eyes, old heavy ones deep and thick (<see cref="Growth"/>).
     /// </summary>
-    public static FishModel Create(FishSpecies species, float weight, bool detailed = false)
+    public static FishModel Create(FishSpecies species, float weight, bool detailed = false, FishAsset? lite = null)
     {
-        var model = new FishModel { _detailed = detailed };
+        var model = new FishModel { _detailed = detailed, _lite = detailed ? null : lite };
         model.Build(species, weight);
         return model;
     }
@@ -481,7 +490,7 @@ public partial class FishModel : Node3D
         // A deeper, thicker body holds more weight for its length: the length follows the weight and the build.
         Length = sp.LengthRef * MathF.Pow(MathF.Max(weight, 0.002f) / (depthK * widthK), 0.33f);
         // A close-up fish of a species with a hand-built model (tools/fish_model) uses it; others are lofted.
-        var asset = _detailed ? FishAsset.For(sp) : null;
+        var asset = _detailed ? FishAsset.For(sp) : _lite;
         var shape = asset == null ? ShapeFor(sp, _detailed) : null;
         float eyeRadius = asset?.EyeRadius ?? shape!.EyeRadius, eyeHead = asset?.HeadHeightAtEye ?? shape!.EyeHeadHeight;
         // Sideways (x) the width, upwards (y) the depth: the cached unit-length shape grows with the fish.
@@ -571,6 +580,11 @@ public partial class FishModel : Node3D
     {
         _bodyShader ??= GD.Load<Shader>("res://shaders/fish_body.gdshader");
         _finShader ??= GD.Load<Shader>("res://shaders/fish_fin.gdshader");
+        if (!_detailed)
+        {
+            BuildLakeAsset(sp, asset, unit, style);
+            return;
+        }
         _bodyShaderMaterial = new ShaderMaterial { Shader = _bodyShader };
         if (asset.BodyAlbedo != null)
             _bodyShaderMaterial.SetShaderParameter("albedo_tex", asset.BodyAlbedo);
@@ -631,6 +645,72 @@ public partial class FishModel : Node3D
     }
 
     private static Shader? _bodyShader, _finShader, _eyeShader, _corneaShader;
+    /// <summary>
+    /// A lake fish on the species' model: body, fins and eyes with materials shared by every fish of the species (no
+    /// corneas: too small to see from the bank), swimming by the same wave as the close-up fish.
+    /// </summary>
+    private void BuildLakeAsset(FishSpecies sp, FishAsset asset, Node3D unit, Graphics.SkinStyle style)
+    {
+        if (!LakeMaterials.TryGetValue(sp.SpeciesName, out var mats))
+        {
+            var body = new ShaderMaterial { Shader = _bodyShader };
+            if (asset.BodyAlbedo != null)
+                body.SetShaderParameter("albedo_tex", asset.BodyAlbedo);
+            if (asset.BodyNormal != null)
+            {
+                body.SetShaderParameter("normal_tex", asset.BodyNormal);
+                body.SetShaderParameter("use_normal", true);
+                body.SetShaderParameter("normal_strength", 0.7f);
+            }
+            // Under the water: a dark back, a dull sheen (a bright silvery clear coat mirrored the sky into pale ghosts).
+            body.SetShaderParameter("metallic", 0.04f + 0.14f * style.Silver);
+            body.SetShaderParameter("roughness", 0.5f);
+            body.SetShaderParameter("clearcoat", 0.08f);
+            body.SetShaderParameter("back_shade", style.Silver > 0.5f ? 0.9f : 0.7f);
+            // From a little above the middle of the body to the top of the back.
+            var box = asset.Body.GetAabb();
+            float mid = box.Position.Y + box.Size.Y * 0.5f;
+            body.SetShaderParameter("back_y0", mid - box.Size.Y * 0.08f);
+            body.SetShaderParameter("back_y1", mid + box.Size.Y * 0.28f);
+            var fins = new System.Collections.Generic.Dictionary<string, ShaderMaterial>();
+            foreach (var (name, _, texture) in asset.Fins)
+            {
+                var m = new ShaderMaterial { Shader = _finShader };
+                if (texture != null)
+                    m.SetShaderParameter("fin_tex", texture);
+                m.SetShaderParameter("flutter", name is "FinPectoral" or "FinPelvic" ? 1f : 0f);
+                fins[name] = m;
+            }
+            _eyeShader ??= GD.Load<Shader>("res://shaders/fish_eye.gdshader");
+            var eyes = new ShaderMaterial[asset.Eyes.Count];
+            for (int i = 0; i < eyes.Length; i++)
+            {
+                eyes[i] = new ShaderMaterial { Shader = _eyeShader };
+                if (asset.Iris != null)
+                    eyes[i].SetShaderParameter("iris_tex", asset.Iris);
+                eyes[i].SetShaderParameter("eye_origin", asset.Eyes[i].Position);
+                eyes[i].SetShaderParameter("eye_scale", Vector3.One);
+            }
+            mats = (body, fins, eyes);
+            LakeMaterials[sp.SpeciesName] = mats;
+        }
+        float phase = (float)(GD.Randf() * Mathf.Tau);
+        void Add(Mesh mesh, Material m, Vector3 position = default, Vector3? scale = null)
+        {
+            var mi = new MeshInstance3D { Mesh = mesh, MaterialOverride = m, Position = position, Scale = scale ?? Vector3.One };
+            mi.SetInstanceShaderParameter("swim_phase", phase);
+            unit.AddChild(mi);
+            _swimmers.Add(mi);
+        }
+        Add(asset.Body, mats.Body);
+        foreach (var (name, mesh, _) in asset.Fins)
+            Add(mesh, mats.Fins[name]);
+        // The eye's own size per fish (the shared material bends it as if unscaled: a hair's difference at this size).
+        var eyeScale = new Vector3(_eyeScale.X * _widthK, _eyeScale.Y, _eyeScale.Z);
+        for (int i = 0; i < asset.Eyes.Count; i++)
+            Add(asset.Eyes[i].Mesh, mats.Eyes[i], asset.Eyes[i].Position, eyeScale);
+    }
+
     private ShaderMaterial? _bodyShaderMaterial;
     private readonly List<GeometryInstance3D> _swimmers = new();
     private float _sentWiggle = -1f;

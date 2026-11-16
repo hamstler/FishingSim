@@ -361,6 +361,15 @@ public sealed class GearSuite : ITestSuite
         for (int i = 0; i < 60; i++)
             swim.Step(1f / 30f, threat, 5f);
         t.Check(swim.Agents.Average(a => Vector2.Distance(a.Position, threat)) > d0, "a running angler scares the fish away");
+        var calm = new FishSwimModel(water, new SystemRng(4));
+        var c0 = calm.Spawn("Płoć", 0.3f, new Vector2(3.5f, 0f), 0, 0.5f, 4f, 0.6f);
+        for (int i = 0; i < 30; i++)
+            calm.Step(1f / 30f, Vector2.Zero, 0f);
+        var c1 = new FishSwimModel(water, new SystemRng(4));
+        var r0 = c1.Spawn("Płoć", 0.3f, new Vector2(3.5f, 0f), 0, 0.5f, 4f, 0.6f);
+        for (int i = 0; i < 30; i++)
+            c1.Step(1f / 30f, Vector2.Zero, 4f);
+        t.Check(c0.Fear <= 0f && r0.Fear > 0f, "a still angler 3.5 m away does not panic the fish; a walking one does");
 
         t.Section("rod bending");
         FishingSim.Core.Physics.RodBendModel Settled(float power, float action, float load)
@@ -439,6 +448,20 @@ public sealed class GearSuite : ITestSuite
         synth.Levels.Wind = 1f;
         synth.Levels.Birds = 1f;
         t.Check(Energy(synth, 22050) > 1e-5f, "wind and birds make an ambience");
+        foreach (var (name, set) in new (string, Action<FishingSim.Core.Audio.Synth>)[]
+        {
+            ("frogs", sy => sy.Levels.Frogs = 1f), ("reeds", sy => sy.Levels.Reeds = 1f),
+            ("water on the hull", sy => sy.Levels.Hull = 1f), ("the village", sy => sy.Levels.Village = 1f),
+            ("thunder", sy => sy.Play(FishingSim.Core.Audio.OneShot.Thunder)), ("a rising fish", sy => sy.Play(FishingSim.Core.Audio.OneShot.Plop)),
+        })
+        {
+            var sy = new FishingSim.Core.Audio.Synth(22050f);
+            set(sy);
+            var buf = new float[22050 * 4];
+            sy.Generate(buf);
+            float e = buf.Sum(x => x * x) / buf.Length;
+            t.Check(e > 1e-6f && buf.All(x => !float.IsNaN(x) && x is >= -1f and <= 1f), $"{name} can be heard (energy {e:0.0e0}), samples stay in range");
+        }
 
         t.Section("bites from the fish you see");
         var lure = new FishSwimModel(water, new SystemRng(5));
@@ -487,14 +510,19 @@ public sealed class GearSuite : ITestSuite
         main.Fish.VisibleDepth = 99f;
         main.Fish.Clarity = 1000f;      // crystal water and polarized glasses: every fish can be seen
         main.Fish.GlareCut = 1f;
+        main.Fish.MaxShown = 4096;
+        main.Fish.MinShownLength = 0f;
         for (int i = 0; i < 3; i++)
             await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
         t.Check(main.Fish.VisibleCount == main.Fish.Agents.Count, "fish in range are drawn under the surface");
         var shown = main.Fish.GetChildren().OfType<FishModel>().First(f => f.Visible);
         t.Check(shown.GlobalPosition.Y < Main.WaterY, "visible fish swim below the water line");
         main.Fish.VisibleRange = 0f;
+        main.Fish.MaxShown = 14;
         await t.Host.ToSignal(t.Host.GetTree(), SceneTree.SignalName.PhysicsFrame);
-        t.Check(main.Fish.VisibleCount == 0, "fish out of range are hidden");
+        for (int i = 0; i < 4; i++)
+            await t.NextFrame();     // the fish are placed (and hidden) once per drawn frame
+        t.Check(main.Fish.VisibleCount == 0, $"fish out of range are hidden ({main.Fish.VisibleCount} of {main.Fish.Agents.Count} still shown)");
         var eyeAt = new Vector3(0f, 1.6f, 0f);
         t.Check(FishPopulation.Sight(eyeAt, new Vector3(0f, -0.5f, -3f), 0f, 0.5f, 2.6f, 0f) > 0.5f
                 && FishPopulation.Sight(eyeAt, new Vector3(0f, -0.5f, -40f), 0f, 0.5f, 2.6f, 0f) < FishPopulation.MinSight

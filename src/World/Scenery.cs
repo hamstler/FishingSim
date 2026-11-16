@@ -388,6 +388,59 @@ public partial class Scenery : Node3D
             Interactables.Add(spot);
             Markers.Add(new MapMarker(spec.Position, building.Title, MarkerColor(spec.Kind)));
         }
+        AddWanderers(loc, layout);
+    }
+
+    /// <summary>The villagers that walk about (World/Props/Wanderer), for tests.</summary>
+    public List<Props.Wanderer> Wanderers { get; } = new();
+
+    /// <summary>
+    /// The village's standing villagers (BuildingKind.Villager) walk about by day: from the nearest house's door (where
+    /// they go in at night) to their own spot, the square, the well and two neighbours' doors.
+    /// </summary>
+    private void AddWanderers(LocationData loc, MapLayout layout)
+    {
+        Wanderers.Clear();
+        if (_world == null)
+            return;
+        var doors = new List<Vector2>();
+        Vector2? well = null;
+        foreach (var spec in layout.Specs)
+        {
+            if (spec.IsDwelling)
+                doors.Add(spec.DoorPoint(loc.PlazaCenter));
+            if (spec.Kind == BuildingKind.Well)
+                well = spec.Position + (loc.PlazaCenter - spec.Position).Normalized() * 1.6f;
+        }
+        if (doors.Count == 0)
+            return;
+        int n = 0;
+        for (int i = 0; i < layout.Specs.Count && i < _buildings.Count; i++)
+        {
+            var spec = layout.Specs[i];
+            if (spec.Kind != BuildingKind.Villager)
+                continue;
+            var npc = _buildings[i].GetChildren().OfType<Props.Npc>().FirstOrDefault();
+            if (npc == null)
+                continue;
+            var own = spec.Position;
+            var byDistance = doors.OrderBy(d => d.DistanceTo(own)).ToList();
+            var stops = new List<Vector2> { byDistance[0], own, loc.PlazaCenter + new Vector2((n % 3 - 1) * 2.2f, (n % 2) * 2f - 1f) };
+            if (well is { } w)
+                stops.Add(w + new Vector2(0.6f * (n % 2 * 2 - 1), 0f));
+            for (int k = 1; k < byDistance.Count && k <= 2; k++)
+                stops.Add(byDistance[k] + new Vector2(0.4f, 0.4f));
+            var walker = Props.Wanderer.Attach(npc, _lake, _world, stops, n * 7 + 3);
+            var world = _world;
+            var talkRng = new Core.SystemRng(n * 31 + 5);
+            var fish = new List<(string, float)>();
+            foreach (var key in loc.Abundance.Keys)
+                fish.Add(((string)key, loc.Abundance[key].AsSingle()));
+            walker.Talk = () => Core.Camp.VillageTalk.Line(new Core.Camp.TalkContext(world.Hour, world.Weather, world.WindTarget, fish), talkRng);
+            Wanderers.Add(walker);
+            n++;
+        }
+        Count("villager_walking", n);
     }
 
     // ------------------------------------------------------------------ campfires

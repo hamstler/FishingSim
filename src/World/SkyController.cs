@@ -141,7 +141,6 @@ public partial class SkyController : Node
     /// </summary>
     private void BuildRain()
     {
-        var rng = new RandomNumberGenerator { Seed = 77 };
         var mm = new MultiMesh
         {
             TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
@@ -149,6 +148,7 @@ public partial class SkyController : Node
             Mesh = new QuadMesh { Size = new Vector2(0.02f, 0.45f) },
             InstanceCount = RainDrops,
         };
+        var rng = new RandomNumberGenerator { Seed = 77 };
         for (int i = 0; i < RainDrops; i++)
         {
             mm.SetInstanceTransform(i, Transform3D.Identity);
@@ -168,6 +168,104 @@ public partial class SkyController : Node
 
     /// <summary>Drops currently drawn (0 when it is not raining).</summary>
     public int VisibleRainDrops => _rainFx.Visible ? _rainFx.Multimesh.VisibleInstanceCount : 0;
+
+    // ------------------------------------------------------------------ mist banks and lightning
+    private MultiMeshInstance3D? _mistBanks;
+    private ShaderMaterial? _mistMaterial;
+    private float _mistShown = -1f;
+    private bool _mistHooked;
+    private DirectionalLight3D? _lightning;
+    private float _flash, _nextFlash = 25f;
+    private readonly RandomNumberGenerator _stormRng = new();
+
+    /// <summary>A lightning flash lit the sky (the thunder follows after the seconds given: Audio plays it).</summary>
+    public event Action<float>? Lightning;
+
+    /// <summary>
+    /// Mist banks: thin horizontal layers over the lake (shaders/mist_bank.gdshader), faded in and out by MistAt (dawn
+    /// and dusk, calm). One MultiMesh, drawn only while there is mist; land shows through where they pass over it (the
+    /// layers lie under 1.5 m, below the banks' tops).
+    /// </summary>
+    private void BuildMistBanks()
+    {
+        if (Bed?.Location == null)
+            return;
+        if (!_mistHooked)
+        {
+            // A new map: new banks over its water.
+            _mistHooked = true;
+            Bed.Rebuilt += () =>
+            {
+                _mistBanks?.QueueFree();
+                _mistBanks = null;
+                _mistShown = -1f;
+            };
+        }
+        _mistMaterial = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/mist_bank.gdshader") };
+        _mistMaterial.SetShaderParameter("noise_tex", Graphics.ProceduralTextures.Noise(91, 0.01f, 256, octaves: 3));
+        // Five layers 0.1-1.4 m over the water, as big as the map.
+        float w = LakeBed.XMax - LakeBed.XMin + 120f, d = LakeBed.ZMax - LakeBed.ZMin + 120f;
+        var plane = new PlaneMesh { Size = new Vector2(w, d), SubdivideWidth = 0, SubdivideDepth = 0 };
+        var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseCustomData = true, Mesh = plane };
+        mm.InstanceCount = 5;
+        var centre = new Vector3((LakeBed.XMin + LakeBed.XMax) / 2f, 0f, (LakeBed.ZMin + LakeBed.ZMax) / 2f);
+        for (int i = 0; i < 5; i++)
+        {
+            mm.SetInstanceTransform(i, new Transform3D(Basis.Identity, centre + Vector3.Up * (0.1f + i * 0.32f)));
+            mm.SetInstanceCustomData(i, new Color(i / 4f, 0f, 0f, 0f));
+        }
+        _mistBanks = new MultiMeshInstance3D { Multimesh = mm, MaterialOverride = _mistMaterial, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Visible = false };
+        AddChild(_mistBanks);
+    }
+
+    private void UpdateMistAndStorm(float dt, float hour, float elevation)
+    {
+        if (_mistBanks == null && Bed?.Location != null)
+            BuildMistBanks();
+        if (_mistBanks != null && _mistMaterial != null)
+        {
+            float mist = MistAt(hour, _wind, _rain) * MistStrength;
+            float shown = MathF.Round(mist * 40f) / 40f;
+            if (MathF.Abs(shown - _mistShown) > 0.001f)
+            {
+                _mistShown = shown;
+                _mistBanks.Visible = shown > 0.02f;
+                _mistMaterial.SetShaderParameter("density", shown * 0.9f);
+                // Dawn mist glows with the low sun; at dusk it goes blue-grey.
+                var tint = SunColour(Math.Clamp(elevation, 0f, 1f)).Lerp(new Color(0.75f, 0.8f, 0.86f), 0.6f) * Math.Clamp(0.18f + elevation * 2.2f, 0.18f, 0.85f);
+                _mistMaterial.SetShaderParameter("mist_color", tint);
+            }
+        }
+        // A storm: in heavy rain with a strong wind, lightning every 15-60 s: the sky and land flash for a moment.
+        bool storm = _rain > 0.7f && _wind > 0.6f;
+        if (_lightning == null)
+        {
+            _lightning = new DirectionalLight3D { LightEnergy = 0f, LightColor = new Color(0.82f, 0.86f, 1f), RotationDegrees = new Vector3(-70f, 30f, 0f), ShadowEnabled = false };
+            AddChild(_lightning);
+        }
+        if (storm)
+        {
+            _nextFlash -= dt;
+            if (_nextFlash <= 0f)
+            {
+                _flash = 1f;
+                _nextFlash = _stormRng.RandfRange(15f, 60f);
+                Lightning?.Invoke(_stormRng.RandfRange(0.8f, 6f));
+            }
+        }
+        if (_flash > 0f || _lightning.LightEnergy > 0f)
+        {
+            _flash = Mathf.MoveToward(_flash, 0f, dt * 5f);
+            // Two quick pulses, as lightning flickers.
+            float pulse = _flash * (0.6f + 0.4f * MathF.Sin(_flash * 40f));
+            _lightning.LightEnergy = 3.5f * pulse;
+        }
+    }
+
+    /// <summary>A flash now (tests and screenshots).</summary>
+    public void FlashLightning() => (_flash, _nextFlash) = (1f, _stormRng.RandfRange(15f, 60f));
+
+    public bool Flashing => _flash > 0.05f;
 
     public override void _Process(double delta)
     {
@@ -194,6 +292,9 @@ public partial class SkyController : Node
         if (Bed != null)
             Bed.Wetness = _groundWet;
         Apply();
+        float hourNow = World.Hour;
+        float elevationNow = MathF.Sin((hourNow - 6f) / 12f * MathF.PI);
+        UpdateMistAndStorm(dt, hourNow, elevationNow);
     }
 
     private static (Color Top, Color Horizon) SampleSky(float hour)

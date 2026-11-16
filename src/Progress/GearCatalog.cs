@@ -34,6 +34,7 @@ public sealed class GearCatalog
         "res://data/tackle/accessories/swietlik.tres",
         "res://data/tackle/accessories/kretlik.tres",
         "res://data/tackle/accessories/wypychacz.tres",
+        "res://data/tackle/accessories/echosonda.tres",
     };
 
     private readonly Dictionary<GearSlot, List<TackleItem>> _items;

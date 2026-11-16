@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AccessoryData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/AccessoryData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Echosonda przenośna"
+Kind = 15
+Power = 1.0
+Description = "Przetwornik za burtą łódki: pokazuje głębokość, kształt dna i ryby pod łodzią."
+Price = 140
+RequiredLevel = 1

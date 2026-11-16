@@ -212,34 +212,48 @@ public static partial class Everyday
     }
 
     /// <summary>
-    /// A clinker-built rowboat (3.6 m) lying on the shore: the hull lofted from its frames (pointed bow at +Z, a flat
-    /// transom at -Z), two thwarts, the oars across them. The keel touches y = 0.
+    /// A clinker-built rowboat (3.6 m): the hull lofted from its frames (a sheer rising to the bow, a rounded bilge, the
+    /// keel curving up into a pointed bow at +Z and a pointed stern at -Z: a double-ender), six overlapping strakes a side,
+    /// a tarred bottom under painted sides, keel, stem and sternpost, gunwales, two thwarts and floorboards. The keel
+    /// touches y = 0. <paramref name="rowing"/>: the oars sit in their rowlocks (pivots "OarL"/"OarR" at the rowlocks,
+    /// the blade out along -X/+X, turned by the rower); otherwise they lie in the boat.
     /// </summary>
-    public static Node3D Rowboat(int seed)
+    public static Node3D Rowboat(int seed, bool rowing = false)
     {
         var root = new Node3D { Name = "Rowboat" };
-        const int along = 28, around = 16;
+        const int along = 32, around = 24;
+        static float Smooth(float a, float b, float x) { float t = Math.Clamp((x - a) / (b - a), 0f, 1f); return t * t * (3f - 2f * t); }
+        // A double-ender (a Nordic færing): both ends pointed, the sheer and the forefoot rising to stem and sternpost.
+        static float Beam(float t) => 0.74f * MathF.Pow(MathF.Max(MathF.Sin(MathF.PI * t), 0f), 0.7f);
+        static float Sheer(float t) => 0.5f + 0.24f * MathF.Pow(MathF.Abs(2f * t - 1f), 3f);
+        static float Keel(float t) => 0.32f * (MathF.Pow(Smooth(0.7f, 1f, t), 1.6f) + MathF.Pow(Smooth(0.7f, 1f, 1f - t), 1.6f));
         Vector3 Hull(int i, int k, float inset)
         {
-            float t = i / (float)along;                       // 0 = transom, 1 = bow
+            float t = i / (float)along;                       // 0 = stern, 1 = bow
             float z = -1.8f + 3.6f * t;
-            float beam = 0.72f * MathF.Pow(MathF.Max(MathF.Sin(MathF.PI * (0.3f + 0.7f * t)), 0f), 0.8f);   // a flat transom, a pointed bow
-            float depth = 0.45f + 0.12f * t * t;
-            float a = k / (float)around;                      // 0 = left gunwale, 1 = right gunwale
-            float u = a * 2f - 1f;
-            float x = u * MathF.Max(beam - inset, 0.005f);
-            // Clinker steps: the planks overlap a little, so the surface steps every tenth of the way round.
-            float step = 0.012f * MathF.Floor(MathF.Abs(u) * 5f);
-            float y = depth * MathF.Pow(MathF.Abs(u), 1.8f) + step + inset;
+            float u = k / (float)around * 2f - 1f;            // -1 = left gunwale, 1 = right gunwale
+            float sgn = MathF.Sign(u), sAbs = MathF.Abs(u);
+            float q = sAbs * MathF.PI / 2f;
+            float bottom = Keel(t), top = Sheer(t);
+            // A round bilge: flat-ish across the keel, turning up into flared sides.
+            float x = sgn * Beam(t) * MathF.Pow(MathF.Sin(q), 0.85f);
+            float y = bottom + (top - bottom) * (1f - MathF.Cos(q));
+            // Clinker: each of the six strakes laps over the one below it.
+            float strake = MathF.Floor(MathF.Min(sAbs, 0.999f) * 6f);
+            x += sgn * 0.012f * strake * MathF.Min(Beam(t) * 4f, 1f);
+            x -= sgn * inset;
+            y += inset;
+            if (sgn != 0f && MathF.Sign(x) != sgn)
+                x = sgn * 0.002f;
             return new Vector3(x, y, z);
         }
-        // The outside (painted, seen from outside) and the inside 2 cm in (bare boards, seen from inside).
-        ArrayMesh Shell(float inset, bool inside)
+        // The outside (seen from outside) for a band of the frames round the hull, and the inside 2 cm in.
+        ArrayMesh Shell(float inset, bool inside, int k0, int k1)
         {
             var st = new SurfaceTool();
             st.Begin(Mesh.PrimitiveType.Triangles);
             for (int i = 0; i < along; i++)
-                for (int k = 0; k < around; k++)
+                for (int k = k0; k < k1; k++)
                 {
                     var quad = inside
                         ? new[] { (i, k), (i + 1, k + 1), (i + 1, k), (i, k), (i, k + 1), (i + 1, k + 1) }
@@ -247,7 +261,7 @@ public static partial class Everyday
                     foreach (var (ia, kb) in quad)
                     {
                         // UV in metres: u along the boat (the boards run bow to stern), v round the hull.
-                        st.SetUV(new Vector2(ia / (float)along * 3.6f, kb / (float)around * 1.8f));
+                        st.SetUV(new Vector2(ia / (float)along * 3.6f, kb / (float)around * 1.9f));
                         st.AddVertex(Hull(ia, kb, inset));
                     }
                 }
@@ -255,39 +269,81 @@ public static partial class Everyday
             st.GenerateTangents();
             return st.Commit();
         }
-        var paint = new[] { new Color(0.62f, 0.4f, 0.26f), new Color(0.45f, 0.55f, 0.62f), new Color(0.6f, 0.56f, 0.45f) }[seed % 3];
-        var hull = BuildingFactory.Weathered("white_planks_clean", paint * 1.4f, 0.8f, triplanar: false, weathering: 1f, moss: 0.15f)
-                   ?? BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = paint, Roughness = 0.85f });
+        var paint = new[] { new Color(0.24f, 0.36f, 0.42f), new Color(0.55f, 0.24f, 0.18f), new Color(0.78f, 0.76f, 0.7f), new Color(0.3f, 0.4f, 0.28f) }[seed % 4];
+        var sides = BuildingFactory.Weathered("white_planks_clean", paint * 1.4f, 0.75f, triplanar: false, weathering: 1f, moss: 0.1f)
+                    ?? BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = paint, Roughness = 0.8f });
+        var tar = BuildingFactory.Weathered("weathered_brown_planks", new Color(0.3f, 0.26f, 0.22f), 0.6f, triplanar: false, moss: 0.05f)
+                  ?? BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = new Color(0.1f, 0.08f, 0.07f), Roughness = 0.6f });
         var bare = BuildingFactory.Weathered("weathered_brown_planks", new Color(0.78f, 0.74f, 0.68f), 0.9f, triplanar: false, moss: 0.1f)
                    ?? CampProps.Wood;
-        root.AddChild(new MeshInstance3D { Mesh = Shell(0f, false), MaterialOverride = hull });
-        root.AddChild(new MeshInstance3D { Mesh = Shell(0.02f, true), MaterialOverride = bare });
-        // The gunwales: a rail along each top edge, covering the shell's raw edge.
+        // Tar on the bottom two strakes a side, paint above.
+        int tarFrom = around / 2 - around / 6, tarTo = around / 2 + around / 6;
+        root.AddChild(new MeshInstance3D { Mesh = Shell(0f, false, 0, tarFrom), MaterialOverride = sides });
+        root.AddChild(new MeshInstance3D { Mesh = Shell(0f, false, tarTo, around), MaterialOverride = sides });
+        root.AddChild(new MeshInstance3D { Mesh = Shell(0f, false, tarFrom, tarTo), MaterialOverride = tar });
+        root.AddChild(new MeshInstance3D { Mesh = Shell(0.02f, true, 0, around), MaterialOverride = bare });
+
+        // A piece of timber from a to b (keel, stem, gunwales).
+        void Timber(Vector3 from, Vector3 to, float w, float h, Material m)
+        {
+            var dir = to - from;
+            if (dir.LengthSquared() < 1e-6f)
+                return;
+            var up = MathF.Abs(dir.Normalized().Y) > 0.95f ? Vector3.Forward : Vector3.Up;
+            root.AddChild(new MeshInstance3D
+            {
+                Mesh = Shapes.RoundedBox(new Vector3(w, h, dir.Length() + 0.012f), MathF.Min(w, h) * 0.3f),
+                MaterialOverride = m,
+                Transform = new Transform3D(Basis.LookingAt(dir.Normalized(), up), (from + to) / 2f),
+            });
+        }
+        // Gunwales along both top edges, the keel under the middle, the stem up the bow.
         foreach (int k in new[] { 0, around })
             for (int i = 0; i < along; i++)
-            {
-                var p0 = Hull(i, k, 0.01f) + new Vector3(0f, 0.015f, 0f);
-                var p1 = Hull(i + 1, k, 0.01f) + new Vector3(0f, 0.015f, 0f);
-                var mid = (p0 + p1) / 2f;
-                var dir = p1 - p0;
-                var rail = new MeshInstance3D
-                {
-                    Mesh = Shapes.RoundedBox(new Vector3(0.05f, 0.045f, dir.Length() + 0.01f), 0.012f),
-                    MaterialOverride = bare,
-                    Transform = new Transform3D(Basis.LookingAt(dir.Normalized(), Vector3.Up), mid),
-                };
-                root.AddChild(rail);
-            }
-        // Transom board, thwarts and the oars.
-        Part(root, Shapes.RoundedBox(new Vector3(1.0f, 0.42f, 0.04f), 0.01f), bare, new Vector3(0f, 0.27f, -1.8f));
-        foreach (float z in new[] { -0.7f, 0.4f })
-            Part(root, Shapes.RoundedBox(new Vector3(1.3f, 0.04f, 0.22f), 0.01f), bare, new Vector3(0f, 0.36f, z));
-        foreach (float x in new[] { -0.22f, 0.22f })
+                Timber(Hull(i, k, 0.01f) + Vector3.Up * 0.015f, Hull(i + 1, k, 0.01f) + Vector3.Up * 0.015f, 0.055f, 0.045f, bare);
+        for (int i = 0; i < along; i++)
+            Timber(Hull(i, around / 2, 0f) + Vector3.Down * 0.025f, Hull(i + 1, around / 2, 0f) + Vector3.Down * 0.025f, 0.06f, 0.05f, tar);
+        foreach (var (end, out_) in new[] { (along, 0.02f), (0, -0.02f) })
+            for (int k = around / 2; k > 0; k -= 2)
+                Timber(Hull(end, k, 0f) + new Vector3(0f, 0f, out_), Hull(end, k - 2, 0f) + new Vector3(0f, 0f, out_), 0.06f, 0.06f, k > tarFrom + 2 ? tar : bare);
+
+        // Thwarts across the boat, floorboards on the bottom.
+        foreach (float tz in new[] { 0.25f, 0.66f })
         {
-            var oar = new Node3D { Position = new Vector3(x, 0.42f, -0.1f), RotationDegrees = new Vector3(90f, x * 20f, 0f) };
-            Part(oar, Rod(0.018f, 2.2f), bare, Vector3.Zero);
-            Part(oar, Shapes.RoundedBox(new Vector3(0.14f, 0.5f, 0.015f), 0.006f), bare, new Vector3(0f, 1.1f, 0f));
-            root.AddChild(oar);
+            float z = -1.8f + 3.6f * tz;
+            float half = Beam(tz) * 0.97f;
+            Part(root, Shapes.RoundedBox(new Vector3(half * 2f, 0.04f, 0.22f), 0.01f), bare, new Vector3(0f, Sheer(tz) - 0.14f, z));
+        }
+        foreach (float x in new[] { -0.17f, 0f, 0.17f })
+            Part(root, Shapes.RoundedBox(new Vector3(0.14f, 0.02f, 2.3f), 0.006f), bare, new Vector3(x, 0.05f + MathF.Abs(x) * 0.25f, 0f));
+
+        // Rowlocks on the gunwales by the rowing thwart, and the oars: in them, or lying in the boat.
+        const float lockT = 0.48f;
+        float lockZ = -1.8f + 3.6f * lockT;
+        foreach (float side in new[] { -1f, 1f })
+        {
+            var at = new Vector3(side * (Beam(lockT) + 0.012f * 5f), Sheer(lockT) + 0.06f, lockZ);
+            Part(root, Rod(0.012f, 0.1f), CampProps.DarkWood, at);
+            var pivot = new Node3D { Name = side < 0f ? "OarL" : "OarR", Position = at + Vector3.Up * 0.03f };
+            var oar = new Node3D();
+            pivot.AddChild(oar);
+            // Along the pivot's X: the loom from 0.85 m inboard (the grip) to the blade 1.45 m out.
+            Part(oar, Rod(0.02f, 2.3f, 10), bare, new Vector3(side * 0.3f, 0f, 0f), new Vector3(0f, 0f, 90f));
+            Part(oar, Shapes.RoundedBox(new Vector3(0.5f, 0.015f, 0.13f), 0.006f), bare, new Vector3(side * 1.25f, 0f, 0f));
+            Part(oar, Rod(0.026f, 0.18f, 10), CampProps.DarkWood, new Vector3(-side * 0.76f, 0f, 0f), new Vector3(0f, 0f, 90f));
+            oar.AddChild(new Node3D { Name = "Grip", Position = new Vector3(-side * 0.76f, 0f, 0f) });
+            if (rowing)
+                root.AddChild(pivot);
+            else
+            {
+                // Shipped: lying along the boat on the thwarts.
+                var shipped = new Node3D { Position = new Vector3(side * 0.18f, Sheer(0.5f) - 0.08f, -0.2f), RotationDegrees = new Vector3(0f, side * 88f, 0f) };
+                oar.Position = Vector3.Zero;
+                pivot.RemoveChild(oar);
+                shipped.AddChild(oar);
+                pivot.Free();
+                root.AddChild(shipped);
+            }
         }
         return root;
     }

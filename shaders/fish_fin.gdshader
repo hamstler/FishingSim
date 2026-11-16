@@ -13,9 +13,14 @@ void vertex() {
 }
 
 void fragment() {
-	vec4 c = texture(fin_tex, UV);
+	// The painted rays softened (a coarser mip under the sharp one): thin, faint lines in a translucent membrane,
+	// not a comb of black stripes; the colour a little calmer.
+	vec4 sharp = texture(fin_tex, UV);
+	vec4 soft = texture(fin_tex, UV, 2.2);
+	vec4 c = vec4(mix(soft.rgb, sharp.rgb, 0.35), mix(soft.a, sharp.a, 0.75));
+	c.rgb = mix(vec3(dot(c.rgb, vec3(0.3, 0.59, 0.11))), c.rgb, 0.8);
 	ALBEDO = c.rgb;
-	ALPHA = c.a;
+	ALPHA = c.a * 0.9;
 	ROUGHNESS = 0.4;
 	SPECULAR = 0.45;
 	BACKLIGHT = c.rgb * 0.55;

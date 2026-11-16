@@ -801,6 +801,12 @@ public partial class HandTools : Node3D
         // The free left hand hangs at the side, palm in.
         var rest = new FirstPersonBody.HandTarget(body * new Vector3(-0.27f, 0.82f, -0.04f), bodyBasis * new Vector3(0.05f, -1f, -0.1f),
             bodyBasis * new Vector3(1f, 0f, 0.1f), 0.35f, leftPole);
+        if (Current == HandTool.None && _player.Boat is { GripL: { } gripL, GripR: { } gripR })
+        {
+            // In the boat with empty hands: both fists round the oars' handles, going with the strokes.
+            return (Grip(gripR.GlobalTransform, Vector3.Zero, Vector3.Left, Vector3.Down, true, 0.026f, rightPole, 0.95f),
+                Grip(gripL.GlobalTransform, Vector3.Zero, Vector3.Right, Vector3.Down, false, 0.026f, leftPole, 0.95f));
+        }
         if (Current == HandTool.None)
         {
             // Empty hands: both arms hang relaxed at the sides.

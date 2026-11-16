@@ -77,7 +77,7 @@ public partial class FishPopulation : Node3D
 
     public IReadOnlyList<FishAgent> Agents => _model.Agents;
 
-    public int VisibleCount => _views.Values.Count(v => v.Visible);
+    public int VisibleCount => _views.Values.Count(v => v.Visible) + _close.Values.Count(v => v.Visible);
 
     public void Setup(LakeBed bed, Node3D watcher, IReadOnlyList<FishSpecies> species, float waterY)
     {
@@ -103,9 +103,15 @@ public partial class FishPopulation : Node3D
         foreach (var v in _views.Values)
             v.QueueFree();
         _views.Clear();
+        foreach (var v in _close.Values)
+            v.QueueFree();
+        _close.Clear();
+        _closeSeen.Clear();
         _model.Clear();
         int school = 0;
         Graphics.FishSkin.PrewarmLight(_species.Where(sp => _bed.AbundanceOf(sp.SpeciesName) > 0f));
+        // The species' hand-built models in light copies: decoded in the background, worn as soon as they are ready.
+        _pendingLite.Clear();
         float totalAbundance = _species.Sum(sp => MathF.Max(_bed.AbundanceOf(sp.SpeciesName), 0f));
         foreach (var sp in _species)
         {
@@ -130,7 +136,7 @@ public partial class FishPopulation : Node3D
                     float weight = sp.MinWeight + (sp.MaxWeight - sp.MinWeight) * MathF.Pow(_rng.NextFloat(), 2.2f);
                     float cruise = 0.35f + 0.25f * sp.Aggression;
                     var agent = _model.Spawn(sp.SpeciesName, weight, p, school, sp.MinDepth, sp.MaxDepth, cruise);
-                    var view = FishModel.Create(sp, weight);
+                    var view = FishModel.Create(sp, weight, lite: Fishing.FishAsset.LiteIfReady(sp, out _));
                     view.Scale = Vector3.One * ViewScale;
                     view.Visible = false;
                     AddChild(view);
@@ -174,6 +180,8 @@ public partial class FishPopulation : Node3D
         agent.Hooked = true;
         if (_views.TryGetValue(agent.Id, out var v))
             v.Visible = false;
+        if (_close.TryGetValue(agent.Id, out var c))
+            c.Visible = false;
     }
 
     /// <summary>The fish got away (or let go of the bait): it swims off in fright from where it was.</summary>
@@ -191,12 +199,15 @@ public partial class FishPopulation : Node3D
         _model.Remove(agent);
         if (_views.Remove(agent.Id, out var v))
             v.QueueFree();
+        if (_close.Remove(agent.Id, out var c))
+            c.QueueFree();
+        _closeSeen.Remove(agent.Id);
         var sp = SpeciesOf(agent);
         if (sp == null || !FindWater(sp, nearPier: false, out var spot))
             return;
         float weight = sp.MinWeight + (sp.MaxWeight - sp.MinWeight) * MathF.Pow(_rng.NextFloat(), 2.2f);
         var fresh = _model.Spawn(sp.SpeciesName, weight, spot, agent.School, sp.MinDepth, sp.MaxDepth, agent.CruiseSpeed);
-        var view = FishModel.Create(sp, weight);
+        var view = FishModel.Create(sp, weight, lite: Fishing.FishAsset.LiteIfReady(sp, out _));
         view.Scale = Vector3.One * ViewScale;
         view.Visible = false;
         AddChild(view);
@@ -268,11 +279,47 @@ public partial class FishPopulation : Node3D
     /// The schools swim and their fish are placed once per rendered frame (not on physics ticks: they move smoothly at
     /// any frame rate, and a slow frame is not made slower by catching up several ticks of fish).
     /// </summary>
+    private readonly List<FishSpecies> _pendingLite = new();
+
+    /// <summary>
+    /// One species a frame: when its model's light copy is decoded, its fish change from the lofted shape to the model
+    /// (same place, heading and visibility).
+    /// </summary>
+    private void UpgradeOneSpecies()
+    {
+        for (int i = 0; i < _pendingLite.Count; i++)
+        {
+            var sp = _pendingLite[i];
+            var lite = Fishing.FishAsset.LiteIfReady(sp, out bool pending);
+            if (pending)
+                continue;
+            _pendingLite.RemoveAt(i);
+            if (lite == null)
+                return;
+            foreach (var a in _model.Agents)
+            {
+                if (a.Species != sp.SpeciesName || !_views.TryGetValue(a.Id, out var old))
+                    continue;
+                var view = FishModel.Create(sp, a.Weight, lite: lite);
+                view.Scale = old.Scale;
+                view.Visible = old.Visible;
+                view.Position = old.Position;
+                view.Rotation = old.Rotation;
+                AddChild(view);
+                _views[a.Id] = view;
+                old.QueueFree();
+            }
+            return;
+        }
+    }
+
     public override void _Process(double delta)
     {
         using var perfScope = Graphics.Perf.Scope("fish");
         if (_watcher == null || !IsInstanceValid(_watcher))
             return;
+        if (_pendingLite.Count > 0)
+            UpgradeOneSpecies();
         float dt = MathF.Min((float)delta, 0.05f);
         var w = _watcher.GlobalPosition;
         float speed = dt > 0f ? new Vector2(w.X - _lastWatcher.X, w.Z - _lastWatcher.Z).Length() / dt : 0f;
@@ -289,20 +336,104 @@ public partial class FishPopulation : Node3D
         // (steep views near the bank show them, flat views further out only reflect the sky).
         var cam = GetViewport()?.GetCamera3D();
         var eye = cam != null ? cam.GlobalPosition : w + Vector3.Up * 1.6f;
+        // Of those, only the nearest MaxShown are drawn, and on screen each wears the very model of the catch panel and
+        // the atlas (FishModel detailed: the species' hand-built model at full quality). The light lofted views stand
+        // in only without a GPU (tests).
+        int shown = 0;
         foreach (var a in _model.Agents)
         {
             if (!_views.TryGetValue(a.Id, out var view))
                 continue;
+            view.Visible = false;
+            if (a.Hooked)
+                continue;
             float dist = new Vector2(a.Position.X - w.X, a.Position.Y - w.Z).Length();
             var at = new Vector3(a.Position.X, _waterY - a.Depth, a.Position.Y);
-            bool visible = dist < VisibleRange && a.Depth < VisibleDepth
-                           && Sight(eye, at, _waterY, a.Depth, Clarity, GlareCut) > MinSight;
-            view.Visible = visible;
-            if (!visible)
-                continue;
-            view.Position = at;
-            view.Rotation = new Vector3(0f, a.Heading, 0f);
-            view.Wiggle = 0.4f + MathF.Min(a.Speed, 2f);
+            // A big fish shows from deeper (its dark back against the bottom) than a small one.
+            bool visible = dist < VisibleRange && a.Depth < VisibleDepth + view.Length * 1.5f
+                           && Sight(eye, at, _waterY, a.Depth, Clarity, GlareCut) > MinSight
+                           && view.Length * ViewScale >= MinShownLength;
+            if (visible)
+                InsertNearest(dist, a, ref shown);
         }
+        _frameClock += dt;
+        bool full = !Graphics.Renderer.IsHeadless;
+        bool madeOne = false;
+        for (int i = 0; i < shown; i++)
+        {
+            var a = _nearest[i].Agent;
+            FishModel? model;
+            if (!full)
+                model = _views[a.Id];
+            else if (!_close.TryGetValue(a.Id, out model))
+            {
+                // One new close model a frame, once its species' pictures are decoded (Prefetch: a worker thread).
+                var sp = SpeciesOf(a);
+                if (sp == null)
+                    continue;
+                FishAsset.Prefetch(sp);
+                if (madeOne || !FishAsset.IsReady(sp))
+                    continue;
+                model = FishModel.Create(sp, a.Weight, detailed: true);
+                model.Scale = Vector3.One * ViewScale;
+                AddChild(model);
+                _close[a.Id] = model;
+                madeOne = true;
+            }
+            model.Position = new Vector3(a.Position.X, _waterY - a.Depth, a.Position.Y);
+            model.Rotation = new Vector3(0f, a.Heading, 0f);
+            model.Wiggle = 0.4f + MathF.Min(a.Speed, 2f);
+            model.Visible = true;
+            _closeSeen[a.Id] = _frameClock;
+        }
+        // Close models not shown this frame are hidden, and let go after a few seconds out of sight.
+        if (full && _close.Count > 0)
+        {
+            _drop.Clear();
+            foreach (var (id, model) in _close)
+            {
+                if (_closeSeen.TryGetValue(id, out float seen) && seen >= _frameClock)
+                    continue;
+                model.Visible = false;
+                if (_frameClock - seen > 4f)
+                    _drop.Add(id);
+            }
+            foreach (int id in _drop)
+            {
+                _close.Remove(id, out var m);
+                m?.QueueFree();
+                _closeSeen.Remove(id);
+            }
+        }
+    }
+
+    private readonly Dictionary<int, FishModel> _close = new();
+    private readonly Dictionary<int, float> _closeSeen = new();
+    private readonly List<int> _drop = new();
+    private float _frameClock;
+
+    /// <summary>Fry shorter than this (as drawn, m) are not shown: a few centimetres of fish read as specks, not fish.</summary>
+    public float MinShownLength { get; set; } = 0.16f;
+
+    /// <summary>How many fish are drawn at most (the nearest ones the angler can see).</summary>
+    public int MaxShown { get; set; } = 14;
+
+    private (float Dist, FishAgent Agent)[] _nearest = new (float, FishAgent)[14];
+
+    /// <summary>Keeps the MaxShown nearest in _nearest, sorted, without allocating.</summary>
+    private void InsertNearest(float dist, FishAgent agent, ref int count)
+    {
+        int cap = Math.Min(MaxShown, 4096);
+        if (_nearest.Length < cap)
+            _nearest = new (float, FishAgent)[cap];
+        if (count == cap && dist >= _nearest[count - 1].Dist)
+            return;
+        int i = count < cap ? count++ : count - 1;
+        while (i > 0 && _nearest[i - 1].Dist > dist)
+        {
+            _nearest[i] = _nearest[i - 1];
+            i--;
+        }
+        _nearest[i] = (dist, agent);
     }
 }

@@ -25,6 +25,12 @@ public partial class Player : CharacterBody3D
 
     private const float EyeHeight = 1.6f;
 
+    /// <summary>Sitting in a boat the eyes are this much lower than standing (the boat puts the body this far under the seat).</summary>
+    public const float SeatedEyeDrop = 0.8f;
+
+    /// <summary>The boat the angler sits in (World/Rowboat moves the body with it), or null on foot.</summary>
+    public World.Rowboat? Boat { get; set; }
+
     private Vector3 _lastValid;
 
     /// <summary>Procedural body animation (head bob, steps, arm pose).</summary>
@@ -81,6 +87,7 @@ public partial class Player : CharacterBody3D
     /// <summary>Puts the player back on the pier, facing the water.</summary>
     public void Respawn()
     {
+        Boat?.ResetToMooring();
         GlobalPosition = SpawnPoint;
         _lastValid = SpawnPoint;
         Velocity = Vector3.Zero;
@@ -103,6 +110,14 @@ public partial class Player : CharacterBody3D
     public override void _PhysicsProcess(double delta)
     {
         using var perfScope = Graphics.Perf.Scope("player");
+        if (Boat != null)
+        {
+            // Sitting in the boat: it carries the body (World/Rowboat); the keys row it.
+            Velocity = Vector3.Zero;
+            _lastValid = Position;
+            Animate((float)delta);
+            return;
+        }
         var dir = Vector2.Zero;
         if (!Busy)
         {

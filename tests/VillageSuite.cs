@@ -153,13 +153,15 @@ public sealed class VillageSuite : ITestSuite
             stats[loc.DisplayName] = new Dictionary<string, int>(scenery.Stats);
             int functional = loc.BuildingSpecs().Count(s => s.IsFunctional);
             int sights = loc.Landmarks.Count(l => !l.StartsWith("platforms"));
-            int doors = scenery.Interactables.Count(x => x.Kind is not (InteractKind.Campfire or InteractKind.Forage or InteractKind.Smokehouse or InteractKind.NoticeBoard));
+            int doors = scenery.Interactables.Count(x => x.Kind is not (InteractKind.Campfire or InteractKind.Forage or InteractKind.Smokehouse or InteractKind.NoticeBoard or InteractKind.Boat));
             int fires = scenery.Campfires.Count;
             int smokehouses = loc.BuildingSpecs().Count(s => s.Kind == BuildingKind.Smokehouse);
             int boards = scenery.Interactables.Count(x => x.Kind == InteractKind.NoticeBoard);
             int forage = scenery.Interactables.Count(x => x.Kind == InteractKind.Forage);
             t.Check(doors == functional && fires == 2 && smokehouses == 1 && boards == 1 && forage == scenery.Forage.Count && forage >= 12
                     && scenery.Interactables.Count == functional + fires + smokehouses + boards + forage
+                        + scenery.Interactables.Count(x => x.Kind == InteractKind.Boat)
+                    && scenery.Interactables.Count(x => x.Kind == InteractKind.Boat) <= 1
                     && scenery.Markers.Count == functional + sights + fires + smokehouses + boards,
                 $"{loc.DisplayName}: {functional} doors with a prompt, {fires} campfires (camp and hearth), a smokehouse, a notice board, "
                 + $"{forage} forest pickings, map markers for them and {sights} landmarks");
@@ -247,8 +249,11 @@ public sealed class VillageSuite : ITestSuite
         {
             var board = new Vector2(2.4f, 0.7f);
             float px = FishingSim.World.Props.BuildingFactory.FitPixelSize(text, board);
-            var size = ThemeDB.FallbackFont.GetStringSize(text, HorizontalAlignment.Left, -1, 64) * px;
-            t.Check(size.X <= board.X * 0.8f && size.Y <= board.Y * 0.6f, $"'{text}' fits its sign ({size.X:0.00} x {size.Y:0.00} m on {board.X} x {board.Y} m)");
+            var font = FishingSim.World.Props.BuildingFactory.SignFont;
+            var size = font.GetStringSize(text, HorizontalAlignment.Left, -1, 64) * px;
+            float letter = font.GetHeight(64) * 0.68f * px;
+            t.Check(size.X <= board.X * 0.63f && size.Y <= board.Y * 0.41f && letter <= 0.225f,
+                $"'{text}' fits its sign with a margin ({size.X:0.00} x {size.Y:0.00} m, letters {letter:0.00} m, on {board.X} x {board.Y} m)");
         }
 
         t.Section("shops open by kind");
@@ -279,6 +284,38 @@ public sealed class VillageSuite : ITestSuite
         shop._UnhandledInput(Key(Godot.Key.B));
         t.Check(!shop.Visible, "the old B shortcut is gone: you have to walk to a shop");
 
+        t.Section("villagers walk about");
+        var walkers = main.Scenery.Wanderers;
+        if (walkers.Count > 0)
+        {
+            world.Hour = 12f;
+            var walker = walkers[0];
+            var npcNode = (Node3D)walker.GetParent();
+            var from = npcNode.GlobalPosition;
+            bool walked = false;
+            for (int i = 0; i < 40 && !walked; i++)
+            {
+                await t.Seconds(0.5);
+                walked = npcNode.GlobalPosition.DistanceTo(from) > 0.5f;
+            }
+            float ground = lake.HeightAt(npcNode.GlobalPosition.X, npcNode.GlobalPosition.Z);
+            t.Check(walked && MathF.Abs(npcNode.GlobalPosition.Y - ground) < 0.15f,
+                $"by day a villager walks about the village on the ground ({walkers.Count} walkers, moved {npcNode.GlobalPosition.DistanceTo(from):0.0} m)");
+            world.Hour = 23f;
+            bool home = false;
+            for (int i = 0; i < 120 && !home; i++)
+            {
+                await t.Seconds(0.5);
+                home = walker.Home;
+            }
+            t.Check(home && !npcNode.Visible, "at night they go home and indoors");
+            world.Hour = 12f;
+            await t.Seconds(0.3);
+            t.Check(npcNode.Visible, "in the morning they come out again");
+        }
+        else
+            t.Check(false, "the village has walking villagers");
+
         t.Section("changing maps");
         shop.OpenFor(ShopKind.Travel);
         shop.Close();
@@ -286,7 +323,7 @@ public sealed class VillageSuite : ITestSuite
         lake.SetLocation(2);
         await t.NextFrame();
         t.Check(lake.LocationIndex == 2 && player.GlobalPosition.DistanceTo(Player.SpawnPoint) < 0.5f && rod.State == RodState.Idle, "a new map puts the player back on the pier");
-        t.Check(main.Scenery.Interactables.Count(x => x.Kind is not (InteractKind.Campfire or InteractKind.Forage or InteractKind.Smokehouse or InteractKind.NoticeBoard))
+        t.Check(main.Scenery.Interactables.Count(x => x.Kind is not (InteractKind.Campfire or InteractKind.Forage or InteractKind.Smokehouse or InteractKind.NoticeBoard or InteractKind.Boat))
                 == lake.Location.BuildingSpecs().Count(s => s.IsFunctional)
                 && main.Scenery.Campfires.Count == 2, "the new map's doors and campfires replace the old ones");
 

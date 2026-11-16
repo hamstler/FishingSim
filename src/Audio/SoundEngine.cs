@@ -31,6 +31,21 @@ public partial class SoundEngine : Node
 
     public Synth Synth => _synth;
 
+    /// <summary>Thunder after a lightning flash, <paramref name="delay"/> seconds later (sound travels 340 m/s).</summary>
+    public void Thunder(float delay)
+    {
+        var timer = GetTree()?.CreateTimer(delay);
+        if (timer != null)
+            timer.Timeout += () => _synth.Play(OneShot.Thunder, Math.Clamp(1.4f - delay * 0.12f, 0.5f, 1.3f));
+    }
+
+    /// <summary>A fish rising at a distance: a plop, quieter further off.</summary>
+    public void Rise(float distance)
+    {
+        if (distance < 40f)
+            _synth.Play(OneShot.Plop, Math.Clamp(1f - distance / 40f, 0f, 1f) * 0.8f);
+    }
+
     /// <summary>Plays the cues of another rod of the set too.</summary>
     public void Track(FishingRod rod) => rod.SoundCue += (cue, gain) => _synth.Play(cue, gain);
 
@@ -112,6 +127,21 @@ public partial class SoundEngine : Node
             if (f.Lit && GodotObject.IsInstanceValid(f) && f.IsInsideTree())
                 fire = MathF.Max(fire, Math.Clamp(1f - (f.GlobalPosition.DistanceTo(p) - 2f) / 14f, 0f, 1f));
         L.Fire = Mathf.MoveToward(L.Fire, fire, dt * 2f);
+        // Frogs from dusk to dawn near the water (fewer in the cold and the rain); the dawn chorus of birds.
+        float hour = _world.Hour;
+        float dusk = Math.Clamp(1f - day * 1.6f, 0f, 1f);
+        L.Frogs = dusk * shore * (1f - rain * 0.7f) * 0.9f;
+        float dawn = MathF.Exp(-MathF.Pow((hour - 5.8f) / 1.1f, 2f));
+        L.Birds = Math.Clamp(L.Birds * (0.6f + 1.4f * dawn), 0f, 1f);
+        // Reeds and grass rustle with the wind, louder by the shore.
+        L.Reeds = Mathf.MoveToward(L.Reeds, Math.Clamp(_world.WindTarget * (0.35f + 0.65f * shore), 0f, 1f), dt * 0.3f);
+        // Water against the boat when aboard, against the pier's posts when standing on it.
+        float hull = Rowboat.Aboard ? 1f : LakeBed.OnPier(p.X, p.Z) ? 0.55f : 0f;
+        L.Hull = Mathf.MoveToward(L.Hull, hull * (0.4f + _world.WindTarget), dt * 2f);
+        // The village by day: voices and work, fading over 25-90 m from its square.
+        var plaza = _lake.Location?.PlazaCenter ?? new Vector2(0f, 28f);
+        float village = Math.Clamp(1f - (new Vector2(p.X, p.Z).DistanceTo(plaza) - 25f) / 65f, 0f, 1f);
+        L.Village = village * Math.Clamp(day * 1.5f, 0f, 1f) * (1f - rain * 0.6f);
 
         // A beaten fish splashes at the surface.
         if (_rod.State == RodState.Close && _rod.Lift < 0.3f)

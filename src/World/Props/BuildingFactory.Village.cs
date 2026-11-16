@@ -435,23 +435,81 @@ public static partial class BuildingFactory
     private static void Well(Building b)
     {
         var stone = Stone(new Color(0.82f, 0.8f, 0.76f));
-        var wood = Wood(new Color(0.6f, 0.46f, 0.32f));
-        // The stone ring with a real shaft: the inner wall goes down out of sight to dark water.
-        b.AddChild(new MeshInstance3D { Mesh = WellRing(0.88f, 0.66f, 0.9f, 2.4f), MaterialOverride = stone });
-        Cyl(b, 0.66f, 0.66f, 0.02f, new Vector3(0f, -1.3f, 0f), Flat(new Color(0.02f, 0.03f, 0.035f), 0.05f), 24);
-        foreach (float sx in new[] { -0.8f, 0.8f })
-            Box(b, new Vector3(0.14f, 2.2f, 0.14f), new Vector3(sx, 1.1f, 0f), wood);
-        AddRoof(b, 2f, 1.5f, 2.1f, 0.7f, 0.15f, ShingleRoof(new Color(0.85f, 0.8f, 0.74f)));
-        Cyl(b, 0.07f, 0.07f, 1.7f, new Vector3(0f, 1.65f, 0f), wood, 8).RotationDegrees = new Vector3(0f, 0f, 90f);
-        Box(b, new Vector3(0.05f, 0.35f, 0.05f), new Vector3(0.9f, 1.5f, 0.1f), wood);
-        Cyl(b, 0.006f, 0.006f, 0.55f, new Vector3(0f, 1.36f, 0f), Flat(new Color(0.7f, 0.66f, 0.52f)), 4);
+        var cap = Stone(new Color(0.7f, 0.69f, 0.66f));
+        var wood = Timber();
+        var rng = new RandomNumberGenerator { Seed = 4211 };
+        const float Outer = 0.86f, Inner = 0.62f, Height = 0.82f;
+        // The shaft: the inner wall goes down out of sight to dark water; a dark ring stands behind the stones.
+        b.AddChild(new MeshInstance3D { Mesh = WellRing(Outer - 0.06f, Inner, Height, 2.4f), MaterialOverride = stone });
+        Cyl(b, Inner, Inner, 0.02f, new Vector3(0f, -1.3f, 0f), Flat(new Color(0.02f, 0.03f, 0.035f), 0.05f), 24);
+        // Laid stones in four staggered courses round the outside, then a ring of flat coping slabs.
+        var stones = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = Shapes.RoundedBox(Vector3.One, 0.18f) };
+        var placed = new List<Transform3D>();
+        const int courses = 4;
+        float courseH = (Height - 0.1f) / courses;
+        for (int c = 0; c < courses; c++)
+        {
+            int count = 13;
+            float shift = c % 2 * 0.5f;
+            for (int i = 0; i < count; i++)
+            {
+                float ang = (i + shift + rng.RandfRange(-0.12f, 0.12f)) * Mathf.Tau / count;
+                float len = Mathf.Tau * Outer / count * rng.RandfRange(0.86f, 0.98f);
+                var size = new Vector3(len, courseH * rng.RandfRange(0.86f, 0.98f), 0.2f * rng.RandfRange(0.85f, 1.1f));
+                var dir = new Vector3(MathF.Cos(ang), 0f, MathF.Sin(ang));
+                var basis = new Basis(Vector3.Up, -ang + Mathf.Pi / 2f)
+                    * new Basis(new Vector3(1f, 0f, 0f), rng.RandfRange(-0.05f, 0.05f)) * Basis.FromScale(size);
+                placed.Add(new Transform3D(basis, dir * (Outer - 0.09f + rng.RandfRange(-0.01f, 0.015f)) + Vector3.Up * (courseH * (c + 0.5f))));
+            }
+        }
+        for (int i = 0; i < 10; i++)
+        {
+            float ang = (i + 0.25f) * Mathf.Tau / 10f;
+            var dir = new Vector3(MathF.Cos(ang), 0f, MathF.Sin(ang));
+            var size = new Vector3(Mathf.Tau * (Outer + Inner) / 2f / 10f * 0.97f, 0.1f, Outer - Inner + 0.1f);
+            var basis = new Basis(Vector3.Up, -ang + Mathf.Pi / 2f) * new Basis(new Vector3(0f, 0f, 1f), rng.RandfRange(-0.03f, 0.03f)) * Basis.FromScale(size);
+            placed.Add(new Transform3D(basis, dir * (Outer + Inner) / 2f + Vector3.Up * (Height - 0.04f)));
+        }
+        // Flagstones round its foot.
+        for (int i = 0; i < 12; i++)
+        {
+            float ang = (i + rng.RandfRange(-0.15f, 0.15f)) * Mathf.Tau / 12f;
+            var dir = new Vector3(MathF.Cos(ang), 0f, MathF.Sin(ang));
+            var size = new Vector3(0.55f * rng.RandfRange(0.8f, 1.1f), 0.06f, 0.5f * rng.RandfRange(0.8f, 1.1f));
+            var basis = new Basis(Vector3.Up, -ang + rng.RandfRange(-0.2f, 0.2f)) * Basis.FromScale(size);
+            placed.Add(new Transform3D(basis, dir * (Outer + 0.32f) + Vector3.Up * 0.01f));
+        }
+        stones.InstanceCount = placed.Count;
+        for (int i = 0; i < placed.Count; i++)
+            stones.SetInstanceTransform(i, placed[i]);
+        b.AddChild(new MultiMeshInstance3D { Multimesh = stones, MaterialOverride = stone });
+
+        // Two round posts on the rim, braced, under a small shingle roof.
+        foreach (float sx in new[] { -1f, 1f })
+        {
+            Cyl(b, 0.075f, 0.09f, 2.25f, new Vector3(sx * 0.74f, Height + 1.0f, 0f), wood, 12);
+            var brace = Box(b, new Vector3(0.06f, 0.6f, 0.06f), new Vector3(sx * 0.56f, 2.05f, 0f), wood);
+            brace.RotationDegrees = new Vector3(0f, 0f, sx * 45f);
+        }
+        Box(b, new Vector3(1.78f, 0.12f, 0.14f), new Vector3(0f, 2.2f, 0f), wood);
+        AddRoof(b, 2.1f, 1.6f, 2.26f, 0.72f, 0.18f, ShingleRoof(new Color(0.85f, 0.8f, 0.74f)));
+        // The windlass: a drum with the rope wound on it, a crank on its end, the rope down to the bucket.
+        float drumY = 1.62f;
+        Cyl(b, 0.1f, 0.1f, 1.36f, new Vector3(0f, drumY, 0f), wood, 14).RotationDegrees = new Vector3(0f, 0f, 90f);
+        var rope = Flat(new Color(0.52f, 0.45f, 0.33f), 0.95f);
+        Cyl(b, 0.118f, 0.118f, 0.36f, new Vector3(-0.1f, drumY, 0f), rope, 16).RotationDegrees = new Vector3(0f, 0f, 90f);
+        Cyl(b, 0.025f, 0.025f, 0.32f, new Vector3(0.9f, drumY, 0f), wood, 8).RotationDegrees = new Vector3(0f, 0f, 90f);
+        Box(b, new Vector3(0.05f, 0.34f, 0.05f), new Vector3(1.05f, drumY - 0.15f, 0f), wood);
+        Cyl(b, 0.025f, 0.025f, 0.16f, new Vector3(1.1f, drumY - 0.3f, 0f), wood, 8).RotationDegrees = new Vector3(0f, 0f, 90f);
+        float bucketTop = Height + 0.38f;
+        Cyl(b, 0.008f, 0.008f, drumY - 0.1f - bucketTop, new Vector3(-0.1f, (drumY - 0.1f + bucketTop) / 2f, 0.1f), rope, 6);
         if (PropAsset.Create("wooden_bucket_01", 0.32f) is { } bucket)
         {
-            bucket.Position = new Vector3(0f, 0.9f, 0f);
+            bucket.Position = new Vector3(-0.1f, bucketTop - 0.32f, 0.1f);
             b.AddChild(bucket);
         }
         else
-            Cyl(b, 0.13f, 0.11f, 0.22f, new Vector3(0f, 1.0f, 0f), wood, 10);
+            Cyl(b, 0.13f, 0.11f, 0.22f, new Vector3(-0.1f, bucketTop - 0.12f, 0.1f), wood, 10);
         Collider(b, new Vector3(1.8f, 1f, 1.8f), new Vector3(0f, 0.5f, 0f));
     }
 

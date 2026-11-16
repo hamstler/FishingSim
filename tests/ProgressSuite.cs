@@ -133,6 +133,28 @@ public sealed class ProgressSuite : ITestSuite
             j.AddCatch(roach, 0.3f);
         t.Check(j.Journal.Count == Profile.JournalLimit, "journal is capped at 300 entries");
 
+        t.Section("trophies and challenges");
+        t.Check(FishingSim.Core.Methods.Trophies.Of(0.9f, 1f) == FishingSim.Core.Methods.TrophyTier.Gold
+                && FishingSim.Core.Methods.Trophies.Of(0.65f, 1f) == FishingSim.Core.Methods.TrophyTier.Silver
+                && FishingSim.Core.Methods.Trophies.Of(0.45f, 1f) == FishingSim.Core.Methods.TrophyTier.Bronze
+                && FishingSim.Core.Methods.Trophies.Of(0.2f, 1f) == FishingSim.Core.Methods.TrophyTier.None,
+            "trophies by the share of the species' biggest weight: bronze 40 %, silver 60 %, gold 80 %");
+        var common = new List<string> { "Płoć", "Okoń" };
+        var ch = new Profile();
+        var today = ch.Challenges(0, common);
+        t.Check(today.Count == 4 && today.Count(c => c.Challenge.Weekly) == 1 && today.All(c => !c.Done)
+                && ch.Challenges(0, common).Select(c => c.Challenge.Id).SequenceEqual(today.Select(c => c.Challenge.Id)),
+            "three daily challenges and a weekly one, the same all day");
+        var countC = today.First(c => c.Challenge.Kind == FishingSim.Core.Methods.ChallengeKind.CatchCount).Challenge;
+        int money0 = ch.Money, xp0 = ch.Xp + ch.Level * 100000;
+        var completed = new List<FishingSim.Core.Methods.Challenge>();
+        for (int i = 0; i < 12; i++)
+            completed.AddRange(ch.CreditChallenges("Płoć", 0.3f, "spławik", false, 0, common));
+        t.Check(completed.Any(c => c.Id == countC.Id) && completed.Count(c => c.Id == countC.Id) == 1 && ch.Money >= money0 + countC.Money,
+            $"a completed challenge pays once ({countC.Title}: +{countC.Money} gr)");
+        var back = ProfileSerializer.FromJson(ProfileSerializer.ToJson(ch).ToJsonString());
+        t.Check(back.Challenges(0, common).Single(c => c.Challenge.Id == countC.Id).Done, "challenge progress is saved");
+
         t.Section("save / load round trip");
         var s = new Profile();
         s.AddCatch(carp, 6.5f, new CatchContext("Jezioro", "Kukurydza", "Hak #5", 3.1f, "07:45"));
