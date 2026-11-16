@@ -293,6 +293,70 @@ public partial class LakeBed : Node3D
         return h;
     }
 
+    /// <summary>
+    /// Small knolls and hummocks between the hills: in 19 m cells, two in three hold one, 5-13 m in radius and 0.4-2 m
+    /// high (gentle enough to walk over), so the meadow and the village rise and fall underfoot.
+    /// </summary>
+    public float KnollsAt(LocationData loc, float x, float z)
+    {
+        const float cell = 19f;
+        int seed = SeedOf(loc) + 7121;
+        int cx = (int)MathF.Floor(x / cell), cz = (int)MathF.Floor(z / cell);
+        float h = 0f;
+        for (int dz = -1; dz <= 1; dz++)
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                int ix = cx + dx, iz = cz + dz;
+                if (Hash(ix, iz, 1, seed) > 0.66f)
+                    continue;
+                float hx = (ix + Hash(ix, iz, 2, seed)) * cell, hz = (iz + Hash(ix, iz, 3, seed)) * cell;
+                float radius = 5f + 8f * Hash(ix, iz, 4, seed);
+                float a = Hash(ix, iz, 6, seed) * MathF.PI, stretch = 0.5f + 0.5f * Hash(ix, iz, 7, seed);
+                float px = x - hx, pz = z - hz;
+                float u = (px * MathF.Cos(a) + pz * MathF.Sin(a)) / radius;
+                float v = (-px * MathF.Sin(a) + pz * MathF.Cos(a)) / (radius * stretch);
+                float d2 = u * u + v * v;
+                if (d2 >= 1f)
+                    continue;
+                float height = MathF.Min(0.4f + 1.6f * Hash(ix, iz, 5, seed), 0.25f * radius * stretch);
+                float k = 1f - d2;
+                h += height * k * k;
+            }
+        return h;
+    }
+
+    /// <summary>
+    /// Hollows and dips: in 31 m cells, about half hold one, 6-18 m in radius and 0.5-2.7 m deep (an old pit, a dried
+    /// pond, a soggy dip). Never in the village's building pads (see NaturalHeight) and never down to the water.
+    /// </summary>
+    public float HollowsAt(LocationData loc, float x, float z)
+    {
+        const float cell = 31f;
+        int seed = SeedOf(loc) + 3307;
+        int cx = (int)MathF.Floor(x / cell), cz = (int)MathF.Floor(z / cell);
+        float h = 0f;
+        for (int dz = -1; dz <= 1; dz++)
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                int ix = cx + dx, iz = cz + dz;
+                if (Hash(ix, iz, 1, seed) > 0.5f)
+                    continue;
+                float hx = (ix + Hash(ix, iz, 2, seed)) * cell, hz = (iz + Hash(ix, iz, 3, seed)) * cell;
+                float radius = 6f + 12f * Hash(ix, iz, 4, seed);
+                float a = Hash(ix, iz, 6, seed) * MathF.PI, stretch = 0.55f + 0.45f * Hash(ix, iz, 7, seed);
+                float px = x - hx, pz = z - hz;
+                float u = (px * MathF.Cos(a) + pz * MathF.Sin(a)) / radius;
+                float v = (-px * MathF.Sin(a) + pz * MathF.Cos(a)) / (radius * stretch);
+                float d2 = u * u + v * v;
+                if (d2 >= 1f)
+                    continue;
+                float depth = MathF.Min(0.5f + 2.2f * Hash(ix, iz, 5, seed), 0.22f * radius * stretch);
+                float k = 1f - d2;
+                h = MathF.Max(h, depth * k * k * (3f - 2f * k));
+            }
+        return h;
+    }
+
     private readonly Dictionary<LocationData, List<(Vector2 P, float R)>> _flat = new();
 
     /// <summary>0 where the ground must stay level (the village square, around the buildings), 1 away from them.</summary>
@@ -308,7 +372,7 @@ public partial class LakeBed : Node3D
         float k = 1f;
         var p = new Vector2(x, z);
         foreach (var (c, r) in spots)
-            k = MathF.Min(k, Smooth(r, r + 22f, p.DistanceTo(c)));
+            k = MathF.Min(k, Smooth(r, r + 12f, p.DistanceTo(c)));
         return k;
     }
 
@@ -324,8 +388,17 @@ public partial class LakeBed : Node3D
         h += 0.045f * MathF.Pow(Math.Clamp(sd - 8f, 0f, 90f), 1.25f) * hill;
         h += _noise.GetNoise2D(x * 1.5f, z * 1.5f) * 3f * hill * Math.Clamp(sd / 40f, 0f, 1f);
         h += _noise.GetNoise2D(x * 8f, z * 8f) * 0.4f * Math.Clamp(sd / 10f, 0f, 1f);
-        // Hills of every size on the land (not on the beach, not in the village), then the mountains at the edge.
-        h += HillsAt(loc, x, z) * Smooth(8f, 30f, sd) * Unflattened(loc, x, z);
+        // A medium swell between the small bumps and the hills (some 15-30 m from crest to crest).
+        h += _noise.GetNoise2D(x * 3.6f + 51f, z * 3.6f - 17f) * 1.6f * Math.Clamp((sd - 4f) / 16f, 0f, 1f);
+        // Hills of every size, knolls and hollows on the land (not on the beach); in the village lower, and none on
+        // the building pads and the square (Unflattened), which the pads then level.
+        float free = Unflattened(loc, x, z);
+        float village = VillageShare(loc, x, z);
+        h += HillsAt(loc, x, z) * Smooth(8f, 30f, sd) * free * (1f - 0.5f * village);
+        h += KnollsAt(loc, x, z) * Smooth(4f, 12f, sd) * (0.35f + 0.65f * free);
+        float hollow = HollowsAt(loc, x, z) * Smooth(9f, 22f, sd) * free * (1f - 0.4f * village);
+        // A dip never takes the ground down to the lake's level (no puddles of lake water inland).
+        h = MathF.Max(h - hollow, MathF.Min(h, 0.9f));
         h += RimAt(loc, x, z);
         return h;
     }
@@ -349,17 +422,23 @@ public partial class LakeBed : Node3D
     }
 
     /// <summary>
-    /// The village lies on one gentle level: within ~30 m of the square the ground eases to the square's height
-    /// (fading out towards the open land and towards the beach), so houses do not stand on mounds or in pits.
+    /// The village lies on a gentle common level: near the square the ground eases half way to the square's height
+    /// (fading out towards the open land and towards the beach); the rises and dips between the houses stay.
     /// </summary>
     private float VillageGround(LocationData loc, float x, float z, float h, float plazaHeight)
     {
         float d = new Vector2(x, z).DistanceTo(loc.PlazaCenter);
         if (d > 70f)
             return h;
-        float w = (1f - Smooth(30f, 68f, d)) * Smooth(5f, 14f, -InsideMetres(loc, x, z));
+        // Only half of the way towards the square's level (and fading out sooner than it used to), so the village's
+        // ground keeps its rises and dips between the houses; the pads level each building.
+        float w = (1f - Smooth(18f, 55f, d)) * 0.55f * Smooth(5f, 14f, -InsideMetres(loc, x, z));
         return h + (plazaHeight - h) * w;
     }
+
+    /// <summary>1 in the village (near the square), fading to 0 some 70 m out.</summary>
+    private static float VillageShare(LocationData loc, float x, float z) =>
+        1f - Smooth(30f, 70f, new Vector2(x, z).DistanceTo(loc.PlazaCenter));
 
     /// <summary>True where the player may stand: on land, in the shallows, or on the pier.</summary>
     public bool IsWalkable(float x, float z)
