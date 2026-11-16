@@ -2390,6 +2390,11 @@ public partial class FishingRod : Node3D
     {
         if (_rest != null || _rig == null)
             return false;
+        if (FishingSim.World.Rowboat.Aboard)
+        {
+            ShowBanner("W łódce wędkę trzyma się w rękach", 2f);
+            return false;
+        }
         if (State is not (RodState.Waiting or RodState.Nibble or RodState.Bite) || _castMethod == FishingMethod.Spinning)
         {
             ShowBanner(_castMethod == FishingMethod.Spinning && State is RodState.Waiting

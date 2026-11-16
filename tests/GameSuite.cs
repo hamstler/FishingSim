@@ -425,6 +425,48 @@ public sealed class GameSuite : ITestSuite
         t.Check(!rod.LastCastTangled, "an untwisted line casts cleanly");
         rod.ResetToIdle();
 
+        t.Section("rowboat");
+        {
+            var boat = main.Boat;
+            var player = main.Player;
+            player.Respawn();
+            await t.NextFrame();
+            var boatSpot = InteractionManager.Nearest(main.Scenery.Interactables, boat.GlobalPosition + new Vector3(-1.5f, 0f, 0f));
+            t.Check(boatSpot == boat.Spot && boatSpot.Prompt.Contains("łódk"), $"the moored boat can be boarded from the pier ({boatSpot?.Prompt})");
+            main.Interactions.Activate(boat.Spot);
+            await t.NextFrame();
+            t.Check(player.Boat == boat && FishingSim.World.Rowboat.Aboard, "E boards the boat");
+            var start = boat.GlobalPosition;
+            boat.RowOverride = new Vector2(1f, 0f);
+            await t.Seconds(3.0);
+            float moved = new Vector2(boat.GlobalPosition.X - start.X, boat.GlobalPosition.Z - start.Z).Length();
+            float seatGap = player.GlobalPosition.DistanceTo(boat.Seat - Vector3.Up * Player.SeatedEyeDrop);
+            t.Check(moved > 1.5f && boat.Speed > 0.4f && seatGap < 0.2f,
+                $"rowing moves the boat and the angler with it ({moved:0.0} m, {boat.Speed:0.0} m/s, seat gap {seatGap:0.00} m)");
+            float heading = boat.Heading;
+            boat.RowOverride = new Vector2(0f, 1f);
+            await t.Seconds(2.0);
+            t.Check(MathF.Abs(Mathf.AngleDifference(heading, boat.Heading)) > 0.3f, $"one oar pulling, the other backing turns the boat ({Mathf.RadToDeg(boat.Heading - heading):0} deg)");
+            boat.RowOverride = new Vector2(0f, 0f);
+            // Far out there is no shore to step onto.
+            bool landing = boat.FindLanding(out _);
+            t.Check(rod.InputBlocked || landing || boat.Toggle(player) is string, "out on the water the angler cannot step out");
+            // Rowing hard at the beach stops in the shallows: the hull never runs aground.
+            boat.ResetToMooring();
+            main.Interactions.Activate(boat.Spot);
+            boat.RowOverride = new Vector2(-1f, 0f);       // astern: towards the beach
+            await t.Seconds(6.0);
+            boat.RowOverride = null;
+            var bp = boat.GlobalPosition;
+            t.Check(rod.Lake.DepthAt(bp.X, bp.Z) >= 0.3f && !(MathF.Abs(bp.X) < 1.6f && bp.Z > -4.2f && bp.Z < 6.2f),
+                $"the boat stops before the shallows and the pier ({bp.X:0.0}, {bp.Z:0.0}, depth {rod.Lake.DepthAt(bp.X, bp.Z):0.00} m)");
+            t.Check(boat.Toggle(player) == null && player.Boat == null && !FishingSim.World.Rowboat.Aboard
+                    && (LakeBed.OnPier(player.GlobalPosition.X, player.GlobalPosition.Z) || rod.Lake.IsWalkable(player.GlobalPosition.X, player.GlobalPosition.Z)),
+                $"by the pier E steps out onto it ({player.GlobalPosition.X:0.0}, {player.GlobalPosition.Z:0.0})");
+            player.Respawn();
+            await t.NextFrame();
+        }
+
         t.Section("rising fish");
         int risen = 0;
         for (int i = 0; i < 40; i++)

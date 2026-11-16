@@ -24,6 +24,11 @@ public partial class Main : Node3D
 
     private Profile _profile = null!;
     private Water _water = null!;
+
+    private ulong _rowRefusedAt;
+
+    /// <summary>The angler's rowboat at the pier.</summary>
+    public World.Rowboat Boat { get; private set; } = null!;
     private SkyController _sky = null!;
     private WorldState _world = null!;
     private float _appliedMurk;
@@ -87,6 +92,18 @@ public partial class Main : Node3D
         Player = new Player { Position = Player.SpawnPoint, Bed = _lake };
         AddChild(Player);
 
+        // The rowboat at the pier (E boards it): its E spot joins the scenery's after every rebuild.
+        Boat = new World.Rowboat { Name = "Rowboat" };
+        AddChild(Boat);
+        Boat.Setup(_lake, _water);
+        Scenery.Interactables.Add(Boat.Spot);
+        _lake.Rebuilt += () =>
+        {
+            Boat.ResetToMooring();
+            if (!Scenery.Interactables.Contains(Boat.Spot))
+                Scenery.Interactables.Add(Boat.Spot);
+        };
+
         _sky = new SkyController { World = _world, Water = _water, Follow = Player.Camera, Bed = _lake };
         AddChild(_sky);
 
@@ -120,6 +137,20 @@ public partial class Main : Node3D
         Tools = new HandTools();
         Player.AddChild(Tools);
         Tools.Setup(Player, Rod, _gear, _profile, _lake, _world, Swarms, marks);
+        // Rowing takes both hands: an idle rod goes into the backpack; one fishing keeps the boat where it is.
+        Boat.HandsFree = () =>
+        {
+            if (Tools.Current == HandTool.None)
+                return true;
+            if (Tools.Current == HandTool.Rod && Rod.State == RodState.Idle && Tools.Select(HandTool.None))
+                return true;
+            if (_rowRefusedAt + 3000 < Time.GetTicksMsec())
+            {
+                Rod.Notify(Rod.State == RodState.Idle ? "Odłóż narzędzie (Q), żeby wiosłować" : "Zwiń zestaw, żeby wiosłować", 2.5f);
+                _rowRefusedAt = Time.GetTicksMsec();
+            }
+            return false;
+        };
         Player.Body.ToolPose = Tools.HandPose;
         Player.Body.ToolBodyFrame = Tools.BodyFrame;
 
@@ -369,6 +400,10 @@ public partial class Main : Node3D
         switch (spot.Kind)
         {
             case InteractKind.Forage when spot.Target is World.Props.ForagePatch patch: Pick(patch); break;
+            case InteractKind.Boat when spot.Target is World.Rowboat boat:
+                if (boat.Toggle(Player) is string why)
+                    Rod.Notify(why, 2.5f);
+                break;
             case InteractKind.Smokehouse: Smokehouse.Open(); break;
             case InteractKind.NoticeBoard: Board.Open(); break;
             case InteractKind.Campfire when spot.Target is World.Props.Campfire fire: cooking.Open(fire); break;

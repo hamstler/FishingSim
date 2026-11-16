@@ -3,7 +3,7 @@ using Godot;
 namespace FishingSim.World;
 
 /// <summary>What happens when the player presses E next to an <see cref="Interactable"/>.</summary>
-public enum InteractKind { Tackle, Bait, FishBuyer, Market, General, Office, BusStop, Campfire, Forage, Smokehouse, NoticeBoard }
+public enum InteractKind { Tackle, Bait, FishBuyer, Market, General, Office, BusStop, Campfire, Forage, Smokehouse, NoticeBoard, Boat }
 
 /// <summary>A spot in front of a door (or sign) where the player can press E.</summary>
 public partial class Interactable : Node3D
@@ -25,6 +25,7 @@ public partial class Interactable : Node3D
         InteractKind.Forage => $"E - zbierz: {Title}",
         InteractKind.Smokehouse => $"E - {Title} (uwędź ryby z siatki)",
         InteractKind.NoticeBoard => $"E - {Title} (zlecenia mieszkańców)",
+        InteractKind.Boat => $"E - {Title}",
         _ => $"E - {Title}",
     };
 

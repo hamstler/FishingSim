@@ -488,6 +488,34 @@ public partial class ScreenshotTool : Node
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
             yaw = Mathf.RadToDeg(MathF.Atan2(-(w.X - stand.X), -(w.Z - stand.Z)));
         }
+        // FISHSIM_BOAT=N: board the rowboat at the pier and row ahead for N physics frames (FISHSIM_BOAT_TURN=-1..1
+        // turns while rowing); the yaw is then relative to the bow (0 = looking ahead). FISHSIM_BOAT_VIEW=1 watches the
+        // boat from the pier instead.
+        if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_BOAT"), out int rowFrames))
+        {
+            float turn = float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_BOAT_TURN"), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float bt) ? bt : 0f;
+            bool watch = System.Environment.GetEnvironmentVariable("FISHSIM_BOAT_VIEW") == "1";
+            main.Boat.Toggle(main.Player);
+            main.Boat.RowOverride = new Vector2(1f, turn);
+            for (int i = 0; i < rowFrames; i++)
+                await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            GD.Print($"boat: rowed {rowFrames} frames, at {main.Boat.GlobalPosition}, speed {main.Boat.Speed:0.00} m/s");
+            if (watch)
+            {
+                var boatAt = main.Boat.GlobalPosition;
+                main.Boat.Toggle(main.Player);
+                if (main.Player.Boat != null)
+                {
+                    main.Player.Boat = null;
+                }
+                main.Player.GlobalPosition = Player.SpawnPoint;
+                var look = boatAt - Player.SpawnPoint;
+                yaw = Mathf.RadToDeg(MathF.Atan2(-look.X, -look.Z));
+            }
+            else
+                yaw += Mathf.RadToDeg(main.Boat.Heading + MathF.PI);
+        }
         main.Player.RotationDegrees = new Vector3(0, yaw, 0);
         main.Player.Camera.RotationDegrees = new Vector3(pitch, 0, 0);
         var rod = main.Rod;
