@@ -49,6 +49,9 @@ public sealed class FishSwimModel
 {
     public const float SchoolRadius = 4f;
     public const float SpookRadius = 6f;
+
+    /// <summary>Calm fish drift away from a still angler closer than this, without panicking.</summary>
+    public const float CalmDistance = 2.5f;
     public const float MinWaterDepth = 0.35f;
 
     private readonly IRng _rng;
@@ -165,7 +168,9 @@ public sealed class FishSwimModel
     {
         if (dt <= 0f)
             return;
-        float spook = SpookRadius * (0.5f + MathF.Min(threatSpeed / 3f, 1.5f));
+        // A still angler is tolerated close by (a quarter of the radius: the fish keep a respectful distance and can be
+        // watched); walking and running spook them further and further out.
+        float spook = SpookRadius * (0.25f + 0.85f * MathF.Min(threatSpeed / 3f, 1.5f));
         // Shoal-mates are looked up per school, not across the whole lake (150 fish: 150 x school size, not 150²).
         _bySchool.Clear();
         foreach (var a in _agents)
@@ -233,6 +238,8 @@ public sealed class FishSwimModel
                 if (threatDist > 1e-4f)
                     steer += away / threatDist * a.CruiseSpeed * 4f;
             }
+            else if (threatDist < CalmDistance && threatDist > 1e-4f)
+                steer += away / threatDist * a.CruiseSpeed * 0.8f * (1f - threatDist / CalmDistance);
 
             // Keep off the shore: look ahead and turn towards deeper water.
             var dir = a.Velocity.LengthSquared() > 1e-6f ? Vector2.Normalize(a.Velocity) : new Vector2(0f, -1f);

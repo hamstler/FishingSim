@@ -361,6 +361,15 @@ public sealed class GearSuite : ITestSuite
         for (int i = 0; i < 60; i++)
             swim.Step(1f / 30f, threat, 5f);
         t.Check(swim.Agents.Average(a => Vector2.Distance(a.Position, threat)) > d0, "a running angler scares the fish away");
+        var calm = new FishSwimModel(water, new SystemRng(4));
+        var c0 = calm.Spawn("Płoć", 0.3f, new Vector2(3.5f, 0f), 0, 0.5f, 4f, 0.6f);
+        for (int i = 0; i < 30; i++)
+            calm.Step(1f / 30f, Vector2.Zero, 0f);
+        var c1 = new FishSwimModel(water, new SystemRng(4));
+        var r0 = c1.Spawn("Płoć", 0.3f, new Vector2(3.5f, 0f), 0, 0.5f, 4f, 0.6f);
+        for (int i = 0; i < 30; i++)
+            c1.Step(1f / 30f, Vector2.Zero, 4f);
+        t.Check(c0.Fear <= 0f && r0.Fear > 0f, "a still angler 3.5 m away does not panic the fish; a walking one does");
 
         t.Section("rod bending");
         FishingSim.Core.Physics.RodBendModel Settled(float power, float action, float load)

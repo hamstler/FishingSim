@@ -349,7 +349,8 @@ public partial class FishPopulation : Node3D
                 continue;
             float dist = new Vector2(a.Position.X - w.X, a.Position.Y - w.Z).Length();
             var at = new Vector3(a.Position.X, _waterY - a.Depth, a.Position.Y);
-            bool visible = dist < VisibleRange && a.Depth < VisibleDepth
+            // A big fish shows from deeper (its dark back against the bottom) than a small one.
+            bool visible = dist < VisibleRange && a.Depth < VisibleDepth + view.Length * 1.5f
                            && Sight(eye, at, _waterY, a.Depth, Clarity, GlareCut) > MinSight
                            && view.Length * ViewScale >= MinShownLength;
             if (visible)
