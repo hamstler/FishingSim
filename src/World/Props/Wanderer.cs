@@ -36,7 +36,7 @@ public partial class Wanderer : Node
     /// <summary>A villager spoke to the angler.</summary>
     public static event Action<string>? Said;
 
-    private float _talkWait;
+    private float _talkWait, _skip;
 
     /// <summary>Day starts / ends (game hours).</summary>
     public float DayFrom { get; set; } = 6.5f;
@@ -68,9 +68,16 @@ public partial class Wanderer : Node
     public override void _Process(double delta)
     {
         using var perfScope = Graphics.Perf.Scope("villagers");
-        float dt = MathF.Min((float)delta, 0.1f);
         if (_stops.Count == 0)
             return;
+        // Far from the camera (or out of sight) a walker is updated four times a second, not every frame.
+        _skip += (float)delta;
+        var cam = GetViewport()?.GetCamera3D();
+        bool far = cam == null || cam.GlobalPosition.DistanceSquaredTo(_npc.GlobalPosition) > 70f * 70f;
+        if (far && _skip < 0.25f)
+            return;
+        float dt = MathF.Min(far ? _skip : (float)delta, 0.3f);
+        _skip = 0f;
         float hour = _world.Hour;
         bool day = hour >= DayFrom && hour < DayTo;
         if (!day)
@@ -105,7 +112,7 @@ public partial class Wanderer : Node
             }
             // The angler stops beside a lingering villager: a word or two, at most once a minute.
             _talkWait -= dt;
-            if (Talk != null && _talkWait <= 0f && GetViewport()?.GetCamera3D() is { } cam
+            if (Talk != null && _talkWait <= 0f && cam != null
                 && cam.GlobalPosition.DistanceTo(_npc.GlobalPosition + Vector3.Up * 1.5f) < 2.6f)
             {
                 _talkWait = 60f;

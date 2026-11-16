@@ -203,6 +203,12 @@ public partial class Rowboat : Node3D
     {
         using var perfScope = Graphics.Perf.Scope("rowboat");
         float dt = (float)delta;
+        // Moored and empty: it only rides the waves (no hull probes against the bottom every tick).
+        if (_rower == null && !Anchored && _velocity.LengthSquared() < 1e-6f && MathF.Abs(_turnRate) < 1e-4f)
+        {
+            Float(dt);
+            return;
+        }
         // The oars: each one pulls (+1), backs (-1) or rests (0).
         float ahead = 0f, turn = 0f, hard = 0f;
         if (_rower != null && !_rower.Busy)

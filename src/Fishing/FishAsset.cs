@@ -38,7 +38,7 @@ public sealed class FishAsset
     public float MaxWidth { get; private init; }
 
     // A few species' models stay loaded (their textures are large); the one used longest ago is let go.
-    private const int CacheSize = 6;
+    private const int CacheSize = 12;
     private static readonly object Gate = new();
     private static readonly Dictionary<string, FishAsset?> Cache = new();
     private static readonly LinkedList<string> Recent = new();
@@ -274,7 +274,9 @@ public sealed class FishAsset
             Mesh? mesh = node switch
             {
                 MeshInstance3D mi => mi.Mesh,
-                ImporterMeshInstance3D imi => imi.Mesh?.GetMesh(),
+                // Levels of detail (Godot picks one by the fish's size on the screen): a fish a few metres off in the
+                // lake is drawn with a fraction of its close-up triangles.
+                ImporterMeshInstance3D imi => WithLods(imi.Mesh),
                 _ => null,
             };
             if (mesh != null && node is Node3D n3)
@@ -442,6 +444,17 @@ public sealed class FishAsset
             MaxHeight = outBox.Size.Y,
             MaxWidth = outBox.Size.X,
         };
+    }
+
+    private static Mesh? WithLods(ImporterMesh? mesh)
+    {
+        if (mesh == null)
+            return null;
+        // Only meshes worth it (the body, ray-tubed fins): the eyes are light already, and every LOD build costs time.
+        if (mesh.GetSurfaceCount() > 0 && mesh.GetSurfaceLodCount(0) == 0
+            && mesh.GetSurfaceArrays(0)[(int)Mesh.ArrayType.Vertex].AsVector3Array().Length > 1500)
+            mesh.GenerateLods(25f, 60f, new Godot.Collections.Array());
+        return mesh.GetMesh();
     }
 
     /// <summary>A node's transform relative to the scene root (the scene is not in the tree, so no GlobalTransform).</summary>
