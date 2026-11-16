@@ -120,7 +120,8 @@ public sealed class GearSuite : ITestSuite
         t.Check(pupil.R < 0.05f && irisRing.R > irisRing.B * 2f, "a roach's eye: black pupil in a red iris");
         var close = FishingSim.Fishing.FishModel.Create(perch, 0.5f, detailed: true);
         int shaded = close.FindChildren("*", nameof(MeshInstance3D), true, false).OfType<MeshInstance3D>().Count(m => m.MaterialOverride is ShaderMaterial);
-        t.Check(shaded >= 6, $"a close-up perch swims with its body and {shaded - 1} fins bending together (shader materials)");
+        bool perchForeign = FishingSim.Fishing.FishAsset.For(perch)?.Foreign == true;   // a Meshy model: one mesh
+        t.Check(shaded >= (perchForeign ? 1 : 6), $"a close-up perch swims with its body and {shaded - 1} fins bending together (shader materials)");
         close.Free();
 
         // Measured species: the painted model follows the side view of a real fish (FishReference) and is credited.
@@ -149,13 +150,14 @@ public sealed class GearSuite : ITestSuite
         }
         // Hand-built models (tools/fish_model): the close-up perch is the model made from photos of real perch.
         var perchAsset = FishingSim.Fishing.FishAsset.For(perch);
-        t.Check(perchAsset != null && perchAsset.Fins.Count == 6 && perchAsset.Eyes.Count == 2 && perchAsset.BodyNormal != null,
+        t.Check(perchAsset != null && (perchAsset.Foreign || perchAsset.Fins.Count == 6 && perchAsset.Eyes.Count == 2) && perchAsset.BodyNormal != null,
             $"the perch has its own model (built in Blender): body with a normal map, {perchAsset?.Fins.Count ?? 0} fins, {perchAsset?.Eyes.Count ?? 0} eyes under corneas");
         if (perchAsset != null)
         {
             var pm = FishingSim.Fishing.FishModel.Create(perch, 0.4f, detailed: true);
             int parts = pm.FindChildren("*", nameof(MeshInstance3D), true, false).Count;
-            t.Check(parts == 9 + perchAsset.Corneas.Count && perchAsset.Corneas.Count == 2 && pm.MaxHeight / pm.Length > 0.22f && pm.MaxHeight / pm.Length < 0.32f && pm.EyeDiameter < 0.62f * pm.HeadHeightAtEye,
+            // A Meshy model's height includes its raised fins.
+            t.Check((perchAsset.Foreign ? parts == 1 && pm.MaxHeight / pm.Length < 0.6f : parts == 9 + perchAsset.Corneas.Count && perchAsset.Corneas.Count == 2 && pm.MaxHeight / pm.Length < 0.32f) && pm.MaxHeight / pm.Length > 0.22f && pm.EyeDiameter < 0.62f * pm.HeadHeightAtEye,
                 $"a close-up perch is built from it ({parts} parts, H/L {pm.MaxHeight / pm.Length:0.00}, eye {pm.EyeDiameter * 1000f:0} mm in a {pm.HeadHeightAtEye * 1000f:0} mm head)");
             pm.Free();
         }
@@ -165,6 +167,13 @@ public sealed class GearSuite : ITestSuite
         foreach (var msp in catalogue)
         {
             var a = FishingSim.Fishing.FishAsset.For(msp);
+            // A Meshy model (assets/fish/meshy) carries its eyes and fins in its one skinned mesh.
+            if (a != null && a.Foreign)
+            {
+                if (a.BodyAlbedo == null || a.BodyNormal == null || a.MaxHeight <= 0.05f || a.MaxHeight > 0.75f)
+                    noModel.Add($"{msp.SpeciesName} (Meshy model: H/L {a.MaxHeight:0.00})");
+                continue;
+            }
             if (a == null || a.Eyes.Count != 2 || a.Fins.Count < 4 || a.BodyAlbedo == null)
             {
                 noModel.Add(msp.SpeciesName);

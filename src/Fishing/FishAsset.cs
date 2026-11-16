@@ -20,6 +20,8 @@ public sealed class FishAsset
     public Mesh Body { get; private init; } = null!;
     public Texture2D? BodyAlbedo { get; private init; }
     public Texture2D? BodyNormal { get; private init; }
+    /// <summary>A model made elsewhere (assets/fish/meshy): one baked skin over an atlas of UV islands, no own fins or eyes.</summary>
+    public bool Foreign { get; private init; }
 
     /// <summary>Fins by name (FinDorsal1, FinDorsal2, FinAnal, FinCaudal, FinPectoral, FinPelvic) with their textures.</summary>
     public IReadOnlyList<(string Name, Mesh Mesh, Texture2D? Texture)> Fins { get; private init; } = Array.Empty<(string, Mesh, Texture2D?)>();
@@ -437,6 +439,7 @@ public sealed class FishAsset
         return new FishAsset
         {
             Body = bodyMesh,
+            Foreign = true,
             BodyAlbedo = colourName != null ? ImageTexture.CreateFromImage(images[colourName]) : null,
             BodyNormal = normalName != null ? ImageTexture.CreateFromImage(images[normalName]) : null,
             EyeRadius = 0.02f,

@@ -46,6 +46,30 @@ def listing(folder):
     return re.findall(r'href="https://drive.google.com/(?:drive/folders/|file/d/)([\w-]+)[^"]*"[^>]*>.*?flip-entry-title">([^<]+)<', s, re.S)
 
 
+def fill_gaps(pic, mask_from=None):
+    """Push-pull fill: the black gaps between UV islands take the colour of the nearest islands, so the mipmaps of a
+    fish seen from afar do not draw dark seams."""
+    import numpy as np
+    a = np.asarray(pic, dtype=np.float32)
+    ref = np.asarray(mask_from if mask_from is not None else pic, dtype=np.float32)
+    if ref.shape[:2] != a.shape[:2]:
+        ref = np.asarray((mask_from or pic).resize(pic.size), dtype=np.float32)
+    mask = (ref.max(axis=2) > 6).astype(np.float32)[..., None]
+    levels = [(a * mask, mask)]
+    while levels[-1][0].shape[0] > 4:
+        c, m = levels[-1]
+        h, w = c.shape[0] // 2 * 2, c.shape[1] // 2 * 2
+        c2 = c[:h:2, :w:2] + c[1:h:2, :w:2] + c[:h:2, 1:w:2] + c[1:h:2, 1:w:2]
+        m2 = m[:h:2, :w:2] + m[1:h:2, :w:2] + m[:h:2, 1:w:2] + m[1:h:2, 1:w:2]
+        levels.append((c2, m2))
+    filled = levels[-1][0] / np.maximum(levels[-1][1], 1e-6)
+    for c, m in reversed(levels[:-1]):
+        up = np.repeat(np.repeat(filled, 2, axis=0), 2, axis=1)[:c.shape[0], :c.shape[1]]
+        own = c / np.maximum(m, 1e-6)
+        filled = np.where(m > 0, own, up)
+    return Image.fromarray(np.clip(filled, 0, 255).astype(np.uint8))
+
+
 def triangles(glb):
     n = struct.unpack("<I", glb[12:16])[0]
     j = json.loads(glb[20:20 + n])
@@ -59,8 +83,9 @@ def shrink(glb, size):
     blob = glb[binoff:binoff + struct.unpack("<I", glb[20 + n:24 + n])[0]]
     views = j["bufferViews"]
     mat = j["materials"][0]
-    keep = {"normal": mat.get("normalTexture", {}).get("index"),
-            "colour": mat["pbrMetallicRoughness"].get("baseColorTexture", {}).get("index")}
+    keep = {"colour": mat["pbrMetallicRoughness"].get("baseColorTexture", {}).get("index"),
+            "normal": mat.get("normalTexture", {}).get("index")}
+    colour_mask = None
     out = bytearray()
     newviews = []
 
@@ -90,6 +115,9 @@ def shrink(glb, size):
         v = views[im["bufferView"]]
         o = v.get("byteOffset", 0)
         pic = Image.open(io.BytesIO(blob[o:o + v["byteLength"]])).convert("RGB")
+        if role == "colour":
+            colour_mask = pic
+        pic = fill_gaps(pic, colour_mask)
         if max(pic.size) > size:
             pic = pic.resize((size, size * pic.size[1] // pic.size[0]), Image.LANCZOS)
         buf = io.BytesIO()
