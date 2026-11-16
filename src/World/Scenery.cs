@@ -865,14 +865,16 @@ public partial class Scenery : Node3D
     private static Color Tint(Color c, float t) => new(c.R + t, c.G + t, c.B + t);
 
     // ------------------------------------------------------------------ trees
+    // Leaf colours as a forest shows them in summer light: deep and a little grey (the old ones were bright lime:
+    // the leaf atlas already brings the leaves' own green).
     private static Color CrownColor(string kind) => kind switch
     {
-        "spruce" => new Color(0.19f, 0.37f, 0.23f),
-        "oak" => new Color(0.24f, 0.42f, 0.11f),
-        "birch" => new Color(0.42f, 0.62f, 0.2f),
-        "pine" => new Color(0.22f, 0.4f, 0.21f),
-        "willow" => new Color(0.38f, 0.52f, 0.2f),
-        _ => new Color(0.2f, 0.4f, 0.12f),
+        "spruce" => new Color(0.17f, 0.3f, 0.2f),
+        "oak" => new Color(0.22f, 0.35f, 0.12f),
+        "birch" => new Color(0.36f, 0.5f, 0.2f),
+        "pine" => new Color(0.2f, 0.33f, 0.19f),
+        "willow" => new Color(0.33f, 0.44f, 0.2f),
+        _ => new Color(0.19f, 0.34f, 0.13f),
     };
 
     private readonly List<(float X, float Z, string Kind)> _treeSpots = new();

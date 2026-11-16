@@ -191,7 +191,10 @@ void fragment() {
 	float swash = water_height(wpos.xz) / max(water_amp, 0.0001);
 	float lap = 0.045 + 0.03 * swash * clamp(water_amp * 12.0, 0.2, 1.0);
 	float foam_tex = texture(foam_noise, wpos.xz * 0.35 + vec2(water_time * 0.02)).r;
-	float foam = (1.0 - smoothstep(0.0, max(lap, 0.01), below)) * smoothstep(0.55, 0.75, foam_tex);
+	// Lacy, thin foam at the edge (two scales of the noise, so it breaks into streaks and holes instead of a row
+	// of bright beads), never fully white.
+	float foam_fine = texture(foam_noise, wpos.xz * 1.6 - vec2(water_time * 0.03, 0.0)).r;
+	float foam = (1.0 - smoothstep(0.0, max(lap, 0.01), below)) * smoothstep(0.5, 0.8, foam_tex) * smoothstep(0.35, 0.65, foam_fine) * 0.6;
 	foam *= step(0.004, below);
 	// White caps on the crests when the wind blows hard, breaking up into streaks downwind.
 	float caps = smoothstep(0.55, 0.95, wind) * smoothstep(0.72, 0.95, crest)
