@@ -20,7 +20,7 @@ namespace FishingSim.UI;
 public partial class Hud : CanvasLayer
 {
     private const float FlashSeconds = 4f;
-    private static readonly Color Ink = new(0.97f, 0.92f, 0.8f);
+    private static readonly Color Ink = new(0.93f, 0.95f, 0.94f);
     private static readonly Color Gold = new(1f, 0.84f, 0.45f);
 
     private FishingRod _rodFixed = null!;
@@ -98,7 +98,7 @@ public partial class Hud : CanvasLayer
             var (icon, note, on, dim) = slots[i];
             var slot = new PanelContainer { CustomMinimumSize = new Vector2(54, 50) };
             slot.AddThemeStyleboxOverride("panel", on
-                ? UITheme.Box(new Color(0.3f, 0.22f, 0.1f, 0.9f), UITheme.Accent, 4, 2, 3)
+                ? UITheme.Box(new Color(0.96f, 0.72f, 0.32f, 0.16f), UITheme.Accent, 5, 2, 3)
                 : UiArt.Nine(UiArt.InsetTexture, 4, 3));
             slot.Modulate = on ? Colors.White : new Color(1f, 1f, 1f, dim ? 0.4f : 0.75f);
             var stack = new Control { CustomMinimumSize = new Vector2(48, 44) };
@@ -180,7 +180,7 @@ public partial class Hud : CanvasLayer
         var l = new Label { HorizontalAlignment = align };
         l.AddThemeFontSizeOverride("font_size", size);
         l.AddThemeColorOverride("font_color", color);
-        l.AddThemeColorOverride("font_outline_color", new Color(0.06f, 0.04f, 0.02f, 0.9f));
+        l.AddThemeColorOverride("font_outline_color", new Color(0.02f, 0.03f, 0.035f, 0.85f));
         l.AddThemeConstantOverride("outline_size", 5);
         AddChild(l);
         return l;

@@ -5,9 +5,9 @@ using Godot;
 namespace FishingSim.UI;
 
 /// <summary>
-/// The pictures the interface is built from, painted in code once and cached: carved oak frames with brass studs,
-/// planked buttons with a bevel, parchment cards, gilded bars, coins, locks and badges. Nine-patch textures keep their
-/// corners crisp at any size.
+/// The pictures the interface is built from, painted in code once and cached: see-through graphite-teal panels with a
+/// hairline border and an amber line along the top, flat rounded buttons (amber for the main action), quiet inner
+/// wells, amber bars, parchment cards, coins, locks and badges. Nine-patch textures keep their corners crisp at any size.
 /// </summary>
 public static class UiArt
 {
@@ -78,53 +78,58 @@ public static class UiArt
     }
 
     // ------------------------------------------------------------------ frames and panels
-    /// <summary>The big panel: dark oak planks, a carved frame with a bevel, a gilt inner line and brass studs.</summary>
-    public static Texture2D PanelTexture => Make("panel", 96, 96, (x, y) =>
+    /// <summary>
+    /// Coverage (0..1, antialiased) of a rounded rectangle w x h with corner radius r at pixel (x, y), and the distance
+    /// of the pixel's centre inside its edge (negative outside).
+    /// </summary>
+    private static (float Cover, float Inside) Rounded(int x, int y, int w, int h, float r)
     {
-        const int W = 96;
-        int d = Math.Min(Math.Min(x, y), Math.Min(W - 1 - x, W - 1 - y));
-        var c = Oak(x, y, new Color(0.17f, 0.115f, 0.07f, 0.96f), 11, 16);
-        if (d < 2)
-            return new Color(0.05f, 0.035f, 0.02f, 1f);
-        if (d < 8)
-        {
-            // The carved frame: light on the top and left, in shade on the bottom and right.
-            bool lit = Math.Min(x, y) == d;
-            var frame = Oak(x, y, new Color(0.33f, 0.21f, 0.12f), 5);
-            float bevel = d < 4 ? (lit ? 1.35f : 0.65f) : d > 6 ? (lit ? 0.7f : 1.2f) : 1f;
-            return new Color(frame.R * bevel, frame.G * bevel, frame.B * bevel, 1f);
-        }
-        if (d == 10)
-            c = Mix(c, new Color(0.85f, 0.66f, 0.3f, 1f), 0.75f);   // the gilt line
-        if (d == 9 || d == 11)
-            c = Mix(c, new Color(0f, 0f, 0f, c.A), 0.35f);
-        foreach (var (sx, sy) in new[] { (15, 15), (W - 16, 15), (15, W - 16), (W - 16, W - 16) })
-            c = Stud(c, x - sx, y - sy, 4.2f);
-        return c;
-    });
+        float px = x + 0.5f, py = y + 0.5f;
+        float qx = MathF.Max(MathF.Max(r - px, px - (w - r)), 0f), qy = MathF.Max(MathF.Max(r - py, py - (h - r)), 0f);
+        float outside = MathF.Sqrt(qx * qx + qy * qy) - r;
+        float edge = MathF.Min(MathF.Min(px, w - px), MathF.Min(py, h - py));
+        float inside = qx > 0f && qy > 0f ? -outside : MathF.Min(edge, -outside);
+        return (Math.Clamp(0.5f - outside, 0f, 1f), inside);
+    }
 
-    /// <summary>An inner panel: a lighter, plain oak board with a thin dark rim.</summary>
-    public static Texture2D InsetTexture => Make("inset", 48, 48, (x, y) =>
+    /// <summary>A flat, see-through card: a soft vertical gradient, a hairline border, a faint light along the top
+    /// inner edge; <paramref name="accent"/> lays a thin amber stripe along the top.</summary>
+    private static Color Card(int x, int y, int w, int h, float r, Color top, Color bottom, Color border, bool accent = false)
     {
-        int d = Math.Min(Math.Min(x, y), Math.Min(47 - x, 47 - y));
-        var c = Oak(x, y, new Color(0.24f, 0.16f, 0.1f, 0.9f), 21);
-        if (d == 0)
-            return new Color(0.07f, 0.045f, 0.03f, 1f);
-        if (d == 1)
-            return Mix(c, new Color(0, 0, 0, 1), Math.Min(x, y) == 1 ? 0.5f : 0.15f);
+        var (cover, inside) = Rounded(x, y, w, h, r);
+        if (cover <= 0f)
+            return new Color(0, 0, 0, 0);
+        var c = top.Lerp(bottom, (y + 0.5f) / h);
+        if (inside < 1.2f)
+            c = c.Lerp(border, Math.Clamp(1.2f - inside, 0f, 1f));
+        else if (y <= 2 && inside < 2.6f)
+            c = c.Lerp(new Color(1f, 1f, 1f, c.A), 0.07f);
+        if (accent && y >= 2 && y <= 3 && inside >= 1.5f)
+            c = new Color(0.96f, 0.72f, 0.32f, 0.95f);
+        c.A *= cover;
         return c;
-    });
+    }
 
-    /// <summary>Parchment: warm, mottled, a little burnt at the edges.</summary>
-    public static Texture2D ParchmentTexture => Make("parchment", 64, 64, (x, y) =>
+    /// <summary>The big panel: deep graphite-teal glass with a hairline border and an amber line along the top.</summary>
+    public static Texture2D PanelTexture => Make("panel2", 96, 96, (x, y) =>
+        Card(x, y, 96, 96, 9f, new Color(0.085f, 0.105f, 0.118f, 0.94f), new Color(0.05f, 0.062f, 0.07f, 0.95f),
+            new Color(0.62f, 0.7f, 0.74f, 0.32f), accent: true));
+
+    /// <summary>An inner panel: a slightly lighter, quieter well inside a panel.</summary>
+    public static Texture2D InsetTexture => Make("inset2", 48, 48, (x, y) =>
+        Card(x, y, 48, 48, 5f, new Color(1f, 1f, 1f, 0.05f), new Color(1f, 1f, 1f, 0.035f), new Color(1f, 1f, 1f, 0.12f)));
+
+    /// <summary>The light card behind item pictures: a cool, softly lit studio grey, darker towards the edges.</summary>
+    public static Texture2D ParchmentTexture => Make("parchment2", 64, 64, (x, y) =>
     {
         int d = Math.Min(Math.Min(x, y), Math.Min(63 - x, 63 - y));
-        float mottle = Noise(x * 0.12f, y * 0.12f, 31) * 0.6f + Noise(x * 0.5f, y * 0.5f, 32) * 0.4f;
-        var c = new Color(0.95f, 0.88f, 0.71f) * (0.9f + 0.12f * mottle);
-        c = Mix(c, new Color(0.62f, 0.44f, 0.24f), Smooth(7f, 0f, d) * 0.65f);
+        float grain = Noise(x * 0.2f, y * 0.2f, 31) * 0.5f + 0.5f;
+        float lightFall = 1f - 0.12f * (y / 63f);
+        var c = new Color(0.84f, 0.87f, 0.88f) * ((0.97f + 0.03f * grain) * lightFall);
+        c = Mix(c, new Color(0.62f, 0.67f, 0.7f), Smooth(6f, 0f, d) * 0.5f);
         c.A = 1f;
         if (d == 0)
-            return new Color(0.36f, 0.23f, 0.12f, 1f);
+            return new Color(0.3f, 0.35f, 0.38f, 1f);
         return c;
     });
 
@@ -134,61 +139,35 @@ public static class UiArt
         float dx = (x - 63.5f) / 64f, dy = (y - 70f) / 64f;
         float r = MathF.Sqrt(dx * dx + dy * dy);
         float a = Smooth(1f, 0.1f, r);
-        return new Color(1f, 0.93f, 0.7f, 0.55f * a);
+        return new Color(1f, 0.97f, 0.9f, 0.5f * a);
     });
 
     // ------------------------------------------------------------------ buttons
-    /// <summary>A planked button in one of its states: normal, hover, pressed, disabled, or gold (the main action).</summary>
-    public static Texture2D ButtonTexture(string state) => Make("button:" + state, 48, 32, (x, y) =>
+    /// <summary>A flat button in one of its states: normal, hover, pressed, disabled, or gold (the main action, amber).</summary>
+    public static Texture2D ButtonTexture(string state) => Make("button2:" + state, 48, 32, (x, y) =>
     {
-        bool gold = state.StartsWith("gold");
-        var baseColor = state switch
+        var (top, bottom, border) = state switch
         {
-            "hover" => new Color(0.46f, 0.31f, 0.17f), "pressed" => new Color(0.24f, 0.15f, 0.09f),
-            "disabled" => new Color(0.2f, 0.17f, 0.14f), "gold" => new Color(0.74f, 0.54f, 0.22f),
-            "goldhover" => new Color(0.86f, 0.66f, 0.28f), "goldpressed" => new Color(0.6f, 0.42f, 0.17f),
-            _ => new Color(0.34f, 0.22f, 0.13f),
+            "hover" => (new Color(0.2f, 0.245f, 0.27f, 0.95f), new Color(0.15f, 0.185f, 0.205f, 0.95f), new Color(0.96f, 0.72f, 0.32f, 0.95f)),
+            "pressed" => (new Color(0.09f, 0.11f, 0.125f, 0.95f), new Color(0.12f, 0.145f, 0.16f, 0.95f), new Color(0.96f, 0.72f, 0.32f, 0.8f)),
+            "disabled" => (new Color(0.11f, 0.12f, 0.13f, 0.6f), new Color(0.09f, 0.1f, 0.11f, 0.6f), new Color(1f, 1f, 1f, 0.06f)),
+            "gold" => (new Color(0.97f, 0.73f, 0.32f, 1f), new Color(0.84f, 0.56f, 0.2f, 1f), new Color(1f, 0.86f, 0.55f, 1f)),
+            "goldhover" => (new Color(1f, 0.8f, 0.42f, 1f), new Color(0.92f, 0.64f, 0.26f, 1f), new Color(1f, 0.94f, 0.75f, 1f)),
+            "goldpressed" => (new Color(0.78f, 0.52f, 0.18f, 1f), new Color(0.86f, 0.6f, 0.24f, 1f), new Color(0.96f, 0.76f, 0.4f, 1f)),
+            _ => (new Color(0.155f, 0.188f, 0.207f, 0.92f), new Color(0.112f, 0.137f, 0.152f, 0.92f), new Color(0.72f, 0.8f, 0.84f, 0.22f)),
         };
-        int d = Math.Min(Math.Min(x, y), Math.Min(47 - x, 31 - y));
-        if (d == 0)
-            return state is "hover" or "goldhover" ? new Color(1f, 0.82f, 0.42f, 1f) : new Color(0.06f, 0.04f, 0.025f, 1f);
-        var c = gold ? new Color(baseColor.R * (0.9f + 0.2f * Noise(x * 0.3f, y * 0.3f, 3)), baseColor.G * (0.9f + 0.2f * Noise(x * 0.3f, y * 0.3f, 3)), baseColor.B, 1f)
-            : Oak(x, y, baseColor, 41);
-        // Light from above: brighter at the top, darker at the foot, a bevel inside the rim.
-        float v = y / 31f;
-        float shade = state is "pressed" or "goldpressed" ? 0.85f + 0.2f * v : 1.18f - 0.36f * v;
-        c = new Color(c.R * shade, c.G * shade, c.B * shade, 1f);
-        if (d == 1)
-        {
-            bool top = Math.Min(x, y) == 1 && y <= x;
-            bool pressed = state is "pressed" or "goldpressed";
-            c = Mix(c, top ^ pressed ? new Color(1f, 0.9f, 0.7f, 1f) : new Color(0f, 0f, 0f, 1f), 0.35f);
-        }
-        if (state == "disabled")
-        {
-            float g = (c.R + c.G + c.B) / 3f;
-            c = new Color(g, g * 0.95f, g * 0.88f, 1f);
-        }
-        return c;
+        return Card(x, y, 48, 32, 5f, top, bottom, border);
     });
 
-    /// <summary>The fill of a progress bar: gilded, brighter along the top.</summary>
-    public static Texture2D BarFill => Make("barfill", 16, 12, (x, y) =>
+    /// <summary>The fill of a progress bar: amber, a little brighter along the top.</summary>
+    public static Texture2D BarFill => Make("barfill2", 16, 12, (x, y) =>
     {
-        float v = y / 11f;
-        var c = new Color(1f, 0.84f, 0.42f).Lerp(new Color(0.7f, 0.46f, 0.15f), v);
-        if (y == 2)
-            c = c.Lerp(Colors.White, 0.45f);
-        if (y == 0 || y == 11)
-            c = c.Darkened(0.35f);
-        return c;
+        var c = new Color(1f, 0.78f, 0.38f).Lerp(new Color(0.86f, 0.55f, 0.18f), y / 11f);
+        return Card(x, y, 16, 12, 3f, c, c, c.Lightened(0.25f));
     });
 
-    public static Texture2D BarBack => Make("barback", 16, 12, (x, y) =>
-    {
-        bool rim = y == 0 || y == 11 || x == 0 || x == 15;
-        return rim ? new Color(0.06f, 0.04f, 0.025f, 1f) : new Color(0.1f, 0.07f, 0.045f, 1f).Lerp(new Color(0.16f, 0.11f, 0.07f, 1f), y / 11f);
-    });
+    public static Texture2D BarBack => Make("barback2", 16, 12, (x, y) =>
+        Card(x, y, 16, 12, 3f, new Color(0f, 0f, 0f, 0.45f), new Color(0f, 0f, 0f, 0.35f), new Color(1f, 1f, 1f, 0.16f)));
 
     // ------------------------------------------------------------------ small pictures
     /// <summary>A gold coin with a fish stamped on it.</summary>

@@ -334,7 +334,7 @@ public partial class Minimap : Control
         var world = _rod.World;
         bool day = DayClock.IsDaytime(world.Hour);
         var box = new Rect2(at + new Vector2(4f, 0f), new Vector2(WidgetWidth - 8f, PlaqueHeight));
-        DrawStyleBox(UITheme.Box(new Color(0.08f, 0.05f, 0.03f, 0.82f), new Color(Brass, 0.7f), 6, 1), box);
+        DrawStyleBox(UITheme.Box(new Color(0.05f, 0.065f, 0.075f, 0.84f), new Color(1f, 1f, 1f, 0.18f), 6, 1), box);
         float inner = box.Size.X - 10f;
         float until = DayClock.RealSecondsUntil(world.Hour, day ? DayClock.NightStart : DayClock.DayStart) / Math.Max(world.TimeScale, 1f);
         string time = world.TimeText;
