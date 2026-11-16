@@ -140,26 +140,12 @@ public partial class Scenery : Node3D
     // ------------------------------------------------------------------ pier
     private void BuildPier()
     {
-        var deck = Graphics.PhotoTextures.Get("brown_planks_09");
-        var wood = BuildingFactory.Pixel(new StandardMaterial3D
-        {
-            AlbedoTexture = deck?.Albedo ?? Textures.Planks(),
-            Uv1Triplanar = true,
-            Uv1Scale = Vector3.One * Textures.TriplanarScale,
-            Roughness = 0.9f,
-        });
-        if (deck != null)
-        {
-            wood.Uv1Scale = Vector3.One / deck.Metres;
-            wood.NormalEnabled = true;
-            wood.NormalTexture = deck.Normal;
-        }
-        else if (Textures.NormalFor(Textures.Planks()) is { } planksNormal)
-        {
-            wood.NormalEnabled = true;
-            wood.NormalTexture = planksNormal;
-        }
-        var dark = BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = new Color(0.22f, 0.15f, 0.09f), Roughness = 0.95f });
+        // Old grey-brown boards weathered like the buildings (colour wander, rain streaks, moss in patches); the posts
+        // and rails darker, soaked and dirty where they stand in the water. The painted planks when the sets are missing.
+        Material wood = Props.BuildingFactory.Weathered("weathered_brown_planks", new Color(0.92f, 0.9f, 0.86f), 0.85f, moss: 0.22f)
+            ?? OldDeck();
+        Material dark = Props.BuildingFactory.Weathered("weathered_brown_planks", new Color(0.5f, 0.45f, 0.4f), 0.92f, scale: 0.6f, moss: 0.12f)
+            ?? BuildingFactory.Pixel(new StandardMaterial3D { AlbedoColor = new Color(0.22f, 0.15f, 0.09f), Roughness = 0.95f });
 
         var body = new StaticBody3D { CollisionLayer = 1, Position = new Vector3(0, 0.95f, 1) };
         var deckSize = new Vector3(3, 0.2f, 10);
@@ -171,7 +157,8 @@ public partial class Scenery : Node3D
         foreach (float z in new[] { -3.5f, -1f, 1.5f, 4f })
         {
             foreach (float x in new[] { -1.35f, 1.35f })
-                AddCylinder(new Vector3(x, -0.4f, z), 0.09f, 3f, dark);
+                // Soaked and dirty from the waterline up (the weathering shader's damp foot, measured from the water).
+                AddCylinder(new Vector3(x, -0.4f, z), 0.09f, 3f, dark).SetInstanceShaderParameter("base_y", 0f);
             AddBox(new Vector3(0, 0.78f, z), new Vector3(3f, 0.1f, 0.12f), dark);
         }
 
@@ -265,13 +252,43 @@ public partial class Scenery : Node3D
         AddChild(new MultiMeshInstance3D { Multimesh = mm, MaterialOverride = _bulbs, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
     }
 
-    private void AddCylinder(Vector3 pos, float radius, float height, Material mat) =>
-        AddChild(new MeshInstance3D
+    private MeshInstance3D AddCylinder(Vector3 pos, float radius, float height, Material mat)
+    {
+        var mi = new MeshInstance3D
         {
-            Mesh = new CylinderMesh { TopRadius = radius, BottomRadius = radius, Height = height, RadialSegments = 8, Rings = 1 },
+            Mesh = new CylinderMesh { TopRadius = radius, BottomRadius = radius, Height = height, RadialSegments = 12, Rings = 1 },
             MaterialOverride = mat,
             Position = pos,
+        };
+        AddChild(mi);
+        return mi;
+    }
+
+    /// <summary>The pier's boards without the photo sets: the old plain material.</summary>
+    private static Material OldDeck()
+    {
+        var deck = Graphics.PhotoTextures.Get("brown_planks_09");
+        var wood = BuildingFactory.Pixel(new StandardMaterial3D
+        {
+            AlbedoTexture = deck?.Albedo ?? Textures.Planks(),
+            Uv1Triplanar = true,
+            Uv1Scale = Vector3.One * Textures.TriplanarScale,
+            Roughness = 0.9f,
         });
+        if (deck != null)
+        {
+            wood.Uv1Scale = Vector3.One / deck.Metres;
+            wood.NormalEnabled = true;
+            wood.NormalTexture = deck.Normal;
+        }
+        else if (Textures.NormalFor(Textures.Planks()) is { } planksNormal)
+        {
+            wood.NormalEnabled = true;
+            wood.NormalTexture = planksNormal;
+        }
+        return wood;
+    }
+
 
     private void AddBox(Vector3 pos, Vector3 size, Material mat) =>
         AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = size }, MaterialOverride = mat, Position = pos });
