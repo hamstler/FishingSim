@@ -513,9 +513,13 @@ public partial class ScreenshotTool : Node
             int n = 0;
             foreach (var agent in main.Fish.Agents)
             {
-                if (n >= 9 || wanted != null && !wanted.Split(',').Contains(agent.Species) || agent.Weight < 0.15f)
+                if (n >= (System.Environment.GetEnvironmentVariable("FISHSIM_FISH_NEAR") == "1" ? 4 : 9)
+                    || wanted != null && !wanted.Split(',').Contains(agent.Species) || agent.Weight < 0.4f)
                     continue;
-                agent.Position = new System.Numerics.Vector2(rngF.RandfRange(-1.8f, 1.8f), -5.3f + rngF.RandfRange(-1.0f, 0.8f));
+                bool near = System.Environment.GetEnvironmentVariable("FISHSIM_FISH_NEAR") == "1";
+                agent.Position = near
+                    ? new System.Numerics.Vector2(-1.2f + n * 0.8f, -5.0f - (n % 2) * 0.5f)
+                    : new System.Numerics.Vector2(rngF.RandfRange(-1.8f, 1.8f), -5.3f + rngF.RandfRange(-1.0f, 0.8f));
                 agent.Depth = 0.35f + rngF.RandfRange(0f, 0.25f);
                 n++;
             }
