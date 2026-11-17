@@ -1,6 +1,7 @@
 """Fetch Meshy AI fish models from a shared Google Drive folder and shrink them for the game.
 
     python3 -I tools/assets/meshy_fish.py FOLDER_ID [--size 2048] [--triangles 30000] [--only id,id]
+    python3 -I tools/assets/meshy_fish.py --file IN.glb OUT.glb [--size 2048] [--triangles N] [--keep-mr]   (one prop)
 
 The folder holds one sub-folder per species (Meshy_AI_<Name>_3D_...), each with one .glb (~49 MB: three 4K PNGs).
 Each model is rewritten as assets/fish/meshy/<id>.glb: a mesh over --triangles collapsed to it in Blender
@@ -76,7 +77,7 @@ def triangles(glb):
     return sum(j["accessors"][p["indices"]]["count"] // 3 for m in j["meshes"] for p in m["primitives"])
 
 
-def shrink(glb, size):
+def shrink(glb, size, keep_mr=False):
     n = struct.unpack("<I", glb[12:16])[0]
     j = json.loads(glb[20:20 + n])
     binoff = 20 + n + 8
@@ -85,6 +86,8 @@ def shrink(glb, size):
     mat = j["materials"][0]
     keep = {"colour": mat["pbrMetallicRoughness"].get("baseColorTexture", {}).get("index"),
             "normal": mat.get("normalTexture", {}).get("index")}
+    if keep_mr:     # props with metal parts (a reel) keep their metallic-roughness picture
+        keep["orm"] = mat["pbrMetallicRoughness"].get("metallicRoughnessTexture", {}).get("index")
     colour_mask = None
     out = bytearray()
     newviews = []
@@ -128,16 +131,19 @@ def shrink(glb, size):
         buf = io.BytesIO()
         pic.save(buf, "WEBP", quality=92 if role == "normal" else 88, method=6)
         images.append({"bufferView": add(buf.getvalue()), "mimeType": "image/webp",
-                       "name": "body_normal" if role == "normal" else "body_albedo"})
+                       "name": {"normal": "body_normal", "colour": "body_albedo", "orm": "orm"}[role]})
         textures.append({"sampler": 0, "extensions": {"EXT_texture_webp": {"source": len(images) - 1}}})
         idx = len(textures) - 1
         if role == "normal":
             mat["normalTexture"] = {"index": idx}
+        elif role == "orm":
+            mat["pbrMetallicRoughness"]["metallicRoughnessTexture"] = {"index": idx}
         else:
             mat["pbrMetallicRoughness"]["baseColorTexture"] = {"index": idx}
-    mat["pbrMetallicRoughness"].pop("metallicRoughnessTexture", None)
-    mat["pbrMetallicRoughness"]["metallicFactor"] = 0.0
-    mat["pbrMetallicRoughness"]["roughnessFactor"] = 0.45
+    if not keep_mr:
+        mat["pbrMetallicRoughness"].pop("metallicRoughnessTexture", None)
+        mat["pbrMetallicRoughness"]["metallicFactor"] = 0.0
+        mat["pbrMetallicRoughness"]["roughnessFactor"] = 0.45
     j["images"], j["textures"], j["bufferViews"] = images, textures, newviews
     j["buffers"] = [{"byteLength": len(out)}]
     j["extensionsUsed"] = sorted(set(j.get("extensionsUsed", [])) | {"EXT_texture_webp"})
@@ -151,8 +157,30 @@ def shrink(glb, size):
             + struct.pack("<I", len(out)) + b"BIN\0" + bytes(out))
 
 
+def convert_file(src, dst, size, target, keep_mr):
+    """One model file (e.g. a Meshy prop: a figure, a rod) shrunk like the fish."""
+    raw = open(src, "rb").read()
+    tris = triangles(raw)
+    if tris > target:
+        with tempfile.TemporaryDirectory() as work:
+            tmp, out = os.path.join(work, "in.glb"), os.path.join(work, "out.glb")
+            open(tmp, "wb").write(raw)
+            subprocess.run(["blender", "-b", "--python-exit-code", "1", "-P",
+                            os.path.join(ROOT, "tools", "assets", "meshy_decimate.py"), "--", tmp, out, str(target)],
+                           check=True, stdout=subprocess.DEVNULL)
+            raw = open(out, "rb").read()
+    small = shrink(raw, size, keep_mr)
+    open(dst, "wb").write(small)
+    print(f"{dst}: {tris} -> {triangles(small)} triangles, {len(small) / 1e6:.1f} MB")
+
+
 def main():
     args = sys.argv[1:]
+    if args and args[0] == "--file":     # --file IN OUT [--size N] [--triangles N] [--keep-mr]
+        size = int(args[args.index("--size") + 1]) if "--size" in args else 2048
+        target = int(args[args.index("--triangles") + 1]) if "--triangles" in args else 30000
+        convert_file(args[1], args[2], size, target, "--keep-mr" in args)
+        return
     folder = args[0]
     size = int(args[args.index("--size") + 1]) if "--size" in args else 2048
     target = int(args[args.index("--triangles") + 1]) if "--triangles" in args else 30000

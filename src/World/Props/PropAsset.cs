@@ -86,7 +86,10 @@ public static class PropAsset
         var decoded = new Dictionary<int, Texture2D>();
         Texture2D? Picture(int? textureIndex, BlockCompress.Kind kind)
         {
-            if (textureIndex is not int ti || ti >= textures.Count || (int?)textures[ti]?["source"] is not int ii)
+            if (textureIndex is not int ti || ti >= textures.Count)
+                return null;
+            // The picture's index: "source", or EXT_texture_webp's (WebP-only files, e.g. the Meshy props).
+            if (((int?)textures[ti]?["source"] ?? (int?)textures[ti]?["extensions"]?["EXT_texture_webp"]?["source"]) is not int ii)
                 return null;
             if (decoded.TryGetValue(ii, out var done))
                 return done;
