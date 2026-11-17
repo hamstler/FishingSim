@@ -479,7 +479,8 @@ znakami towarowymi żadnej firmy ani ich przeróbkami. Ewentualna zbieżność z
   Do projektu trafiły wyłącznie liczby (obrysy ciała, położenie płetw i oka, barwy), nie ilustracje. Źródła każdego
   gatunku są w [`assets/fish/CREDITS.md`](assets/fish/CREDITS.md).
 - **Wędkarz i wędka spinningowa z Meshy AI** (`assets/models/meshy_fisherman.glb`, `meshy_spinning_rod.glb`): tak samo
-  wygenerowane przez autora projektu na płatnym planie Premium; stoją jako wędkarze na brzegu.
+  wygenerowane przez autora projektu na płatnym planie Premium; stoją jako wędkarze na brzegu, a wędka jest też
+  wędką gracza (pocięta na odcinki, gnie się pod obciążeniem; `tools/assets/meshy_rod_split.py`).
 - **Modele ryb z Meshy AI** (`assets/fish/meshy/<id>.glb`, wszystkie 66 gatunków) wygenerował autor projektu w Meshy AI
   (obraz → 3D) z własnych obrazów na płatnym planie Premium, więc należą do autora i są częścią projektu na licencji
   GPL; zastępują w grze modele z `assets/fish/models` (te zostają jako zapas). Szczegóły i warunki w

@@ -210,7 +210,7 @@ public partial class FirstPersonBody : Node3D
         bool onReel = action is BodyAction.Fight || (ReelingSource?.Invoke() ?? false);
         _leftOnReel = Mathf.MoveToward(_leftOnReel, onReel ? 1f : 0f, dt * 5f);
         if (ReelingSource?.Invoke() ?? false)
-            _crank += dt * 9f;
+            _crank -= dt * 9f;     // seen from the left: over the top, forwards and down (anticlockwise), as a reel winds
         _rig.SetCrank(_crank);
         var knob = RodRig.KnobAt(_crank);
         var leftAt = LeftRest.Lerp(ToLocal(_rig.ToGlobal(knob)), _leftOnReel);
@@ -315,15 +315,19 @@ public partial class FirstPersonBody : Node3D
         bool onReel = action is BodyAction.Fight || (ReelingSource?.Invoke() ?? false);
         _leftOnReel = Mathf.MoveToward(_leftOnReel, onReel ? 1f : 0f, dt * 4f);
         if (ReelingSource?.Invoke() ?? false)
-            _crank += dt * 9f;
+            _crank -= dt * 9f;     // seen from the left: over the top, forwards and down (anticlockwise), as a reel winds
         _rig.SetCrank(_crank);
-        // The crank's knob is pinched in the fingertips, the hand lying the most natural way round it.
-        // The knob lies in the hand from below: the palm turned up towards the rod, the fingers closing round it from
-        // the front (pointing up the rod), as an angler's hand winds; not laid over it from above, palm down.
-        var pinch = BarGrip(_rig.ToGlobal(RodRig.KnobAt(_crank)), rigBasis * Vector3.Right, 0.0085f, false, leftArm, 0f, Mathf.DegToRad(20f),
-            0f, 0.97f, 0.078f, true, 0.012f, _rodLeft, dt, ToGlobal(new Vector3(-0.55f, -0.6f, 0.3f)),
-            rigBasis * Vector3.Back, 0.5f,
-            fingersToward: rodAxis, fingersCone: 0.2f);
+        // The crank's knob pinched between the thumb and the index finger, the hand straight on from the forearm (no
+        // bent wrist): the fingers point the way the forearm runs (from the elbow, hanging below the shoulder, to the
+        // knob), the palm faces the reel, the knob lies at the fingertips on the palm's side and the thumb rests on top
+        // of it (ThumbOn below). The pole keeps the elbow down and out.
+        var knobAt = _rig.ToGlobal(RodRig.KnobAt(_crank));
+        var elbowGuess = leftArm.Shoulder - leftArm.BodyUp * (leftArm.Upper * 0.9f) - leftArm.BodyRight * 0.06f;
+        var pinchFingers = (knobAt - elbowGuess).Normalized();
+        var towardReel = rigBasis * Vector3.Right;
+        var pinchPalm = (towardReel - pinchFingers * towardReel.Dot(pinchFingers)).Normalized();
+        var pinch = new HandTarget(knobAt - pinchFingers * 0.072f - pinchPalm * 0.016f, pinchFingers, pinchPalm, 0.8f,
+            ToGlobal(new Vector3(-0.55f, -0.6f, 0.3f)));
         if (System.Environment.GetEnvironmentVariable("FISHSIM_IK_DEBUG") == "1" && Engine.GetProcessFrames() % 60 == 0)
             GD.Print($"PINCH fingers {pinch.Fingers} palm {pinch.Palm} rod {rodAxis} cam fwd {-_camera.GlobalBasis.Z} body right {bodyBasis.X} knob {_rig.ToGlobal(RodRig.KnobAt(_crank))} wrist {pinch.Wrist}");
         var held = HeldFishSource?.Invoke();
@@ -341,7 +345,10 @@ public partial class FirstPersonBody : Node3D
         var left = Mix(Mix(rest, pinch, onCrank), fish, Smooth01(_leftOnFish));
         Apply(ik.Left, left, 0f);
         ik.Left.ThumbAlong = null;
-        ik.Left.ThumbOn = null;
+        // On the crank the knob is held between the thumb and the index finger: the thumb's tip on top of it.
+        ik.Left.ThumbOn = onCrank > 0.5f && _leftOnFish < 0.5f
+            ? _rig.ToGlobal(RodRig.KnobAt(_crank) + new Vector3(-0.004f, 0f, 0.0125f))
+            : null;
         // On the crank the fingers close round the knob and stop on it.
         ik.Left.Obstacles.Clear();
         if (_leftOnReel > 0.5f && _leftOnFish < 0.5f)
