@@ -551,5 +551,5 @@ public partial class ArmIK : SkeletonModifier3D
         return sk.GlobalTransform * sk.GetBoneGlobalPose(arm.Upper).Origin;
     }
 
-    private static readonly bool Debug = System.Environment.GetEnvironmentVariable("FISHSIM_IK_DEBUG") == "1";
+    internal static readonly bool Debug = System.Environment.GetEnvironmentVariable("FISHSIM_IK_DEBUG") == "1";
 }

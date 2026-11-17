@@ -1,14 +1,18 @@
-"""Turns the Meshy spinning rod (assets/models/meshy_spinning_rod.glb) into the player's rod for RodRig.
+"""Turns the user's Meshy rod and reel into the player's rod and reel for RodRig.
 
-    python3 -I tools/assets/meshy_rod_split.py [IN.glb] [OUT.glb] [--butt X --seat X --blank X] [--no-reel]
+    python3 -I tools/assets/meshy_rod_split.py IN.glb OUT.glb [--butt X --seat X --blank X] [--no-reel]
     python3 -I tools/assets/meshy_rod_split.py --reel IN.glb OUT.glb     (a reel model on its own, see place_reel)
 
-The model lies along X (butt at +X, tip at -X) with its reel hanging at -Y. It is laid into RodRig's space (the rod
+The player's rod now: IN = the reel-less Meshy rod (meshy_fish.py --file ... --keep-mr), OUT =
+assets/models/meshy_rod2_player.glb with --butt 0.951 --seat 0.45 --blank 0.32 --no-reel; the reel:
+--reel IN assets/models/meshy_reel.glb.
+
+A rod model lies along X (butt at +X, tip at -X) with any reel hanging at -Y. It is laid into RodRig's space (the rod
 along +Y, the reel side -Z): the butt at y = -0.33, the reel seat at RodRig.SeatCentre (0.1), the blank's start at
 RodRig.BlankStart (0.25) and the tip-top at 0.25 + 10 x 0.3 m; its thickness scaled so the grip is as thick as
-RodRig's own. The reel is cut away (the game keeps its own animated reel, crank and bail). The blank is cut into the
-ten sections of RodRig's bending joints, each mesh in its section's own frame (its origin at the section's base), so
-the game hangs every piece on its joint and the model bends with RodBendModel. Nodes: Handle, Seg0 .. Seg9.
+RodRig's own. A reel on it is cut away unless --no-reel. The blank is cut into the ten sections of RodRig's bending
+joints, each mesh in its section's own frame (its origin at the section's base), so the game hangs every piece on its
+joint and the model bends with RodBendModel. Nodes: Handle, Seg0 .. Seg9.
 """
 import json, os, struct, sys
 import numpy as np
@@ -29,8 +33,9 @@ if NO_REEL:
 REEL_MODE = "--reel" in ARGS
 if REEL_MODE:
     ARGS.remove("--reel")
-SRC = ARGS[0] if len(ARGS) > 0 else os.path.join(ROOT, "assets", "models", "meshy_spinning_rod.glb")
-DST = ARGS[1] if len(ARGS) > 1 else os.path.join(ROOT, "assets", "models", "meshy_rod_player.glb")
+if len(ARGS) != 2:
+    sys.exit(__doc__)
+SRC, DST = ARGS
 
 # RodRig's frame.
 BUTT_Y, SEAT_Y, BLANK_START, JOINTS, SEGMENT = -0.33, 0.1, 0.25, 10, 0.3

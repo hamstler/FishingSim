@@ -1437,7 +1437,17 @@ public partial class Scenery : Node3D
         var (angler, rod, bob) = _anglerParts[index];
         if (!IsInstanceValid(bob))
             return;
-        var rest = bob.Position;
+        AnglerCaught?.Invoke(index);
+        // Catches can come seconds apart (the stool, PassTime): a running show is left alone, and the float and the
+        // rod always return to the rest taken before the first one (never to a raised or sunken pose).
+        if (bob.GetMeta("catching", false).AsBool())
+            return;
+        bob.SetMeta("catching", true);
+        if (!bob.HasMeta("rest"))
+            bob.SetMeta("rest", bob.Position);
+        if (rod != null && IsInstanceValid(rod) && !rod.HasMeta("held"))
+            rod.SetMeta("held", rod.Transform);
+        var rest = bob.GetMeta("rest").AsVector3();
         var tween = bob.CreateTween();
         tween.TweenProperty(bob, "position", rest + new Vector3(0f, -0.25f, 0f), 0.35f);
         tween.TweenCallback(Callable.From(() =>
@@ -1448,7 +1458,7 @@ public partial class Scenery : Node3D
             // A standing angler (a statue model) strikes: the rod swings up and comes back down.
             if (rod != null && IsInstanceValid(rod))
             {
-                var held = rod.Transform;
+                var held = rod.GetMeta("held").AsTransform3D();
                 var up = new Transform3D(new Basis(Vector3.Right, -Mathf.DegToRad(28f)), Vector3.Zero);
                 var hands = rod.GetMeta("hands", Vector3.Zero).AsVector3();
                 var raised = new Transform3D(Basis.Identity, hands) * up * new Transform3D(Basis.Identity, -hands) * held;
@@ -1459,8 +1469,7 @@ public partial class Scenery : Node3D
             }
         }));
         tween.TweenInterval(6f);
-        tween.TweenCallback(Callable.From(() => { bob.Position = rest; bob.Visible = true; }));
-        AnglerCaught?.Invoke(index);
+        tween.TweenCallback(Callable.From(() => { bob.Position = rest; bob.Visible = true; bob.SetMeta("catching", false); }));
     }
 
     /// <summary>A local angler landed a fish (for the sound and tests).</summary>

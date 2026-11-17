@@ -52,6 +52,16 @@ public partial class Menu : Control
                 World.Props.CharacterAsset.Prewarm();
                 ProceduralTextures.PrewarmFoliage();
             });
+        if (!Renderer.IsHeadless)
+        {
+            // The rod and reel in the angler's hands (glTF and pictures, read on the main thread once): a second after
+            // the menu shows, not as a hitch when the first map opens.
+            GetTree().CreateTimer(1.0).Timeout += () =>
+            {
+                World.Props.PropAsset.Named(Fishing.RodRig.ModelRodId);
+                World.Props.PropAsset.Named(Fishing.RodRig.ModelReelId);
+            };
+        }
         foreach (var path in LakeBed.LocationPaths)
             _locations.Add(GD.Load<LocationData>(path));
         BuildBackground();
