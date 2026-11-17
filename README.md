@@ -479,7 +479,8 @@ znakami towarowymi żadnej firmy ani ich przeróbkami. Ewentualna zbieżność z
   Do projektu trafiły wyłącznie liczby (obrysy ciała, położenie płetw i oka, barwy), nie ilustracje. Źródła każdego
   gatunku są w [`assets/fish/CREDITS.md`](assets/fish/CREDITS.md).
 - **Modele ryb z Meshy AI** (`assets/fish/meshy/<id>.glb`, wszystkie 66 gatunków) wygenerował autor projektu w Meshy AI
-  (obraz → 3D) z własnych obrazów; zastępują w grze modele z `assets/fish/models` (te zostają jako zapas). Szczegóły i warunki w
+  (obraz → 3D) z własnych obrazów na płatnym planie Premium, więc należą do autora i są częścią projektu na licencji
+  GPL; zastępują w grze modele z `assets/fish/models` (te zostają jako zapas). Szczegóły i warunki w
   [`assets/fish/meshy/CREDITS.md`](assets/fish/meshy/CREDITS.md).
 - **Barwy i kształty części gatunków** zmierzono na zdjęciach z Wikimedia Commons na wolnych licencjach. Same zdjęcia
   nie są częścią projektu; autorzy i licencje są w `assets/fish/CREDITS.md` i w atlasie ryb w grze.

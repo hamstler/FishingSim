@@ -1,6 +1,6 @@
 # Meshy AI fish models
 
-The `<id>.glb` models in this folder were generated with Meshy AI (https://www.meshy.ai, image to 3D) by the
-project's author from their own reference pictures, then decimated and re-encoded with tools/assets/meshy_fish.py.
-Under Meshy's terms of service the generated assets belong to the user who made them on a paid plan and may be used
-commercially; assets made on the free plan are published under CC BY 4.0 (credit: "Meshy AI").
+The `<id>.glb` models in this folder (all 66 species) were generated with Meshy AI (https://www.meshy.ai, image to
+3D) by the project's author on a paid (Premium) plan, from their own reference pictures, then decimated and
+re-encoded with tools/assets/meshy_fish.py. Under Meshy's terms of service, assets generated on a paid plan belong
+to the user who generated them; the author releases them with the project under GPL-3.0-or-later.
