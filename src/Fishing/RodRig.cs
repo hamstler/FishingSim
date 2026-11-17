@@ -70,7 +70,11 @@ public partial class RodRig : Node3D
 
     /// <summary>The crank knob's centre at a crank angle (rig space): it turns in the plane across the left side.</summary>
     public static Vector3 KnobAt(float angle) =>
-        CrankAxis + new Vector3(-0.026f, MathF.Sin(angle) * CrankArm, -MathF.Cos(angle) * CrankArm);
+        CrankAxis + new Vector3(KnobOut, MathF.Sin(angle) * CrankArm, -MathF.Cos(angle) * CrankArm);
+
+    /// <summary>How far the knob stands out to the left of the crank's axis: clear of the reel, so the left hand holds
+    /// it between the thumb and the index finger.</summary>
+    public const float KnobOut = -0.05f;
 
     public override void _Ready()
     {
@@ -91,18 +95,21 @@ public partial class RodRig : Node3D
         var line = Tackle(5, new Color(0.82f, 0.86f, 0.78f), 0.4f);                         // line on the spool
         var knob = Tackle(7, new Color(0.32f, 0.2f, 0.12f), 0.6f);                          // the crank's knob
 
-        // Handle: butt cap, rear cork grip (with a few darker filler rings), reel seat, fore grip, winding check.
-        Cyl(this, 0.0155f, 0.016f, 0.03f, new Vector3(0, -0.315f, 0), rubber, 16);
-        Cyl(this, 0.0148f, 0.0155f, 0.25f, new Vector3(0, -0.175f, 0), cork, 16);
-        Cyl(this, 0.0145f, 0.0148f, 0.1f, new Vector3(0, -0.0f, 0), cork, 16);
+        // Handle: butt cap, rear cork grip (with a few darker filler rings), reel seat, fore grip, winding check (in their
+        // own node, so a modelled rod can stand in for them: UseModel).
+        var handle = _procHandle = new Node3D { Name = "ProcHandle" };
+        AddChild(handle);
+        Cyl(handle, 0.0155f, 0.016f, 0.03f, new Vector3(0, -0.315f, 0), rubber, 16);
+        Cyl(handle, 0.0148f, 0.0155f, 0.25f, new Vector3(0, -0.175f, 0), cork, 16);
+        Cyl(handle, 0.0145f, 0.0148f, 0.1f, new Vector3(0, -0.0f, 0), cork, 16);
         foreach (float y in new[] { -0.24f, -0.12f, -0.03f })
-            Cyl(this, 0.0152f, 0.0152f, 0.004f, new Vector3(0, y, 0), corkDark, 16);
-        Cyl(this, SeatRadius, SeatRadius, 0.12f, new Vector3(0, SeatCentre, 0), seat, 16);
-        Cyl(this, 0.0148f, 0.0142f, 0.016f, new Vector3(0, SeatCentre - 0.052f, 0), chrome, 16);   // rear hood
-        Cyl(this, 0.0142f, 0.0148f, 0.016f, new Vector3(0, SeatCentre + 0.05f, 0), chrome, 16);    // front hood
-        Cyl(this, 0.0158f, 0.0158f, 0.018f, new Vector3(0, SeatCentre + 0.071f, 0), seat, 16);     // locking nut
-        Cyl(this, 0.0115f, 0.0135f, 0.07f, new Vector3(0, SeatCentre + 0.115f, 0), cork, 16);      // fore grip
-        Cyl(this, 0.009f, 0.0105f, 0.008f, new Vector3(0, BlankStart - 0.004f, 0), chrome, 16);    // winding check
+            Cyl(handle, 0.0152f, 0.0152f, 0.004f, new Vector3(0, y, 0), corkDark, 16);
+        Cyl(handle, SeatRadius, SeatRadius, 0.12f, new Vector3(0, SeatCentre, 0), seat, 16);
+        Cyl(handle, 0.0148f, 0.0142f, 0.016f, new Vector3(0, SeatCentre - 0.052f, 0), chrome, 16);   // rear hood
+        Cyl(handle, 0.0142f, 0.0148f, 0.016f, new Vector3(0, SeatCentre + 0.05f, 0), chrome, 16);    // front hood
+        Cyl(handle, 0.0158f, 0.0158f, 0.018f, new Vector3(0, SeatCentre + 0.071f, 0), seat, 16);     // locking nut
+        Cyl(handle, 0.0115f, 0.0135f, 0.07f, new Vector3(0, SeatCentre + 0.115f, 0), cork, 16);      // fore grip
+        Cyl(handle, 0.009f, 0.0105f, 0.008f, new Vector3(0, BlankStart - 0.004f, 0), chrome, 16);    // winding check
 
         BuildReel(reelBody, reelTrim, chrome, line, knob, seat);
 
@@ -121,16 +128,20 @@ public partial class RodRig : Node3D
             float r0 = Mathf.Lerp(0.0078f, 0.0017f, MathF.Pow(t0, 0.85f)), r1 = Mathf.Lerp(0.0078f, 0.0017f, MathF.Pow(t1, 0.85f));
             var seg = new Node3D { Position = new Vector3(0, yOffset, 0) };
             parent.AddChild(seg);
-            var blankMesh = Cyl(seg, r1, r0, SegmentLength, new Vector3(0, SegmentLength * 0.5f, 0), blank, 10);
+            // The section's own blank, guide and whippings (a modelled rod's piece takes their place: UseModel).
+            var proc = new Node3D { Name = "Proc" };
+            seg.AddChild(proc);
+            _procSections.Add(proc);
+            var blankMesh = Cyl(proc, r1, r0, SegmentLength, new Vector3(0, SegmentLength * 0.5f, 0), blank, 10);
             _blankMeshes.Add(blankMesh);
             _blankMaterial = blank;
             if (guides.TryGetValue(i, out var g))
-                Guide(seg, SegmentLength * 0.55f, Mathf.Lerp(r0, r1, 0.55f), g.Ring, g.Height, chrome, whip);
+                Guide(proc, SegmentLength * 0.55f, Mathf.Lerp(r0, r1, 0.55f), g.Ring, g.Height, chrome, whip);
             if (i == 0)
             {
                 // A decorative whipping above the fore grip and the hook keeper.
-                Cyl(seg, r0 * 1.12f, r0 * 1.12f, 0.025f, new Vector3(0, 0.02f, 0), whip, 10);
-                seg.AddChild(new MeshInstance3D
+                Cyl(proc, r0 * 1.12f, r0 * 1.12f, 0.025f, new Vector3(0, 0.02f, 0), whip, 10);
+                proc.AddChild(new MeshInstance3D
                 {
                     Mesh = new TorusMesh { InnerRadius = 0.0022f, OuterRadius = 0.0034f, Rings = 8, RingSegments = 5 },
                     MaterialOverride = chrome, Position = new Vector3(0, 0.06f, -r0 - 0.004f), RotationDegrees = new Vector3(0, 0, 90f),
@@ -148,10 +159,53 @@ public partial class RodRig : Node3D
             MaterialOverride = chrome, Position = new Vector3(0, SegmentLength + 0.004f, -0.003f), RotationDegrees = new Vector3(90f, 0, 0),
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
         };
-        parent.AddChild(top);
+        _procSections[^1].AddChild(top);
         Tip = new Node3D { Position = new Vector3(0, SegmentLength, 0) };
         parent.AddChild(Tip);
         SetLook(_lookRod, _lookReel);
+        UseModel();
+    }
+
+    private Node3D? _procHandle;
+    private readonly List<Node3D> _procSections = new();
+    private readonly List<MeshInstance3D> _modelSections = new();
+    private bool _quiverOn;
+
+    /// <summary>The rod modelled by the user (assets/models/meshy_rod_player.glb, cut by tools/assets/meshy_rod_split.py
+    /// into the handle and the ten bending sections): stands in for the built handle and blank, each section hung on
+    /// its joint so it bends as the built one did; the reel stays the built, animated one. Not without a screen.</summary>
+    public bool Modelled { get; private set; }
+
+    private void UseModel()
+    {
+        if (World.Props.PropAsset.Named("meshy_rod_player") is not { } parts || !parts.TryGetValue("Handle", out var handleMesh))
+            return;
+        for (int i = 0; i < _segments.Count; i++)
+            if (!parts.ContainsKey($"Seg{i}"))
+                return;
+        Modelled = true;
+        _procHandle!.Visible = false;
+        AddChild(new MeshInstance3D { Name = "ModelHandle", Mesh = handleMesh, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        for (int i = 0; i < _segments.Count; i++)
+        {
+            _procSections[i].Visible = false;
+            var piece = new MeshInstance3D { Name = "Model", Mesh = parts[$"Seg{i}"], CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+            _segments[i].AddChild(piece);
+            _modelSections.Add(piece);
+        }
+        ShowQuiver();
+    }
+
+    /// <summary>A quiver tip (bottom rods) is the built blank's bright last two sections, also on a modelled rod.</summary>
+    private void ShowQuiver()
+    {
+        if (!Modelled)
+            return;
+        for (int i = _segments.Count - 2; i < _segments.Count; i++)
+        {
+            _procSections[i].Visible = _quiverOn;
+            _modelSections[i].Visible = !_quiverOn;
+        }
     }
 
     private Node3D? _indicator, _bobbin;
@@ -259,6 +313,8 @@ public partial class RodRig : Node3D
         });
         for (int i = _blankMeshes.Count - 2; i < _blankMeshes.Count; i++)
             _blankMeshes[i].MaterialOverride = on ? _quiverMaterial : _blankMaterial;
+        _quiverOn = on;
+        ShowQuiver();
     }
 
     /// <summary>A guide under the blank: a ring standing on a two-legged frame, whipped to the blank.</summary>
@@ -353,8 +409,10 @@ public partial class RodRig : Node3D
         Cyl(_crank, 0.0075f, 0.0075f, 0.008f, Vector3.Zero, trim, 14).RotationDegrees = new Vector3(0, 0, 90f);
         var arm = Box(_crank, new Vector3(0.005f, 0.009f, CrankArm + 0.008f), new Vector3(-0.008f, 0f, -CrankArm * 0.5f), body, 0.0022f);
         arm.RotationDegrees = Vector3.Zero;
-        Cyl(_crank, 0.0028f, 0.0028f, 0.016f, new Vector3(-0.014f, 0f, -CrankArm), metal, 8).RotationDegrees = new Vector3(0, 0, 90f);
-        var knobMesh = Cyl(_crank, 0.0085f, 0.0075f, 0.024f, new Vector3(-0.026f, 0f, -CrankArm), knob, 14);
+        // The knob's shaft runs out to the left, clear of the reel's side.
+        float shaft = -KnobOut - 0.018f;
+        Cyl(_crank, 0.0028f, 0.0028f, shaft, new Vector3(-0.006f - shaft * 0.5f, 0f, -CrankArm), metal, 8).RotationDegrees = new Vector3(0, 0, 90f);
+        var knobMesh = Cyl(_crank, 0.0085f, 0.0075f, 0.024f, new Vector3(KnobOut, 0f, -CrankArm), knob, 14);
         knobMesh.RotationDegrees = new Vector3(0, 0, 90f);
         SetCrank(0f);
     }
@@ -365,7 +423,7 @@ public partial class RodRig : Node3D
         if (_crank == null)
             return;
         _crank.Rotation = new Vector3(angle, 0f, 0f);
-        _rotor.Rotation = new Vector3(0f, -angle * 5.2f, 0f);
+        _rotor.Rotation = new Vector3(0f, angle * 5.2f, 0f);
     }
 
     /// <summary>Opens (1) or closes (0) the bail: open for the cast, flipped closed when the reel turns again.</summary>

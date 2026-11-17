@@ -210,7 +210,7 @@ public partial class FirstPersonBody : Node3D
         bool onReel = action is BodyAction.Fight || (ReelingSource?.Invoke() ?? false);
         _leftOnReel = Mathf.MoveToward(_leftOnReel, onReel ? 1f : 0f, dt * 5f);
         if (ReelingSource?.Invoke() ?? false)
-            _crank += dt * 9f;
+            _crank -= dt * 9f;     // seen from the left: over the top, forwards and down (anticlockwise), as a reel winds
         _rig.SetCrank(_crank);
         var knob = RodRig.KnobAt(_crank);
         var leftAt = LeftRest.Lerp(ToLocal(_rig.ToGlobal(knob)), _leftOnReel);
@@ -315,7 +315,7 @@ public partial class FirstPersonBody : Node3D
         bool onReel = action is BodyAction.Fight || (ReelingSource?.Invoke() ?? false);
         _leftOnReel = Mathf.MoveToward(_leftOnReel, onReel ? 1f : 0f, dt * 4f);
         if (ReelingSource?.Invoke() ?? false)
-            _crank += dt * 9f;
+            _crank -= dt * 9f;     // seen from the left: over the top, forwards and down (anticlockwise), as a reel winds
         _rig.SetCrank(_crank);
         // The crank's knob is pinched in the fingertips, the hand lying the most natural way round it.
         // The knob lies in the hand from below: the palm turned up towards the rod, the fingers closing round it from
@@ -341,7 +341,10 @@ public partial class FirstPersonBody : Node3D
         var left = Mix(Mix(rest, pinch, onCrank), fish, Smooth01(_leftOnFish));
         Apply(ik.Left, left, 0f);
         ik.Left.ThumbAlong = null;
-        ik.Left.ThumbOn = null;
+        // On the crank the knob is held between the thumb and the index finger: the thumb's tip on top of it.
+        ik.Left.ThumbOn = onCrank > 0.5f && _leftOnFish < 0.5f
+            ? _rig.ToGlobal(RodRig.KnobAt(_crank) + new Vector3(-0.004f, 0f, 0.0125f))
+            : null;
         // On the crank the fingers close round the knob and stop on it.
         ik.Left.Obstacles.Clear();
         if (_leftOnReel > 0.5f && _leftOnFish < 0.5f)

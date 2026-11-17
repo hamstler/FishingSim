@@ -19,7 +19,11 @@ public static class PropAsset
 {
     private const int Version = 1;
 
-    private sealed record Model(List<(Mesh Mesh, Transform3D Transform)> Parts, Aabb Bounds);
+    private sealed record Model(List<(Mesh Mesh, Transform3D Transform)> Parts, Aabb Bounds, Dictionary<string, Mesh> Named);
+
+    /// <summary>The model's meshes by their node names (e.g. the player's rod: Handle, Seg0 ..), materials set; null
+    /// when the model is missing or there is no screen.</summary>
+    public static IReadOnlyDictionary<string, Mesh>? Named(string id) => Load(id)?.Named;
 
     private static readonly Dictionary<string, Model?> Cache = new();
 
@@ -155,6 +159,7 @@ public static class PropAsset
             || doc.GenerateScene(state) is not Node3D root)
             return null;
         var parts = new List<(Mesh, Transform3D)>();
+        var named = new Dictionary<string, Mesh>();
         var bounds = new Aabb();
         bool first = true;
         foreach (var node in root.FindChildren("*", "", true, false))
@@ -175,12 +180,13 @@ public static class PropAsset
             }
             var t = GlobalOf(n3, root);
             parts.Add((am, t));
+            named[node.Name] = am;
             var box = t * am.GetAabb();
             bounds = first ? box : bounds.Merge(box);
             first = false;
         }
         root.Free();
-        return parts.Count == 0 ? null : new Model(parts, bounds);
+        return parts.Count == 0 ? null : new Model(parts, bounds, named);
     }
 
     private static Transform3D GlobalOf(Node3D n, Node3D root)
