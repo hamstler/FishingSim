@@ -69,12 +69,15 @@ public partial class RodRig : Node3D
     public const float CrankArm = 0.046f;
 
     /// <summary>The crank knob's centre at a crank angle (rig space): it turns in the plane across the left side.</summary>
-    public static Vector3 KnobAt(float angle) =>
+    public static Vector3 KnobAt(float angle) => KnobOverride ??
         CrankAxis + new Vector3(KnobOut, MathF.Sin(angle) * CrankArm, -MathF.Cos(angle) * CrankArm);
 
     /// <summary>How far the knob stands out to the left of the crank's axis: clear of the reel, so the left hand holds
     /// it between the thumb and the index finger.</summary>
     public const float KnobOut = -0.05f;
+
+    /// <summary>Preview of a modelled reel (FISHSIM_MODEL_REEL=1): its knob stands still here and the hand holds it.</summary>
+    public static Vector3? KnobOverride;
 
     public override void _Ready()
     {
@@ -166,7 +169,7 @@ public partial class RodRig : Node3D
         UseModel();
     }
 
-    private Node3D? _procHandle;
+    private Node3D? _procHandle, _builtReel;
     private readonly List<Node3D> _procSections = new();
     private readonly List<MeshInstance3D> _modelSections = new();
     private bool _quiverOn;
@@ -178,7 +181,14 @@ public partial class RodRig : Node3D
 
     private void UseModel()
     {
-        if (World.Props.PropAsset.Named("meshy_rod_player") is not { } parts || !parts.TryGetValue("Handle", out var handleMesh))
+        bool modelReel = System.Environment.GetEnvironmentVariable("FISHSIM_MODEL_REEL") == "1";
+        if (modelReel && World.Props.PropAsset.Named("meshy_reel") is { } reelParts && reelParts.TryGetValue("Reel", out var reelMesh))
+        {
+            _builtReel!.Visible = false;
+            AddChild(new MeshInstance3D { Name = "ModelReel", Mesh = reelMesh, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+            KnobOverride = new Vector3(-0.1125f, 0.1173f, -0.12f);
+        }
+        if (World.Props.PropAsset.Named(modelReel ? "meshy_rod2_player" : "meshy_rod_player") is not { } parts || !parts.TryGetValue("Handle", out var handleMesh))
             return;
         for (int i = 0; i < _segments.Count; i++)
             if (!parts.ContainsKey($"Seg{i}"))
@@ -339,7 +349,7 @@ public partial class RodRig : Node3D
     /// <summary>The fixed-spool reel under the seat.</summary>
     private void BuildReel(Material body, Material trim, Material metal, Material line, Material knob, Material dark)
     {
-        var reel = new Node3D { Name = "Reel" };
+        var reel = _builtReel = new Node3D { Name = "Reel" };
         AddChild(reel);
         // Foot clamped in the seat and the stem down to the body, leaning a little forward.
         Box(reel, new Vector3(0.011f, 0.056f, 0.0035f), new Vector3(0, SeatCentre, -SeatRadius - 0.0015f), body, 0.0015f);

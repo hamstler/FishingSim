@@ -1,6 +1,7 @@
 """Turns the Meshy spinning rod (assets/models/meshy_spinning_rod.glb) into the player's rod for RodRig.
 
-    python3 -I tools/assets/meshy_rod_split.py [IN.glb] [OUT.glb]
+    python3 -I tools/assets/meshy_rod_split.py [IN.glb] [OUT.glb] [--butt X --seat X --blank X] [--no-reel]
+    python3 -I tools/assets/meshy_rod_split.py --reel IN.glb OUT.glb     (a reel model on its own, see place_reel)
 
 The model lies along X (butt at +X, tip at -X) with its reel hanging at -Y. It is laid into RodRig's space (the rod
 along +Y, the reel side -Z): the butt at y = -0.33, the reel seat at RodRig.SeatCentre (0.1), the blank's start at
@@ -13,14 +14,29 @@ import json, os, struct, sys
 import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "assets", "models", "meshy_spinning_rod.glb")
-DST = sys.argv[2] if len(sys.argv) > 2 else os.path.join(ROOT, "assets", "models", "meshy_rod_player.glb")
+ARGS = [a for a in sys.argv[1:]]
+def _opt(name, default):
+    if name in ARGS:
+        i = ARGS.index(name)
+        v = ARGS[i + 1]
+        del ARGS[i:i + 2]
+        return float(v)
+    return default
+X_BUTT_ARG, X_SEAT_ARG, X_BLANK_ARG = _opt("--butt", 0.951), _opt("--seat", 0.42), _opt("--blank", 0.22)
+NO_REEL = "--no-reel" in ARGS
+if NO_REEL:
+    ARGS.remove("--no-reel")
+REEL_MODE = "--reel" in ARGS
+if REEL_MODE:
+    ARGS.remove("--reel")
+SRC = ARGS[0] if len(ARGS) > 0 else os.path.join(ROOT, "assets", "models", "meshy_spinning_rod.glb")
+DST = ARGS[1] if len(ARGS) > 1 else os.path.join(ROOT, "assets", "models", "meshy_rod_player.glb")
 
 # RodRig's frame.
 BUTT_Y, SEAT_Y, BLANK_START, JOINTS, SEGMENT = -0.33, 0.1, 0.25, 10, 0.3
 GRIP_RADIUS = 0.0148          # RodRig's cork grip
 # The model's landmarks along X (measured): the butt, the reel seat, where the blank leaves the fore grip, the tip.
-X_BUTT, X_SEAT, X_BLANK = 0.951, 0.42, 0.22
+X_BUTT, X_SEAT, X_BLANK = X_BUTT_ARG, X_SEAT_ARG, X_BLANK_ARG
 REEL_X = (0.25, 0.64)         # the reel hangs under the seat here
 
 
@@ -45,7 +61,82 @@ def read(path):
     return j, blob, data
 
 
+def write(j, blob, pieces, dst):
+    """pieces: [(name, positions, normals, uvs, triangle indices)] -> a .glb with the source's material and pictures."""
+    out = bytearray()
+    views, accessors, meshes, nodes = [], [], [], []
+
+    def add(data, target=None):
+        while len(out) % 4:
+            out.append(0)
+        view = {"buffer": 0, "byteOffset": len(out), "byteLength": len(data)}
+        if target:
+            view["target"] = target
+        views.append(view)
+        out.extend(data)
+        return len(views) - 1
+
+    for name, pos, nor, uv, ind in pieces:
+        pos, nor, uv, ind = pos.astype("<f4"), nor.astype("<f4"), uv.astype("<f4"), ind.reshape(-1).astype("<u4")
+        a0 = len(accessors)
+        accessors.append({"bufferView": add(pos.tobytes(), 34962), "componentType": 5126, "count": len(pos), "type": "VEC3",
+                          "min": pos.min(0).tolist(), "max": pos.max(0).tolist()})
+        accessors.append({"bufferView": add(nor.tobytes(), 34962), "componentType": 5126, "count": len(nor), "type": "VEC3"})
+        accessors.append({"bufferView": add(uv.tobytes(), 34962), "componentType": 5126, "count": len(uv), "type": "VEC2"})
+        accessors.append({"bufferView": add(ind.tobytes(), 34963), "componentType": 5125, "count": len(ind), "type": "SCALAR"})
+        meshes.append({"name": name, "primitives": [{"attributes": {"POSITION": a0, "NORMAL": a0 + 1, "TEXCOORD_0": a0 + 2},
+                                                     "indices": a0 + 3, "material": 0}]})
+        nodes.append({"name": name, "mesh": len(meshes) - 1})
+    images = []
+    for im in j["images"]:
+        v = j["bufferViews"][im["bufferView"]]
+        o = v.get("byteOffset", 0)
+        images.append({"bufferView": add(blob[o:o + v["byteLength"]]), "mimeType": im["mimeType"], "name": im.get("name", "")})
+    doc = {
+        "asset": {"version": "2.0", "generator": "FishingSim meshy_rod_split.py"},
+        "scene": 0, "scenes": [{"nodes": list(range(len(nodes)))}], "nodes": nodes, "meshes": meshes,
+        "materials": j["materials"], "textures": j["textures"], "images": images, "samplers": j.get("samplers", [{}]),
+        "accessors": accessors, "bufferViews": views, "buffers": [{"byteLength": len(out)}],
+        "extensionsUsed": j.get("extensionsUsed", []), "extensionsRequired": j.get("extensionsRequired", []),
+    }
+    while len(out) % 4:
+        out.append(0)
+    js = json.dumps(doc, separators=(",", ":")).encode()
+    js += b" " * (-len(js) % 4)
+    glb = b"glTF" + struct.pack("<II", 2, 28 + len(js) + len(out)) + struct.pack("<I", len(js)) + b"JSON" + js \
+        + struct.pack("<I", len(out)) + b"BIN\0" + bytes(out)
+    open(dst, "wb").write(glb)
+    print(f"{dst}: {len(glb) / 1e6:.1f} MB")
+
+
+# RodRig's reel seat: the foot's top touches the seat's underside here (rig space), and the built reel's spool axis
+# lies this far below it.
+SEAT_RADIUS, FOOT_TO_SPOOL = 0.0125, 0.0755
+
+
+def place_reel():
+    """A Meshy reel (foot on top at +Y, the rod along Z, the spool's front at +Z, the crank at +X) into RodRig's space:
+    the foot's top under the reel seat, the spool's front towards the tip, the crank on the left; scaled so the spool's
+    axis lies as far under the foot as the built reel's. Prints where the crank's knob ends up."""
+    j, blob, d = read(SRC)
+    P, N, UV, T = d["P"], d["N"], d["UV"], d["I"]
+    top = P[:, 1].max()
+    foot = P[P[:, 1] > top - 0.05]
+    fx, fz = foot[:, 0].mean(), foot[:, 2].mean()
+    front = P[P[:, 2] > P[:, 2].max() - 0.05]                 # the spool's front (drag knob): the spool's axis
+    spool_y = front[:, 1].mean()
+    k = FOOT_TO_SPOOL / (top - spool_y)
+    rig = np.stack([-(P[:, 0] - fx), P[:, 2] - fz, P[:, 1] - top], axis=1) * k + np.array([0.0, SEAT_Y, -SEAT_RADIUS])
+    n = np.stack([-N[:, 0], N[:, 2], N[:, 1]], axis=1)
+    knob = rig[P[:, 0] > P[:, 0].max() - 0.12].mean(axis=0)
+    print(f"scale {k:.4f}; knob at rig {knob.round(4)}")
+    write(j, blob, [("Reel", rig, n, UV, T)], DST)
+
+
 def main():
+    if REEL_MODE:
+        place_reel()
+        return
     j, blob, d = read(SRC)
     P, N, UV, T = d["P"], d["N"], d["UV"], d["I"]
     # The blank's axis (y, z as a line in x), fitted on the bare blank between the guides.
@@ -65,7 +156,7 @@ def main():
     print(f"axis y {fy}, z {fz}; handle radius {r_handle:.4f} -> radial scale {kr:.3f}")
 
     # Cut the reel away: triangles with every corner below the handle's surface over the reel's span.
-    below = (P[:, 1] - ay < -r_handle * 1.08) & (P[:, 0] > REEL_X[0]) & (P[:, 0] < REEL_X[1])
+    below = (P[:, 1] - ay < -r_handle * 1.08) & (P[:, 0] > REEL_X[0]) & (P[:, 0] < REEL_X[1]) & (not NO_REEL)
     keep = ~below[T].all(axis=1)
     T = T[keep]
     print(f"reel cut: {int((~keep).sum())} triangles")
@@ -87,62 +178,17 @@ def main():
     mid_y = rig[T].mean(axis=1)[:, 1]
     piece = np.where(mid_y < BLANK_START, -1, np.clip(((mid_y - BLANK_START) // SEGMENT).astype(int), 0, JOINTS - 1))
 
-    out = bytearray()
-    views, accessors, meshes, nodes = [], [], [], []
-
-    def add(data, target=None):
-        while len(out) % 4:
-            out.append(0)
-        view = {"buffer": 0, "byteOffset": len(out), "byteLength": len(data)}
-        if target:
-            view["target"] = target
-        views.append(view)
-        out.extend(data)
-        return len(views) - 1
-
+    pieces = []
     for p in range(-1, JOINTS):
         tris = T[piece == p]
         if len(tris) == 0:
             continue
         used, inverse = np.unique(tris, return_inverse=True)
         origin = np.array([0.0, 0.0, 0.0]) if p < 0 else np.array([0.0, BLANK_START + p * SEGMENT, 0.0])
-        pos = (rig[used] - origin).astype("<f4")
-        nor = n[used].astype("<f4")
-        uv = UV[used].astype("<f4")
-        ind = inverse.reshape(-1).astype("<u4")
-        a0 = len(accessors)
-        accessors.append({"bufferView": add(pos.tobytes(), 34962), "componentType": 5126, "count": len(pos), "type": "VEC3",
-                          "min": pos.min(0).tolist(), "max": pos.max(0).tolist()})
-        accessors.append({"bufferView": add(nor.tobytes(), 34962), "componentType": 5126, "count": len(nor), "type": "VEC3"})
-        accessors.append({"bufferView": add(uv.tobytes(), 34962), "componentType": 5126, "count": len(uv), "type": "VEC2"})
-        accessors.append({"bufferView": add(ind.tobytes(), 34963), "componentType": 5125, "count": len(ind), "type": "SCALAR"})
         name = "Handle" if p < 0 else f"Seg{p}"
-        meshes.append({"name": name, "primitives": [{"attributes": {"POSITION": a0, "NORMAL": a0 + 1, "TEXCOORD_0": a0 + 2},
-                                                     "indices": a0 + 3, "material": 0}]})
-        nodes.append({"name": name, "mesh": len(meshes) - 1})
-        print(f"{name}: {len(ind) // 3} triangles")
-
-    # The pictures as they were (WebP), and the material.
-    images = []
-    for im in j["images"]:
-        v = j["bufferViews"][im["bufferView"]]
-        o = v.get("byteOffset", 0)
-        images.append({"bufferView": add(blob[o:o + v["byteLength"]]), "mimeType": im["mimeType"], "name": im.get("name", "")})
-    doc = {
-        "asset": {"version": "2.0", "generator": "FishingSim meshy_rod_split.py"},
-        "scene": 0, "scenes": [{"nodes": list(range(len(nodes)))}], "nodes": nodes, "meshes": meshes,
-        "materials": j["materials"], "textures": j["textures"], "images": images, "samplers": j.get("samplers", [{}]),
-        "accessors": accessors, "bufferViews": views, "buffers": [{"byteLength": len(out)}],
-        "extensionsUsed": j.get("extensionsUsed", []), "extensionsRequired": j.get("extensionsRequired", []),
-    }
-    while len(out) % 4:
-        out.append(0)
-    js = json.dumps(doc, separators=(",", ":")).encode()
-    js += b" " * (-len(js) % 4)
-    glb = b"glTF" + struct.pack("<II", 2, 28 + len(js) + len(out)) + struct.pack("<I", len(js)) + b"JSON" + js \
-        + struct.pack("<I", len(out)) + b"BIN\0" + bytes(out)
-    open(DST, "wb").write(glb)
-    print(f"{DST}: {len(glb) / 1e6:.1f} MB")
+        pieces.append((name, rig[used] - origin, n[used], UV[used], inverse.reshape(-1, 3)))
+        print(f"{name}: {len(tris)} triangles")
+    write(j, blob, pieces, DST)
 
 
 if __name__ == "__main__":
