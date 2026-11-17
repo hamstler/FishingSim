@@ -85,7 +85,13 @@ public partial class RodRig : Node3D
     private static readonly Vector3 ModelCrankHub = new(-0.045f, 0.089f, -0.0965f);
     private static readonly Vector3 ModelRotorPivot = new(-0.0023f, 0.115f, -0.0879f);
     private const float ModelCrankArm = 0.0364f, ModelKnobOut = -0.0543f;
-    private Node3D? _modelRotor, _modelCrank;
+    private static readonly Vector3 ModelBailPivot = new(0.0108f, 0.0414f, 0.0487f);      // rotor space
+    private static readonly Vector3 ModelBailAxis = new Vector3(-0.6952f, 0.0059f, -0.7187f).Normalized();
+    private Node3D? _modelRotor, _modelCrank, _modelBail;
+
+    /// <summary>Screenshots: FISHSIM_BAIL=0..1 holds the bail at least this far open.</summary>
+    private static readonly float BailShot = float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_BAIL"),
+        System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var b) ? b : 0f;
 
     public override void _Ready()
     {
@@ -210,13 +216,15 @@ public partial class RodRig : Node3D
     }
 
     /// <summary>The user's reel in place of the built one: the body stands, the rotor with the bail turns about the
-    /// spool's axis and the crank about its hub (SetCrank); the hands follow its knob (KnobAt). The bail stays closed.</summary>
+    /// spool's axis and the crank about its hub (SetCrank), the bail's wire swings over about its pivots (SetBail);
+    /// the hands follow its knob (KnobAt).</summary>
     public bool ModelledReel { get; private set; }
 
     private void UseModelReel()
     {
         if (World.Props.PropAsset.Named("meshy_reel") is not { } parts || !parts.TryGetValue("Body", out var body)
-            || !parts.TryGetValue("Rotor", out var rotor) || !parts.TryGetValue("Crank", out var crank))
+            || !parts.TryGetValue("Rotor", out var rotor) || !parts.TryGetValue("Crank", out var crank)
+            || !parts.TryGetValue("Bail", out var bail))
             return;
         ModelledReel = true;
         _builtReel!.Visible = false;
@@ -225,6 +233,9 @@ public partial class RodRig : Node3D
         _modelRotor = new Node3D { Name = "ModelRotor", Position = ModelRotorPivot };
         _modelRotor.AddChild(new MeshInstance3D { Mesh = rotor, CastShadow = off });
         AddChild(_modelRotor);
+        _modelBail = new Node3D { Name = "ModelBail", Position = ModelBailPivot };
+        _modelBail.AddChild(new MeshInstance3D { Mesh = bail, CastShadow = off });
+        _modelRotor.AddChild(_modelBail);
         _modelCrank = new Node3D { Name = "ModelCrank", Position = ModelCrankHub };
         _modelCrank.AddChild(new MeshInstance3D { Mesh = crank, CastShadow = off });
         AddChild(_modelCrank);
@@ -475,8 +486,11 @@ public partial class RodRig : Node3D
     /// <summary>Opens (1) or closes (0) the bail: open for the cast, flipped closed when the reel turns again.</summary>
     public void SetBail(float open)
     {
+        open = Math.Clamp(MathF.Max(open, BailShot), 0f, 1f);
         if (_bail != null)
-            _bail.Rotation = new Vector3(Math.Clamp(open, 0f, 1f) * 2.7f, 0f, 0f);
+            _bail.Rotation = new Vector3(open * 2.7f, 0f, 0f);
+        if (_modelBail != null)
+            _modelBail.Basis = new Basis(ModelBailAxis, open * 2.7f);
     }
 
     /// <summary>Number of bending sections of the blank (matches <see cref="Core.Physics.RodBendModel"/>).</summary>

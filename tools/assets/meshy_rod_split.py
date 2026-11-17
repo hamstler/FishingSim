@@ -139,7 +139,8 @@ CRANK_LEFT, CRANK_FRONT = -0.042, 0.14
 CRANK_HUB = np.array([-0.045, 0.089, -0.0965])
 SPOOL_AXIS_XZ = np.array([-0.0023, -0.0879])
 ROTOR_BACK, SPOOL_BACK, ROTOR_RADIUS, SPOOL_RADIUS = 0.115, 0.146, 0.037, 0.0315
-ARMS_BACK, STEM_FRONT = 0.106, 0.134          # the rotor's two arms reach back past the cup; the foot's stem ends here
+ARMS_BACK, STEM_FRONT = 0.106, 0.134
+BAIL_FRONT, BAIL_RADIUS, BAIL_FROM, BAIL_TO = 0.158, 0.044, 75.0, 222.0          # the rotor's two arms reach back past the cup; the foot's stem ends here
 
 
 def split_reel(rig, n, UV, T):
@@ -163,9 +164,26 @@ def split_reel(rig, n, UV, T):
     arm = np.hypot(rel[1], rel[2])
     print(f"crank hub {CRANK_HUB}, knob out {rel[0]:.4f}, arm {arm:.4f}, drawn at {np.degrees(angle0):.1f} deg")
     rotor_pivot = np.array([SPOOL_AXIS_XZ[0], ROTOR_BACK, SPOOL_AXIS_XZ[1]])
+    # The bail's wire: the half ring round the back of the spool from the roller's arm (~75 deg) over the crank side
+    # to the other arm (~-140 deg). It swings over about the line through its two ends (the pivots).
+    around = np.where(up < 0, up + 360, up)
+    bail = rotor & (c[:, 1] >= SPOOL_BACK) & (c[:, 1] < BAIL_FRONT) & (r >= BAIL_RADIUS) \
+        & (around >= BAIL_FROM) & (around <= BAIL_TO)
+    rotor &= ~bail
+    bv = c[bail]
+    ba = around[bail]
+    lo, hi = np.percentile(ba, 4), np.percentile(ba, 96)
+    end_a, end_b = bv[ba <= lo].mean(axis=0), bv[ba >= hi].mean(axis=0)
+    axis = (end_b - end_a) / np.linalg.norm(end_b - end_a)
+    middle = bv[np.abs(ba - (lo + hi) / 2) < 10].mean(axis=0) - end_a
+    middle -= axis * middle.dot(axis)
+    sign = 1.0 if np.cross(axis, middle)[1] > 0 else -1.0       # a positive quarter turn would carry it forwards
+    print(f"bail pivot {end_a.round(4)} (rotor local {(end_a - rotor_pivot).round(4)}), axis {axis.round(4)}, "
+          f"opens by {sign:+.0f} x angle; {bail.sum()} triangles")
     pieces = []
-    for name, mask, origin, turn in (("Body", ~crank & ~rotor, np.zeros(3), False),
+    for name, mask, origin, turn in (("Body", ~crank & ~rotor & ~bail, np.zeros(3), False),
                                      ("Rotor", rotor, rotor_pivot, False),
+                                     ("Bail", bail, end_a, False),
                                      ("Crank", crank, CRANK_HUB, True)):
         tris = T[mask]
         used, inverse = np.unique(tris, return_inverse=True)
