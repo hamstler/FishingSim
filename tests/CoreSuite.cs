@@ -42,8 +42,9 @@ public sealed class CoreSuite : ITestSuite
         t.Check(pike.WeatherMultiplier("rain") == 1.3f && pike.WeatherMultiplier("hail") == 1f, "weather multiplier lookup with default");
         t.Check(lake.AbundanceOf("Karp") == 0.6f && lake.AbundanceOf("Pstrąg potokowy") == 0f, "location abundance lookup");
         t.Check(lake.OutlineRx == 120f && lake.HolePos == new Vector2(12, -40), "location numbers and vectors");
-        var teleskop = GD.Load<RodData>("res://data/tackle/rods/teleskop.tres");
-        t.Check(teleskop.ItemId == "teleskop" && teleskop.Price == 120 && teleskop.RequiredLevel == 2, "tackle id comes from the file name");
+        var jesion = GD.Load<RodData>("res://data/tackle/rods/s_jesion_300.tres");
+        t.Check(jesion.ItemId == "s_jesion_300" && jesion.Price == 70 && jesion.RequiredLevel == 1 && jesion.Model == "rods/float_ostoja"
+                && System.MathF.Abs(jesion.Length - 3f) < 0.001f, "tackle id comes from the file name; a series rod names its model and length");
 
         t.Section("bite model");
         var worm = new BiteContext("worm", 5f, 3f, lake, DayPeriod.Day, Weather.Clear);

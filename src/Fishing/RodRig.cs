@@ -244,15 +244,25 @@ public partial class RodRig : Node3D
     /// <summary>One section's length for this rod.</summary>
     public float SectionLength => (RodLength + ButtY - BlankStart) / Joints;
 
+    /// <summary>Takes a replaced model's node out of the tree at once (a queued free left it there, holding its name,
+    /// till the frame's end: the new one got renamed and IconStudio missed it) and frees it.</summary>
+    private static void Drop(Node? node)
+    {
+        if (node == null)
+            return;
+        node.GetParent()?.RemoveChild(node);
+        node.QueueFree();
+    }
+
     private void ShowRodModel(string id)
     {
         if (id == _rodModelId)
             return;
         _rodModelId = id;
-        _modelHandle?.QueueFree();
+        Drop(_modelHandle);
         _modelHandle = null;
         foreach (var piece in _modelSections)
-            piece.QueueFree();
+            Drop(piece);
         _modelSections.Clear();
         Modelled = false;
         _procHandle!.Visible = true;
@@ -303,9 +313,9 @@ public partial class RodRig : Node3D
         if (id == _reelModelId)
             return;
         _reelModelId = id;
-        _modelReelBody?.QueueFree();
-        _modelRotor?.QueueFree();
-        _modelCrank?.QueueFree();
+        Drop(_modelReelBody);
+        Drop(_modelRotor);
+        Drop(_modelCrank);
         _modelReelBody = _modelRotor = _modelCrank = _modelBail = null;
         ModelledReel = false;
         _builtReel!.Visible = true;

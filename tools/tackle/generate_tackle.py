@@ -492,21 +492,11 @@ Model = {q(se[3])}
     return ids
 
 
-# The hand-made rods and reels get their model (and the rods their length, from the name).
-KEEP_RODS = {
-    "junior": ("rods/float_ostoja", 2.0), "teleskop": ("rods/float_ostoja", 2.4), "karpiowka": ("rods/carp_kaminari", 3.6),
-    "wierzbowa_splawikowa": ("rods/float_fjordline", 3.6), "cisowy_spinning": ("rods/spin_kaminari", 2.1),
-    "grabowy_gruntowy": ("rods/feeder_borealis", 2.7), "trzcinowa_odleglosciowa": ("rods/float_borealis", 4.2),
-    "jesionowy_spinning": ("rods/spin_kaminari", 2.4), "sumowy_kij": ("rods/feeder_ironwood", 2.7),
-    "wedka_mistrza": ("rods/float_borealis", 4.0), "ostoja_picker": ("rods/feeder_ostoja", 2.7),
-    "kaminari_ul_trout": ("rods/spin_hokuto", 1.8), "kaminari_jig": ("rods/spin_kaminari", 2.7),
-    "borealis_heavy_feeder": ("rods/feeder_borealis", 3.9), "ironwood_musky": ("rods/spin_ironwood", 2.4),
-}
+# The hand-made reels kept in the shop get their model (the hand-made rods and the other reels were retired:
+# Profile.RetiredRods/RetiredReels).
 KEEP_REELS = {
-    "mlynek1000": "reels/small_hokuto", "mlynek3000": "reels/medium_hokuto", "freerunner": "reels/baitrunner_kaminari",
-    "hokuto_kaiten2500": "reels/small_hokuto", "fjordline_freespool6000": "reels/baitrunner_fjordline",
-    "mosiezny_hamulec": "reels/small_fjordline", "orzechowy_lekki": "reels/small_fjordline",
-    "szpula_lipowa": "reels/small_fjordline", "beben_sumowy": "reels/big_ironwood",
+    "mlynek1000": "reels/small_hokuto", "fjordline_freespool6000": "reels/baitrunner_fjordline",
+    "beben_sumowy": "reels/big_ironwood",
 }
 #   id, name, model, drag max, speed, capacity, price, level, body, trim, description
 NEW_REELS = [
@@ -544,8 +534,6 @@ Model = {q(r[2])}
             f.write(body)
     for ident, model in KEEP_REELS.items():
         patch(os.path.join(REELS, ident + ".tres"), dict(Model=q(model)))
-    for ident, (model, length) in KEEP_RODS.items():
-        patch(os.path.join(RODS, ident + ".tres"), dict(Model=q(model), Length=f"{length:g}"))
     return ids
 
 

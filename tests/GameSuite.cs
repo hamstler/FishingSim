@@ -98,10 +98,10 @@ public sealed class GameSuite : ITestSuite
         int RodIndex(string id) => loadout.Items(TackleSlot.Rod).ToList().FindIndex(i => i.ItemId == id);
         int BaitIndex(string id) => loadout.Items(TackleSlot.Bait).ToList().FindIndex(i => i.ItemId == id);
         int rodBefore = loadout.Index[(int)TackleSlot.Rod], baitBefore = loadout.Index[(int)TackleSlot.Bait];
-        profile.Owned["rod"].Add("cisowy_spinning");
-        profile.Owned["rod"].Add("grabowy_gruntowy");
+        profile.Owned["rod"].Add("s_raiden_210");
+        profile.Owned["rod"].Add("s_nordlys_300");
         loadout.BaitCounts["blystka_obrotowa"] = 1;
-        loadout.Index[(int)TackleSlot.Rod] = RodIndex("cisowy_spinning");
+        loadout.Index[(int)TackleSlot.Rod] = RodIndex("s_raiden_210");
         loadout.Index[(int)TackleSlot.Bait] = BaitIndex("blystka_obrotowa");
         rod.ApplyTackle();
         rod.DevInstantBite = false;
@@ -233,7 +233,7 @@ public sealed class GameSuite : ITestSuite
 
         // Bottom: the feeder, the baited spot, the rod rest.
         loadout.BaitCounts["worm"] = 10;
-        loadout.Index[(int)TackleSlot.Rod] = RodIndex("grabowy_gruntowy");
+        loadout.Index[(int)TackleSlot.Rod] = RodIndex("s_nordlys_300");
         loadout.Index[(int)TackleSlot.Bait] = BaitIndex("worm");
         rod.ApplyTackle();
         t.Check(rod.Method == FishingSim.Core.Methods.FishingMethod.Bottom, "bait on a bottom rod lies on the bottom");
@@ -505,7 +505,7 @@ public sealed class GameSuite : ITestSuite
         rod.ResetToIdle();
         rod.DevSpeciesIndex = -1;
         int Ix(TackleLoadout lo, TackleSlot slot, string id) => lo.Items(slot).ToList().FindIndex(i => i.ItemId == id);
-        foreach (var (kind, id) in new[] { ("rod", "teleskop"), ("rod", "karpiowka"), ("reel", "mlynek3000"), ("reel", "freerunner") })
+        foreach (var (kind, id) in new[] { ("rod", "s_jesion_300"), ("rod", "s_koi_360"), ("reel", "r_hokuto_kaiten4000"), ("reel", "r_kaminari_longcast5000") })
             if (!profile.Owned[kind].Contains(id))
                 profile.Owned[kind].Add(id);
         profile.BaitCounts["worm"] = 40;
@@ -514,19 +514,19 @@ public sealed class GameSuite : ITestSuite
         rod2.Loadout.Index[(int)TackleSlot.Rod] = Ix(rod2.Loadout, TackleSlot.Rod, loadout.Rod.ItemId);
         rod2.Loadout.SyncToProfile();
         t.Check(!rod2.Loadout.Ready && !rods.Active.Equals(rod2), "a second rod needs a rod and a reel of its own (not the first rod's)");
-        rod2.Loadout.Index[(int)TackleSlot.Rod] = Ix(rod2.Loadout, TackleSlot.Rod, "teleskop");
-        rod2.Loadout.Index[(int)TackleSlot.Reel] = Ix(rod2.Loadout, TackleSlot.Reel, "mlynek3000");
+        rod2.Loadout.Index[(int)TackleSlot.Rod] = Ix(rod2.Loadout, TackleSlot.Rod, "s_jesion_300");
+        rod2.Loadout.Index[(int)TackleSlot.Reel] = Ix(rod2.Loadout, TackleSlot.Reel, "r_hokuto_kaiten4000");
         rod2.Loadout.Index[(int)TackleSlot.Bait] = Ix(rod2.Loadout, TackleSlot.Bait, "worm");
         rod2.Loadout.SyncToProfile();
         rod2.ApplyTackle();
-        rod3.Loadout.Index[(int)TackleSlot.Rod] = Ix(rod3.Loadout, TackleSlot.Rod, "karpiowka");
-        rod3.Loadout.Index[(int)TackleSlot.Reel] = Ix(rod3.Loadout, TackleSlot.Reel, "freerunner");
+        rod3.Loadout.Index[(int)TackleSlot.Rod] = Ix(rod3.Loadout, TackleSlot.Rod, "s_koi_360");
+        rod3.Loadout.Index[(int)TackleSlot.Reel] = Ix(rod3.Loadout, TackleSlot.Reel, "r_kaminari_longcast5000");
         rod3.Loadout.Index[(int)TackleSlot.Bait] = Ix(rod3.Loadout, TackleSlot.Bait, "worm");
         rod3.Loadout.SyncToProfile();
         rod3.ApplyTackle();
         var saved3 = ProfileSerializer.FromJson(ProfileSerializer.ToJson(profile).ToJsonString());
-        t.Check(rod2.Loadout.Ready && rod3.Loadout.Ready && saved3.EquippedFor(1).GetValueOrDefault("rod") == "teleskop"
-                && saved3.EquippedFor(2).GetValueOrDefault("reel") == "freerunner",
+        t.Check(rod2.Loadout.Ready && rod3.Loadout.Ready && saved3.EquippedFor(1).GetValueOrDefault("rod") == "s_jesion_300"
+                && saved3.EquippedFor(2).GetValueOrDefault("reel") == "r_kaminari_longcast5000",
             "rods 2 and 3 get their own rod and reel, and the profile keeps them");
         loadout.Index[(int)TackleSlot.Bait] = Ix(loadout, TackleSlot.Bait, "worm");
         rod.ApplyTackle();
@@ -625,10 +625,11 @@ public sealed class GameSuite : ITestSuite
         t.Check(takers.Count > 0 && takers.All(c => c.Species.AffinityFor("livebait") > 0f) && takers.Any(c => c.Species.SpeciesName == "Szczupak"),
             $"live bait only attracts predators ({string.Join(", ", takers.Select(c => c.Species.SpeciesName))})");
         loadout.Index[(int)TackleSlot.Bait] = 0;
-        loadout.Index[(int)TackleSlot.Rod] = 0;
+        int RodAt(string id) => Array.FindIndex(loadout.Items(TackleSlot.Rod).ToArray(), r => r.ItemId == id);
+        loadout.Index[(int)TackleSlot.Rod] = RodAt("s_jesion_240");
         rod.ApplyTackle();
         float junior = rod.EstimateCastRange();
-        loadout.Index[(int)TackleSlot.Rod] = 2;
+        loadout.Index[(int)TackleSlot.Rod] = RodAt("s_fjell_match_450");
         rod.ApplyTackle();
         t.Check(junior is > 15f and < 24f && rod.EstimateCastRange() > junior * 1.2f, $"cast range grows with the rod (~{junior:0} m -> ~{rod.EstimateCastRange():0} m)");
         loadout.Index[(int)TackleSlot.Rod] = 0;
@@ -757,7 +758,7 @@ public sealed class GameSuite : ITestSuite
         shop.OpenFor(ShopKind.Tackle);
         t.Check(shop.FreeKitButton.Visible && !shop.FreeKitButton.Disabled, "a broke angler may take the free kit");
         shop.FreeKitButton.EmitSignal(BaseButton.SignalName.Pressed);
-        t.Check(profile.Owns(TackleSlot.Rod, "junior") && loadout.Ready && main.Player.Rig.Visible && !shop.FreeKitButton.Visible,
+        t.Check(profile.Owns(TackleSlot.Rod, "s_jesion_240") && loadout.Ready && main.Player.Rig.Visible && !shop.FreeKitButton.Visible,
             "the free kit puts a rod back in the hand");
         shop.Close();
 
