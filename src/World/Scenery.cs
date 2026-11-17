@@ -1424,7 +1424,7 @@ public partial class Scenery : Node3D
         return true;
     }
 
-    private readonly List<(Props.Npc Angler, MeshInstance3D Float)> _anglerParts = new();
+    private readonly List<(Props.Npc? Angler, Node3D? Rod, MeshInstance3D Float)> _anglerParts = new();
 
     /// <summary>
     /// A local angler gets a bite and lands a fish: the float goes under, the angler gets up to land it, and a little
@@ -1434,13 +1434,30 @@ public partial class Scenery : Node3D
     {
         if (index < 0 || index >= _anglerParts.Count)
             return;
-        var (angler, bob) = _anglerParts[index];
-        if (!IsInstanceValid(angler) || !IsInstanceValid(bob))
+        var (angler, rod, bob) = _anglerParts[index];
+        if (!IsInstanceValid(bob))
             return;
         var rest = bob.Position;
         var tween = bob.CreateTween();
         tween.TweenProperty(bob, "position", rest + new Vector3(0f, -0.25f, 0f), 0.35f);
-        tween.TweenCallback(Callable.From(() => { bob.Visible = false; angler.PlayGesture("Interact"); }));
+        tween.TweenCallback(Callable.From(() =>
+        {
+            bob.Visible = false;
+            if (angler != null && IsInstanceValid(angler))
+                angler.PlayGesture("Interact");
+            // A standing angler (a statue model) strikes: the rod swings up and comes back down.
+            if (rod != null && IsInstanceValid(rod))
+            {
+                var held = rod.Transform;
+                var up = new Transform3D(new Basis(Vector3.Right, -Mathf.DegToRad(28f)), Vector3.Zero);
+                var hands = rod.GetMeta("hands", Vector3.Zero).AsVector3();
+                var raised = new Transform3D(Basis.Identity, hands) * up * new Transform3D(Basis.Identity, -hands) * held;
+                var swing = rod.CreateTween();
+                swing.TweenProperty(rod, "transform", raised, 0.25f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
+                swing.TweenInterval(4f);
+                swing.TweenProperty(rod, "transform", held, 1.2f).SetTrans(Tween.TransitionType.Sine);
+            }
+        }));
         tween.TweenInterval(6f);
         tween.TweenCallback(Callable.From(() => { bob.Position = rest; bob.Visible = true; }));
         AnglerCaught?.Invoke(index);
@@ -1448,6 +1465,43 @@ public partial class Scenery : Node3D
 
     /// <summary>A local angler landed a fish (for the sound and tests).</summary>
     public event Action<int>? AnglerCaught;
+
+    /// <summary>The Meshy fisherman's hands (model units: feet at y = 0, facing +Z) and the rod's grip on its reel seat.</summary>
+    private static readonly Vector3 FishermanHands = new(0.02f, 1.087f, 0.244f);
+    private const float FishermanModelHeight = 1.904f, RodModelLength = 1.904f, RodGripX = 0.38f, RodBlankY = 0.13f, RodBottomY = -0.162f;
+
+    /// <summary>
+    /// The standing angler (assets/models/meshy_fisherman.glb, a posed statue: the user's Meshy model) holding the
+    /// Meshy spinning rod (meshy_spinning_rod.glb) by its reel seat, the tip out over the water rising 25 degrees.
+    /// Returns the rod (for its strike), or null without the models or a screen (the sitting angler stands in).
+    /// </summary>
+    private static Node3D? StandingAngler(Node3D root)
+    {
+        float height = 1.8f;
+        var man = Props.PropAsset.Create("meshy_fisherman", height);
+        if (man == null)
+            return null;
+        float rodLength = 1.7f, k = rodLength / RodModelLength;     // 30 % under the first 2.4 m (the user found it too big)
+        var rod = Props.PropAsset.Create("meshy_spinning_rod", scale: k);
+        if (rod == null)
+        {
+            man.Free();
+            return null;
+        }
+        root.AddChild(man);
+        // The rod's model lies along X (butt at +X, tip at -X) with the reel hanging at -Y; turned so the tip points
+        // at the water (+Z) rising 25 degrees, its reel seat in his hands.
+        var hands = FishermanHands * (height / FishermanModelHeight);
+        var tipWay = new Vector3(0f, MathF.Sin(Mathf.DegToRad(25f)), MathF.Cos(Mathf.DegToRad(25f)));
+        var x = -tipWay;
+        var y = (Vector3.Up - tipWay * Vector3.Up.Dot(tipWay)).Normalized();
+        var basis = new Basis(x, y, x.Cross(y));
+        var grip = new Vector3(RodGripX * k, (RodBlankY - RodBottomY) * k, 0f);   // where PropAsset puts the seat
+        rod.Transform = new Transform3D(basis, hands - basis * grip);
+        rod.SetMeta("hands", hands);
+        root.AddChild(rod);
+        return rod;
+    }
 
     private void BuildAnglers(LocationData loc)
     {
@@ -1501,6 +1555,27 @@ public partial class Scenery : Node3D
             float h = _lake.HeightAt(loc, seat.X, seat.Y);
             var root = new Node3D { Name = "Angler", Position = new Vector3(seat.X, h, seat.Y) };
             root.Rotation = new Vector3(0f, MathF.Atan2(toWater.X, toWater.Y), 0f);
+            // The angler from the user's Meshy models: a man standing on the bank with the spinning rod in his hands.
+            if (StandingAngler(root) is { } standingRod)
+            {
+                var standingBob = new MeshInstance3D
+                {
+                    Mesh = new CapsuleMesh { Radius = 0.025f, Height = 0.16f, RadialSegments = 8, Rings = 2 },
+                    MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.9f, 0.18f, 0.12f), Roughness = 0.5f },
+                    Position = new Vector3(floatAt.X, 0.03f, floatAt.Y),
+                };
+                AddChild(standingBob);
+                Track(standingBob);
+                AddChild(root);
+                Track(root);
+                Prop(root, 160f);
+                _anglerParts.Add((null, standingRod, standingBob));
+                Solids.BoxIn(root.Transform, new Vector3(0f, 0.9f, 0f), new Vector3(0.55f, 1.8f, 0.45f));
+                _reserved.Add((seat, 3.5f));
+                Anglers.Add((root.Position, new Vector3(floatAt.X, 0f, floatAt.Y)));
+                Count("angler");
+                continue;
+            }
             var angler = Props.People.Create(Props.Role.Fisherman, 60 + Anglers.Count, "Sitting_Idle_Loop", new[] { "Sitting_Talking_Loop" });
             // The log lies across, as thick as his seat is high; he sits with his hips over its axis, facing the water.
             var log = Props.CampProps.SeatLog(1.1f, Anglers.Count + 11, angler.SeatLogRadius, even: true);
@@ -1535,7 +1610,7 @@ public partial class Scenery : Node3D
             AddChild(root);
             Track(root);
             Prop(root, 160f);
-            _anglerParts.Add((angler, bob));
+            _anglerParts.Add((angler, null, bob));
             Solids.BoxIn(root.Transform, new Vector3(0f, 0.25f, 0f), new Vector3(1.1f, 0.5f, 0.5f));
             _reserved.Add((seat, 3.5f));
             Anglers.Add((root.Position, new Vector3(floatAt.X, 0f, floatAt.Y)));
