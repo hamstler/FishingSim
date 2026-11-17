@@ -318,12 +318,12 @@ public partial class FirstPersonBody : Node3D
             _crank -= dt * 9f;     // seen from the left: over the top, forwards and down (anticlockwise), as a reel winds
         _rig.SetCrank(_crank);
         // The crank's knob is pinched in the fingertips, the hand lying the most natural way round it.
-        // The knob lies in the hand from below: the palm turned up towards the rod, the fingers closing round it from
-        // the front (pointing up the rod), as an angler's hand winds; not laid over it from above, palm down.
+        // The hand turned half round the knob's (horizontal) axis from a palm-up hold: the palm faces down onto the
+        // knob and the fingers point back towards the angler (the user's call, twice: palm up from below was wrong).
         var pinch = BarGrip(_rig.ToGlobal(RodRig.KnobAt(_crank)), rigBasis * Vector3.Right, 0.0085f, false, leftArm, 0f, Mathf.DegToRad(20f),
             0f, 0.97f, 0.078f, true, 0.012f, _rodLeft, dt, ToGlobal(new Vector3(-0.55f, -0.6f, 0.3f)),
-            rigBasis * Vector3.Back, 0.5f,
-            fingersToward: rodAxis, fingersCone: 0.2f);
+            rigBasis * Vector3.Forward, 0.3f,
+            fingersToward: -rodAxis, fingersCone: 0.2f);
         if (System.Environment.GetEnvironmentVariable("FISHSIM_IK_DEBUG") == "1" && Engine.GetProcessFrames() % 60 == 0)
             GD.Print($"PINCH fingers {pinch.Fingers} palm {pinch.Palm} rod {rodAxis} cam fwd {-_camera.GlobalBasis.Z} body right {bodyBasis.X} knob {_rig.ToGlobal(RodRig.KnobAt(_crank))} wrist {pinch.Wrist}");
         var held = HeldFishSource?.Invoke();
