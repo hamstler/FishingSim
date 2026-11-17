@@ -1041,7 +1041,9 @@ public partial class ScreenshotTool : Node
                     rod.ReelOverride = true;
                     for (int i = 0; i < reelFrames; i++)
                         await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-                    rod.ReelOverride = false;
+                    // FISHSIM_REEL_HOLD=1: keep reeling through the shot (the left hand on the crank).
+                    if (System.Environment.GetEnvironmentVariable("FISHSIM_REEL_HOLD") != "1")
+                        rod.ReelOverride = false;
                     GD.Print($"reeled {reelFrames} frames: slack {rod.Slack:0.00} m, float moved {floatAt.DistanceTo(rod.Bobber.GlobalPosition):0.00} m");
                 }
                 // FISHSIM_FP=1: keep the angler's own view.

@@ -152,7 +152,10 @@ void fragment() {
 				break;
 			vec3 scene = view_at(sp.xy, INV_PROJECTION_MATRIX);
 			float gap = length(p) - length(scene);
-			if (gap > 0.0 && gap < t * 0.35 + 0.6) {
+			// Only what stands above the water is mirrored: the screen also holds what lies under the surface (fish,
+			// the bed, the hook rig), and a ray meeting those drew a second, upside-down fish beside the real one.
+			float scene_y = (INV_VIEW_MATRIX * vec4(scene, 1.0)).y;
+			if (gap > 0.0 && gap < t * 0.35 + 0.6 && scene_y > wpos.y - 0.03) {
 				vec2 edge = smoothstep(0.0, 0.08, sp.xy) * (1.0 - smoothstep(0.92, 1.0, sp.xy));
 				hit = edge.x * edge.y * (1.0 - float(i) / float(ssr_steps));
 				reflected = textureLod(screen_tex, sp.xy, 0.0).rgb;

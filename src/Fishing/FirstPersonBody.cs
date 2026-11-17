@@ -318,8 +318,14 @@ public partial class FirstPersonBody : Node3D
             _crank += dt * 9f;
         _rig.SetCrank(_crank);
         // The crank's knob is pinched in the fingertips, the hand lying the most natural way round it.
+        // The knob lies in the hand from below: the palm turned up towards the rod, the fingers closing round it from
+        // the front (pointing up the rod), as an angler's hand winds; not laid over it from above, palm down.
         var pinch = BarGrip(_rig.ToGlobal(RodRig.KnobAt(_crank)), rigBasis * Vector3.Right, 0.0085f, false, leftArm, 0f, Mathf.DegToRad(20f),
-            0f, 0.97f, 0.078f, true, 0.012f, _rodLeft, dt, ToGlobal(new Vector3(-0.55f, -0.6f, 0.3f)));
+            0f, 0.97f, 0.078f, true, 0.012f, _rodLeft, dt, ToGlobal(new Vector3(-0.55f, -0.6f, 0.3f)),
+            rigBasis * Vector3.Back, 0.5f,
+            fingersToward: rodAxis, fingersCone: 0.2f);
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_IK_DEBUG") == "1" && Engine.GetProcessFrames() % 60 == 0)
+            GD.Print($"PINCH fingers {pinch.Fingers} palm {pinch.Palm} rod {rodAxis} cam fwd {-_camera.GlobalBasis.Z} body right {bodyBasis.X} knob {_rig.ToGlobal(RodRig.KnobAt(_crank))} wrist {pinch.Wrist}");
         var held = HeldFishSource?.Invoke();
         _leftOnFish = Mathf.MoveToward(_leftOnFish, held != null ? 1f : 0f, dt * 6f);
         if (held is FishModel fm)
@@ -393,7 +399,7 @@ public partial class FirstPersonBody : Node3D
     /// </summary>
     public static HandTarget BarGrip(Vector3 at, Vector3 axis, float radius, bool right, ArmShape arm, float deltaMin, float deltaMax,
         float slideRange, float grip, float along, bool eitherWay, float barLength, GripState state, float dt, Vector3 pole,
-        Vector3? palmToward = null, float palmCone = -1f)
+        Vector3? palmToward = null, float palmCone = -1f, Vector3? fingersToward = null, float fingersCone = -1f)
     {
         var a0 = axis.Normalized();
         var up = arm.BodyUp;
@@ -431,8 +437,15 @@ public partial class FirstPersonBody : Node3D
                         for (int k = -1; k <= 1; k++)
                         {
                             float slide = k * slideRange;
-                            if (palmToward is Vector3 want && (u * MathF.Cos(phi) + v * MathF.Sin(phi)).Dot(want) < palmCone)
+                            var pDir = u * MathF.Cos(phi) + v * MathF.Sin(phi);
+                            if (palmToward is Vector3 want && pDir.Dot(want) < palmCone)
                                 continue;   // the hand must lie the way the grip is held (e.g. a rod: palm on the seat's side)
+                            if (fingersToward is Vector3 wantF)
+                            {
+                                var e2 = right ? pDir.Cross(a) : a.Cross(pDir);
+                                if ((a * MathF.Sin(delta) + e2 * MathF.Cos(delta)).Dot(wantF) < fingersCone)
+                                    continue;   // e.g. the crank: fingers round the knob from the front, not curled back
+                            }
                             float score = Cost(at, a, u, v, phi, delta, slide, radius, along, right, arm, pole)
                                           + (state.Has ? Change(state, phi, delta, slide, sign) : 0f);
                             if (score < bestScore)
