@@ -128,9 +128,53 @@ def place_reel():
     k = FOOT_TO_SPOOL / (top - spool_y)
     rig = np.stack([-(P[:, 0] - fx), P[:, 2] - fz, P[:, 1] - top], axis=1) * k + np.array([0.0, SEAT_Y, -SEAT_RADIUS])
     n = np.stack([-N[:, 0], N[:, 2], N[:, 1]], axis=1)
-    knob = rig[P[:, 0] > P[:, 0].max() - 0.12].mean(axis=0)
-    print(f"scale {k:.4f}; knob at rig {knob.round(4)}")
-    write(j, blob, [("Reel", rig, n, UV, T)], DST)
+    write(j, blob, split_reel(rig, n, UV, T), DST)
+
+
+# The parts of the placed reel that move (rig space, measured on the Meshy reel by slicing it): the crank (everything
+# left of the gearbox's side cover in front of the bail's pivot) turns about the hub where its arm leaves the cover;
+# the rotor (the perforated cup behind the spool with its two arms, and in front of it what stands out past the spool's lip: the bail's
+# arms, wire and roller) turns about the spool's axis. The spool, the body, the foot stay. RodRig mirrors these numbers.
+CRANK_LEFT, CRANK_FRONT = -0.042, 0.14
+CRANK_HUB = np.array([-0.045, 0.089, -0.0965])
+SPOOL_AXIS_XZ = np.array([-0.0023, -0.0879])
+ROTOR_BACK, SPOOL_BACK, ROTOR_RADIUS, SPOOL_RADIUS = 0.115, 0.146, 0.037, 0.0315
+ARMS_BACK, STEM_FRONT = 0.106, 0.134          # the rotor's two arms reach back past the cup; the foot's stem ends here
+
+
+def split_reel(rig, n, UV, T):
+    """-> Body (rig space), Rotor (about its axis point at the rotor's back), Crank (about the hub, turned so the knob
+    hangs straight down at crank angle 0 as RodRig.KnobAt expects)."""
+    c = rig[T].mean(axis=1)                                        # triangle centres
+    r = np.hypot(c[:, 0] - SPOOL_AXIS_XZ[0], c[:, 2] - SPOOL_AXIS_XZ[1])
+    crank = (c[:, 0] < CRANK_LEFT) & (c[:, 1] < CRANK_FRONT)
+    up = np.degrees(np.arctan2(c[:, 2] - SPOOL_AXIS_XZ[1], c[:, 0] - SPOOL_AXIS_XZ[0]))   # 90 = towards the rod
+    stem = (c[:, 1] < STEM_FRONT) & (np.abs(up - 90) < 25)
+    rotor = ~crank & (((c[:, 1] >= ROTOR_BACK) & (c[:, 1] < SPOOL_BACK) & (r < ROTOR_RADIUS))
+                      | ((c[:, 1] >= ARMS_BACK) & (c[:, 1] < SPOOL_BACK) & (r >= 0.03) & (r < 0.065) & ~stem)
+                      | ((c[:, 1] >= SPOOL_BACK) & (r >= SPOOL_RADIUS)))
+    knob_v = rig[rig[:, 0] < -0.082]
+    knob = (knob_v.min(axis=0) + knob_v.max(axis=0)) / 2
+    rel = knob - CRANK_HUB
+    angle0 = np.arctan2(rel[1], -rel[2])                           # KnobAt: (sin a, -cos a) in (y, z)
+    ca, sa = np.cos(-angle0), np.sin(-angle0)
+    def unturn(v):                                                 # about X by -angle0
+        return np.stack([v[:, 0], v[:, 1] * ca - v[:, 2] * sa, v[:, 1] * sa + v[:, 2] * ca], axis=1)
+    arm = np.hypot(rel[1], rel[2])
+    print(f"crank hub {CRANK_HUB}, knob out {rel[0]:.4f}, arm {arm:.4f}, drawn at {np.degrees(angle0):.1f} deg")
+    rotor_pivot = np.array([SPOOL_AXIS_XZ[0], ROTOR_BACK, SPOOL_AXIS_XZ[1]])
+    pieces = []
+    for name, mask, origin, turn in (("Body", ~crank & ~rotor, np.zeros(3), False),
+                                     ("Rotor", rotor, rotor_pivot, False),
+                                     ("Crank", crank, CRANK_HUB, True)):
+        tris = T[mask]
+        used, inverse = np.unique(tris, return_inverse=True)
+        v, nn = rig[used] - origin, n[used]
+        if turn:
+            v, nn = unturn(v), unturn(nn)
+        pieces.append((name, v, nn, UV[used], inverse.reshape(-1, 3)))
+        print(f"{name}: {len(tris)} triangles")
+    return pieces
 
 
 def main():

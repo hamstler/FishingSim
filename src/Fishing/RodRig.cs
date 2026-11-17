@@ -63,21 +63,29 @@ public partial class RodRig : Node3D
     /// <summary>The reel's body centre below the seat (rig space) and the crank's axis point on its left side.</summary>
     private static readonly Vector3 ReelBody = new(0f, SeatCentre - 0.004f, -0.088f);
 
-    private static readonly Vector3 CrankAxis = ReelBody + new Vector3(-0.026f, 0f, 0f);
+    private static readonly Vector3 BuiltCrankAxis = ReelBody + new Vector3(-0.026f, 0f, 0f);
+    private const float BuiltCrankArm = 0.046f, BuiltKnobOut = -0.05f;
+
+    /// <summary>The crank's hub (rig space): the built reel's, or the modelled reel's once one is in use (UseModel).</summary>
+    private static Vector3 CrankAxis = BuiltCrankAxis;
 
     /// <summary>Length of the crank arm (axis to knob).</summary>
-    public const float CrankArm = 0.046f;
+    public static float CrankArm { get; private set; } = BuiltCrankArm;
 
     /// <summary>The crank knob's centre at a crank angle (rig space): it turns in the plane across the left side.</summary>
-    public static Vector3 KnobAt(float angle) => KnobOverride ??
+    public static Vector3 KnobAt(float angle) =>
         CrankAxis + new Vector3(KnobOut, MathF.Sin(angle) * CrankArm, -MathF.Cos(angle) * CrankArm);
 
     /// <summary>How far the knob stands out to the left of the crank's axis: clear of the reel, so the left hand holds
     /// it between the thumb and the index finger.</summary>
-    public const float KnobOut = -0.05f;
+    public static float KnobOut { get; private set; } = BuiltKnobOut;
 
-    /// <summary>Preview of a modelled reel (FISHSIM_MODEL_REEL=1): its knob stands still here and the hand holds it.</summary>
-    public static Vector3? KnobOverride;
+    // The user's reel (assets/models/meshy_reel.glb, laid under the seat and cut into Body, Rotor and Crank by
+    // tools/assets/meshy_rod_split.py --reel): the pivots and the crank's size as that script prints them.
+    private static readonly Vector3 ModelCrankHub = new(-0.045f, 0.089f, -0.0965f);
+    private static readonly Vector3 ModelRotorPivot = new(-0.0023f, 0.115f, -0.0879f);
+    private const float ModelCrankArm = 0.0364f, ModelKnobOut = -0.0543f;
+    private Node3D? _modelRotor, _modelCrank;
 
     public override void _Ready()
     {
@@ -181,14 +189,9 @@ public partial class RodRig : Node3D
 
     private void UseModel()
     {
-        bool modelReel = System.Environment.GetEnvironmentVariable("FISHSIM_MODEL_REEL") == "1";
-        if (modelReel && World.Props.PropAsset.Named("meshy_reel") is { } reelParts && reelParts.TryGetValue("Reel", out var reelMesh))
-        {
-            _builtReel!.Visible = false;
-            AddChild(new MeshInstance3D { Name = "ModelReel", Mesh = reelMesh, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
-            KnobOverride = new Vector3(-0.1125f, 0.1173f, -0.12f);
-        }
-        if (World.Props.PropAsset.Named(modelReel ? "meshy_rod2_player" : "meshy_rod_player") is not { } parts || !parts.TryGetValue("Handle", out var handleMesh))
+        UseModelReel();
+        var rodId = World.Props.PropAsset.Named("meshy_rod2_player") != null ? "meshy_rod2_player" : "meshy_rod_player";
+        if (World.Props.PropAsset.Named(rodId) is not { } parts || !parts.TryGetValue("Handle", out var handleMesh))
             return;
         for (int i = 0; i < _segments.Count; i++)
             if (!parts.ContainsKey($"Seg{i}"))
@@ -205,6 +208,33 @@ public partial class RodRig : Node3D
         }
         ShowQuiver();
     }
+
+    /// <summary>The user's reel in place of the built one: the body stands, the rotor with the bail turns about the
+    /// spool's axis and the crank about its hub (SetCrank); the hands follow its knob (KnobAt). The bail stays closed.</summary>
+    public bool ModelledReel { get; private set; }
+
+    private void UseModelReel()
+    {
+        if (World.Props.PropAsset.Named("meshy_reel") is not { } parts || !parts.TryGetValue("Body", out var body)
+            || !parts.TryGetValue("Rotor", out var rotor) || !parts.TryGetValue("Crank", out var crank))
+            return;
+        ModelledReel = true;
+        _builtReel!.Visible = false;
+        var off = GeometryInstance3D.ShadowCastingSetting.Off;
+        AddChild(new MeshInstance3D { Name = "ModelReel", Mesh = body, CastShadow = off });
+        _modelRotor = new Node3D { Name = "ModelRotor", Position = ModelRotorPivot };
+        _modelRotor.AddChild(new MeshInstance3D { Mesh = rotor, CastShadow = off });
+        AddChild(_modelRotor);
+        _modelCrank = new Node3D { Name = "ModelCrank", Position = ModelCrankHub };
+        _modelCrank.AddChild(new MeshInstance3D { Mesh = crank, CastShadow = off });
+        AddChild(_modelCrank);
+        CrankAxis = ModelCrankHub;
+        CrankArm = ModelCrankArm;
+        KnobOut = ModelKnobOut;
+        SetCrank(_crankAngle);
+    }
+
+    private float _crankAngle;
 
     /// <summary>A quiver tip (bottom rods) is the built blank's bright last two sections, also on a modelled rod.</summary>
     private void ShowQuiver()
@@ -414,15 +444,15 @@ public partial class RodRig : Node3D
         }
         Box(reel, new Vector3(0.006f, 0.004f, 0.009f), ReelBody + new Vector3(0f, -0.031f, 0.012f), dark, 0.0015f);
         // The crank on the left: a cap over the axle, the arm, the knob on its end (pointing outwards).
-        _crank = new Node3D { Position = CrankAxis };
+        _crank = new Node3D { Position = BuiltCrankAxis };
         reel.AddChild(_crank);
         Cyl(_crank, 0.0075f, 0.0075f, 0.008f, Vector3.Zero, trim, 14).RotationDegrees = new Vector3(0, 0, 90f);
-        var arm = Box(_crank, new Vector3(0.005f, 0.009f, CrankArm + 0.008f), new Vector3(-0.008f, 0f, -CrankArm * 0.5f), body, 0.0022f);
+        var arm = Box(_crank, new Vector3(0.005f, 0.009f, BuiltCrankArm + 0.008f), new Vector3(-0.008f, 0f, -BuiltCrankArm * 0.5f), body, 0.0022f);
         arm.RotationDegrees = Vector3.Zero;
         // The knob's shaft runs out to the left, clear of the reel's side.
-        float shaft = -KnobOut - 0.018f;
-        Cyl(_crank, 0.0028f, 0.0028f, shaft, new Vector3(-0.006f - shaft * 0.5f, 0f, -CrankArm), metal, 8).RotationDegrees = new Vector3(0, 0, 90f);
-        var knobMesh = Cyl(_crank, 0.0085f, 0.0075f, 0.024f, new Vector3(KnobOut, 0f, -CrankArm), knob, 14);
+        float shaft = -BuiltKnobOut - 0.018f;
+        Cyl(_crank, 0.0028f, 0.0028f, shaft, new Vector3(-0.006f - shaft * 0.5f, 0f, -BuiltCrankArm), metal, 8).RotationDegrees = new Vector3(0, 0, 90f);
+        var knobMesh = Cyl(_crank, 0.0085f, 0.0075f, 0.024f, new Vector3(BuiltKnobOut, 0f, -BuiltCrankArm), knob, 14);
         knobMesh.RotationDegrees = new Vector3(0, 0, 90f);
         SetCrank(0f);
     }
@@ -434,6 +464,12 @@ public partial class RodRig : Node3D
             return;
         _crank.Rotation = new Vector3(angle, 0f, 0f);
         _rotor.Rotation = new Vector3(0f, angle * 5.2f, 0f);
+        _crankAngle = angle;
+        if (_modelCrank != null)
+        {
+            _modelCrank.Rotation = new Vector3(angle, 0f, 0f);
+            _modelRotor!.Rotation = new Vector3(0f, angle * 5.2f, 0f);
+        }
     }
 
     /// <summary>Opens (1) or closes (0) the bail: open for the cast, flipped closed when the reel turns again.</summary>
