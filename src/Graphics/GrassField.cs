@@ -46,7 +46,16 @@ public partial class GrassField : Node3D
         GraphicsQuality.Changed -= Invalidate;
     }
 
-    private void Invalidate() => _centre = new Vector2(float.MaxValue, float.MaxValue);
+    private void Invalidate()
+    {
+        _centre = new Vector2(float.MaxValue, float.MaxValue);
+        // A new map (or new settings): the old field must not stand on it while the new one is placed.
+        if (_instance?.Multimesh is { } old)
+        {
+            _instance.Multimesh = null;
+            old.Dispose();
+        }
+    }
 
     public override void _Process(double delta)
     {
@@ -68,7 +77,7 @@ public partial class GrassField : Node3D
             // the old field when complete. One build at a time: a newer centre waits for the running one.
             if (_instance.Multimesh == null)
                 Build(p);
-            else if (_job == null)
+            else if (_job == null && GraphicsQuality.GrassRadius > 0f)
             {
                 _centre = p;
                 var loc = _bed.Location;

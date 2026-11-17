@@ -1429,7 +1429,7 @@ public partial class FishingRod : Node3D
             // Decode the species' model pictures while the float twitches; the painted close-up skin (4096 px with a
             // normal map, on every core) only for a species without a model, which then needs it.
             if (FishAsset.HasModel(CurrentSpecies))
-                FishAsset.Prefetch(CurrentSpecies);
+                FishAsset.Prefetch(CurrentSpecies, urgent: true);
             else
                 Graphics.FishSkin.Prewarm(CurrentSpecies);
         }
@@ -1665,6 +1665,9 @@ public partial class FishingRod : Node3D
         _fishModel = FishModel.Create(species, CurrentWeight, detailed: true);
         _fishNode.AddChild(_fishModel);
         _fishNode.Visible = true;
+        // A little fish on the line may be taken by a predator: the likeliest ones' models are made ready meanwhile.
+        if (PreyAttack.IsPrey(species.SpeciesName, CurrentWeight))
+            PrefetchPredators(species);
         _fishDepth = 0.3f;
         _jump = 0f;
         _jumpThrew = false;
@@ -1690,6 +1693,28 @@ public partial class FishingRod : Node3D
     /// A predator takes the little fish on the line: the fight goes on with the predator where the prey was, holding
     /// it (not the hook) in its jaws.
     /// </summary>
+    private void PrefetchPredators(FishSpecies prey)
+    {
+        FishSpecies? first = null, second = null;
+        float w1 = 0f, w2 = 0f;
+        foreach (var sp in _species)
+            if (PreyAttack.Predators.TryGetValue(sp.SpeciesName, out float tendency) && sp.SpeciesName != prey.SpeciesName)
+            {
+                float w = tendency * Lake.Location.AbundanceOf(sp.SpeciesName);
+                if (w > w1)
+                {
+                    (second, w2) = (first, w1);
+                    (first, w1) = (sp, w);
+                }
+                else if (w > w2)
+                    (second, w2) = (sp, w);
+            }
+        if (first != null)
+            FishAsset.Prefetch(first, urgent: true);
+        if (second != null)
+            FishAsset.Prefetch(second, urgent: true);
+    }
+
     public void PredatorTakes()
     {
         if (_fight == null || CurrentSpecies == null)
