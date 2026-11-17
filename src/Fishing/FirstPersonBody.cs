@@ -260,28 +260,34 @@ public partial class FirstPersonBody : Node3D
         if (ToolPose?.Invoke() is { } tool)
         {
             _rodRight.Has = _rodLeft.Has = false;
-            foreach (var (arm, t, shape, state, right) in new[]
-                     {
-                         (ik.Right, tool.Right, rightArm, _toolRight, true), (ik.Left, tool.Left, leftArm, _toolLeft, false),
-                     })
-            {
-                var target = t;
-                if (t.Bar is { } bar && t.BarWeight > 0f)
-                {
-                    // The hand round the tool's handle in the most natural way it can take, blended in as it reaches it.
-                    var g = BarGrip((bar.A + bar.B) * 0.5f, bar.B - bar.A, bar.Radius, right, shape, 0f, 0.25f, 0.02f, t.Grip,
-                        0.065f, true, bar.A.DistanceTo(bar.B) * 0.5f, state, dt, t.Pole);
-                    target = Mix(t, g, t.BarWeight);
-                }
-                else
-                    state.Has = false;
-                Apply(arm, target, 0f);
-                arm.ThumbAlong = null;
-                arm.ThumbOn = null;
-            }
+            ToolHand(ik.Right, tool.Right, rightArm, _toolRight, true, dt);
+            ToolHand(ik.Left, tool.Left, leftArm, _toolLeft, false, dt);
             return;
         }
         _toolRight.Has = _toolLeft.Has = false;
+        RodHands(action, dt, ik, rightArm, leftArm, bodyBasis);
+    }
+
+    /// <summary>One hand on a tool's handle (no per-frame array of both hands).</summary>
+    private static void ToolHand(ArmIK.Arm arm, HandTarget t, ArmShape shape, GripState state, bool right, float dt)
+    {
+        var target = t;
+        if (t.Bar is { } bar && t.BarWeight > 0f)
+        {
+            // The hand round the tool's handle in the most natural way it can take, blended in as it reaches it.
+            var g = BarGrip((bar.A + bar.B) * 0.5f, bar.B - bar.A, bar.Radius, right, shape, 0f, 0.25f, 0.02f, t.Grip,
+                0.065f, true, bar.A.DistanceTo(bar.B) * 0.5f, state, dt, t.Pole);
+            target = Mix(t, g, t.BarWeight);
+        }
+        else
+            state.Has = false;
+        Apply(arm, target, 0f);
+        arm.ThumbAlong = null;
+        arm.ThumbOn = null;
+    }
+
+    private void RodHands(BodyAction action, float dt, ArmIK ik, ArmShape rightArm, ArmShape leftArm, Basis bodyBasis)
+    {
         var rigBasis = _rig.GlobalTransform.Basis.Orthonormalized();
         var rodAxis = (rigBasis * Vector3.Up).Normalized();
         // The right hand round the reel seat as anglers hold it: the palm on the seat's right side (the back of the hand
@@ -395,34 +401,46 @@ public partial class FirstPersonBody : Node3D
         int bestStep = 0;
         // Every way round the bar now and then (and at the start); between, only the ways near the last best one, on
         // the same side: the hand moves little from frame to frame (576 to 1152 tries a hand a frame before).
-        bool full = !state.Has || ++state.SinceFull >= 12;
+        bool full = !state.Has || ++state.SinceFull >= 12 || dt > 0.05f;     // a long frame: the hand may have moved far
         if (full)
             state.SinceFull = 0;
-        foreach (float sign in eitherWay ? BothWays : OneWay)
+        // A partial search that finds no way the hand may lie (all ruled out by the palm's cone) searches everything:
+        // left as it was, the hand jumped to phi = 0.
+        for (int pass = 0; pass < 2; pass++)
         {
-            if (!full && sign != state.Sign)
-                continue;
-            var a = a0 * sign;
-            var (u, v) = Around(a, up, arm.BodyRight);
-            for (int n = 0; n < (full ? 48 : 7); n++)
+            if (pass == 1)
             {
-                int i = full ? n : ((state.BestStep + n - 3) % 48 + 48) % 48;
-                float phi = i / 48f * Mathf.Tau;
-                for (int j = 0; j < 4; j++)
+                if (full || bestScore < float.MaxValue)
+                    break;
+                full = true;
+                state.SinceFull = 0;
+            }
+            foreach (float sign in eitherWay ? BothWays : OneWay)
+            {
+                if (!full && sign != state.Sign)
+                    continue;
+                var a = a0 * sign;
+                var (u, v) = Around(a, up, arm.BodyRight);
+                for (int n = 0; n < (full ? 48 : 7); n++)
                 {
-                    float delta = Mathf.Lerp(deltaMin, deltaMax, j / 3f);
-                    for (int k = -1; k <= 1; k++)
+                    int i = full ? n : ((state.BestStep + n - 3) % 48 + 48) % 48;
+                    float phi = i / 48f * Mathf.Tau;
+                    for (int j = 0; j < 4; j++)
                     {
-                        float slide = k * slideRange;
-                        if (palmToward is Vector3 want && (u * MathF.Cos(phi) + v * MathF.Sin(phi)).Dot(want) < palmCone)
-                            continue;   // the hand must lie the way the grip is held (e.g. a rod: palm on the seat's side)
-                        float score = Cost(at, a, u, v, phi, delta, slide, radius, along, right, arm, pole)
-                                      + (state.Has ? Change(state, phi, delta, slide, sign) : 0f);
-                        if (score < bestScore)
+                        float delta = Mathf.Lerp(deltaMin, deltaMax, j / 3f);
+                        for (int k = -1; k <= 1; k++)
                         {
-                            bestScore = score;
-                            (bestPhi, bestDelta, bestSlide, bestSign) = (phi, delta, slide, sign);
-                            bestStep = i;
+                            float slide = k * slideRange;
+                            if (palmToward is Vector3 want && (u * MathF.Cos(phi) + v * MathF.Sin(phi)).Dot(want) < palmCone)
+                                continue;   // the hand must lie the way the grip is held (e.g. a rod: palm on the seat's side)
+                            float score = Cost(at, a, u, v, phi, delta, slide, radius, along, right, arm, pole)
+                                          + (state.Has ? Change(state, phi, delta, slide, sign) : 0f);
+                            if (score < bestScore)
+                            {
+                                bestScore = score;
+                                (bestPhi, bestDelta, bestSlide, bestSign) = (phi, delta, slide, sign);
+                                bestStep = i;
+                            }
                         }
                     }
                 }

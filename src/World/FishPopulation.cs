@@ -358,7 +358,7 @@ public partial class FishPopulation : Node3D
         }
         _frameClock += dt;
         bool full = !Graphics.Renderer.IsHeadless;
-        bool madeOne = false;
+        bool madeOne = false, askedOne = false;
         for (int i = 0; i < shown; i++)
         {
             var a = _nearest[i].Agent;
@@ -371,7 +371,12 @@ public partial class FishPopulation : Node3D
                 var sp = SpeciesOf(a);
                 if (sp == null)
                     continue;
-                FishAsset.Prefetch(sp);
+                // One preparation asked for a frame (the nearest fish first); the rest wait their turn.
+                if (!askedOne && !FishAsset.IsReady(sp))
+                {
+                    FishAsset.Prefetch(sp);
+                    askedOne = true;
+                }
                 if (madeOne || !FishAsset.IsReady(sp))
                     continue;
                 model = FishModel.Create(sp, a.Weight, detailed: true);

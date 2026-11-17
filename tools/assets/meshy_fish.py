@@ -53,7 +53,7 @@ def fill_gaps(pic, mask_from=None):
     a = np.asarray(pic, dtype=np.float32)
     ref = np.asarray(mask_from if mask_from is not None else pic, dtype=np.float32)
     if ref.shape[:2] != a.shape[:2]:
-        ref = np.asarray((mask_from or pic).resize(pic.size), dtype=np.float32)
+        ref = np.asarray((mask_from if mask_from is not None else pic).resize(pic.size), dtype=np.float32)
     mask = (ref.max(axis=2) > 6).astype(np.float32)[..., None]
     levels = [(a * mask, mask)]
     while levels[-1][0].shape[0] > 4:
@@ -97,7 +97,11 @@ def shrink(glb, size):
         return len(newviews) - 1
 
     remap = {}
+    if len(j.get("materials", [])) != 1 or any("sparse" in a for a in j["accessors"]):
+        raise ValueError("expected one material and no sparse accessors (a Meshy export)")
     for a in j["accessors"]:
+        if "bufferView" not in a:
+            continue
         bv = a["bufferView"]
         if bv not in remap:
             v = views[bv]
@@ -120,7 +124,7 @@ def shrink(glb, size):
             colour_mask = pic
         pic = fill_gaps(pic, colour_mask)
         if max(pic.size) > size:
-            pic = pic.resize((size, size * pic.size[1] // pic.size[0]), Image.LANCZOS)
+            pic.thumbnail((size, size), Image.LANCZOS)     # keeps the aspect, either way round
         buf = io.BytesIO()
         pic.save(buf, "WEBP", quality=92 if role == "normal" else 88, method=6)
         images.append({"bufferView": add(buf.getvalue()), "mimeType": "image/webp",
@@ -177,14 +181,13 @@ def main():
             continue
         tris = triangles(raw)
         if tris > target:
-            tmp = os.path.join(tempfile.mkdtemp(), "in.glb")
-            open(tmp, "wb").write(raw)
-            out = tmp.replace("in.glb", "out.glb")
-            subprocess.run(["blender", "-b", "--python-exit-code", "1", "-P",
-                            os.path.join(ROOT, "tools", "assets", "meshy_decimate.py"), "--", tmp, out, str(target)],
-                           check=True, stdout=subprocess.DEVNULL)
-            raw2 = open(out, "rb").read()
-            shutil.rmtree(os.path.dirname(tmp))
+            with tempfile.TemporaryDirectory() as work:
+                tmp, out = os.path.join(work, "in.glb"), os.path.join(work, "out.glb")
+                open(tmp, "wb").write(raw)
+                subprocess.run(["blender", "-b", "--python-exit-code", "1", "-P",
+                                os.path.join(ROOT, "tools", "assets", "meshy_decimate.py"), "--", tmp, out, str(target)],
+                               check=True, stdout=subprocess.DEVNULL)
+                raw2 = open(out, "rb").read()
         else:
             raw2 = raw
         small = shrink(raw2, size)

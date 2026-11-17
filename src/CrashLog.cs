@@ -49,6 +49,21 @@ public static class CrashLog
             // caches stay as they are
         }
         string path = Path;
+        // Exceptions in tasks (fish models, grass, skins prepared in the background) are kept by their Task, not
+        // raised: written down when such a task is collected unobserved.
+        System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            try
+            {
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
+                System.IO.File.AppendAllText(path, $"{DateTime.Now:u} (background task)\n{e.Exception}\n\n");
+            }
+            catch (Exception)
+            {
+                // the log stays as it is
+            }
+            e.SetObserved();
+        };
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {
             try

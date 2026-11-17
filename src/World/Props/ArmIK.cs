@@ -259,6 +259,9 @@ public partial class ArmIK : SkeletonModifier3D
     {
         if (arm.Chains.Count == 0 || arm.Obstacles.Count == 0)
         {
+            arm.LastCount = -1;     // the next obstacles are searched afresh
+            foreach (var chain in arm.Chains)
+                chain.HasTarget = false;
             foreach (var chain in arm.Chains)
                 chain.HasShown = false;
             foreach (var (bone, ax, angle) in arm.Curl)
@@ -317,6 +320,7 @@ public partial class ArmIK : SkeletonModifier3D
                 if (dir.LengthSquared() > 1e-10f)
                 {
                     LayThumb(sk, chain, parent, dir.Normalized());
+                    chain.HasTarget = false;     // a later wrap round the obstacles searches again
                     continue;
                 }
             }
@@ -458,6 +462,7 @@ public partial class ArmIK : SkeletonModifier3D
         for (int k = 1; k < 3; k++)
             sk.SetBonePoseRotation(chain.Bones[k], Rotation(sk, chain, k, 0.18f, 0f).GetRotationQuaternion());
         chain.HasShown = false;
+        chain.HasTarget = false;
     }
 
     /// <summary>The upper arm's and the forearm's lengths in world units, or null until the skeleton is ready.</summary>

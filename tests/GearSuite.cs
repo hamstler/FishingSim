@@ -36,6 +36,39 @@ public sealed class GearSuite : ITestSuite
         var roach = Species("ploc");
         var all = new[] { roach, Species("leszcz"), carp, Species("szczupak") };
 
+        t.Section("fish models prepared in the background");
+        {
+            // Six species asked for every frame, as the lake does when they swim into view: every one gets its model
+            // (dropping running preparations to make room restarted them forever and none was ever made).
+            var six = new[] { "sum", "jesiotr", "sterlet", "wegorz", "piskorz", "sliz" }.Select(Species).ToArray();
+            bool notReadyFirst = !FishingSim.Fishing.FishAsset.IsReady(six[0]);
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            int ready = 0;
+            while (watch.ElapsedMilliseconds < 120000)
+            {
+                ready = 0;
+                bool asked = false;
+                foreach (var sp in six)
+                {
+                    if (FishingSim.Fishing.FishAsset.IsReady(sp))
+                    {
+                        ready++;
+                        FishingSim.Fishing.FishAsset.For(sp);
+                    }
+                    else if (!asked)
+                    {
+                        FishingSim.Fishing.FishAsset.Prefetch(sp);
+                        asked = true;
+                    }
+                }
+                if (ready == six.Length)
+                    break;
+                await Task.Delay(20);
+            }
+            t.Check(notReadyFirst && ready == six.Length,
+                $"six species asked for at once all get their models ({ready}/6 in {watch.ElapsedMilliseconds} ms; a species never asked for is not 'ready')");
+        }
+
         t.Section("pictures decode on many threads at once");
         {
             // A model's WebP pictures decoded on worker threads while others decode too (fish, props, glTF): every one

@@ -40,7 +40,9 @@ public sealed class FishAsset
     public float MaxWidth { get; private init; }
 
     // A few species' models stay loaded (their textures are large); the one used longest ago is let go.
-    private const int CacheSize = 12;
+    // Species with a Meshy model take ~8 MB of video memory (2K, block compressed): a lake's species all fit, so the
+    // fish swimming in view do not unload and reload one another.
+    private const int CacheSize = 48;
     private static readonly object Gate = new();
     private static readonly Dictionary<string, FishAsset?> Cache = new();
     private static readonly LinkedList<string> Recent = new();
@@ -60,36 +62,70 @@ public sealed class FishAsset
     /// Starts decoding a species' pictures on a worker thread (when a fish takes the bait), so that its model is ready
     /// without a hitch when the fish is hooked.
     /// </summary>
-    public static void Prefetch(FishSpecies sp)
+    public static void Prefetch(FishSpecies sp, bool urgent = false)
     {
         string id = FishReference.IdOf(sp);
+        if (id == "")
+            return;
+        lock (Gate)
+            if (Cache.ContainsKey(id) || Decoding.ContainsKey(id))
+                return;
         string path = PathOf(id);
+        if (!FileAccess.FileExists(path))
+            return;
         lock (Gate)
         {
-            if (id == "" || Cache.ContainsKey(id) || Decoding.ContainsKey(id) || !FileAccess.FileExists(path))
+            if (Cache.ContainsKey(id) || Decoding.ContainsKey(id))
                 return;
-            // Decoded pictures wait for their model at most four at a time (browsing the atlas decodes ahead).
-            while (Decoding.Count >= 4 && DecodeOrder.First != null)
+            // A preparation once started always finishes: at most MaxRunning run at a time and a further request
+            // waits (the caller asks again next frame). Dropping running ones to make room restarted the same few
+            // decodes every frame when five species swam into view at once, and no model was ever made.
+            int running = 0;
+            foreach (var task in Decoding.Values)
+                if (!task.IsCompleted)
+                    running++;
+            if (running >= MaxRunning && !urgent)
+                return;     // the fish on the line (urgent) never waits behind the lake's
+            // Finished ones wait for their model; past MaxWaiting the oldest finished one is let go.
+            while (Decoding.Count >= MaxWaiting && DropOldestFinished())
             {
-                if (Decoding.Remove(DecodeOrder.First.Value, out var dropped))
-                    dropped.ContinueWith(t =>
-                    {
-                        if (t.IsCompletedSuccessfully)
-                            t.Result?.DisposeImages();
-                    });
-                DecodeOrder.RemoveFirst();
             }
             Decoding[id] = Task.Run(() => Prepare(path));
             DecodeOrder.AddLast(id);
         }
     }
 
-    /// <summary>Whether <see cref="For"/> would return at once (the model is loaded, or its pictures are decoded).</summary>
+    private const int MaxRunning = 3, MaxWaiting = 8;
+
+    private static bool DropOldestFinished()
+    {
+        for (var node = DecodeOrder.First; node != null; node = node.Next)
+            if (Decoding.TryGetValue(node.Value, out var task) && task.IsCompleted)
+            {
+                Decoding.Remove(node.Value);
+                DecodeOrder.Remove(node);
+                if (task.IsCompletedSuccessfully)
+                    task.Result?.DisposeImages();
+                return true;
+            }
+        return false;
+    }
+
+    /// <summary>
+    /// Whether <see cref="For"/> would return at once: the model is loaded or prepared (or the species has none). A
+    /// species not yet asked for is not ready (call <see cref="Prefetch"/>): For would load it on the calling thread.
+    /// </summary>
     public static bool IsReady(FishSpecies sp)
     {
         string id = FishReference.IdOf(sp);
         lock (Gate)
-            return Cache.ContainsKey(id) || !Decoding.TryGetValue(id, out var task) || task.IsCompleted;
+        {
+            if (Cache.ContainsKey(id))
+                return true;
+            if (Decoding.TryGetValue(id, out var task))
+                return task.IsCompleted;
+        }
+        return !HasModel(sp);
     }
 
     public static FishAsset? For(FishSpecies sp)
@@ -120,8 +156,9 @@ public sealed class FishAsset
                 {
                     prepared = pending?.Result;
                 }
-                catch (AggregateException)
+                catch (AggregateException e)
                 {
+                    GD.PushWarning($"fish model {path} (background): {e.InnerException?.Message}");
                     prepared = null;     // prepared again below
                 }
                 asset = Load(path, prepared);
@@ -211,7 +248,10 @@ public sealed class FishAsset
                 _ => image.LoadJpgFromBuffer(bytes),
             };
             if (error != Error.Ok)
+            {
+                image.Dispose();
                 continue;
+            }
             string name = (string?)node["name"] ?? "";
             bool normal = name.EndsWith("normal");
             // Down to the graphics quality's texture size (Low 1024, Medium 2048): a quarter of the memory per halving.
@@ -228,7 +268,15 @@ public sealed class FishAsset
             // compressed (BC1/BC3 for colours, BC5 for the normal map). Where the engine has no compressor (an export
             // without one), the pictures stay as they are.
             if (CompressTextures && image.GetWidth() >= 512)
-                image.Compress(Image.CompressMode.S3Tc, normal ? Image.CompressSource.Normal : Image.CompressSource.Srgb);
+            {
+                // The game's own block compressor: Godot's (Image.Compress) exists only in the editor, so an exported
+                // game kept every fish picture as plain pixels (~180 MB a species).
+                var kind = normal ? Graphics.BlockCompress.Kind.TwoChannel
+                    : image.DetectAlpha() != Image.AlphaMode.None ? Graphics.BlockCompress.Kind.ColourAlpha : Graphics.BlockCompress.Kind.Colour;
+                var packed = Graphics.BlockCompress.Compress(image, kind);
+                image.Dispose();
+                image = packed;
+            }
             images[name] = image;
         }
         return images;
@@ -308,11 +356,21 @@ public sealed class FishAsset
         public float EyeRadius { get; init; }
         public Aabb BodyBox { get; init; }
 
+        /// <summary>Lets go of the decoded pictures and the importer meshes (both native memory).</summary>
         public void DisposeImages()
         {
             foreach (var image in Images.Values)
                 image.Dispose();
+            foreach (var part in Parts)
+                part.Mesh.Dispose();
         }
+    }
+
+    private static Mesh BodyOf(ImporterMesh mesh)
+    {
+        var body = mesh.GetMesh();
+        mesh.Dispose();
+        return body;
     }
 
     /// <summary>Reads and prepares a model (any thread: no rendering-server calls).</summary>
@@ -320,6 +378,20 @@ public sealed class FishAsset
     {
         var glb = FileAccess.GetFileAsBytes(path);
         var images = DecodeImages(glb, maxBody, maxFin);
+        try
+        {
+            return Prepare(path, glb, images);
+        }
+        catch
+        {
+            foreach (var image in images.Values)
+                image.Dispose();
+            throw;
+        }
+    }
+
+    private static Prepared? Prepare(string path, byte[] glb, Dictionary<string, Image> images)
+    {
         var doc = new GltfDocument();
         var state = new GltfState { HandleBinaryImage = 0 };
         // GLTFDocument decodes every picture in full even when told to discard them (4K WebP, and the memory for it):
@@ -345,6 +417,14 @@ public sealed class FishAsset
                 xf = nodes[p].Xform * xf;
             parts.Add((node.ResourceName, im, xf));
         }
+        // The parsed state's wrappers go now (the meshes are held by the parts); left to the finaliser, every
+        // species load kept the whole parsed document alive.
+        foreach (var node in nodes)
+            node.Dispose();
+        foreach (var mesh in meshes)
+            mesh.Dispose();
+        state.Dispose();
+        doc.Dispose();
         if (IsForeign(path))
             return PrepareForeign(path, parts, images);
         foreach (var part in parts)
@@ -413,7 +493,7 @@ public sealed class FishAsset
             return new FishAsset
             {
                 Foreign = true,
-                Body = prepared.Parts[0].Mesh.GetMesh(),
+                Body = BodyOf(prepared.Parts[0].Mesh),
                 BodyAlbedo = colourName != null ? ImageTexture.CreateFromImage(images[colourName]) : null,
                 BodyNormal = normalName != null ? ImageTexture.CreateFromImage(images[normalName]) : null,
                 EyeRadius = 0.02f,
@@ -423,6 +503,8 @@ public sealed class FishAsset
             };
         }
         var parts = prepared.Parts.Select(p => (p.Name, Mesh: (Mesh)p.Mesh.GetMesh(), p.Transform)).ToList();
+        foreach (var part in prepared.Parts)
+            part.Mesh.Dispose();     // the GPU mesh is made; the importer's arrays and LODs need not wait for the finaliser
         var body = parts.FirstOrDefault(p => p.Name == "Body");
         var eyes = parts.Where(p => p.Name.StartsWith("Eye")).OrderBy(p => p.Name == "EyeLeft").ToList();
         if (body.Mesh == null || eyes.Count == 0)
