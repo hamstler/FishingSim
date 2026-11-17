@@ -1481,7 +1481,7 @@ public partial class Scenery : Node3D
         var man = Props.PropAsset.Create("meshy_fisherman", height);
         if (man == null)
             return null;
-        float rodLength = 2.4f, k = rodLength / RodModelLength;
+        float rodLength = 1.7f, k = rodLength / RodModelLength;     // 30 % under the first 2.4 m (the user found it too big)
         var rod = Props.PropAsset.Create("meshy_spinning_rod", scale: k);
         if (rod == null)
         {
