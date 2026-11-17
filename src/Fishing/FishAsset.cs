@@ -493,8 +493,10 @@ public sealed class FishAsset
         float Comp(Vector3 v, int i) => i == 0 ? v.X : i == 1 ? v.Y : v.Z;
         int along = size.X >= size.Y && size.X >= size.Z ? 0 : size.Y >= size.Z ? 1 : 2;
         int[] others = Enumerable.Range(0, 3).Where(i => i != along).ToArray();
-        int across = Comp(size, others[0]) <= Comp(size, others[1]) ? others[0] : others[1];   // the thin side: width
-        int upAxis = others[0] == across ? others[1] : others[0];
+        // glTF is Y-up, and the models keep it (Meshy's lie along Z with the back at +Y): up is +Y unless the fish lies
+        // along Y. Guessing up as the taller side turned flat fish (sturgeons, loaches, eels, barbels) on their backs.
+        int upAxis = along != 1 ? 1 : Comp(size, others[0]) >= Comp(size, others[1]) ? others[0] : others[1];
+        int across = others[0] == upAxis ? others[1] : others[0];
         Vector3 nose, up;
         string json = path.GetBaseName() + ".json";
         var spec = FileAccess.FileExists(json) ? JsonNode.Parse(FileAccess.GetFileAsString(json)) as JsonObject : null;
