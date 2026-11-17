@@ -13,3 +13,4 @@ RequiredLevel = 5
 Description = "Najlepszy kołowrotek cechu: mocny hamulec i duża szpula."
 BodyColor = Color(0.08, 0.08, 0.09, 1)
 TrimColor = Color(0.75, 0.15, 0.1, 1)
+Model = "reels/baitrunner_kaminari"

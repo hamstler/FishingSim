@@ -1027,6 +1027,13 @@ public partial class ScreenshotTool : Node
                 lo.Index[(int)TackleSlot.Line] = lo.Items(TackleSlot.Line).ToList().FindIndex(i => i.ItemId == lineId);
                 lo.Index[(int)TackleSlot.Bait] = BaitIx("worm");
                 lo.BaitCounts["worm"] = 10;
+                // FISHSIM_ROD / FISHSIM_REEL = an item id: that rod / reel in the hands (its model and length).
+                foreach (var (envName, slot, key) in new[] { ("FISHSIM_ROD", TackleSlot.Rod, "rod"), ("FISHSIM_REEL", TackleSlot.Reel, "reel") })
+                    if (System.Environment.GetEnvironmentVariable(envName) is { Length: > 0 } wanted)
+                    {
+                        pr.Owned[key].Add(wanted);
+                        lo.Index[(int)slot] = lo.Items(slot).ToList().FindIndex(i => i.ItemId == wanted);
+                    }
                 rod.ApplyTackle();
                 rod.CastNow(0.7f);
                 for (int i = 0; i < 400 && rod.State != RodState.Waiting; i++)

@@ -13,3 +13,4 @@ RequiredLevel = 4
 Description = "Duża szpula i mocny hamulec na długie odjazdy karpi i amurów z dalekich łowisk."
 BodyColor = Color(0.1, 0.14, 0.1, 1)
 TrimColor = Color(0.78, 0.6, 0.3, 1)
+Model = "reels/baitrunner_fjordline"

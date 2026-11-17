@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Kaminari Raiden 2,1 m · spinning (krótka)"
+Kind = 1
+CastMult = 1.12
+MaxLoad = 7.24
+ShockAbsorb = 0.109
+Action = 0.25
+Price = 300
+RequiredLevel = 3
+Description = "Szybki, uniwersalny spinning na okonie, sandacze i średnie szczupaki. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy."
+BlankColor = Color(0.06, 0.08, 0.18, 1)
+WhipColor = Color(0.8, 0.82, 0.86, 1)
+FoamGrip = true
+Length = 2.1
+Model = "rods/spin_kaminari"

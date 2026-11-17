@@ -16,3 +16,5 @@ Description = "Lekka gruntówka z miękką szczytówką: drobne leszcze, płocie
 BlankColor = Color(0.18, 0.22, 0.14, 1)
 WhipColor = Color(0.75, 0.62, 0.3, 1)
 FoamGrip = false
+Model = "rods/feeder_ostoja"
+Length = 2.7

@@ -16,3 +16,5 @@ Description = "Klejona z kilku gatunków drewna przez mistrza cechu: daleki rzut
 BlankColor = Color(0.24, 0.12, 0.09, 1)
 WhipColor = Color(0.75, 0.62, 0.3, 1)
 FoamGrip = false
+Model = "rods/float_borealis"
+Length = 4

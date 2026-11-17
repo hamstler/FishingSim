@@ -13,3 +13,4 @@ RequiredLevel = 2
 Description = "Okuty w kuźni: mocniejszy hamulec i szybsze zwijanie."
 BodyColor = Color(0.2, 0.21, 0.23, 1)
 TrimColor = Color(0.62, 0.52, 0.3, 1)
+Model = "reels/medium_hokuto"

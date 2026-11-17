@@ -28,6 +28,13 @@ public partial class RodData : TackleItem
     /// <summary>Thread of the guide whippings.</summary>
     [Export] public Color WhipColor { get; set; } = new(0.75f, 0.62f, 0.3f);
 
+    /// <summary>Length butt to tip (m); 0 = RodRig's default (3.58 m). Longer rods cast further (CastMult).</summary>
+    [Export] public float Length { get; set; }
+
+    /// <summary>The 3D model in the angler's hands (PropAsset id under assets/models, e.g. "rods/carp_ostoja";
+    /// empty = RodRig.ModelRodId).</summary>
+    [Export] public string Model { get; set; } = "";
+
     /// <summary>Grips of EVA foam (dark) instead of cork.</summary>
     [Export] public bool FoamGrip { get; set; }
 }

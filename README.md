@@ -481,6 +481,10 @@ znakami towarowymi żadnej firmy ani ich przeróbkami. Ewentualna zbieżność z
 - **Wędkarz i wędka spinningowa z Meshy AI** (`assets/models/meshy_fisherman.glb`, `meshy_spinning_rod.glb`): tak samo
   wygenerowane przez autora projektu na płatnym planie Premium; stoją jako wędkarze na brzegu, a wędka jest też
   wędką gracza (pocięta na odcinki, gnie się pod obciążeniem; `tools/assets/meshy_rod_split.py`).
+- **Wędki i kołowrotki z Meshy AI** (`assets/models/rods/*.glb` – 12 serii, `assets/models/reels/*.glb` + `.json` –
+  6 kołowrotków, `meshy_rod2_player.glb`, `meshy_reel.glb`): wygenerowane przez autora projektu na płatnym planie
+  Premium; każdy przedmiot w sklepie ma swój model (`RodData.Model`, `ReelData.Model`), wędki są pocięte na odcinki
+  i rozciągane do swojej długości, kołowrotki na korpus, rotor, kabłąk i korbę.
 - **Modele ryb z Meshy AI** (`assets/fish/meshy/<id>.glb`, wszystkie 66 gatunków) wygenerował autor projektu w Meshy AI
   (obraz → 3D) z własnych obrazów na płatnym planie Premium, więc należą do autora i są częścią projektu na licencji
   GPL; zastępują w grze modele z `assets/fish/models` (te zostają jako zapas). Szczegóły i warunki w

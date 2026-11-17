@@ -13,3 +13,4 @@ RequiredLevel = 3
 Description = "Mosiężny hamulec nie puszcza przy dużej rybie."
 BodyColor = Color(0.15, 0.17, 0.15, 1)
 TrimColor = Color(0.78, 0.6, 0.3, 1)
+Model = "reels/small_fjordline"

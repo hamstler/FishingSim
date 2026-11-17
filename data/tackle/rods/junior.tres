@@ -16,3 +16,5 @@ Description = "Prosty kij z leszczyny: wygina się sama szczytówka. Na płocie 
 BlankColor = Color(0.32, 0.2, 0.1, 1)
 WhipColor = Color(0.8, 0.75, 0.6, 1)
 FoamGrip = false
+Model = "rods/float_ostoja"
+Length = 2

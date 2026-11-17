@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ReelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/ReelData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Kaminari Long Cast 5000 · wolny bieg"
+DragMax = 10.0
+ReelSpeed = 3.4
+LineCapacity = 260.0
+Price = 680
+RequiredLevel = 5
+Description = "Długa stożkowa szpula do dalekich rzutów i wolny bieg na karpie."
+BodyColor = Color(0.06, 0.06, 0.07, 1)
+TrimColor = Color(0.78, 0.78, 0.8, 1)
+Model = "reels/baitrunner_kaminari"

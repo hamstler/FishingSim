@@ -16,3 +16,5 @@ Description = "Kij do wielkich przynęt (swimbaity, duże jerki i żaby): wytrzy
 BlankColor = Color(0.25, 0.08, 0.06, 1)
 WhipColor = Color(0.08, 0.08, 0.08, 1)
 FoamGrip = true
+Model = "rods/spin_ironwood"
+Length = 2.4

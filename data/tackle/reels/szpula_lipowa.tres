@@ -13,3 +13,4 @@ RequiredLevel = 1
 Description = "Najtańsza szpula z lipowego drewna."
 BodyColor = Color(0.55, 0.4, 0.25, 1)
 TrimColor = Color(0.7, 0.55, 0.3, 1)
+Model = "reels/small_fjordline"

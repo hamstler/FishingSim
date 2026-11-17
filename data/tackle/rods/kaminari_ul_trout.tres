@@ -16,3 +16,5 @@ Description = "Cienki, miękki kij na drobne przynęty 1-7 g: pstrągi, okonie i
 BlankColor = Color(0.55, 0.6, 0.62, 1)
 WhipColor = Color(0.1, 0.1, 0.12, 1)
 FoamGrip = false
+Model = "rods/spin_hokuto"
+Length = 1.8

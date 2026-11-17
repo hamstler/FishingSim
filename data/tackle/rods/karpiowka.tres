@@ -16,3 +16,5 @@ Description = "Sztywna i mocna, pracuje całym blankiem: na karpie i amury."
 BlankColor = Color(0.05, 0.05, 0.05, 1)
 WhipColor = Color(0.08, 0.08, 0.08, 1)
 FoamGrip = true
+Model = "rods/carp_kaminari"
+Length = 3.6
