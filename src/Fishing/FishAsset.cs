@@ -44,10 +44,17 @@ public sealed class FishAsset
     private static readonly object Gate = new();
     private static readonly Dictionary<string, FishAsset?> Cache = new();
     private static readonly LinkedList<string> Recent = new();
-    private static readonly Dictionary<string, Task<Dictionary<string, Image>>> Decoding = new();
+    private static readonly Dictionary<string, Task<Prepared?>> Decoding = new();
     private static readonly LinkedList<string> DecodeOrder = new();
 
     public static bool Has(FishSpecies sp) => For(sp) != null;
+
+    /// <summary>Whether the species has a model file (cheap: nothing is loaded).</summary>
+    public static bool HasModel(FishSpecies sp)
+    {
+        string id = FishReference.IdOf(sp);
+        return id != "" && FileAccess.FileExists(PathOf(id));
+    }
 
     /// <summary>
     /// Starts decoding a species' pictures on a worker thread (when a fish takes the bait), so that its model is ready
@@ -68,12 +75,11 @@ public sealed class FishAsset
                     dropped.ContinueWith(t =>
                     {
                         if (t.IsCompletedSuccessfully)
-                            foreach (var image in t.Result.Values)
-                                image.Dispose();
+                            t.Result?.DisposeImages();
                     });
                 DecodeOrder.RemoveFirst();
             }
-            Decoding[id] = Task.Run(() => DecodeImages(FileAccess.GetFileAsBytes(path)));
+            Decoding[id] = Task.Run(() => Prepare(path));
             DecodeOrder.AddLast(id);
         }
     }
@@ -103,22 +109,22 @@ public sealed class FishAsset
         {
             try
             {
-                Task<Dictionary<string, Image>>? pending;
+                Task<Prepared?>? pending;
                 lock (Gate)
                 {
                     Decoding.Remove(id, out pending);
                     DecodeOrder.Remove(id);
                 }
-                Dictionary<string, Image>? images = null;
+                Prepared? prepared = null;
                 try
                 {
-                    images = pending?.Result;
+                    prepared = pending?.Result;
                 }
                 catch (AggregateException)
                 {
-                    images = null;     // decoded again below
+                    prepared = null;     // prepared again below
                 }
-                asset = Load(path, images);
+                asset = Load(path, prepared);
             }
             catch (Exception e)
             {
@@ -233,7 +239,7 @@ public sealed class FishAsset
     public const int LiteBody = 1024, LiteFin = 512;
 
     private static readonly Dictionary<string, FishAsset?> LiteCache = new();
-    private static readonly Dictionary<string, Task<Dictionary<string, Image>>> LiteDecoding = new();
+    private static readonly Dictionary<string, Task<Prepared?>> LiteDecoding = new();
 
     /// <summary>
     /// Starts decoding a light copy of the species' model (small pictures) on a worker thread, for the fish swimming in
@@ -248,7 +254,7 @@ public sealed class FishAsset
         {
             if (id == "" || LiteCache.ContainsKey(id) || LiteDecoding.ContainsKey(id) || !FileAccess.FileExists(path))
                 return;
-            LiteDecoding[id] = Task.Run(() => DecodeImages(FileAccess.GetFileAsBytes(path), LiteBody, LiteFin));
+            LiteDecoding[id] = Task.Run(() => Prepare(path, LiteBody, LiteFin));
         }
     }
 
@@ -259,7 +265,7 @@ public sealed class FishAsset
     public static FishAsset? LiteIfReady(FishSpecies sp, out bool pending)
     {
         string id = FishReference.IdOf(sp);
-        Task<Dictionary<string, Image>>? task;
+        Task<Prepared?>? task;
         lock (Gate)
         {
             pending = false;
@@ -288,71 +294,139 @@ public sealed class FishAsset
         return asset;
     }
 
-    private static FishAsset? Load(string path, Dictionary<string, Image>? images)
+    /// <summary>
+    /// A model read and prepared off the main thread: its pictures decoded (mipmaps, block compression), its meshes
+    /// parsed with their levels of detail and, for a foreign model, joined, turned and given tangents. Only the upload
+    /// to the GPU is left for the main thread.
+    /// </summary>
+    private sealed class Prepared
     {
-        var glb = FileAccess.GetFileAsBytes(path);
-        images ??= DecodeImages(glb);
-        try
+        public required Dictionary<string, Image> Images { get; init; }
+        public required List<(string Name, ImporterMesh Mesh, Transform3D Transform)> Parts { get; init; }
+        public bool Foreign { get; init; }
+        public float HeadHeightAtEye { get; init; }
+        public float EyeRadius { get; init; }
+        public Aabb BodyBox { get; init; }
+
+        public void DisposeImages()
         {
-            return Load(path, glb, images);
-        }
-        finally
-        {
-            // The textures hold their own copies; the decoded pictures' native memory goes now, not at finalisation.
-            foreach (var image in images.Values)
+            foreach (var image in Images.Values)
                 image.Dispose();
         }
     }
 
-    private static FishAsset? Load(string path, byte[] glb, Dictionary<string, Image> images)
+    /// <summary>Reads and prepares a model (any thread: no rendering-server calls).</summary>
+    private static Prepared? Prepare(string path, int maxBody = 0, int maxFin = 0)
     {
+        var glb = FileAccess.GetFileAsBytes(path);
+        var images = DecodeImages(glb, maxBody, maxFin);
         var doc = new GltfDocument();
         var state = new GltfState { HandleBinaryImage = 0 };
-        // GLTFDocument decodes every picture in full even when told to discard them (4K WebP on the main thread, and
-        // the memory for it): it is handed the model without its pictures, which are decoded above with their mipmaps.
+        // GLTFDocument decodes every picture in full even when told to discard them (4K WebP, and the memory for it):
+        // it is handed the model without its pictures, which are decoded above with their mipmaps.
         if (doc.AppendFromBuffer(Graphics.ImageDecode.WithoutPictures(glb), path.GetBaseDir(), state) != Error.Ok)
-            return null;
-        var root = doc.GenerateScene(state) as Node3D;
-        if (root == null)
-            return null;
-        var parts = new List<(string Name, Mesh Mesh, Transform3D Transform)>();
-        foreach (var node in root.FindChildren("*", "", true, false))
         {
-            Mesh? mesh = node switch
-            {
-                MeshInstance3D mi => mi.Mesh,
-                // Levels of detail (Godot picks one by the fish's size on the screen): a fish a few metres off in the
-                // lake is drawn with a fraction of its close-up triangles.
-                ImporterMeshInstance3D imi => WithLods(imi.Mesh),
-                _ => null,
-            };
-            if (mesh != null && node is Node3D n3)
-                parts.Add((node.Name, mesh, GlobalOf(n3, root)));
-        }
-        root.Free();
-
-        Texture2D? Picture(string name) =>
-            images.TryGetValue(name, out var image) || images.TryGetValue(name.Split('.')[0], out image)
-                ? ImageTexture.CreateFromImage(image)
-                : null;
-        if (IsForeign(path))
-            return LoadForeign(path, parts, images);
-        var body = parts.FirstOrDefault(p => p.Name == "Body");
-        var eyes = parts.Where(p => p.Name.ToString().StartsWith("Eye")).OrderBy(p => p.Name == "EyeLeft").ToList();
-        if (body.Mesh == null || eyes.Count == 0)
+            foreach (var image in images.Values)
+                image.Dispose();
             return null;
-        var aabb = body.Mesh.GetAabb();
-        var eyeAabb = eyes[0].Mesh.GetAabb();
+        }
+        // The meshes straight from the parsed state (ImporterMesh, plain arrays): no scene is generated (that would
+        // make the GPU meshes here, on a worker thread, and without levels of detail).
+        var nodes = state.GetNodes();
+        var meshes = state.GetMeshes();
+        var parts = new List<(string Name, ImporterMesh Mesh, Transform3D Transform)>();
+        for (int n = 0; n < nodes.Count; n++)
+        {
+            var node = nodes[n];
+            if (node.Mesh < 0 || node.Mesh >= meshes.Count || meshes[node.Mesh].Mesh is not { } im)
+                continue;
+            var xf = node.Xform;
+            for (int p = node.Parent; p >= 0; p = nodes[p].Parent)
+                xf = nodes[p].Xform * xf;
+            parts.Add((node.ResourceName, im, xf));
+        }
+        if (IsForeign(path))
+            return PrepareForeign(path, parts, images);
+        foreach (var part in parts)
+            WithLods(part.Mesh);
+        var body = parts.FirstOrDefault(p => p.Name == "Body");
+        var eyes = parts.Where(p => p.Name.StartsWith("Eye")).ToList();
+        if (body.Mesh == null || eyes.Count == 0)
+            return new Prepared { Images = images, Parts = parts };
+        var verts = body.Mesh.GetSurfaceArrays(0)[(int)Mesh.ArrayType.Vertex].AsVector3Array();
+        var eyeVerts = eyes[0].Mesh.GetSurfaceArrays(0)[(int)Mesh.ArrayType.Vertex].AsVector3Array();
         float eyeZ = eyes[0].Transform.Origin.Z;
         // Body height at the eye, from the body's vertices near it.
         float lo = float.MaxValue, hi = float.MinValue;
-        var verts = body.Mesh.SurfaceGetArrays(0)[(int)Mesh.ArrayType.Vertex].AsVector3Array();
         foreach (var v in verts)
             if (MathF.Abs(v.Z - eyeZ) < 0.008f)
             {
                 lo = MathF.Min(lo, v.Y);
                 hi = MathF.Max(hi, v.Y);
             }
+        var box = BoxOf(verts);
+        return new Prepared
+        {
+            Images = images, Parts = parts, BodyBox = box,
+            EyeRadius = BoxOf(eyeVerts).Size.Y * 0.5f,
+            HeadHeightAtEye = hi > lo ? hi - lo : box.Size.Y * 0.5f,
+        };
+    }
+
+    private static Aabb BoxOf(Vector3[] verts)
+    {
+        var box = verts.Length > 0 ? new Aabb(verts[0], Vector3.Zero) : new Aabb();
+        foreach (var v in verts)
+            box = box.Expand(v);
+        return box;
+    }
+
+    /// <summary>Uploads a prepared model (main thread) and lets go of its decoded pictures.</summary>
+    private static FishAsset? Load(string path, Prepared? prepared)
+    {
+        prepared ??= Prepare(path);
+        if (prepared == null)
+            return null;
+        try
+        {
+            return Build(prepared);
+        }
+        finally
+        {
+            // The textures hold their own copies; the decoded pictures' native memory goes now, not at finalisation.
+            prepared.DisposeImages();
+        }
+    }
+
+    private static FishAsset? Build(Prepared prepared)
+    {
+        var images = prepared.Images;
+        Texture2D? Picture(string name) =>
+            images.TryGetValue(name, out var image) || images.TryGetValue(name.Split('.')[0], out image)
+                ? ImageTexture.CreateFromImage(image)
+                : null;
+        if (prepared.Foreign)
+        {
+            // The skin and the normal map: the first colour picture, and the one named *normal*.
+            string? normalName = images.Keys.FirstOrDefault(k => k.ToLowerInvariant().Contains("normal"));
+            string? colourName = images.Keys.FirstOrDefault(k => k != normalName && !k.ToLowerInvariant().Contains("rough") && !k.ToLowerInvariant().Contains("metal"));
+            return new FishAsset
+            {
+                Foreign = true,
+                Body = prepared.Parts[0].Mesh.GetMesh(),
+                BodyAlbedo = colourName != null ? ImageTexture.CreateFromImage(images[colourName]) : null,
+                BodyNormal = normalName != null ? ImageTexture.CreateFromImage(images[normalName]) : null,
+                EyeRadius = 0.02f,
+                HeadHeightAtEye = prepared.HeadHeightAtEye,
+                MaxHeight = prepared.BodyBox.Size.Y,
+                MaxWidth = prepared.BodyBox.Size.X,
+            };
+        }
+        var parts = prepared.Parts.Select(p => (p.Name, Mesh: (Mesh)p.Mesh.GetMesh(), p.Transform)).ToList();
+        var body = parts.FirstOrDefault(p => p.Name == "Body");
+        var eyes = parts.Where(p => p.Name.StartsWith("Eye")).OrderBy(p => p.Name == "EyeLeft").ToList();
+        if (body.Mesh == null || eyes.Count == 0)
+            return null;
         return new FishAsset
         {
             Body = body.Mesh,
@@ -362,10 +436,10 @@ public sealed class FishAsset
             Iris = Picture("iris"),
             Eyes = eyes.Select(p => (p.Mesh, p.Transform.Origin)).ToList(),
             Corneas = parts.Where(p => p.Name.StartsWith("Cornea")).Select(p => (p.Mesh, p.Transform.Origin)).ToList(),
-            EyeRadius = eyeAabb.Size.Y * 0.5f,
-            HeadHeightAtEye = hi > lo ? hi - lo : aabb.Size.Y * 0.5f,
-            MaxHeight = aabb.Size.Y,
-            MaxWidth = aabb.Size.X,
+            EyeRadius = prepared.EyeRadius,
+            HeadHeightAtEye = prepared.HeadHeightAtEye,
+            MaxHeight = prepared.BodyBox.Size.Y,
+            MaxWidth = prepared.BodyBox.Size.X,
         };
     }
 
@@ -376,7 +450,7 @@ public sealed class FishAsset
     /// &lt;id&gt;.json beside it says {"nose": "+x" | "-x" | "+y" | "-y" | "+z" | "-z", "up": ...}. Pictures: the first
     /// colour picture is the skin, one named *normal* the normal map. The eyes are in the skin, so none are added.
     /// </summary>
-    private static FishAsset? LoadForeign(string path, List<(string Name, Mesh Mesh, Transform3D Transform)> parts,
+    private static Prepared? PrepareForeign(string path, List<(string Name, ImporterMesh Mesh, Transform3D Transform)> parts,
         Dictionary<string, Image> images)
     {
         var verts = new List<Vector3>();
@@ -386,7 +460,7 @@ public sealed class FishAsset
         foreach (var (_, mesh, xf) in parts)
             for (int sfc = 0; sfc < mesh.GetSurfaceCount(); sfc++)
             {
-                var arr = mesh.SurfaceGetArrays(sfc);
+                var arr = mesh.GetSurfaceArrays(sfc);
                 var v = arr[(int)Mesh.ArrayType.Vertex].AsVector3Array();
                 var n = arr[(int)Mesh.ArrayType.Normal].VariantType == Variant.Type.Nil ? null : arr[(int)Mesh.ArrayType.Normal].AsVector3Array();
                 var uv = arr[(int)Mesh.ArrayType.TexUV].VariantType == Variant.Type.Nil ? null : arr[(int)Mesh.ArrayType.TexUV].AsVector2Array();
@@ -406,7 +480,11 @@ public sealed class FishAsset
                         index.Add(start + k);
             }
         if (verts.Count < 3)
+        {
+            foreach (var image in images.Values)
+                image.Dispose();
             return null;
+        }
         var box = new Aabb(verts[0], Vector3.Zero);
         foreach (var v in verts)
             box = box.Expand(v);
@@ -430,7 +508,6 @@ public sealed class FishAsset
         {
             // The head end is thicker across than the tail's thin fin: compare the width in the end tenths.
             float lo = Comp(box.Position, along), len = Comp(size, along);
-            float wHead = 0f, wTail = 0f;
             float minA = float.MaxValue, maxA = float.MinValue, minB = float.MaxValue, maxB = float.MinValue;
             foreach (var v in verts)
             {
@@ -438,11 +515,10 @@ public sealed class FishAsset
                 if (t < 0.15f) { minA = MathF.Min(minA, c); maxA = MathF.Max(maxA, c); }
                 else if (t > 0.85f) { minB = MathF.Min(minB, c); maxB = MathF.Max(maxB, c); }
             }
-            wTail = maxA - minA;
-            wHead = maxB - minB;
+            float wTail = maxA - minA, wHead = maxB - minB;
             nose = Axis(along) * (wHead >= wTail ? 1f : -1f);
         }
-        up = Dir((string?)spec?["up"]) ?? Axis(upAxis) * (upAxis == 1 ? 1f : 1f);
+        up = Dir((string?)spec?["up"]) ?? Axis(upAxis);
         // Model basis: X = right side, Y = up, Z = nose.
         var z = nose.Normalized();
         var y = (up - z * up.Dot(z)).Normalized();
@@ -465,14 +541,13 @@ public sealed class FishAsset
         arrays[(int)Mesh.ArrayType.Normal] = outN;
         arrays[(int)Mesh.ArrayType.TexUV] = uvs.ToArray();
         arrays[(int)Mesh.ArrayType.Index] = index.ToArray();
-        // Tangents for the normal map.
+        // Tangents for the normal map, and levels of detail (a lake fish a few metres off needs a fraction of them).
         var st = new SurfaceTool();
         st.CreateFromArrays(arrays);
         st.GenerateTangents();
-        var bodyMesh = st.Commit();
-        // The skin's and the normal map's pictures.
-        string? normalName = images.Keys.FirstOrDefault(k => k.ToLowerInvariant().Contains("normal"));
-        string? colourName = images.Keys.FirstOrDefault(k => k != normalName && !k.ToLowerInvariant().Contains("rough") && !k.ToLowerInvariant().Contains("metal"));
+        var body = new ImporterMesh();
+        body.AddSurface(Mesh.PrimitiveType.Triangles, st.CommitToArrays());
+        WithLods(body);
         // Height at the head (the eye would sit about a fifth back from the nose).
         float lo2 = float.MaxValue, hi2 = float.MinValue;
         foreach (var v in outV)
@@ -481,36 +556,20 @@ public sealed class FishAsset
                 lo2 = MathF.Min(lo2, v.Y);
                 hi2 = MathF.Max(hi2, v.Y);
             }
-        return new FishAsset
+        return new Prepared
         {
-            Body = bodyMesh,
-            Foreign = true,
-            BodyAlbedo = colourName != null ? ImageTexture.CreateFromImage(images[colourName]) : null,
-            BodyNormal = normalName != null ? ImageTexture.CreateFromImage(images[normalName]) : null,
-            EyeRadius = 0.02f,
+            Images = images, Foreign = true, BodyBox = outBox,
+            Parts = new List<(string, ImporterMesh, Transform3D)> { ("Body", body, Transform3D.Identity) },
             HeadHeightAtEye = hi2 > lo2 ? hi2 - lo2 : outBox.Size.Y * 0.5f,
-            MaxHeight = outBox.Size.Y,
-            MaxWidth = outBox.Size.X,
         };
     }
 
-    private static Mesh? WithLods(ImporterMesh? mesh)
+    /// <summary>Levels of detail for meshes worth it (the body, ray-tubed fins); Godot picks one by screen size.</summary>
+    private static void WithLods(ImporterMesh mesh)
     {
-        if (mesh == null)
-            return null;
-        // Only meshes worth it (the body, ray-tubed fins): the eyes are light already, and every LOD build costs time.
         if (mesh.GetSurfaceCount() > 0 && mesh.GetSurfaceLodCount(0) == 0
             && mesh.GetSurfaceArrays(0)[(int)Mesh.ArrayType.Vertex].AsVector3Array().Length > 1500)
             mesh.GenerateLods(25f, 60f, new Godot.Collections.Array());
-        return mesh.GetMesh();
     }
 
-    /// <summary>A node's transform relative to the scene root (the scene is not in the tree, so no GlobalTransform).</summary>
-    private static Transform3D GlobalOf(Node3D n, Node3D root)
-    {
-        var t = n.Transform;
-        for (var p = n.GetParent() as Node3D; p != null && p != root; p = p.GetParent() as Node3D)
-            t = p.Transform * t;
-        return t;
-    }
 }

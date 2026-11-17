@@ -34,6 +34,15 @@ public partial class ArmIK : SkeletonModifier3D
         /// <summary>The curl last shown (fractions per joint), eased towards the new one each frame.</summary>
         public readonly float[] Shown = new float[3];
         public bool HasShown;
+        /// <summary>The curl found by the last search, reused while the obstacles keep their place in the hand.</summary>
+        public readonly float[] Target = new float[3];
+        public bool HasTarget;
+        // The bones' rest bases, pose positions and the tip's rest offset, read once (the search asks for them
+        // hundreds of times a frame; each is a call into the engine).
+        public readonly Basis[] Rest = new Basis[3];
+        public readonly Vector3[] Offset = new Vector3[3];
+        public Vector3 TipOffset;
+        public bool Cached;
     }
 
     public sealed class Arm
@@ -66,6 +75,10 @@ public partial class ArmIK : SkeletonModifier3D
         internal readonly List<Chain> Chains = new();
         /// <summary>The point between the middle and ring knuckles, in the hand's rest frame (fingers, palm, side).</summary>
         internal Vector3 GapLocal;
+        // The obstacles in the hand bone's frame at the last finger search, and the grip and spread then.
+        internal readonly Capsule[] LastLocal = new Capsule[12];
+        internal int LastCount = -1;
+        internal float LastGrip, LastSplay;
 
         public Arm(string side) => Side = side;
     }
@@ -180,9 +193,10 @@ public partial class ArmIK : SkeletonModifier3D
             Prepare(sk);
         var toSkeleton = sk.GlobalTransform.AffineInverse();
         float dt = Math.Clamp((float)GetProcessDeltaTime(), 0f, 0.1f);
-        foreach (var arm in new[] { Right, Left })
-            if (arm.Enabled && arm.Hand >= 0 && arm.Upper >= 0 && arm.Lower >= 0)
-                Solve(sk, arm, toSkeleton, dt);
+        if (Right.Enabled && Right.Hand >= 0 && Right.Upper >= 0 && Right.Lower >= 0)
+            Solve(sk, Right, toSkeleton, dt);
+        if (Left.Enabled && Left.Hand >= 0 && Left.Upper >= 0 && Left.Lower >= 0)
+            Solve(sk, Left, toSkeleton, dt);
     }
 
     private static void Solve(Skeleton3D sk, Arm arm, Transform3D toSkeleton, float dt)
@@ -262,10 +276,38 @@ public partial class ArmIK : SkeletonModifier3D
             var o = arm.Obstacles[i];
             obstacles[i] = new Capsule(toSkeleton * o.A, toSkeleton * o.B, o.Radius * scale);
         }
+        // Fingers wrapped round a handle that has not moved in the hand (to half a millimetre) keep their last
+        // search's curl: only a regrip, a turned crank or a new tool searches again.
+        var handInv = sk.GetBoneGlobalPose(arm.Hand).AffineInverse();
+        float tolerance = 0.0005f * scale;
+        bool same = arm.LastCount == obstacles.Length && MathF.Abs(arm.LastGrip - arm.Grip) < 1e-4f
+                    && MathF.Abs(arm.LastSplay - arm.Splay) < 1e-4f;
+        for (int i = 0; i < obstacles.Length; i++)
+        {
+            var local = new Capsule(handInv * obstacles[i].A, handInv * obstacles[i].B, obstacles[i].Radius);
+            var last = arm.LastLocal[i];
+            if (same && (local.A.DistanceTo(last.A) > tolerance || local.B.DistanceTo(last.B) > tolerance
+                         || MathF.Abs(local.Radius - last.Radius) > tolerance))
+                same = false;
+            arm.LastLocal[i] = local;
+        }
+        arm.LastCount = obstacles.Length;
+        arm.LastGrip = arm.Grip;
+        arm.LastSplay = arm.Splay;
         Span<float> c = stackalloc float[3];
         Span<float> depth = stackalloc float[Steps + 1];
         foreach (var chain in arm.Chains)
         {
+            if (!chain.Cached)
+            {
+                for (int k = 0; k < 3; k++)
+                {
+                    chain.Rest[k] = sk.GetBoneRest(chain.Bones[k]).Basis;
+                    chain.Offset[k] = sk.GetBonePosePosition(chain.Bones[k]);
+                }
+                chain.TipOffset = sk.GetBoneRest(chain.Tip).Origin;
+                chain.Cached = true;
+            }
             var parent = sk.GetBoneGlobalPose(sk.GetBoneParent(chain.Bones[0]));
             if (chain.Name == "thumb" && arm.ThumbOn is Vector3 on)
             {
@@ -284,6 +326,12 @@ public partial class ArmIK : SkeletonModifier3D
                 continue;
             }
             float radius = chain.Radius * scale;
+            if (same && chain.HasTarget)
+            {
+                for (int k = 0; k < 3; k++)
+                    c[k] = chain.Target[k];
+                goto Show;
+            }
             c[0] = c[1] = c[2] = 0f;
             float limit = chain.Name == "thumb" ? arm.Grip * 0.8f : arm.Grip;
             // Joint by joint from the knuckle out: each phase turns the joints from j0 outwards together, as far as
@@ -328,6 +376,10 @@ public partial class ArmIK : SkeletonModifier3D
                 if (best == Steps)
                     break;      // nothing in the way: closed as far as the grip goes
             }
+            for (int k = 0; k < 3; k++)
+                chain.Target[k] = c[k];
+            chain.HasTarget = true;
+            Show:
             // Eased from frame to frame, so the fingers settle round the handle instead of flickering.
             float ease = chain.HasShown ? 1f - MathF.Exp(-18f * dt) : 1f;
             for (int k = 0; k < 3; k++)
@@ -431,10 +483,10 @@ public partial class ArmIK : SkeletonModifier3D
     /// <summary>A finger joint's local rotation for curl fraction <paramref name="t"/> (and spread for the first joint).</summary>
     private static Basis Rotation(Skeleton3D sk, Chain chain, int k, float t, float splay)
     {
-        var b = sk.GetBoneRest(chain.Bones[k]).Basis * new Basis(chain.Axes[k], chain.Angles[k] * t);
+        var rest = chain.Cached ? chain.Rest[k] : sk.GetBoneRest(chain.Bones[k]).Basis;
         if (k == 0 && chain.SplaySign != 0f && splay != 0f)
-            b = sk.GetBoneRest(chain.Bones[k]).Basis * new Basis(chain.SplayAxis, splay * chain.SplaySign) * new Basis(chain.Axes[k], chain.Angles[k] * t);
-        return b;
+            return rest * new Basis(chain.SplayAxis, splay * chain.SplaySign) * new Basis(chain.Axes[k], chain.Angles[k] * t);
+        return rest * new Basis(chain.Axes[k], chain.Angles[k] * t);
     }
 
     /// <summary>How deep a finger at curl fractions <paramref name="c"/> is inside the obstacles (summed over points
@@ -447,14 +499,13 @@ public partial class ArmIK : SkeletonModifier3D
         float sum = 0f;
         for (int k = 0; k < 3; k++)
         {
-            int bone = chain.Bones[k];
-            g = g * new Transform3D(Rotation(sk, chain, k, c[k], splay), sk.GetBonePosePosition(bone));
+            g = g * new Transform3D(Rotation(sk, chain, k, c[k], splay), chain.Offset[k]);
             var at = g.Origin;
             if (k > 0)
                 sum += Overlap(at, obstacles, radius) + Overlap((prev + at) * 0.5f, obstacles, radius);
             prev = at;
         }
-        var tip = g * sk.GetBoneRest(chain.Tip).Origin;
+        var tip = g * chain.TipOffset;
         return sum + Overlap(tip, obstacles, radius * 0.85f) + Overlap((prev + tip) * 0.5f, obstacles, radius);
     }
 
