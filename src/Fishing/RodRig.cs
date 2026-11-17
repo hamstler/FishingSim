@@ -49,13 +49,15 @@ public partial class RodRig : Node3D
         yield return (ReelBody + new Vector3(0, -0.02f, 0), ReelBody + new Vector3(0, 0.07f, 0), 0.024f);
     }
 
-    /// <summary>What the hand on the crank must not enter (rig space): the knob, the crank arm, the reel's body.</summary>
-    public static IEnumerable<(Vector3 A, Vector3 B, float Radius)> CrankObstacles(float angle)
+    /// <summary>What the hand on the crank must not enter (rig space): the knob, the crank arm, the reel's body
+    /// (this rig's reel: the built one or the modelled one).</summary>
+    public IEnumerable<(Vector3 A, Vector3 B, float Radius)> CrankObstacles(float angle)
     {
         var knob = KnobAt(angle);
+        var body = ModelledReel ? ModelReelBody : ReelBody;
         yield return (knob + new Vector3(0.012f, 0f, 0f), knob - new Vector3(0.012f, 0f, 0f), 0.0085f);
         yield return (CrankAxis + new Vector3(-0.008f, 0f, 0f), knob + new Vector3(0.018f, 0f, 0f), 0.0045f);
-        yield return (ReelBody + new Vector3(0, -0.02f, 0), ReelBody + new Vector3(0, 0.07f, 0), 0.024f);
+        yield return (body + new Vector3(0, -0.02f, 0), body + new Vector3(0, 0.07f, 0), 0.024f);
     }
 
     private const float SeatCentre = 0.1f;
@@ -66,25 +68,30 @@ public partial class RodRig : Node3D
     private static readonly Vector3 BuiltCrankAxis = ReelBody + new Vector3(-0.026f, 0f, 0f);
     private const float BuiltCrankArm = 0.046f, BuiltKnobOut = -0.05f;
 
-    /// <summary>The crank's hub (rig space): the built reel's, or the modelled reel's once one is in use (UseModel).</summary>
-    private static Vector3 CrankAxis = BuiltCrankAxis;
+    /// <summary>The crank's hub (rig space): the built reel's, or the modelled reel's when this rig shows one.</summary>
+    private Vector3 CrankAxis = BuiltCrankAxis;
 
-    /// <summary>Length of the crank arm (axis to knob).</summary>
-    public static float CrankArm { get; private set; } = BuiltCrankArm;
+    /// <summary>Length of the crank arm (axis to knob) of this rig's reel.</summary>
+    public float CrankArm { get; private set; } = BuiltCrankArm;
 
     /// <summary>The crank knob's centre at a crank angle (rig space): it turns in the plane across the left side.</summary>
-    public static Vector3 KnobAt(float angle) =>
+    public Vector3 KnobAt(float angle) =>
         CrankAxis + new Vector3(KnobOut, MathF.Sin(angle) * CrankArm, -MathF.Cos(angle) * CrankArm);
 
     /// <summary>How far the knob stands out to the left of the crank's axis: clear of the reel, so the left hand holds
     /// it between the thumb and the index finger.</summary>
-    public static float KnobOut { get; private set; } = BuiltKnobOut;
+    public float KnobOut { get; private set; } = BuiltKnobOut;
+
+    /// <summary>False before the rig enters the tree: the built rod and reel only (IconStudio photographs the built
+    /// parts, which carry each item's colours).</summary>
+    public bool UseModels { get; set; } = true;
 
     // The user's reel (assets/models/meshy_reel.glb, laid under the seat and cut into Body, Rotor and Crank by
     // tools/assets/meshy_rod_split.py --reel): the pivots and the crank's size as that script prints them.
     private static readonly Vector3 ModelCrankHub = new(-0.045f, 0.089f, -0.0965f);
     private static readonly Vector3 ModelRotorPivot = new(-0.0023f, 0.115f, -0.0879f);
     private const float ModelCrankArm = 0.0364f, ModelKnobOut = -0.0543f;
+    private static readonly Vector3 ModelReelBody = new(-0.0023f, 0.088f, -0.0879f);
     private static readonly Vector3 ModelBailPivot = new(0.0108f, 0.0414f, 0.0487f);      // rotor space
     private static readonly Vector3 ModelBailAxis = new Vector3(-0.6952f, 0.0059f, -0.7187f).Normalized();
     private Node3D? _modelRotor, _modelCrank, _modelBail;
@@ -180,7 +187,8 @@ public partial class RodRig : Node3D
         Tip = new Node3D { Position = new Vector3(0, SegmentLength, 0) };
         parent.AddChild(Tip);
         SetLook(_lookRod, _lookReel);
-        UseModel();
+        if (UseModels)
+            UseModel();
     }
 
     private Node3D? _procHandle, _builtReel;
@@ -188,16 +196,18 @@ public partial class RodRig : Node3D
     private readonly List<MeshInstance3D> _modelSections = new();
     private bool _quiverOn;
 
-    /// <summary>The rod modelled by the user (assets/models/meshy_rod_player.glb, cut by tools/assets/meshy_rod_split.py
+    /// <summary>The user's rod and reel models (PropAsset ids); Main warms them while the menu shows.</summary>
+    public const string ModelRodId = "meshy_rod2_player", ModelReelId = "meshy_reel";
+
+    /// <summary>The rod modelled by the user (assets/models/meshy_rod2_player.glb, cut by tools/assets/meshy_rod_split.py
     /// into the handle and the ten bending sections): stands in for the built handle and blank, each section hung on
-    /// its joint so it bends as the built one did; the reel stays the built, animated one. Not without a screen.</summary>
+    /// its joint so it bends as the built one did. Not without a screen.</summary>
     public bool Modelled { get; private set; }
 
     private void UseModel()
     {
         UseModelReel();
-        var rodId = World.Props.PropAsset.Named("meshy_rod2_player") != null ? "meshy_rod2_player" : "meshy_rod_player";
-        if (World.Props.PropAsset.Named(rodId) is not { } parts || !parts.TryGetValue("Handle", out var handleMesh))
+        if (World.Props.PropAsset.Named(ModelRodId) is not { } parts || !parts.TryGetValue("Handle", out var handleMesh))
             return;
         for (int i = 0; i < _segments.Count; i++)
             if (!parts.ContainsKey($"Seg{i}"))
@@ -222,7 +232,7 @@ public partial class RodRig : Node3D
 
     private void UseModelReel()
     {
-        if (World.Props.PropAsset.Named("meshy_reel") is not { } parts || !parts.TryGetValue("Body", out var body)
+        if (World.Props.PropAsset.Named(ModelReelId) is not { } parts || !parts.TryGetValue("Body", out var body)
             || !parts.TryGetValue("Rotor", out var rotor) || !parts.TryGetValue("Crank", out var crank)
             || !parts.TryGetValue("Bail", out var bail))
             return;

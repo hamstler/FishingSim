@@ -18,7 +18,7 @@ public partial class IconStudio : Node
     public enum Shot { Lure, Plate, Rod, Reel }
 
     /// <summary>Bump when the models or the studio change.</summary>
-    public const int Version = 2;
+    public const int Version = 3;
     private const int RenderSize = 512;
     private const string Dir = "user://texcache/icons";
 
@@ -263,7 +263,7 @@ public partial class IconStudio : Node
             }
             case Shot.Rod:
             {
-                var rig = new RodRig();
+                var rig = new RodRig { UseModels = false };   // the built parts carry each item's colours
                 _stage.AddChild(rig);
                 rig.Position = Vector3.Zero;
                 rig.SetLook((RodData)item, null);
@@ -277,7 +277,7 @@ public partial class IconStudio : Node
             }
             case Shot.Reel:
             {
-                var rig = new RodRig();
+                var rig = new RodRig { UseModels = false };   // the built parts carry each item's colours
                 _stage.AddChild(rig);
                 rig.Position = Vector3.Zero;
                 rig.SetLook(null, (ReelData)item);

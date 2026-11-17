@@ -60,23 +60,23 @@ public sealed class FishAsset
 
     /// <summary>
     /// Starts decoding a species' pictures on a worker thread (when a fish takes the bait), so that its model is ready
-    /// without a hitch when the fish is hooked.
+    /// without a hitch when the fish is hooked. True when this call started a preparation.
     /// </summary>
-    public static void Prefetch(FishSpecies sp, bool urgent = false)
+    public static bool Prefetch(FishSpecies sp, bool urgent = false)
     {
         string id = FishReference.IdOf(sp);
         if (id == "")
-            return;
+            return false;
         lock (Gate)
             if (Cache.ContainsKey(id) || Decoding.ContainsKey(id))
-                return;
+                return false;
         string path = PathOf(id);
         if (!FileAccess.FileExists(path))
-            return;
+            return false;
         lock (Gate)
         {
             if (Cache.ContainsKey(id) || Decoding.ContainsKey(id))
-                return;
+                return false;
             // A preparation once started always finishes: at most MaxRunning run at a time and a further request
             // waits (the caller asks again next frame). Dropping running ones to make room restarted the same few
             // decodes every frame when five species swam into view at once, and no model was ever made.
@@ -85,13 +85,14 @@ public sealed class FishAsset
                 if (!task.IsCompleted)
                     running++;
             if (running >= MaxRunning && !urgent)
-                return;     // the fish on the line (urgent) never waits behind the lake's
+                return false;     // the fish on the line (urgent) never waits behind the lake's
             // Finished ones wait for their model; past MaxWaiting the oldest finished one is let go.
             while (Decoding.Count >= MaxWaiting && DropOldestFinished())
             {
             }
             Decoding[id] = Task.Run(() => Prepare(path));
             DecodeOrder.AddLast(id);
+            return true;
         }
     }
 

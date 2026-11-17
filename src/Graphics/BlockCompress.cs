@@ -40,7 +40,7 @@ public static class BlockCompress
         int w = source.GetWidth(), h = source.GetHeight();
         var format = FormatOf(kind);
         // Godot's own layout for this format (mip offsets, blocks of at least 4x4 for the smallest levels).
-        var layout = Image.CreateEmpty(w, h, source.HasMipmaps(), format);
+        using var layout = Image.CreateEmpty(w, h, source.HasMipmaps(), format);
         int levels = layout.GetMipmapCount() + 1;
         int sourceLevels = source.GetMipmapCount() + 1;
         var dst = new byte[layout.GetData().Length];

@@ -371,12 +371,10 @@ public partial class FishPopulation : Node3D
                 var sp = SpeciesOf(a);
                 if (sp == null)
                     continue;
-                // One preparation asked for a frame (the nearest fish first); the rest wait their turn.
+                // One preparation started a frame (the nearest fish first; a species already decoding does not
+                // count, so all of FishAsset's worker slots fill); the rest wait their turn.
                 if (!askedOne && !FishAsset.IsReady(sp))
-                {
-                    FishAsset.Prefetch(sp);
-                    askedOne = true;
-                }
+                    askedOne = FishAsset.Prefetch(sp);
                 if (madeOne || !FishAsset.IsReady(sp))
                     continue;
                 model = FishModel.Create(sp, a.Weight, detailed: true);
