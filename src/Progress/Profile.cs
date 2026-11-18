@@ -270,7 +270,7 @@ public sealed class Profile
         CatchCounts = new();
         Owned = new()
         {
-            ["rod"] = new() { "junior" },
+            ["rod"] = new() { "s_jesion_240" },
             ["reel"] = new() { "mlynek1000" },
             ["line"] = new() { "g_zylka_016_przezroczysta" },
             ["hook"] = new() { "hak5" },
@@ -279,7 +279,7 @@ public sealed class Profile
         BaitCounts = new() { ["worm"] = 20, ["bread"] = 10 };
         Equipped = new()
         {
-            ["rod"] = "junior", ["reel"] = "mlynek1000", ["line"] = "g_zylka_016_przezroczysta", ["hook"] = "hak5", ["bait"] = "worm",
+            ["rod"] = "s_jesion_240", ["reel"] = "mlynek1000", ["line"] = "g_zylka_016_przezroczysta", ["hook"] = "hak5", ["bait"] = "worm",
             ["leader"] = TackleSlotExtensions.NoLeader,
         };
         RodSlots = new() { new(), new() };
@@ -479,13 +479,56 @@ public sealed class Profile
         return null;
     }
 
+    // ------------------------------------------------------------------ retired tackle
+    /// <summary>Rods and reels taken out of the shop (every one now stands on the user's Meshy models): a save that owns
+    /// or uses one gets its nearest successor instead (MigrateRetired, after loading).</summary>
+    public static readonly IReadOnlyDictionary<string, string> RetiredRods = new Dictionary<string, string>
+    {
+        ["junior"] = "s_jesion_240", ["teleskop"] = "s_jesion_300", ["karpiowka"] = "s_koi_360",
+        ["wierzbowa_splawikowa"] = "s_bologna_360", ["cisowy_spinning"] = "s_raiden_210", ["grabowy_gruntowy"] = "s_nordlys_300",
+        ["trzcinowa_odleglosciowa"] = "s_fjell_match_420", ["jesionowy_spinning"] = "s_raiden_240", ["sumowy_kij"] = "s_silurus_pro_270",
+        ["wedka_mistrza"] = "s_fjell_match_450", ["ostoja_picker"] = "s_picker_plus_270", ["kaminari_ul_trout"] = "s_hikari_180",
+        ["kaminari_jig"] = "s_raiden_270", ["borealis_heavy_feeder"] = "s_nordlys_390", ["ironwood_musky"] = "s_hammerhead_220",
+    };
+
+    public static readonly IReadOnlyDictionary<string, string> RetiredReels = new Dictionary<string, string>
+    {
+        ["mlynek3000"] = "r_hokuto_kaiten4000", ["freerunner"] = "r_kaminari_longcast5000", ["szpula_lipowa"] = "r_fjordline_lett2500",
+        ["orzechowy_lekki"] = "r_fjordline_lett2500", ["mosiezny_hamulec"] = "r_fjordline_lett2500", ["hokuto_kaiten2500"] = "mlynek1000",
+    };
+
+    /// <summary>Replaces retired rods and reels in the owned lists and in every rod slot's equipment.</summary>
+    public void MigrateRetired()
+    {
+        foreach (var (key, map) in new[] { ("rod", RetiredRods), ("reel", RetiredReels) })
+        {
+            if (Owned.TryGetValue(key, out var list))
+            {
+                var moved = new List<string>();
+                foreach (var id in list)
+                {
+                    string now = map.TryGetValue(id, out var to) ? to : id;
+                    if (!moved.Contains(now))
+                        moved.Add(now);
+                }
+                Owned[key] = moved;
+            }
+            for (int slot = 0; slot < 3; slot++)
+            {
+                var eq = EquippedFor(slot);
+                if (eq.TryGetValue(key, out var id) && map.TryGetValue(id, out var to))
+                    eq[key] = to;
+            }
+        }
+    }
+
     // ------------------------------------------------------------------ broken gear and the free kit
     /// <summary>The starter kit handed out free at the tackle shop to anglers who cannot afford anything else (and the
     /// first tackle): a balanced set whose weakest link is the line (rod 3 kg, 0.16 mm mono 2.7 kg, hook #10 3.6 kg,
     /// reel drag up to 2 kg, so the drag slips before anything breaks).</summary>
     public static readonly IReadOnlyDictionary<TackleSlot, string> StarterKit = new Dictionary<TackleSlot, string>
     {
-        [TackleSlot.Rod] = "junior", [TackleSlot.Reel] = "mlynek1000", [TackleSlot.Line] = "g_zylka_016_przezroczysta", [TackleSlot.Hook] = "hak5",
+        [TackleSlot.Rod] = "s_jesion_240", [TackleSlot.Reel] = "mlynek1000", [TackleSlot.Line] = "g_zylka_016_przezroczysta", [TackleSlot.Hook] = "hak5",
     };
 
     /// <summary>Worms that come with the free kit when the angler has no bait at all.</summary>

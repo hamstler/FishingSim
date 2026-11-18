@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ReelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/ReelData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Fjordline Lett 2500 · lekki spinningowy"
+DragMax = 4.0
+ReelSpeed = 3.7
+LineCapacity = 100.0
+Price = 220
+RequiredLevel = 2
+Description = "Lekki kołowrotek z drewnianą gałką: ultralight i lekki spławik."
+BodyColor = Color(0.12, 0.18, 0.12, 1)
+TrimColor = Color(0.78, 0.6, 0.3, 1)
+Model = "reels/small_fjordline"

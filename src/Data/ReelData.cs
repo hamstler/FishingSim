@@ -14,6 +14,10 @@ public partial class ReelData : TackleItem
     /// <summary>Metres of line on the spool.</summary>
     [Export] public float LineCapacity { get; set; } = 100f;
 
+    /// <summary>The 3D model on the rod (PropAsset id under assets/models with its .json frame, e.g. "reels/small_hokuto";
+    /// empty = RodRig.ModelReelId).</summary>
+    [Export] public string Model { get; set; } = "";
+
     /// <summary>Housing colour of the reel.</summary>
     [Export] public Color BodyColor { get; set; } = new(0.2f, 0.21f, 0.23f);
 

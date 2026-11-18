@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Hokuto Hikari UL 1,8 m · ultralekki spinning (krótka)"
+Kind = 1
+CastMult = 0.919
+MaxLoad = 3.08
+ShockAbsorb = 0.223
+Action = 0.35
+Price = 210
+RequiredLevel = 2
+Description = "Delikatny ultralight z cienką szczytówką: pstrągi, okonie i drobne obrotówki. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy."
+BlankColor = Color(0.55, 0.58, 0.6, 1)
+WhipColor = Color(0.92, 0.92, 0.9, 1)
+FoamGrip = false
+Length = 1.8
+Model = "rods/spin_hokuto"

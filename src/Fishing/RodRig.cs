@@ -54,7 +54,7 @@ public partial class RodRig : Node3D
     public IEnumerable<(Vector3 A, Vector3 B, float Radius)> CrankObstacles(float angle)
     {
         var knob = KnobAt(angle);
-        var body = ModelledReel ? ModelReelBody : ReelBody;
+        var body = ModelledReel ? _modelBodyCentre : ReelBody;
         yield return (knob + new Vector3(0.012f, 0f, 0f), knob - new Vector3(0.012f, 0f, 0f), 0.0085f);
         yield return (CrankAxis + new Vector3(-0.008f, 0f, 0f), knob + new Vector3(0.018f, 0f, 0f), 0.0045f);
         yield return (body + new Vector3(0, -0.02f, 0), body + new Vector3(0, 0.07f, 0), 0.024f);
@@ -86,15 +86,41 @@ public partial class RodRig : Node3D
     /// parts, which carry each item's colours).</summary>
     public bool UseModels { get; set; } = true;
 
-    // The user's reel (assets/models/meshy_reel.glb, laid under the seat and cut into Body, Rotor and Crank by
-    // tools/assets/meshy_rod_split.py --reel): the pivots and the crank's size as that script prints them.
-    private static readonly Vector3 ModelCrankHub = new(-0.045f, 0.089f, -0.0965f);
-    private static readonly Vector3 ModelRotorPivot = new(-0.0023f, 0.115f, -0.0879f);
-    private const float ModelCrankArm = 0.0364f, ModelKnobOut = -0.0543f;
-    private static readonly Vector3 ModelReelBody = new(-0.0023f, 0.088f, -0.0879f);
-    private static readonly Vector3 ModelBailPivot = new(0.0108f, 0.0414f, 0.0487f);      // rotor space
-    private static readonly Vector3 ModelBailAxis = new Vector3(-0.6952f, 0.0059f, -0.7187f).Normalized();
-    private Node3D? _modelRotor, _modelCrank, _modelBail;
+    /// <summary>
+    /// A modelled reel's moving parts (rig space, from the &lt;id&gt;.json that tools/assets/meshy_rod_split.py --reel
+    /// writes beside the model): the crank's hub, arm and knob offset, the rotor's pivot on the spool's axis, the bail's
+    /// pivot (rotor space) and axis, the body's centre (the hand's obstacle).
+    /// </summary>
+    private sealed record ReelFrame(Vector3 Hub, float Arm, float KnobOut, Vector3 Rotor, Vector3 BailPivot, Vector3 BailAxis, Vector3 Body);
+
+    private static readonly Dictionary<string, ReelFrame?> Frames = new();
+
+    private static ReelFrame? FrameOf(string id)
+    {
+        if (Frames.TryGetValue(id, out var cached))
+            return cached;
+        ReelFrame? frame = null;
+        string path = $"res://assets/models/{id}.json";
+        if (FileAccess.FileExists(path))
+        {
+            try
+            {
+                var j = System.Text.Json.Nodes.JsonNode.Parse(FileAccess.GetFileAsString(path))!;
+                Vector3 V(string key) => new((float)j[key]![0]!, (float)j[key]![1]!, (float)j[key]![2]!);
+                frame = new ReelFrame(V("hub"), (float)j["arm"]!, (float)j["knob_out"]!, V("rotor"), V("bail_pivot"),
+                    V("bail_axis").Normalized(), V("body"));
+            }
+            catch (Exception e)
+            {
+                GD.PushWarning($"reel frame {path}: {e.Message}");
+            }
+        }
+        Frames[id] = frame;
+        return frame;
+    }
+
+    private Node3D? _modelRotor, _modelCrank, _modelBail, _modelReelBody;
+    private Vector3 _bailAxis = Vector3.Right, _modelBodyCentre;
 
     /// <summary>Screenshots: FISHSIM_BAIL=0..1 holds the bail at least this far open.</summary>
     private static readonly float BailShot = float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_BAIL"),
@@ -186,9 +212,8 @@ public partial class RodRig : Node3D
         _procSections[^1].AddChild(top);
         Tip = new Node3D { Position = new Vector3(0, SegmentLength, 0) };
         parent.AddChild(Tip);
+        _built = true;
         SetLook(_lookRod, _lookReel);
-        if (UseModels)
-            UseModel();
     }
 
     private Node3D? _procHandle, _builtReel;
@@ -196,25 +221,61 @@ public partial class RodRig : Node3D
     private readonly List<MeshInstance3D> _modelSections = new();
     private bool _quiverOn;
 
-    /// <summary>The user's rod and reel models (PropAsset ids); Main warms them while the menu shows.</summary>
+    private bool _built;
+
+    /// <summary>The default rod and reel models (PropAsset ids) for items that name none; Main warms them while the menu
+    /// shows.</summary>
     public const string ModelRodId = "meshy_rod2_player", ModelReelId = "meshy_reel";
 
-    /// <summary>The rod modelled by the user (assets/models/meshy_rod2_player.glb, cut by tools/assets/meshy_rod_split.py
-    /// into the handle and the ten bending sections): stands in for the built handle and blank, each section hung on
+    /// <summary>A rod modelled by the user (RodData.Model, else ModelRodId: a .glb cut by tools/assets/meshy_rod_split.py
+    /// into the handle and the ten bending sections) stands in for the built handle and blank, each section hung on
     /// its joint so it bends as the built one did. Not without a screen.</summary>
     public bool Modelled { get; private set; }
 
-    private void UseModel()
+    private string? _rodModelId, _reelModelId;
+    private MeshInstance3D? _modelHandle;
+
+    /// <summary>The rod's length (m, butt to tip): the ten sections share what the handle leaves.</summary>
+    public float RodLength { get; private set; } = DefaultLength;
+
+    public const float DefaultLength = BlankStart + Joints * SegmentLength - ButtY;
+    private const float ButtY = -0.33f;
+
+    /// <summary>One section's length for this rod.</summary>
+    public float SectionLength => (RodLength + ButtY - BlankStart) / Joints;
+
+    /// <summary>Takes a replaced model's node out of the tree at once (a queued free left it there, holding its name,
+    /// till the frame's end: the new one got renamed and IconStudio missed it) and frees it.</summary>
+    private static void Drop(Node? node)
     {
-        UseModelReel();
-        if (World.Props.PropAsset.Named(ModelRodId) is not { } parts || !parts.TryGetValue("Handle", out var handleMesh))
+        if (node == null)
+            return;
+        node.GetParent()?.RemoveChild(node);
+        node.QueueFree();
+    }
+
+    private void ShowRodModel(string id)
+    {
+        if (id == _rodModelId)
+            return;
+        _rodModelId = id;
+        Drop(_modelHandle);
+        _modelHandle = null;
+        foreach (var piece in _modelSections)
+            Drop(piece);
+        _modelSections.Clear();
+        Modelled = false;
+        _procHandle!.Visible = true;
+        foreach (var proc in _procSections)
+            proc.Visible = true;
+        if (id == "" || World.Props.PropAsset.Named(id) is not { } parts || !parts.TryGetValue("Handle", out var handleMesh))
             return;
         for (int i = 0; i < _segments.Count; i++)
             if (!parts.ContainsKey($"Seg{i}"))
                 return;
         Modelled = true;
-        _procHandle!.Visible = false;
-        AddChild(new MeshInstance3D { Name = "ModelHandle", Mesh = handleMesh, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        _procHandle.Visible = false;
+        AddChild(_modelHandle = new MeshInstance3D { Name = "ModelHandle", Mesh = handleMesh, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
         for (int i = 0; i < _segments.Count; i++)
         {
             _procSections[i].Visible = false;
@@ -222,38 +283,75 @@ public partial class RodRig : Node3D
             _segments[i].AddChild(piece);
             _modelSections.Add(piece);
         }
+        ApplyLength();
         ShowQuiver();
     }
 
-    /// <summary>The user's reel in place of the built one: the body stands, the rotor with the bail turns about the
-    /// spool's axis and the crank about its hub (SetCrank), the bail's wire swings over about its pivots (SetBail);
-    /// the hands follow its knob (KnobAt).</summary>
+    /// <summary>Stretches the ten sections to the rod's length (the handle keeps its size): each joint sits one section
+    /// further, each section's visible parts are scaled along the blank.</summary>
+    private void ApplyLength()
+    {
+        float len = SectionLength, k = len / SegmentLength;
+        for (int i = 0; i < _segments.Count; i++)
+        {
+            if (i > 0)
+                _segments[i].Position = new Vector3(0f, len, 0f);
+            _procSections[i].Scale = new Vector3(1f, k, 1f);
+            if (i < _modelSections.Count)
+                _modelSections[i].Scale = new Vector3(1f, k, 1f);
+        }
+        Tip.Position = new Vector3(0f, len, 0f);
+    }
+
+    /// <summary>A reel modelled by the user (ReelData.Model, else ModelReelId; its frame in the .json beside it) in place
+    /// of the built one: the body stands, the rotor with the bail turns about the spool's axis and the crank about its
+    /// hub (SetCrank), the bail's wire swings over about its pivots (SetBail); the hands follow its knob (KnobAt).</summary>
     public bool ModelledReel { get; private set; }
 
-    private void UseModelReel()
+    private void ShowReelModel(string id)
     {
-        if (World.Props.PropAsset.Named(ModelReelId) is not { } parts || !parts.TryGetValue("Body", out var body)
-            || !parts.TryGetValue("Rotor", out var rotor) || !parts.TryGetValue("Crank", out var crank)
-            || !parts.TryGetValue("Bail", out var bail))
+        if (id == _reelModelId)
+            return;
+        _reelModelId = id;
+        Drop(_modelReelBody);
+        Drop(_modelRotor);
+        Drop(_modelCrank);
+        _modelReelBody = _modelRotor = _modelCrank = _modelBail = null;
+        ModelledReel = false;
+        _builtReel!.Visible = true;
+        CrankAxis = BuiltCrankAxis;
+        CrankArm = BuiltCrankArm;
+        KnobOut = BuiltKnobOut;
+        if (id == "" || FrameOf(id) is not { } f || World.Props.PropAsset.Named(id) is not { } parts
+            || !parts.TryGetValue("Body", out var body) || !parts.TryGetValue("Rotor", out var rotor)
+            || !parts.TryGetValue("Crank", out var crank))
             return;
         ModelledReel = true;
-        _builtReel!.Visible = false;
+        _builtReel.Visible = false;
         var off = GeometryInstance3D.ShadowCastingSetting.Off;
-        AddChild(new MeshInstance3D { Name = "ModelReel", Mesh = body, CastShadow = off });
-        _modelRotor = new Node3D { Name = "ModelRotor", Position = ModelRotorPivot };
+        AddChild(_modelReelBody = new MeshInstance3D { Name = "ModelReel", Mesh = body, CastShadow = off });
+        _modelRotor = new Node3D { Name = "ModelRotor", Position = f.Rotor };
         _modelRotor.AddChild(new MeshInstance3D { Mesh = rotor, CastShadow = off });
         AddChild(_modelRotor);
-        _modelBail = new Node3D { Name = "ModelBail", Position = ModelBailPivot };
-        _modelBail.AddChild(new MeshInstance3D { Mesh = bail, CastShadow = off });
-        _modelRotor.AddChild(_modelBail);
-        _modelCrank = new Node3D { Name = "ModelCrank", Position = ModelCrankHub };
+        if (parts.TryGetValue("Bail", out var bail))          // a reel whose wire could not be cut keeps it on the rotor
+        {
+            _modelBail = new Node3D { Name = "ModelBail", Position = f.BailPivot };
+            _modelBail.AddChild(new MeshInstance3D { Mesh = bail, CastShadow = off });
+            _modelRotor.AddChild(_modelBail);
+        }
+        _modelCrank = new Node3D { Name = "ModelCrank", Position = f.Hub };
         _modelCrank.AddChild(new MeshInstance3D { Mesh = crank, CastShadow = off });
         AddChild(_modelCrank);
-        CrankAxis = ModelCrankHub;
-        CrankArm = ModelCrankArm;
-        KnobOut = ModelKnobOut;
+        _bailAxis = f.BailAxis;
+        _modelBodyCentre = f.Body;
+        CrankAxis = f.Hub;
+        CrankArm = f.Arm;
+        KnobOut = f.KnobOut;
         SetCrank(_crankAngle);
+        SetBail(_bailOpen);
     }
+
+    private float _bailOpen;
 
     private float _crankAngle;
 
@@ -328,8 +426,15 @@ public partial class RodRig : Node3D
     {
         _lookRod = rod ?? _lookRod;
         _lookReel = reel ?? _lookReel;
-        if (_blank == null)
+        if (_blank == null || !_built)
             return;
+        RodLength = _lookRod is { Length: > 1f } r ? Math.Clamp(r.Length, 1.6f, 4.6f) : DefaultLength;
+        if (UseModels)
+        {
+            ShowRodModel(_lookRod is { Model: { Length: > 0 } m } ? m : ModelRodId);
+            ShowReelModel(_lookReel is { Model: { Length: > 0 } n } ? n : ModelReelId);
+        }
+        ApplyLength();
         if (rod != null)
         {
             _blank.SetShaderParameter("base_color", rod.BlankColor);
@@ -499,8 +604,9 @@ public partial class RodRig : Node3D
         open = Math.Clamp(MathF.Max(open, BailShot), 0f, 1f);
         if (_bail != null)
             _bail.Rotation = new Vector3(open * 2.7f, 0f, 0f);
+        _bailOpen = open;
         if (_modelBail != null)
-            _modelBail.Basis = new Basis(ModelBailAxis, open * 2.7f);
+            _modelBail.Basis = new Basis(_bailAxis, open * 2.7f);
     }
 
     /// <summary>Number of bending sections of the blank (matches <see cref="Core.Physics.RodBendModel"/>).</summary>

@@ -274,6 +274,7 @@ public static class ProfileSerializer
             foreach (var (k, v) in eq)
                 if (v != null) p.Equipped[k] = v.GetValue<string>();
         }
+        p.MigrateRetired();
         if (d["meal"] is JsonObject m && Str(m["name"]) is string mealName)
         {
             p.Meal = new Core.Camp.MealBuff(mealName, Float(m["hours"], 1f), Float(m["xp_bonus"], 0f), Float(m["bite_bonus"], 0f));

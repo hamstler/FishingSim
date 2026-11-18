@@ -50,19 +50,19 @@ public sealed class ProgressSuite : ITestSuite
 
         t.Section("shop rules");
         var q = new Profile();
-        t.Check(q.Buy(TackleSlot.Rod, "teleskop", 120, 2) == "Wymagany poziom 2", "level gate blocks the Teleskop rod");
+        t.Check(q.Buy(TackleSlot.Rod, "s_jesion_300", 120, 2) == "Wymagany poziom 2", "level gate blocks a level-2 rod");
         q.Xp = 60; q.Level = 2;
-        t.Check(q.Buy(TackleSlot.Rod, "teleskop", 120, 2) == "Za mało pieniędzy", "not enough money (60 < 120)");
+        t.Check(q.Buy(TackleSlot.Rod, "s_jesion_300", 120, 2) == "Za mało pieniędzy", "not enough money (60 < 120)");
         q.Money = 200;
-        t.Check(q.Buy(TackleSlot.Rod, "teleskop", 120, 2) == null && q.Money == 80 && q.Owns(TackleSlot.Rod, "teleskop"), "buying works and charges 120 zł");
-        t.Check(q.Buy(TackleSlot.Rod, "teleskop", 120, 2) == "Już to masz", "cannot buy the same rod twice");
+        t.Check(q.Buy(TackleSlot.Rod, "s_jesion_300", 120, 2) == null && q.Money == 80 && q.Owns(TackleSlot.Rod, "s_jesion_300"), "buying works and charges 120 zł");
+        t.Check(q.Buy(TackleSlot.Rod, "s_jesion_300", 120, 2) == "Już to masz", "cannot buy the same rod twice");
         t.Check(q.Buy(TackleSlot.Bait, "worm", 10, 1, 10) == null && q.BaitCounts["worm"] == 30, "a bait pack adds 10 pieces");
 
         t.Section("loadout only cycles owned gear");
         var lo = new TackleLoadout();
         var pr = new Profile();
         lo.Attach(pr);
-        t.Check(lo.Rod.ItemId == "junior", "starts on the Junior rod");
+        t.Check(lo.Rod.ItemId == "s_jesion_240", "starts on the Ostoja Jesion 2,4 m");
         // Hooks follow the real scale from #24 (smallest) to 4/0 (largest), stronger and heavier as they grow.
         var hooks = lo.Items(TackleSlot.Hook).Cast<HookData>().OrderBy(h => h.Size).ToList();
         t.Check(hooks.Count == 17 && hooks[0].Label == "#24" && hooks[^1].Label == "4/0",
@@ -74,21 +74,21 @@ public sealed class ProgressSuite : ITestSuite
         t.Check(rising, "a bigger hook (smaller number, then n/0) is stronger and heavier");
         // The starter kit is balanced: the line gives first, the reel's drag slips before it.
         var kitLine = GD.Load<LineData>("res://data/tackle/lines/g_zylka_016_przezroczysta.tres");
-        var kitRod = GD.Load<RodData>("res://data/tackle/rods/junior.tres");
+        var kitRod = GD.Load<RodData>("res://data/tackle/rods/s_jesion_240.tres");
         var kitHook = GD.Load<HookData>("res://data/tackle/hooks/hak5.tres");
         var kitReel = GD.Load<ReelData>("res://data/tackle/reels/mlynek1000.tres");
         t.Check(lo.Line.ItemId == "g_zylka_016_przezroczysta" && kitLine.Strength < kitRod.MaxLoad && kitLine.Strength < kitHook.Strength
                 && kitReel.DragMax < kitLine.Strength && kitHook.Label == "#10",
             $"starter kit: line {kitLine.Strength} kg is the weakest link (rod {kitRod.MaxLoad}, hook #10 {kitHook.Strength}), drag up to {kitReel.DragMax} kg");
         lo.Cycle(TackleSlot.Rod, 1);
-        t.Check(lo.Rod.ItemId == "junior", "cycling stays put with a single owned rod");
-        pr.Owned["rod"].Add("karpiowka");
+        t.Check(lo.Rod.ItemId == "s_jesion_240", "cycling stays put with a single owned rod");
+        pr.Owned["rod"].Add("s_koi_360");
         lo.Cycle(TackleSlot.Rod, 1);
-        t.Check(lo.Rod.ItemId == "karpiowka" && pr.Equipped["rod"] == "karpiowka", "cycling skips the unowned Teleskop and records the choice");
+        t.Check(lo.Rod.ItemId == "s_koi_360" && pr.Equipped["rod"] == "s_koi_360", "cycling skips the unowned rods and records the choice");
         lo.Cycle(TackleSlot.Bait, 1);
         t.Check(lo.Bait.ItemId == "bread", "bait cycling skips baits with no stock");
         lo.Cycle(TackleSlot.Rod, -1);
-        t.Check(lo.Rod.ItemId == "junior", "cycling backwards wraps around");
+        t.Check(lo.Rod.ItemId == "s_jesion_240", "cycling backwards wraps around");
         pr.BaitCounts["bread"] = 0;
         pr.BaitCounts["worm"] = 0;
         t.Check(lo.BaitCount == 0, "an empty bait reports 0 pieces");
@@ -100,24 +100,24 @@ public sealed class ProgressSuite : ITestSuite
         var bl = new TackleLoadout();
         bl.Attach(bp);
         t.Check(bp.HasKit && bl.Ready, "a new angler has a complete kit");
-        t.Check(bp.Destroy(TackleSlot.Rod, "junior") && !bp.Owns(TackleSlot.Rod, "junior") && bp.Equipped["rod"] == "",
+        t.Check(bp.Destroy(TackleSlot.Rod, "s_jesion_240") && !bp.Owns(TackleSlot.Rod, "s_jesion_240") && bp.Equipped["rod"] == "",
             "a snapped rod leaves the inventory and is no longer equipped");
         bl.Resync();
         t.Check(!bp.HasKit && !bl.Ready && bp.MissingKit().SequenceEqual(new[] { TackleSlot.Rod }), "without a rod the kit is incomplete");
         int cost = bl.CostOfMissing();
-        t.Check(cost == 40, $"a replacement rod costs {cost} gr (the cheapest one at level 1)");
+        t.Check(cost == 60, $"a replacement rod costs {cost} gr (the cheapest one at level 1)");
         bp.Money = 60;
         t.Check(!bp.CanClaimFreeKit(cost) && bp.ClaimFreeKit(cost) != null && !bp.HasKit, "with money for a new rod the free kit is refused");
         bp.Money = 25;
-        t.Check(bp.CanClaimFreeKit(cost) && bp.ClaimFreeKit(cost) == null && bp.HasKit && bp.Equipped["rod"] == "junior" && bp.Money == 25,
+        t.Check(bp.CanClaimFreeKit(cost) && bp.ClaimFreeKit(cost) == null && bp.HasKit && bp.Equipped["rod"] == "s_jesion_240" && bp.Money == 25,
             "a broke angler gets the starter rod for free");
         bl.Resync();
-        t.Check(bl.Ready && bl.Rod.ItemId == "junior", "the loadout picks the handed-out rod up");
+        t.Check(bl.Ready && bl.Rod.ItemId == "s_jesion_240", "the loadout picks the handed-out rod up");
         t.Check(bp.ClaimFreeKit(0) != null, "no second free kit while the kit is complete");
-        bp.Owned["rod"].Add("teleskop");
-        bp.Equipped["rod"] = "teleskop";
-        bp.Destroy(TackleSlot.Rod, "teleskop");
-        t.Check(bp.Equipped["rod"] == "junior" && bp.HasKit, "losing one of two rods falls back to the other");
+        bp.Owned["rod"].Add("s_jesion_300");
+        bp.Equipped["rod"] = "s_jesion_300";
+        bp.Destroy(TackleSlot.Rod, "s_jesion_300");
+        t.Check(bp.Equipped["rod"] == "s_jesion_240" && bp.HasKit, "losing one of two rods falls back to the other");
         bp.Destroy(TackleSlot.Hook, "hak5");
         bp.BaitCounts.Clear();
         bp.Money = 0;
@@ -160,16 +160,16 @@ public sealed class ProgressSuite : ITestSuite
         s.AddCatch(carp, 6.5f, new CatchContext("Jezioro", "Kukurydza", "Hak #5", 3.1f, "07:45"));
         s.AddCatch(pike, 3.1f);
         s.Money = 777;
-        s.Owned["rod"].Add("teleskop");
+        s.Owned["rod"].Add("s_jesion_300");
         s.BaitCounts["boilie"] = 12;
-        s.Equipped["rod"] = "teleskop";
+        s.Equipped["rod"] = "s_jesion_300";
         s.LocationIdx = 1;
         s.Hour = 19.5f;
         const string path = "/tmp/fishsim_cs_save_test.json";
         t.Check(s.Save(path), "save writes the file");
         var l = Profile.LoadFrom(path);
         t.Check(l.Money == 777 && l.Level == s.Level && l.Xp == s.Xp, "money, level and XP survive");
-        t.Check(l.Owned["rod"].SequenceEqual(new[] { "junior", "teleskop" }) && l.Equipped["rod"] == "teleskop", "owned and equipped gear survive");
+        t.Check(l.Owned["rod"].SequenceEqual(new[] { "s_jesion_240", "s_jesion_300" }) && l.Equipped["rod"] == "s_jesion_300", "owned and equipped gear survive");
         t.Check(l.BaitCounts["boilie"] == 12 && l.BaitCounts["worm"] == 20, "bait stock survives");
         t.Check(l.Keepnet.Count == 2 && System.MathF.Abs(l.Keepnet[0].Weight - 6.5f) < 0.001f, "keepnet survives");
         t.Check(System.MathF.Abs(l.Records["Karp"] - 6.5f) < 0.001f && l.CatchCounts["Szczupak"] == 1, "records and counters survive");
@@ -186,14 +186,15 @@ public sealed class ProgressSuite : ITestSuite
         var old = ProfileSerializer.FromJson(legacy);
         t.Check(old.Money == 312 && old.Level == 2 && old.TotalCatches == 7 && old.LocationIdx == 2, "integers parse");
         t.Check(old.Hour == 7f && old.Records["Karp"] == 4.5f, "floats written as 7.0 parse");
-        t.Check(old.Owned["rod"].Contains("teleskop") && old.BaitCounts["worm"] == 14 && old.BaitCounts.Count == 1, "owned gear and bait stock parse");
+        t.Check(old.Owned["rod"].SequenceEqual(new[] { "s_jesion_240", "s_jesion_300" }) && old.Equipped["rod"] == "s_jesion_300"
+                && old.BaitCounts["worm"] == 14 && old.BaitCounts.Count == 1, "owned gear and bait stock parse; retired rods become their successors");
         t.Check(old.Journal.Count == 1 && old.Journal[0].Location == null && old.Journal[0].Hour == "12:00", "journal entries without optional fields parse");
         t.Check(old.Owns(TackleSlot.Leader, TackleSlotExtensions.NoLeader) && new TackleLoadout().Leader != null,
             "an old save without leaders still has \"no leader\"");
 
         t.Section("lures, leaders and lines");
         var tackle = new TackleLoadout();
-        t.Check(tackle.Items(TackleSlot.Rod).Count >= 10 && tackle.Items(TackleSlot.Reel).Count >= 7 && tackle.Items(TackleSlot.Line).Count >= 9
+        t.Check(tackle.Items(TackleSlot.Rod).Count >= 10 && tackle.Items(TackleSlot.Reel).Count >= 6 && tackle.Items(TackleSlot.Line).Count >= 9
                 && tackle.Items(TackleSlot.Leader).Count >= 6 && tackle.Items(TackleSlot.Bait).Count >= 26,
             "the shops stock many rods, reels, lines, leaders and baits");
         t.Check(tackle.Items(TackleSlot.Bait).OfType<BaitData>().Count(b => b.Kind == BaitKind.Lure && b.Reusable) >= 8,

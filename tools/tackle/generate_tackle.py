@@ -400,6 +400,143 @@ def patch(path, fields):
         f.write(text)
 
 
+# ---------------------------------------------------------------- rods and reels on the user's Meshy models
+RODS = os.path.join(ROOT, "data", "tackle", "rods")
+REELS = os.path.join(ROOT, "data", "tackle", "reels")
+
+# One series = one model (assets/models/rods/<model>.glb) in three lengths. Stats are the series' middle length; the
+# short and long versions follow length_stats.
+#   id, brand + name, kind (0 float, 1 spinning, 2 bottom, 3 carp), model, lengths (m), max load kg, action,
+#   shock absorb, cast mult, price, level, blank, whip, foam grip, Polish kind word, description
+ROD_SERIES = [
+    ("raiden", "Kaminari Raiden", 1, "rods/spin_kaminari", (2.1, 2.4, 2.7), 7.0, 0.25, 0.12, 1.25, 340, 3,
+     (0.06, 0.08, 0.18), (0.8, 0.82, 0.86), True, "spinning",
+     "Szybki, uniwersalny spinning na okonie, sandacze i średnie szczupaki."),
+    ("hikari", "Hokuto Hikari UL", 1, "rods/spin_hokuto", (1.8, 2.0, 2.2), 3.0, 0.35, 0.24, 1.0, 240, 2,
+     (0.55, 0.58, 0.6), (0.92, 0.92, 0.9), False, "ultralekki spinning",
+     "Delikatny ultralight z cienką szczytówką: pstrągi, okonie i drobne obrotówki."),
+    ("hammerhead", "Ironwood Hammerhead", 1, "rods/spin_ironwood", (1.9, 2.2, 2.5), 15.0, 0.2, 0.07, 1.15, 760, 6,
+     (0.3, 0.07, 0.08), (0.08, 0.08, 0.08), True, "ciężki spinning",
+     "Sztywny kij na duże woblery, jerki i grube szczupaki."),
+    ("nordlys", "Borealis Nordlys Feeder", 2, "rods/feeder_borealis", (3.0, 3.6, 3.9), 8.0, 0.6, 0.2, 1.3, 380, 3,
+     (0.05, 0.05, 0.06), (0.85, 0.12, 0.1), True, "feeder",
+     "Feeder z pomarańczową szczytówką na leszcze, karasie i liny z koszyka."),
+    ("picker_plus", "Ostoja Picker Plus", 2, "rods/feeder_ostoja", (2.4, 2.7, 3.0), 4.5, 0.7, 0.27, 1.05, 170, 1,
+     (0.18, 0.22, 0.14), (0.78, 0.62, 0.3), False, "lekki gruntowy",
+     "Lekki picker na płocie i krąpie blisko brzegu: czuła biała szczytówka."),
+    ("silurus_pro", "Ironwood Silurus Pro", 2, "rods/feeder_ironwood", (2.7, 3.0, 3.3), 20.0, 0.9, 0.1, 1.05, 1050, 7,
+     (0.3, 0.3, 0.32), (0.06, 0.06, 0.06), True, "sumowy",
+     "Gruby kij z mocnymi przelotkami na sumy i największe karpie."),
+    ("fjell_match", "Borealis Fjell Match", 0, "rods/float_borealis", (3.9, 4.2, 4.5), 4.5, 0.4, 0.3, 1.35, 340, 3,
+     (0.06, 0.08, 0.2), (0.78, 0.62, 0.3), False, "odległościówka",
+     "Długa odległościówka na daleki spławik: płocie, leszcze i jazie."),
+    ("bologna", "Fjordline Bologna", 0, "rods/float_fjordline", (3.6, 4.0, 4.5), 4.0, 0.3, 0.3, 1.1, 200, 2,
+     (0.6, 0.54, 0.42), (0.42, 0.26, 0.14), False, "bolonka",
+     "Bolonka na spławik z przelotkami na wysokich stopkach: rzeka i głębsze stanowiska."),
+    ("jesion", "Ostoja Jesion", 0, "rods/float_ostoja", (2.4, 3.0, 3.6), 3.5, 0.5, 0.3, 0.9, 70, 1,
+     (0.42, 0.27, 0.14), (0.6, 0.5, 0.35), False, "drewniana spławikówka",
+     "Prosta wędka z jesionu ze sznurkowymi owijkami: dobra na początek."),
+    ("karp_classic", "Ostoja Karp Classic", 3, "rods/carp_ostoja", (3.0, 3.6, 3.9), 10.0, 0.85, 0.14, 1.1, 420, 4,
+     (0.08, 0.16, 0.1), (0.78, 0.62, 0.3), True, "karpiówka",
+     "Klasyczna, paraboliczna karpiówka z pełną pianką."),
+    ("koi", "Kaminari Koi", 3, "rods/carp_kaminari", (3.0, 3.6, 3.9), 12.0, 0.8, 0.12, 1.2, 650, 5,
+     (0.05, 0.05, 0.05), (0.85, 0.12, 0.1), True, "karpiówka",
+     "Nowoczesna karpiówka z krótką rękojeścią: dalekie rzuty ciężkimi zestawami."),
+    ("polar_carp", "Borealis Polar Carp", 3, "rods/carp_borealis", (3.0, 3.6, 3.9), 14.0, 0.75, 0.12, 1.3, 950, 6,
+     (0.04, 0.07, 0.2), (0.82, 0.84, 0.88), False, "karpiówka",
+     "Karpiówka z najwyższej półki: korek, lakierowany blank, rzuty na 100 m."),
+]
+LENGTH_WORD = ("krótka", "średnia", "długa")
+
+
+def length_stats(series, i):
+    """The series' stats for its i-th length (0 short, 1 middle, 2 long): a longer rod casts further (cast x (L/Lm)^0.8)
+    and cushions a lunge better (shock x (L/Lm)^0.7), its leverage takes a little off what it lifts
+    (max load x (Lm/L)^0.25) and it costs more."""
+    lengths = series[4]
+    L, Lm = lengths[i], lengths[1]
+    return dict(length=L, cast=series[8] * (L / Lm) ** 0.8, shock=min(0.5, series[7] * (L / Lm) ** 0.7),
+                load=series[5] * (Lm / L) ** 0.25, price=int(round(series[9] * (0.88, 1.0, 1.15)[i] / 5) * 5))
+
+
+def write_rod_series():
+    ids = []
+    for se in ROD_SERIES:
+        for i, L in enumerate(se[4]):
+            st = length_stats(se, i)
+            ident = f"s_{se[0]}_{int(round(L * 100))}"
+            ids.append(ident)
+            body = f"""[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = {q(f"{se[1]} {num(L)} m · {se[14]} ({LENGTH_WORD[i]})")}
+Kind = {se[2]}
+CastMult = {st['cast']:.3g}
+MaxLoad = {st['load']:.3g}
+ShockAbsorb = {st['shock']:.3g}
+Action = {se[6]:g}
+Price = {st['price']}
+RequiredLevel = {se[10]}
+Description = {q(se[15] + " Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy.")}
+BlankColor = {col(se[11])}
+WhipColor = {col(se[12])}
+FoamGrip = {"true" if se[13] else "false"}
+Length = {L:g}
+Model = {q(se[3])}
+"""
+            with open(os.path.join(RODS, ident + ".tres"), "w", encoding="utf-8") as f:
+                f.write(body)
+    return ids
+
+
+# The hand-made reels kept in the shop get their model (the hand-made rods and the other reels were retired:
+# Profile.RetiredRods/RetiredReels).
+KEEP_REELS = {
+    "mlynek1000": "reels/small_hokuto", "fjordline_freespool6000": "reels/baitrunner_fjordline",
+    "beben_sumowy": "reels/big_ironwood",
+}
+#   id, name, model, drag max, speed, capacity, price, level, body, trim, description
+NEW_REELS = [
+    ("r_hokuto_kaiten4000", "Hokuto Kaiten 4000 FD · uniwersalny", "reels/medium_hokuto", 7.0, 3.6, 160, 420, 4,
+     (0.22, 0.23, 0.25), (0.75, 0.15, 0.1), "Średni kołowrotek z przednim hamulcem: spinning, feeder i spławik."),
+    ("r_kaminari_longcast5000", "Kaminari Long Cast 5000 · wolny bieg", "reels/baitrunner_kaminari", 10.0, 3.4, 260, 680, 5,
+     (0.06, 0.06, 0.07), (0.78, 0.78, 0.8), "Długa stożkowa szpula do dalekich rzutów i wolny bieg na karpie."),
+    ("r_fjordline_lett2500", "Fjordline Lett 2500 · lekki spinningowy", "reels/small_fjordline", 4.0, 3.7, 100, 220, 2,
+     (0.12, 0.18, 0.12), (0.78, 0.6, 0.3), "Lekki kołowrotek z drewnianą gałką: ultralight i lekki spławik."),
+]
+
+
+def write_reels():
+    ids = []
+    for r in NEW_REELS:
+        ids.append(r[0])
+        body = f"""[gd_resource type="Resource" script_class="ReelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/ReelData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = {q(r[1])}
+DragMax = {r[3]:.1f}
+ReelSpeed = {r[4]:g}
+LineCapacity = {r[5]:.1f}
+Price = {r[6]}
+RequiredLevel = {r[7]}
+Description = {q(r[10])}
+BodyColor = {col(r[8])}
+TrimColor = {col(r[9])}
+Model = {q(r[2])}
+"""
+        with open(os.path.join(REELS, r[0] + ".tres"), "w", encoding="utf-8") as f:
+            f.write(body)
+    for ident, model in KEEP_REELS.items():
+        patch(os.path.join(REELS, ident + ".tres"), dict(Model=q(model)))
+    return ids
+
+
 def main():
     ids = [l["id"] for l in LURES]
     if len(ids) != len(set(ids)):
@@ -426,10 +563,15 @@ def main():
         patch(os.path.join(BAITS, ident + ".tres"), fields)
     for ident, (d, c) in KEEP_LINES.items():
         patch(os.path.join(LINES, ident + ".tres"), dict(Diameter=f"{d:g}", LineColor=col(c)))
+    for old in os.listdir(RODS):
+        if old.startswith("s_") and old.endswith(".tres"):
+            os.remove(os.path.join(RODS, old))
+    rod_ids = write_rod_series()
+    reel_ids = write_reels()
     with open(OUT_CS, "w", encoding="utf-8") as f:
         f.write("// Generated by tools/tackle/generate_tackle.py: do not edit by hand.\n")
         f.write("namespace FishingSim.Progress;\n\n")
-        f.write("/// <summary>The catalogue's spinning lures and lines (ids of data/tackle/baits/l_*.tres and lines/g_*.tres).</summary>\n")
+        f.write("/// <summary>The catalogue's spinning lures, lines, rod series and new reels (ids of data/tackle/baits/l_*.tres, lines/g_*.tres, rods/s_*.tres, reels/r_*.tres).</summary>\n")
         f.write("public static class GeneratedTackle\n{\n")
         f.write("    public static readonly string[] Lures =\n    {\n")
         for i in range(0, len(ids), 4):
@@ -437,10 +579,17 @@ def main():
         f.write("    };\n\n    public static readonly string[] Lines =\n    {\n")
         for i in range(0, len(lids), 4):
             f.write("        " + " ".join(f'"{x}",' for x in lids[i:i + 4]) + "\n")
+        f.write("    };\n\n    public static readonly string[] Rods =\n    {\n")
+        for i in range(0, len(rod_ids), 4):
+            f.write("        " + " ".join(f'"{x}",' for x in rod_ids[i:i + 4]) + "\n")
+        f.write("    };\n\n    public static readonly string[] Reels =\n    {\n")
+        for i in range(0, len(reel_ids), 4):
+            f.write("        " + " ".join(f'"{x}",' for x in reel_ids[i:i + 4]) + "\n")
         f.write("    };\n}\n")
     fams = {}
     for l in LURES:
         fams[l["family"]] = fams.get(l["family"], 0) + 1
+    print(f"{len(rod_ids)} series rods, {len(reel_ids)} new reels")
     print(f"{len(LURES)} lures ({', '.join(f'{k} {v}' for k, v in fams.items())}), {len(LINE_LIST)} lines")
 
 

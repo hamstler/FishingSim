@@ -599,12 +599,12 @@ public partial class ScreenshotTool : Node
         if (System.Environment.GetEnvironmentVariable("FISHSIM_THREE_RODS") == "1")
         {
             var pr3 = main.Rod.Profile;
-            foreach (var (kind, id) in new[] { ("rod", "teleskop"), ("rod", "karpiowka"), ("reel", "mlynek3000"), ("reel", "freerunner") })
+            foreach (var (kind, id) in new[] { ("rod", "s_jesion_300"), ("rod", "s_koi_360"), ("reel", "r_hokuto_kaiten4000"), ("reel", "r_kaminari_longcast5000") })
                 if (!pr3.Owned[kind].Contains(id))
                     pr3.Owned[kind].Add(id);
             pr3.BaitCounts["worm"] = 40;
             int Ix3(TackleLoadout lo, TackleSlot slot, string id) => lo.Items(slot).ToList().FindIndex(i => i.ItemId == id);
-            foreach (var (k, r, reel) in new[] { (1, "teleskop", "mlynek3000"), (2, "karpiowka", "freerunner") })
+            foreach (var (k, r, reel) in new[] { (1, "s_jesion_300", "r_hokuto_kaiten4000"), (2, "s_koi_360", "r_kaminari_longcast5000") })
             {
                 var lo = main.Rods.Get(k).Loadout;
                 lo.Index[(int)TackleSlot.Rod] = Ix3(lo, TackleSlot.Rod, r);
@@ -1027,6 +1027,13 @@ public partial class ScreenshotTool : Node
                 lo.Index[(int)TackleSlot.Line] = lo.Items(TackleSlot.Line).ToList().FindIndex(i => i.ItemId == lineId);
                 lo.Index[(int)TackleSlot.Bait] = BaitIx("worm");
                 lo.BaitCounts["worm"] = 10;
+                // FISHSIM_ROD / FISHSIM_REEL = an item id: that rod / reel in the hands (its model and length).
+                foreach (var (envName, slot, key) in new[] { ("FISHSIM_ROD", TackleSlot.Rod, "rod"), ("FISHSIM_REEL", TackleSlot.Reel, "reel") })
+                    if (System.Environment.GetEnvironmentVariable(envName) is { Length: > 0 } wanted)
+                    {
+                        pr.Owned[key].Add(wanted);
+                        lo.Index[(int)slot] = lo.Items(slot).ToList().FindIndex(i => i.ItemId == wanted);
+                    }
                 rod.ApplyTackle();
                 rod.CastNow(0.7f);
                 for (int i = 0; i < 400 && rod.State != RodState.Waiting; i++)
@@ -1064,9 +1071,9 @@ public partial class ScreenshotTool : Node
             }
             else if (arg == 1)
             {
-                pr.Owned["rod"].Add("cisowy_spinning");
+                pr.Owned["rod"].Add("s_raiden_210");
                 lo.BaitCounts["rybka_drewniana"] = 1;
-                lo.Index[(int)TackleSlot.Rod] = RodIx("cisowy_spinning");
+                lo.Index[(int)TackleSlot.Rod] = RodIx("s_raiden_210");
                 lo.Index[(int)TackleSlot.Bait] = BaitIx("rybka_drewniana");
                 rod.ApplyTackle();
                 rod.CastNow(0.4f);
@@ -1096,10 +1103,10 @@ public partial class ScreenshotTool : Node
             }
             else
             {
-                pr.Owned["rod"].Add("grabowy_gruntowy");
+                pr.Owned["rod"].Add("s_nordlys_300");
                 main.Gear.Buy(GearSlot.Accessory, GD.Load<TackleItem>("res://data/tackle/accessories/podporka.tres"));
                 lo.BaitCounts["worm"] = 10;
-                lo.Index[(int)TackleSlot.Rod] = RodIx("grabowy_gruntowy");
+                lo.Index[(int)TackleSlot.Rod] = RodIx("s_nordlys_300");
                 lo.Index[(int)TackleSlot.Bait] = BaitIx("worm");
                 rod.ApplyTackle();
                 rod.CastNow(0.5f);

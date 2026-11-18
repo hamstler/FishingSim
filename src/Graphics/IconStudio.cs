@@ -18,7 +18,7 @@ public partial class IconStudio : Node
     public enum Shot { Lure, Plate, Rod, Reel }
 
     /// <summary>Bump when the models or the studio change.</summary>
-    public const int Version = 3;
+    public const int Version = 8;
     private const int RenderSize = 512;
     private const string Dir = "user://texcache/icons";
 
@@ -221,6 +221,17 @@ public partial class IconStudio : Node
         return Image.CreateFromData(w, h, false, Image.Format.Rgba8, dst);
     }
 
+    private static Aabb FacesBox(Transform3D xf, Mesh mesh)
+    {
+        var faces = mesh.GetFaces();
+        if (faces.Length == 0)
+            return xf * mesh.GetAabb();
+        var box = new Aabb(xf * faces[0], Vector3.Zero);
+        for (int i = 1; i < faces.Length; i += 3)
+            box = box.Expand(xf * faces[i]);
+        return box;
+    }
+
     private static Aabb Bounds(Node3D root)
     {
         Aabb? box = null;
@@ -228,7 +239,9 @@ public partial class IconStudio : Node
         {
             if (n is VisualInstance3D vi && (n is not Node3D nd || nd.IsVisibleInTree()))
             {
-                var b = vi.GlobalTransform * vi.GetAabb();
+                // The modelled reel's parts report AABBs well off their vertices (the frame came out twice too large
+                // with the reel in a corner, or cut the crank off): meshes are measured from their faces.
+                var b = n is MeshInstance3D { Mesh: { } m } ? FacesBox(vi.GlobalTransform, m) : vi.GlobalTransform * vi.GetAabb();
                 box = box == null ? b : box.Value.Merge(b);
             }
             foreach (var c in n.GetChildren())
@@ -263,26 +276,26 @@ public partial class IconStudio : Node
             }
             case Shot.Rod:
             {
-                var rig = new RodRig { UseModels = false };   // the built parts carry each item's colours
+                var rig = new RodRig();                        // the item's own Meshy model (built parts without one)
                 _stage.AddChild(rig);
                 rig.Position = Vector3.Zero;
                 rig.SetLook((RodData)item, null);
                 // The handle and the butt section to the first guide, diagonally: cork or foam, seat, whippings.
-                var reel = rig.GetNodeOrNull<Node3D>("Reel");
-                if (reel != null)
-                    reel.Visible = false;
+                foreach (var c in rig.GetChildren())
+                    if (c is Node3D n && ReelParts.Contains(n.Name.ToString()))
+                        n.Visible = false;
                 rig.Rotation = new Vector3(Mathf.DegToRad(52f), 0.35f, 0f);
                 HideBeyond(rig, 0.95f);
                 return rig;
             }
             case Shot.Reel:
             {
-                var rig = new RodRig { UseModels = false };   // the built parts carry each item's colours
+                var rig = new RodRig();                        // the item's own Meshy model (the built reel without one)
                 _stage.AddChild(rig);
                 rig.Position = Vector3.Zero;
                 rig.SetLook(null, (ReelData)item);
                 foreach (var c in rig.GetChildren())
-                    if (c is Node3D n && n.Name != "Reel")
+                    if (c is Node3D n && !ReelParts.Contains(n.Name.ToString()))
                         n.Visible = false;
                 rig.Rotation = new Vector3(-Mathf.Pi / 2f + 0.15f, 0.5f, 0f);
                 return rig;
@@ -290,6 +303,9 @@ public partial class IconStudio : Node
         }
         return null;
     }
+
+    /// <summary>The rig's reel nodes: the built one and a modelled one's body, rotor (with the bail) and crank.</summary>
+    private static readonly HashSet<string> ReelParts = new() { "Reel", "ModelReel", "ModelRotor", "ModelCrank" };
 
     /// <summary>Hides the parts of a rod further than <paramref name="reach"/> metres up the blank (rig space).</summary>
     private static void HideBeyond(RodRig rig, float reach)

@@ -13,3 +13,4 @@ RequiredLevel = 6
 Description = "Ogromny bęben z mocnym hamulcem: dla sumów i jesiotrów."
 BodyColor = Color(0.1, 0.12, 0.18, 1)
 TrimColor = Color(0.7, 0.7, 0.72, 1)
+Model = "reels/big_ironwood"

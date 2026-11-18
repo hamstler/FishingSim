@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Ironwood Hammerhead 2,5 m · ciężki spinning (długa)"
+Kind = 1
+CastMult = 1.27
+MaxLoad = 14.5
+ShockAbsorb = 0.0766
+Action = 0.2
+Price = 875
+RequiredLevel = 6
+Description = "Sztywny kij na duże woblery, jerki i grube szczupaki. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy."
+BlankColor = Color(0.3, 0.07, 0.08, 1)
+WhipColor = Color(0.08, 0.08, 0.08, 1)
+FoamGrip = true
+Length = 2.5
+Model = "rods/spin_ironwood"

@@ -13,3 +13,4 @@ RequiredLevel = 1
 Description = "Prosty kołowrotek z drewna na małe ryby."
 BodyColor = Color(0.25, 0.25, 0.27, 1)
 TrimColor = Color(0.6, 0.6, 0.62, 1)
+Model = "reels/small_hokuto"

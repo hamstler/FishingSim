@@ -13,13 +13,10 @@ namespace FishingSim.Progress;
 public sealed class TackleLoadout
 {
     // The first items of each list keep their places (saves and tests refer to them by index); new ones follow.
-    private static readonly string[] RodPaths = Paths("rods",
-        "junior", "teleskop", "karpiowka", "wierzbowa_splawikowa", "cisowy_spinning", "grabowy_gruntowy",
-        "trzcinowa_odleglosciowa", "jesionowy_spinning", "sumowy_kij", "wedka_mistrza",
-        "ostoja_picker", "kaminari_ul_trout", "kaminari_jig", "borealis_heavy_feeder", "ironwood_musky");
+    // Rods and reels: only those on the user's Meshy models (the older ones are retired: Profile.RetiredRods/Reels).
+    private static readonly string[] RodPaths = Paths("rods", GeneratedTackle.Rods);
     private static readonly string[] ReelPaths = Paths("reels",
-        "mlynek1000", "mlynek3000", "freerunner", "szpula_lipowa", "orzechowy_lekki", "mosiezny_hamulec", "beben_sumowy",
-        "hokuto_kaiten2500", "fjordline_freespool6000");
+        new[] { "mlynek1000", "beben_sumowy", "fjordline_freespool6000" }.Concat(GeneratedTackle.Reels).ToArray());
     private static readonly string[] LinePaths = Paths("lines",
         new[] { "zylka016", "zylka025", "plecionka030", "jelito_cienkie", "jelito_mocne", "jedwab_skrecany",
             "plecionka_konopna", "plecionka_jedwabna", "plecionka_smolowana" }.Concat(GeneratedTackle.Lines).ToArray());

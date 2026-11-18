@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Ostoja Jesion 3,6 m · drewniana spławikówka (długa)"
+Kind = 0
+CastMult = 1.04
+MaxLoad = 3.34
+ShockAbsorb = 0.341
+Action = 0.5
+Price = 80
+RequiredLevel = 1
+Description = "Prosta wędka z jesionu ze sznurkowymi owijkami: dobra na początek. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy."
+BlankColor = Color(0.42, 0.27, 0.14, 1)
+WhipColor = Color(0.6, 0.5, 0.35, 1)
+FoamGrip = false
+Length = 3.6
+Model = "rods/float_ostoja"
