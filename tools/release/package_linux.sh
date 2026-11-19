@@ -45,8 +45,8 @@ Architecture: amd64
 Installed-Size: $size
 Depends: libc6, libgl1, libvulkan1
 Maintainer: Krystian Naskręski <noreply@users.noreply.github.com>
-Description: Fishing simulator (Godot 4.3)
- Nordic-styled fishing simulator with lakes, villages and 66 fish species.
+Description: Fishing simulator
+ Fishing simulator with lakes and 66 fish species.
 CTRL
 mkdir -p "$deb/usr/share/doc/fishingsim"
 cp "$HERE/../../LICENSE" "$deb/usr/share/doc/fishingsim/copyright"

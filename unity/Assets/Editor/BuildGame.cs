@@ -63,6 +63,8 @@ namespace FishingSim.EditorTools
             string path = Arg("-customBuildPath", $"build/{targetName}/FishingSim");
             if (target == BuildTarget.StandaloneWindows64 && !path.EndsWith(".exe"))
                 path += ".exe";
+            if (target == BuildTarget.StandaloneLinux64 && !path.EndsWith(".x86_64"))
+                path += ".x86_64";
             var options = new BuildPlayerOptions
             {
                 scenes = new[] { ScenePath },

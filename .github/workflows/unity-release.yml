@@ -1,0 +1,159 @@
+# Builds the Unity version (unity/) for Windows and Linux and publishes a GitHub release:
+#   FishingSim-<ver>-windows-setup.exe (Inno Setup), FishingSim-<ver>-windows-x86_64.zip,
+#   fishingsim_<ver>_amd64.deb, FishingSim-<ver>-linux-x86_64.tar.gz
+# Runs by hand (Actions -> Unity release -> Run workflow) or on a push whose commit message holds [unity-release].
+# The version is the input's or tools/release/VERSION. Needs the UNITY_LICENSE, UNITY_EMAIL, UNITY_PASSWORD secrets.
+name: Unity release
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version (empty = tools/release/VERSION)"
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: github.event_name != 'push' || contains(github.event.head_commit.message, '[unity-release]')
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        target: [StandaloneWindows64, StandaloneLinux64]
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/share/swift
+          sudo docker image prune --all --force || true
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            unity
+            .github
+            tools/release
+      - uses: actions/cache@v4
+        with:
+          path: unity/Library
+          key: Library-${{ matrix.target }}-${{ hashFiles('unity/Packages/manifest.json') }}
+      - uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: unity
+          targetPlatform: ${{ matrix.target }}
+          unityVersion: 6000.0.64f1
+          buildName: FishingSim
+          buildMethod: FishingSim.EditorTools.BuildGame.Build
+          versioning: None
+      - uses: actions/upload-artifact@v4
+        with:
+          name: game-${{ matrix.target }}
+          path: build/${{ matrix.target }}
+          retention-days: 3
+
+  package:
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            tools/release
+            LICENSE
+            README.md
+      - name: Version
+        id: ver
+        run: |
+          v="${{ github.event.inputs.version }}"
+          if [ -z "$v" ]; then v="$(tr -d ' \n' < tools/release/VERSION)"; fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: game-StandaloneLinux64
+          path: build/linux
+      - uses: actions/download-artifact@v4
+        with:
+          name: game-StandaloneWindows64
+          path: build/windows
+      - name: Packages
+        run: |
+          ls -la build/linux build/windows
+          rm -rf build/linux/*_BurstDebugInformation_DoNotShip build/windows/*_BurstDebugInformation_DoNotShip
+          cp LICENSE build/linux/ && cp LICENSE build/windows/
+          chmod +x build/linux/FishingSim.x86_64
+          bash tools/release/package_linux.sh "${{ steps.ver.outputs.version }}" build/linux build/dist
+          (cd build/windows && zip -qr9 "../dist/FishingSim-${{ steps.ver.outputs.version }}-windows-x86_64.zip" .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-linux
+          path: build/dist
+          retention-days: 3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-files
+          path: build/windows
+          retention-days: 3
+
+  installer:
+    needs: package
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            tools/release
+            LICENSE
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-files
+          path: build/windows
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; }
+          & $iscc "/DAppVersion=${{ needs.package.outputs.version }}" "/DSourceDir=$PWD\build\windows" "/DOutDir=$PWD\build\dist" tools\release\FishingSim.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-windows
+          path: build/dist
+          retention-days: 3
+
+  publish:
+    needs: [package, installer]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - run: ls -la dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.package.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: Fishing Sim ${{ needs.package.outputs.version }} (Unity)
+          body: |
+            Fishing Sim ${{ needs.package.outputs.version }}: pierwsza wersja na silniku Unity 6.
+
+            **Windows:** pobierz `FishingSim-${{ needs.package.outputs.version }}-windows-setup.exe` i uruchom instalator (albo rozpakuj `.zip` i uruchom `FishingSim.exe`).
+            **Linux:** `sudo apt install ./fishingsim_${{ needs.package.outputs.version }}_amd64.deb` (uruchom: `fishingsim`), albo rozpakuj `.tar.gz` i uruchom `FishingSim.x86_64`.
+
+            Grafika: DirectX 11 (Windows) / Vulkan lub OpenGL (Linux). Zapis gry i ustawienia: folder użytkownika Unity (Windows: `%USERPROFILE%\AppData\LocalLow\Krystian Naskreski\Fishing Sim`), tam też `logs/errors.txt` i `Player.log`.
+            © 2026 Krystian Naskręski, wszelkie prawa zastrzeżone (zob. LICENSE).
+          files: dist/*
+          fail_on_unmatched_files: true
