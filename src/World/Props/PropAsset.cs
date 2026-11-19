@@ -158,15 +158,43 @@ public static class PropAsset
             materials[(string?)mat["name"] ?? ""] = m;
         }
 
-        var doc = new GltfDocument();
-        var state = new GltfState { HandleBinaryImage = 0 };
-        if (doc.AppendFromBuffer(ImageDecode.WithoutPictures(glb, keepMaterialNames: true), path.GetBaseDir(), state) != Error.Ok
-            || doc.GenerateScene(state) is not Node3D root)
+        // The meshes: from the mesh cache (a large model's parse and LOD generation took seconds per map load), or
+        // read from the glTF, given LODs and cached for the next time.
+        string flat = $"{id.Replace('/', '_')}_{glb.Length}";
+        var loaded = MeshCache.Read(flat) ?? ReadMeshes(id, glb, path, flat);
+        if (loaded == null)
             return null;
         var parts = new List<(Mesh, Transform3D)>();
         var named = new Dictionary<string, Mesh>();
         var bounds = new Aabb();
         bool first = true;
+        foreach (var (name, am, t) in loaded)
+        {
+            for (int s = 0; s < am.GetSurfaceCount(); s++)
+            {
+                string mname = am.SurfaceGetName(s);
+                if (materials.TryGetValue(mname, out var m) || (materials.Count == 1 && (m = materials.Values.First()) != null))
+                    am.SurfaceSetMaterial(s, m);
+            }
+            parts.Add((am, t));
+            named[name] = am;
+            var box = t * am.GetAabb();
+            bounds = first ? box : bounds.Merge(box);
+            first = false;
+        }
+        return parts.Count == 0 ? null : new Model(parts, bounds, named);
+    }
+
+    /// <summary>The model's meshes (node name, mesh with LODs and each surface named after its glTF material, transform)
+    /// read from the glTF; meshes over <see cref="MeshCache.MinVertices"/> are written to the mesh cache.</summary>
+    private static List<(string Name, ArrayMesh Mesh, Transform3D Transform)>? ReadMeshes(string id, byte[] glb, string path, string flat)
+    {
+        var doc = new GltfDocument();
+        var state = new GltfState { HandleBinaryImage = 0 };
+        if (doc.AppendFromBuffer(ImageDecode.WithoutPictures(glb, keepMaterialNames: true), path.GetBaseDir(), state) != Error.Ok
+            || doc.GenerateScene(state) is not Node3D root)
+            return null;
+        var list = new List<(string, ArrayMesh, Transform3D)>();
         foreach (var node in root.FindChildren("*", "", true, false))
         {
             Mesh? mesh = node switch
@@ -177,25 +205,24 @@ public static class PropAsset
             };
             if (mesh is not ArrayMesh am || node is not Node3D n3)
                 continue;
-            // Props seen from afar (the Meshy anglers 60k triangles, barrels, the fire pit...) get distance LODs like
+            // Props seen from afar (the Meshy buildings and anglers, barrels, the fire pit...) get distance LODs like
             // the fish (FishAsset.WithLods); the rod and reel in the angler's hands are always close and keep theirs.
             if (!id.StartsWith("rods/") && !id.StartsWith("reels/") && WithLods(am) is { } lodded)
                 am = lodded;
+            // The surfaces are matched to the materials by name; the glTF's own (picture-less) materials are dropped
+            // so a cached mesh holds no material.
             for (int s = 0; s < am.GetSurfaceCount(); s++)
             {
-                string name = am.SurfaceGetMaterial(s)?.ResourceName ?? "";
-                if (materials.TryGetValue(name, out var m) || (materials.Count == 1 && (m = materials.Values.First()) != null))
-                    am.SurfaceSetMaterial(s, m);
+                am.SurfaceSetName(s, am.SurfaceGetMaterial(s)?.ResourceName ?? "");
+                am.SurfaceSetMaterial(s, null);
             }
-            var t = GlobalOf(n3, root);
-            parts.Add((am, t));
-            named[node.Name] = am;
-            var box = t * am.GetAabb();
-            bounds = first ? box : bounds.Merge(box);
-            first = false;
+            list.Add((node.Name, am, GlobalOf(n3, root)));
         }
         root.Free();
-        return parts.Count == 0 ? null : new Model(parts, bounds, named);
+        if (list.Count == 0)
+            return null;
+        MeshCache.Write(flat, list);
+        return list;
     }
 
     /// <summary>The mesh again with generated LODs (Godot picks one by its size on screen; runtime-loaded glTF gets

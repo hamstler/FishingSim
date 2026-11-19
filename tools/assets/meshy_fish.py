@@ -1,7 +1,7 @@
 """Fetch Meshy AI fish models from a shared Google Drive folder and shrink them for the game.
 
     python3 -I tools/assets/meshy_fish.py FOLDER_ID [--size 2048] [--triangles 30000] [--only id,id]
-    python3 -I tools/assets/meshy_fish.py --file IN.glb OUT.glb [--size 2048] [--triangles N] [--keep-mr]   (one prop)
+    python3 -I tools/assets/meshy_fish.py --file IN.glb OUT.glb [--size 2048] [--triangles N] [--keep-mr] [--keep-seams]   (one prop)
     python3 -I tools/assets/meshy_fish.py FOLDER_ID --bake [--only id,id]   (bake the originals onto the models in place)
 
 The folder holds one sub-folder per species (Meshy_AI_<Name>_3D_...), each with one .glb (~49 MB: three 4K PNGs).
@@ -161,7 +161,7 @@ def shrink(glb, size, keep_mr=False):
             + struct.pack("<I", len(out)) + b"BIN\0" + bytes(out))
 
 
-def convert_file(src, dst, size, target, keep_mr):
+def convert_file(src, dst, size, target, keep_mr, seams=False):
     """One model file (e.g. a Meshy prop: a figure, a rod) shrunk like the fish."""
     raw = open(src, "rb").read()
     tris = triangles(raw)
@@ -170,8 +170,8 @@ def convert_file(src, dst, size, target, keep_mr):
             tmp, out = os.path.join(work, "in.glb"), os.path.join(work, "out.glb")
             open(tmp, "wb").write(raw)
             subprocess.run(["blender", "-b", "--python-exit-code", "1", "-P",
-                            os.path.join(ROOT, "tools", "assets", "meshy_decimate.py"), "--", tmp, out, str(target)],
-                           check=True, stdout=subprocess.DEVNULL)
+                            os.path.join(ROOT, "tools", "assets", "meshy_decimate.py"), "--", tmp, out, str(target)]
+                           + (["seams"] if seams else []), check=True, stdout=subprocess.DEVNULL)
             raw = open(out, "rb").read()
     small = shrink(raw, size, keep_mr)
     open(dst, "wb").write(small)
@@ -183,7 +183,7 @@ def main():
     if args and args[0] == "--file":     # --file IN OUT [--size N] [--triangles N] [--keep-mr]
         size = int(args[args.index("--size") + 1]) if "--size" in args else 2048
         target = int(args[args.index("--triangles") + 1]) if "--triangles" in args else 30000
-        convert_file(args[1], args[2], size, target, "--keep-mr" in args)
+        convert_file(args[1], args[2], size, target, "--keep-mr" in args, "--keep-seams" in args)
         return
     folder = args[0]
     size = int(args[args.index("--size") + 1]) if "--size" in args else 2048
