@@ -46,7 +46,7 @@ public partial class ScreenshotTool : Node
         GetWindow().Size = size;
         // FISHSIM_QUALITY=0..3 picks the graphics quality (Niska..Ultra) for this run.
         if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_QUALITY"), out int qualitySetting))
-            FishingSim.Graphics.GraphicsQuality.Set((FishingSim.Graphics.QualityLevel)Math.Clamp(qualitySetting, 0, 3));
+            FishingSim.Graphics.GraphicsQuality.Set((FishingSim.Graphics.QualityLevel)Math.Clamp(qualitySetting + 1, 0, FishingSim.Graphics.GraphicsQuality.LevelCount - 1));
         // FISHSIM_VIEW=0..3 picks the view distance (Bliski..Bardzo daleki) for this run.
         if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_VIEW"), out int viewSetting))
             FishingSim.Graphics.GraphicsQuality.SetView((FishingSim.Graphics.ViewDistance)Math.Clamp(viewSetting, 0, 3));
@@ -501,6 +501,30 @@ public partial class ScreenshotTool : Node
             for (int i = 0; i < 20; i++)
                 await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
             yaw = Mathf.RadToDeg(MathF.Atan2(-(w.X - stand.X), -(w.Z - stand.Z)));
+        }
+        // FISHSIM_LOOK_BUILDING=<BuildingKind> (e.g. Cabin): stand FISHSIM_SHOT_DIST (default 7) metres before the
+        // first building of that kind, a little off its axis, and look at it.
+        if (System.Environment.GetEnvironmentVariable("FISHSIM_LOOK_BUILDING") is { Length: > 0 } kindName)
+        {
+            var bed = main.GetChildren().OfType<LakeBed>().First();
+            var target = main.FindChildren("*", "Building", true, false).OfType<Building>()
+                .FirstOrDefault(b => b.Spec != null && b.Spec.Kind.ToString() == kindName);
+            if (target == null)
+                GD.Print($"LOOK_BUILDING: no {kindName}");
+            else
+            {
+                float dist = float.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_SHOT_DIST"), System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out float sd) ? sd : 7f;
+                var front = target.GlobalTransform.Basis.Z with { Y = 0f };
+                front = front.Normalized().Rotated(Vector3.Up, 0.45f);
+                var c = target.GlobalPosition;
+                var stand = c + front * dist;
+                main.Player.GlobalPosition = new Vector3(stand.X, bed.HeightAt(stand.X, stand.Z) + 0.3f, stand.Z);
+                for (int i = 0; i < 20; i++)
+                    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+                yaw = Mathf.RadToDeg(MathF.Atan2(-(c.X - stand.X), -(c.Z - stand.Z)));
+                GD.Print($"LOOK_BUILDING {kindName} at {c}");
+            }
         }
         // FISHSIM_LOOK_FISH=1: wait for the lake fish to wear their models, then bring a few of them (FISHSIM_FISH_SPECIES =
         // a species name, else whatever swims) under the end of the pier, half a metre deep; look down at them.

@@ -42,8 +42,7 @@ public static class PhotoTextures
         if (img.LoadWebpFromBuffer(FileAccess.GetFileAsBytes(path)) != Error.Ok)
             return null;
         img.Convert(Image.Format.Rgba8);
-        // Every texture is 1K now (GraphicsQuality.TextureLimit): the 4K photographs are shrunk as they are decoded,
-        // so nothing larger is ever compressed or cached.
+        // The photographs (4K) are shrunk to the Textures setting as they are decoded, so nothing larger is compressed or cached.
         if (img.GetWidth() > MaxSide || img.GetHeight() > MaxSide)
         {
             float k = (float)MaxSide / Math.Max(img.GetWidth(), img.GetHeight());
@@ -53,7 +52,7 @@ public static class PhotoTextures
     }
 
     /// <summary>The largest side a photographed set is read at.</summary>
-    public const int MaxSide = 1024;
+    public static readonly int MaxSide = GraphicsQuality.PaintSize;
 
     /// <summary>Decodes and compresses every set into the disk cache (no textures are made: safe on a worker thread).</summary>
     public static void Prewarm()
@@ -64,8 +63,8 @@ public static class PhotoTextures
         foreach (var id in dir.GetDirectories())
             if (Has(id))
             {
-                TextureStore.Get($"photo_{id}_a", Version, BlockCompress.Kind.Colour, () => Decode(id, "diff")!).Image.Dispose();
-                TextureStore.Get($"photo_{id}_n", Version, BlockCompress.Kind.TwoChannel, () => Decode(id, "nor")!, normalMap: true).Image.Dispose();
+                TextureStore.Get($"photo_{id}_a_{MaxSide}", Version, BlockCompress.Kind.Colour, () => Decode(id, "diff")!).Image.Dispose();
+                TextureStore.Get($"photo_{id}_n_{MaxSide}", Version, BlockCompress.Kind.TwoChannel, () => Decode(id, "nor")!, normalMap: true).Image.Dispose();
             }
     }
 
@@ -83,8 +82,8 @@ public static class PhotoTextures
                 var plain = ImageTexture.CreateFromImage(Image.CreateEmpty(4, 4, false, Image.Format.Rgba8));
                 return Cache[id] = new Photo(plain, plain, Metres(id));
             }
-            var (albedo, _) = TextureStore.Get($"photo_{id}_a", Version, BlockCompress.Kind.Colour, () => Decode(id, "diff")!);
-            var (normal, _) = TextureStore.Get($"photo_{id}_n", Version, BlockCompress.Kind.TwoChannel, () => Decode(id, "nor")!, normalMap: true);
+            var (albedo, _) = TextureStore.Get($"photo_{id}_a_{MaxSide}", Version, BlockCompress.Kind.Colour, () => Decode(id, "diff")!);
+            var (normal, _) = TextureStore.Get($"photo_{id}_n_{MaxSide}", Version, BlockCompress.Kind.TwoChannel, () => Decode(id, "nor")!, normalMap: true);
             var photo = new Photo(ImageTexture.CreateFromImage(albedo), ImageTexture.CreateFromImage(normal), Metres(id));
             Cache[id] = photo;
             return photo;

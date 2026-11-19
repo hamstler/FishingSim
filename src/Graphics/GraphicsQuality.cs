@@ -3,7 +3,7 @@ using Godot;
 
 namespace FishingSim.Graphics;
 
-public enum QualityLevel { Low, Medium, High, Ultra }
+public enum QualityLevel { UltraLow, Low, Medium, High, Ultra }
 
 /// <summary>How far the world is drawn in detail (a separate choice from the effects' quality).</summary>
 public enum ViewDistance { Short, Medium, Long, Extreme }
@@ -18,7 +18,7 @@ public static class GraphicsQuality
     private const string ConfigPath = "user://graphics.cfg";
 
     /// <summary>Bump when the presets change: older saved effect settings then follow the new preset.</summary>
-    private const int SettingsVersion = 3;
+    private const int SettingsVersion = 4;     // 4: Ultra Low added in front (saved levels move up one)
     private static bool _loaded;
     private static QualityLevel _level = QualityLevel.High;
     private static ViewDistance _view = ViewDistance.Long;
@@ -38,7 +38,7 @@ public static class GraphicsQuality
     {
         public readonly string Key, Name, Hint;
         public readonly string[] Steps;
-        public readonly int[] Preset;          // the step for Low, Medium, High, Ultra
+        public readonly int[] Preset;          // the step for Ultra Low, Low, Medium, High, Ultra
         public readonly bool Display;          // a window/display setting (not part of the presets)
         public int Value;
 
@@ -49,41 +49,42 @@ public static class GraphicsQuality
         }
     }
 
-    // Every preset reads and paints the world's textures at 1K (the user's choice: memory and the first start on weak PCs).
-    public static readonly Setting Textures = new("textures", "Tekstury", "Rozdzielczość tekstur świata: 1K przy każdym ustawieniu.",
-        new[] { "1K" }, new[] { 0, 0, 0, 0 });
+    // The largest texture side: 1K on Ultra Low and Low (memory and the first start on weak PCs) .. 8K on Ultra.
+    public static readonly Setting Textures = new("textures", "Tekstury",
+        "Największa rozdzielczość tekstur: 1K (słabe komputery) .. 8K (dużo pamięci karty). Pełna zmiana po ponownym uruchomieniu gry.",
+        new[] { "1K", "2K", "4K", "8K" }, new[] { 0, 0, 1, 2, 3 });
     public static readonly Setting Shadows = new("shadows", "Cienie", "Zasięg i ostrość cieni od słońca.",
-        new[] { "Wyłączone", "Niskie", "Średnie", "Wysokie", "Ultra" }, new[] { 1, 2, 3, 4 });
+        new[] { "Wyłączone", "Niskie", "Średnie", "Wysokie", "Ultra" }, new[] { 0, 1, 2, 3, 4 });
     // No MSAA: in Godot 4.3 it leaves the depth texture the water reads empty (no refraction, no bottom, no shore).
     public static readonly Setting AntiAliasing = new("aa", "Wygładzanie krawędzi", "TAA najlepiej wygładza trawę, liście i linkę; FXAA jest najtańsze.",
-        new[] { "Wyłączone", "FXAA", "TAA" }, new[] { 1, 1, 2, 2 });
+        new[] { "Wyłączone", "FXAA", "TAA" }, new[] { 1, 1, 1, 2, 2 });
     public static readonly Setting Occlusion = new("ssao", "Cieniowanie otoczenia (SSAO)", "Miękkie cienie w zakamarkach.",
-        new[] { "Wyłączone", "Włączone" }, new[] { 0, 1, 1, 1 });
+        new[] { "Wyłączone", "Włączone" }, new[] { 0, 0, 1, 1, 1 });
     public static readonly Setting IndirectLight = new("ssil", "Światło odbite (SSIL)", "Kolorowe odbicia światła od otoczenia. Kosztowne.",
-        new[] { "Wyłączone", "Włączone" }, new[] { 0, 0, 0, 1 });
+        new[] { "Wyłączone", "Włączone" }, new[] { 0, 0, 0, 0, 1 });
     public static readonly Setting Reflections = new("reflections", "Odbicia w wodzie", "Odbicia brzegu i nieba w wodzie (SSR).",
-        new[] { "Tylko niebo", "Niskie", "Średnie", "Wysokie" }, new[] { 0, 1, 2, 3 });
+        new[] { "Tylko niebo", "Niskie", "Średnie", "Wysokie" }, new[] { 0, 0, 1, 2, 3 });
     public static readonly Setting Fog = new("fog", "Mgła wolumetryczna", "Mgła z promieniami słońca.",
-        new[] { "Wyłączona", "Bliska", "Daleka" }, new[] { 0, 1, 2, 2 });
+        new[] { "Wyłączona", "Bliska", "Daleka" }, new[] { 0, 0, 1, 2, 2 });
     public static readonly Setting Glow = new("glow", "Poświata (bloom)", "Blask jasnych miejsc: słońca na wodzie, latarni.",
-        new[] { "Wyłączona", "Włączona" }, new[] { 0, 1, 1, 1 });
+        new[] { "Wyłączona", "Włączona" }, new[] { 0, 0, 1, 1, 1 });
     public static readonly Setting Plants = new("plants", "Trawa i rośliny", "Gęstość i zasięg trawy, kwiatów i trzcin.",
-        new[] { "Niska", "Średnia", "Wysoka", "Ultra" }, new[] { 0, 1, 2, 3 });
+        new[] { "Niska", "Średnia", "Wysoka", "Ultra" }, new[] { 0, 0, 1, 2, 3 });
     public static readonly Setting WindowMode = new("window", "Tryb okna", "",
-        new[] { "Okno", "Okno zmaksymalizowane", "Pełny ekran", "Pełny ekran (wyłączny)" }, new[] { 1, 1, 1, 1 }, display: true);
+        new[] { "Okno", "Okno zmaksymalizowane", "Pełny ekran", "Pełny ekran (wyłączny)" }, new[] { 1, 1, 1, 1, 1 }, display: true);
     public static readonly Setting VSync = new("vsync", "Synchronizacja pionowa", "Bez rozrywania obrazu; ogranicza FPS do odświeżania monitora.",
-        new[] { "Wyłączona", "Włączona", "Adaptacyjna" }, new[] { 1, 1, 1, 1 }, display: true);
+        new[] { "Wyłączona", "Włączona", "Adaptacyjna" }, new[] { 1, 1, 1, 1, 1 }, display: true);
     public static readonly int[] FpsSteps = { 0, 30, 60, 75, 90, 120, 144, 165, 240 };
     public static readonly Setting FpsLimit = new("fps", "Limit klatek", "Górna granica FPS (mniej ciepła i hałasu karty).",
-        Array.ConvertAll(FpsSteps, f => f == 0 ? "Bez limitu" : $"{f} FPS"), new[] { 0, 0, 0, 0 }, display: true);
+        Array.ConvertAll(FpsSteps, f => f == 0 ? "Bez limitu" : $"{f} FPS"), new[] { 0, 0, 0, 0, 0 }, display: true);
 
     public static readonly float[] UiScales = { 1f, 1.25f, 1.5f, 1.75f, 2f };
     public static readonly Setting UiScale = new("ui_scale", "Skala interfejsu", "Wielkość napisów i paneli przy 1920x1080 (obraz 3D zawsze w pełnej rozdzielczości).",
-        new[] { "Mała", "Średnia", "Normalna", "Duża", "Bardzo duża" }, new[] { 2, 2, 2, 2 }, display: true);
+        new[] { "Mała", "Średnia", "Normalna", "Duża", "Bardzo duża" }, new[] { 2, 2, 2, 2, 2 }, display: true);
     public static readonly Setting FpsCounter = new("fps_counter", "Licznik FPS", "Liczba klatek na sekundę w rogu ekranu; szczegóły = pełny panel wydajności (F11).",
-        new[] { "Wyłączony", "FPS", "FPS + szczegóły" }, new[] { 0, 0, 0, 0 }, display: true);
+        new[] { "Wyłączony", "FPS", "FPS + szczegóły" }, new[] { 0, 0, 0, 0, 0 }, display: true);
     public static readonly Setting FloatPreview = new("float_preview", "Podgląd spławika", "Okienko z bliskim widokiem spławika, gdy trzymasz w ręce wędkę z zarzuconym spławikiem.",
-        new[] { "Wyłączony", "Włączony" }, new[] { 0, 0, 0, 0 }, display: true);
+        new[] { "Wyłączony", "Włączony" }, new[] { 0, 0, 0, 0, 0 }, display: true);
 
     /// <summary>Every setting of the graphics screen, in its order (the view distance and 3D resolution have their own rows).</summary>
     public static readonly Setting[] Settings = { Textures, Shadows, AntiAliasing, Occlusion, IndirectLight, Reflections, Fog, Glow, Plants };
@@ -139,6 +140,7 @@ public static class GraphicsQuality
 
     public static string Title(QualityLevel level) => level switch
     {
+        QualityLevel.UltraLow => "Ultra niska",
         QualityLevel.Low => "Niska",
         QualityLevel.Medium => "Średnia",
         QualityLevel.High => "Wysoka",
@@ -156,7 +158,9 @@ public static class GraphicsQuality
         Changed?.Invoke();
     }
 
-    public static void Cycle() => Set((QualityLevel)(((int)Level + 1) % 4));
+    public static void Cycle() => Set((QualityLevel)(((int)Level + 1) % LevelCount));
+
+    public const int LevelCount = 5;
 
     public static ViewDistance View
     {
@@ -239,8 +243,15 @@ public static class GraphicsQuality
     /// re-renders the scene round it whenever anything there moves.</summary>
     public static bool PointShadows => V(Shadows) >= 3;
 
-    /// <summary>The largest texture side: 1024 at every setting.</summary>
-    public static int TextureLimit => 1024;
+    /// <summary>The largest texture side by the Textures setting: 1024, 2048, 4096 or 8192.</summary>
+    public static int TextureLimit => 1024 << V(Textures);
+
+    /// <summary>
+    /// The side the game paints and decodes its own textures at (ground, bark, buildings, leaves, photographed sets),
+    /// fixed when they are first painted in a run: the Textures setting, at most 4096 (the photographed sets are 4K;
+    /// a painted 8K layer would need ~1 GB of working memory).
+    /// </summary>
+    public static int PaintSize => Math.Min(TextureLimit, 4096);
 
     /// <summary>Screen-space reflection steps of the water by the Reflections setting (0 = the sky only).</summary>
     public static int WaterReflectionSteps => V(Reflections) switch { 0 => 0, 1 => 12, 2 => 20, _ => 32 };
@@ -286,11 +297,15 @@ public static class GraphicsQuality
             SaveConfig();
             return;
         }
-        _level = (QualityLevel)Math.Clamp(cfg.GetValue("graphics", "quality", (int)QualityLevel.High).AsInt32(), 0, 3);
+        int savedVersion = cfg.GetValue("graphics", "version", 0).AsInt32();
+        int savedLevel = cfg.GetValue("graphics", "quality", (int)QualityLevel.High).AsInt32();
+        if (savedVersion < 4 && cfg.HasSectionKey("graphics", "quality"))
+            savedLevel++;      // saved before Ultra Low was put in front
+        _level = (QualityLevel)Math.Clamp(savedLevel, 0, LevelCount - 1);
         _view = (ViewDistance)Math.Clamp(cfg.GetValue("graphics", "view", (int)ViewDistance.Long).AsInt32(), 0, 3);
         _scale = Math.Clamp(cfg.GetValue("graphics", "scale", 100).AsInt32(), 50, 100);
         // Settings saved by older versions (missing, or from presets that have changed since) follow the preset.
-        bool current = cfg.GetValue("graphics", "version", 0).AsInt32() >= SettingsVersion;
+        bool current = savedVersion >= SettingsVersion;
         foreach (var st in Settings)
             st.Value = current
                 ? Math.Clamp(cfg.GetValue("graphics", st.Key, st.Preset[(int)_level]).AsInt32(), 0, st.Steps.Length - 1)
@@ -428,7 +443,7 @@ public static class GraphicsQuality
         // Weak GPUs (the Low preset): no sharpening mip bias (project.godot's -0.5 costs texture bandwidth on every
         // surface; the 16x anisotropy is a project setting Godot 4.3 cannot change per viewport), meshes drop to
         // their LODs sooner, the softest shadow filters off.
-        bool low = Level == QualityLevel.Low;
+        bool low = Level <= QualityLevel.Low;
         vp.TextureMipmapBias = low ? 0f : -0.5f;
         vp.MeshLodThreshold = low ? 3f : 1f;
         var filter = low ? RenderingServer.ShadowQuality.Hard : V(Shadows) >= 3 ? RenderingServer.ShadowQuality.SoftMedium : RenderingServer.ShadowQuality.SoftLow;
@@ -436,8 +451,8 @@ public static class GraphicsQuality
         RenderingServer.PositionalSoftShadowFilterSetQuality(filter);
     }
 
-    /// <summary>Fish under the water cast shadows except on Low (they are barely seen from above the surface).</summary>
-    public static bool FishShadows => Level != QualityLevel.Low;
+    /// <summary>Fish under the water cast shadows except on Ultra Low and Low (they are barely seen from above the surface).</summary>
+    public static bool FishShadows => Level > QualityLevel.Low;
 
     public static void ApplySun(DirectionalLight3D sun)
     {

@@ -16,12 +16,12 @@ namespace FishingSim.World.Props;
 public static class GroundTextures
 {
     /// <summary>Pixels across one tile (2 m): 2048 px per metre.</summary>
-    public const int Size = 1024;
+    public static readonly int Size = Graphics.GraphicsQuality.PaintSize;     // fixed for the run (Textures setting, <= 4K)
     public const float TileMetres = 2f;
     private const int CacheVersion = 4;
 
     /// <summary>The designs are written for a 1024-pixel tile; every length in pixels is multiplied by this.</summary>
-    private const float K = Size / 1024f;
+    private static readonly float K = Size / 1024f;
 
     /// <summary>The tile's size in those design units.</summary>
     private const float V = 1024f;
@@ -37,7 +37,7 @@ public static class GroundTextures
 
     /// <summary>The photographed grounds and barks at full 4K (2048 px per metre); TextureStore.MaxSize reads them
     /// smaller on the lower quality settings (the top mipmap levels are skipped).</summary>
-    public const int PhotoSize = 1024;
+    public static readonly int PhotoSize = Graphics.GraphicsQuality.PaintSize;
     private const int PhotoVersion = 4;     // 3: painted and decoded at 1K; 4: new forest, sand and path sets
 
     /// <summary>True when every ground layer has its photographed set (they keep most of their own colour).</summary>
@@ -86,8 +86,8 @@ public static class GroundTextures
         foreach (var id in new[] { "pine_bark", "bark_brown_02" })
             if (Graphics.PhotoTextures.Has(id))
             {
-                Graphics.TextureStore.Get($"bark_photo_{id}_a", PhotoVersion, Graphics.BlockCompress.Kind.ColourAlpha, () => Graphics.PhotoTextures.AlbedoWithHeight(id, PhotoSize)).Image.Dispose();
-                Graphics.TextureStore.Get($"bark_photo_{id}_n", PhotoVersion, Graphics.BlockCompress.Kind.TwoChannel, () => Graphics.PhotoTextures.GroundNormal(id, PhotoSize),
+                Graphics.TextureStore.Get($"bark_photo_{id}_a_{PhotoSize}", PhotoVersion, Graphics.BlockCompress.Kind.ColourAlpha, () => Graphics.PhotoTextures.AlbedoWithHeight(id, PhotoSize)).Image.Dispose();
+                Graphics.TextureStore.Get($"bark_photo_{id}_n_{PhotoSize}", PhotoVersion, Graphics.BlockCompress.Kind.TwoChannel, () => Graphics.PhotoTextures.GroundNormal(id, PhotoSize),
                     normalMap: true).Image.Dispose();
             }
             else
@@ -191,7 +191,7 @@ public static class GroundTextures
     /// </summary>
     private sealed class Sheet
     {
-        public const int N = Size * Size;
+        public static readonly int N = Size * Size;
         public readonly float[] R, G, B, H;
 
         /// <summary>How strongly the height tilts the normal map, and how much the cavities darken the colour.</summary>
@@ -233,7 +233,7 @@ public static class GroundTextures
             if (_queue == null || _queue.Count == 0)
                 return;
             const int bands = 32;
-            const int rows = Size / bands;
+            int rows = Size / bands;
             Parallel.For(0, bands, FishingSim.Graphics.Workers.Options, b =>
             {
                 int y0 = b * rows, y1 = y0 + rows;
@@ -460,9 +460,9 @@ public static class GroundTextures
                 return cached;
             if (!Graphics.PhotoTextures.Has(id) || Graphics.Renderer.IsHeadless)
                 return null;
-            var (a, mean) = Graphics.TextureStore.Get($"bark_photo_{id}_a", PhotoVersion, Graphics.BlockCompress.Kind.ColourAlpha,
+            var (a, mean) = Graphics.TextureStore.Get($"bark_photo_{id}_a_{PhotoSize}", PhotoVersion, Graphics.BlockCompress.Kind.ColourAlpha,
                 () => Graphics.PhotoTextures.AlbedoWithHeight(id, PhotoSize));
-            var (n, _) = Graphics.TextureStore.Get($"bark_photo_{id}_n", PhotoVersion, Graphics.BlockCompress.Kind.TwoChannel,
+            var (n, _) = Graphics.TextureStore.Get($"bark_photo_{id}_n_{PhotoSize}", PhotoVersion, Graphics.BlockCompress.Kind.TwoChannel,
                 () => Graphics.PhotoTextures.GroundNormal(id, PhotoSize), normalMap: true);
             var result = ((Texture2D)ImageTexture.CreateFromImage(a), (Texture2D)ImageTexture.CreateFromImage(n), mean);
             PhotoBark[id] = result;
@@ -534,7 +534,7 @@ public static class GroundTextures
                 c = c.Lerp(new Color(0.88f, 0.78f, 0.66f), Math.Clamp((peel - 0.63f) * 9f, 0f, 0.7f));
             float h = 0.6f + 0.08f * n + 0.04f * m;
             // Lenticels: thin dark dashes running round the trunk (rows of 16 px, slots of 64 px: seamless).
-            const int rowPx = (int)(16 * K), slotPx = (int)(64 * K);
+            int rowPx = (int)(16 * K), slotPx = (int)(64 * K);
             int row = y / rowPx, shift = (int)(Hash(row, 0, 104) * slotPx), slot = ((x + shift) & (Size - 1)) / slotPx;
             float rowY = row * rowPx + (4f + Hash(row, slot, 105) * 8f) * K;
             float dashLen = (10f + 34f * Hash(row, slot, 106)) * K;
