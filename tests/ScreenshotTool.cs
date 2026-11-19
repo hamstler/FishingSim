@@ -741,7 +741,7 @@ public partial class ScreenshotTool : Node
             double draws = Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame);
             double prims = Performance.GetMonitor(Performance.Monitor.RenderTotalPrimitivesInFrame);
             GD.Print($"PERF frames={times.Count} median={times[times.Count / 2]:0.0}ms p95={times[(int)(times.Count * 0.95)]:0.0}ms max={times[^1]:0.0}ms over50={times.Count(x => x > 50)} pos={main.Player.GlobalPosition}\n" +
-                     $"DRAW view={FishingSim.Graphics.GraphicsQuality.ViewTitle(FishingSim.Graphics.GraphicsQuality.View)} objects={objects:0} drawcalls={draws:0} primitives={prims / 1e6:0.00}M\n{FishingSim.Graphics.Perf.Report()}");
+                     $"DRAW view={FishingSim.Graphics.GraphicsQuality.ViewTitle(FishingSim.Graphics.GraphicsQuality.View)} objects={objects:0} drawcalls={draws:0} primitives={prims / 1e6:0.00}M buildings: {FishingSim.World.Building.MergedParts} parts merged into {FishingSim.World.Building.MergedInto} meshes\n{FishingSim.Graphics.Perf.Report()}");
         }
         else if (mode == 12)
         {
