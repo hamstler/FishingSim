@@ -33,14 +33,15 @@ public static class GroundTextures
     /// The photographed grounds used instead of the painted ones when they are all present (assets/textures, CC0):
     /// meadow, forest floor, beach sand, rocky trail, river pebbles, rock face, snow; each a 2 m tile.
     /// </summary>
-    private static readonly string[] Photos = { "leafy_grass", "forrest_ground_01", "damp_beach_sand", "rocky_trail", "dry_river_pebbles", "rock_face_04", "snow_02" };
+    private static readonly string[] Photos = { "leafy_grass", "forest_leaves_02", "coast_sand_03", "forest_ground_04", "dry_river_pebbles", "rock_face_04", "snow_02" };
 
     /// <summary>The photographed grounds and barks at full 4K (2048 px per metre); TextureStore.MaxSize reads them
     /// smaller on the lower quality settings (the top mipmap levels are skipped).</summary>
     public const int PhotoSize = 1024;
-    private const int PhotoVersion = 3;     // 3: painted and decoded at 1K
+    private const int PhotoVersion = 4;     // 3: painted and decoded at 1K; 4: new forest, sand and path sets
 
-    private static bool UsePhotos => Array.TrueForAll(Photos, Graphics.PhotoTextures.Has);
+    /// <summary>True when every ground layer has its photographed set (they keep most of their own colour).</summary>
+    public static bool UsePhotos => Array.TrueForAll(Photos, Graphics.PhotoTextures.Has);
 
     /// <summary>Roughness of each ground (the texture keeps only colour, height and the surface's tilt).</summary>
     public static readonly float[] Roughness = { 0.8f, 0.85f, 0.9f, 0.88f, 0.55f, 0.75f, 0.5f };

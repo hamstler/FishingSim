@@ -7,8 +7,10 @@ Wszystkie na licencji CC0 1.0 (domena publiczna): wolno ich używać w każdym c
 | bark_brown_02 | Bark Brown 02 | Rob Tuytel | CC0 1.0 (public domain) | https://polyhaven.com/a/bark_brown_02 |
 | brown_planks_09 | Brown Planks 09 | Rob Tuytel | CC0 1.0 (public domain) | https://polyhaven.com/a/brown_planks_09 |
 | clay_roof_tiles_02 | Clay Roof Tiles 02 | Amal Kumar | CC0 1.0 (public domain) | https://polyhaven.com/a/clay_roof_tiles_02 |
-| damp_beach_sand | Damp Beach Sand | Dimitrios Savva | CC0 1.0 (public domain) | https://polyhaven.com/a/damp_beach_sand |
+| coast_sand_03 | Coast Sand 03 | Rob Tuytel | CC0 1.0 (public domain) | https://polyhaven.com/a/coast_sand_03 |
 | dry_river_pebbles | Dry River Pebbles | Amal Kumar | CC0 1.0 (public domain) | https://polyhaven.com/a/dry_river_pebbles |
+| forest_ground_04 | Forest Ground 04 | Rob Tuytel, Rico Cilliers | CC0 1.0 (public domain) | https://polyhaven.com/a/forest_ground_04 |
+| forest_leaves_02 | Forest Leaves 02 | Rob Tuytel | CC0 1.0 (public domain) | https://polyhaven.com/a/forest_leaves_02 |
 | forrest_ground_01 | Forest Ground 01 | Rob Tuytel | CC0 1.0 (public domain) | https://polyhaven.com/a/forrest_ground_01 |
 | grey_roof_tiles_02 | Grey Roof Tiles 02 | Rob Tuytel | CC0 1.0 (public domain) | https://polyhaven.com/a/grey_roof_tiles_02 |
 | hessian_230 | Hessian 230 | colormass, Rico Cilliers | CC0 1.0 (public domain) | https://polyhaven.com/a/hessian_230 |

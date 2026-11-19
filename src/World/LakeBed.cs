@@ -575,21 +575,37 @@ public partial class LakeBed : Node3D
             var k = new Vector3(want.X / MathF.Max(mean.R, 0.001f), want.Y / MathF.Max(mean.G, 0.001f), want.Z / MathF.Max(mean.B, 0.001f));
             return Vector3.One.Lerp(k, amount);
         }
+        // A photographed ground: the map's brightness in full (the light and exposure are made for it), the hue only by
+        // <paramref name="hue"/>: the photo keeps its own colours.
+        Vector3 Photo(Color mapColour, int layer, float hue)
+        {
+            var mean = Props.GroundTextures.Mean(layer);
+            var want = Lin(mapColour);
+            float lumWant = 0.2126f * want.X + 0.7152f * want.Y + 0.0722f * want.Z;
+            float lumMean = MathF.Max(0.2126f * mean.R + 0.7152f * mean.G + 0.0722f * mean.B, 0.001f);
+            var full = new Vector3(want.X / MathF.Max(mean.R, 0.001f), want.Y / MathF.Max(mean.G, 0.001f), want.Z / MathF.Max(mean.B, 0.001f));
+            return (Vector3.One * (lumWant / lumMean)).Lerp(full, hue);
+        }
         var tints = new Vector3[Props.GroundTextures.Count];
         // Meadows a touch calmer than the map's colour (lit smoothly now, without the old banding, they read brighter).
         static Color Calm(Color c) => new Color(c.Luminance, c.Luminance, c.Luminance).Lerp(c, 0.85f) * 0.92f;
-        tints[Props.GroundTextures.Grass] = Towards(Calm(loc.GrassColor), Props.GroundTextures.Grass, 1f);
-        tints[Props.GroundTextures.Forest] = Towards(loc.DarkGrassColor.Lerp(loc.PathColor, 0.6f) * 0.75f, Props.GroundTextures.Forest, 0.35f);
-        tints[Props.GroundTextures.Sand] = Towards(loc.SandColor, Props.GroundTextures.Sand, 1f);
-        tints[Props.GroundTextures.Path] = Towards(Calm(loc.PathColor), Props.GroundTextures.Path, 1f);
-        tints[Props.GroundTextures.Bed] = Towards(loc.SandColor * 0.7f, Props.GroundTextures.Bed, 0.5f);
+        // Photographed grounds keep most of their own hue (taken fully to the map's flat colour, the meadow became a
+        // saturated lawn and the paths orange) at the map's brightness; painted ones take the map's colour.
+        bool photo = Props.GroundTextures.UsePhotos;
+        Vector3 Tint(Color c, int layer, float painted, float hue) => photo ? Photo(c, layer, hue) : Towards(c, layer, painted);
+        tints[Props.GroundTextures.Grass] = Tint(Calm(loc.GrassColor), Props.GroundTextures.Grass, 1f, 0.45f);
+        tints[Props.GroundTextures.Forest] = photo ? Photo(loc.DarkGrassColor.Lerp(loc.PathColor, 0.6f) * 0.75f, Props.GroundTextures.Forest, 0.15f)
+            : Towards(loc.DarkGrassColor.Lerp(loc.PathColor, 0.6f) * 0.75f, Props.GroundTextures.Forest, 0.35f);
+        tints[Props.GroundTextures.Sand] = Tint(loc.SandColor, Props.GroundTextures.Sand, 1f, 0.3f);
+        tints[Props.GroundTextures.Path] = Tint(Calm(loc.PathColor), Props.GroundTextures.Path, 1f, 0.2f);
+        tints[Props.GroundTextures.Bed] = Tint(loc.SandColor * 0.7f, Props.GroundTextures.Bed, 0.5f, 0.3f);
         tints[Props.GroundTextures.Rock] = Vector3.One;
         tints[Props.GroundTextures.Snow] = Vector3.One;
         material.SetShaderParameter("layer_tint", tints);
         material.SetShaderParameter("layer_rough", Props.GroundTextures.Roughness);
         material.SetShaderParameter("snow_line", loc.SnowLine);
         material.SetShaderParameter("rock_line", loc.RockLine);
-        material.SetShaderParameter("dark_grass_tint", Towards(Calm(loc.DarkGrassColor), Props.GroundTextures.Grass, 1f));
+        material.SetShaderParameter("dark_grass_tint", Tint(Calm(loc.DarkGrassColor), Props.GroundTextures.Grass, 1f, 0.6f));
     }
 
 

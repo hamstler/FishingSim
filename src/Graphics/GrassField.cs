@@ -32,7 +32,8 @@ public partial class GrassField : Node3D
     {
         _instance = new MultiMeshInstance3D
         {
-            MaterialOverride = TreeFactory.GrassMaterial(),
+            // Photographed clump cards (CC0) when the atlas is there; the curved blades otherwise (headless, tests).
+            MaterialOverride = (Material?)TreeFactory.GrassCardMaterial() ?? TreeFactory.GrassMaterial(),
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
         };
         AddChild(_instance);
@@ -81,7 +82,7 @@ public partial class GrassField : Node3D
             {
                 _centre = p;
                 var loc = _bed.Location;
-                float radius = GraphicsQuality.GrassRadius, spacing = GraphicsQuality.GrassSpacing;
+                float radius = GraphicsQuality.GrassRadius, spacing = Spacing;
                 _workBed ??= new LakeBed();
                 var bed = _workBed;
                 _job = System.Threading.Tasks.Task.Run(() => Compute(bed, loc, p, radius, spacing));
@@ -128,7 +129,7 @@ public partial class GrassField : Node3D
             _instance.Multimesh = null;
             return;
         }
-        var field = Compute(_bed, _bed.Location, centre, GraphicsQuality.GrassRadius, GraphicsQuality.GrassSpacing);
+        var field = Compute(_bed, _bed.Location, centre, GraphicsQuality.GrassRadius, Spacing);
         Apply(field.Buffer, field.Count);
     }
 
@@ -188,6 +189,10 @@ public partial class GrassField : Node3D
         return new Field(centre, buffer, n);
     }
 
+    /// <summary>Clumps' spacing: the photographed cards (6 triangles a clump, see-through between the blades) stand
+    /// closer than the curved blades (hundreds of triangles) did.</summary>
+    private static float Spacing => GraphicsQuality.GrassSpacing * (TreeFactory.GrassCardMaterial() != null ? 0.78f : 1f);
+
     /// <summary>The new field replaces the old one (main thread).</summary>
     private void Apply(float[] buffer, int n)
     {
@@ -195,7 +200,7 @@ public partial class GrassField : Node3D
         {
             TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
             UseColors = true,
-            Mesh = TreeFactory.MeadowClump(),
+            Mesh = TreeFactory.GrassCardMaterial() != null ? TreeFactory.MeadowCards() : TreeFactory.MeadowClump(),
             InstanceCount = buffer.Length / 16,
             VisibleInstanceCount = n,
         };
