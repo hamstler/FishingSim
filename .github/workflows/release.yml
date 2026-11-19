@@ -149,6 +149,6 @@ jobs:
             **Linux:** `sudo apt install ./fishingsim_${{ needs.export.outputs.version }}_amd64.deb` (uruchom: `fishingsim` lub z menu), albo rozpakuj `.tar.gz` i uruchom `FishingSim.x86_64`.
 
             Wymagania: karta graficzna z Vulkanem (Forward+). Pierwsze uruchomienie przygotowuje tekstury w tle (kilka minut).
-            Licencja GPL-3.0-or-later; materiały zewnętrzne CC0 (zob. README / CREDITS.md).
+            © 2026 Krystian Naskręski, wszelkie prawa zastrzeżone (zob. LICENSE). Materiały innych autorów: zob. README / CREDITS.md.
           files: dist/*
           fail_on_unmatched_files: true

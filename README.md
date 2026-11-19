@@ -1,6 +1,6 @@
 # Fishing Sim (RF4-like), wersja C#
 
-Wolna gra na licencji **GNU GPL 3.0 lub nowszej**: możesz ją kopiować, zmieniać i rozpowszechniać, a zmienioną wersję udostępniasz na tej samej licencji razem z kodem źródłowym. Szczegóły w sekcji [Licencja](#licencja) i w pliku [`LICENSE`](LICENSE).
+Gra prywatna, własność Krystiana Naskręskiego; wszelkie prawa zastrzeżone. Szczegóły w sekcji [Licencja](#licencja) i w pliku [`LICENSE`](LICENSE).
 
 **Styl graficzny: nordycki, zbliżony do Valheima** (jedyny): pełna rozdzielczość z ostrymi, ręcznie malowanymi w kodzie teksturami, gęsta mgła wolumetryczna z promieniami słońca, cienie i okluzja otoczenia, poświata jasnych miejsc, chłodne cienie i ciepłe światło, jasne księżycowe noce. Wioska jest średniowieczna: domy z szachulcem i strzechą, latarnie na drewnianych słupach, drewniana wędka. Waluta to grosze (gr), sklepy to kramy, turnieje prowadzi gildia wędkarzy, a na inne łowisko jedzie się wozem.
 
@@ -449,30 +449,12 @@ Tryby: 0 widok, 1 hol, 2 złowiona ryba, 3 sklep, 4 pauza, 5 ekran gracza, 6 log
 
 ## Licencja
 
-Copyright (C) 2026 hamstler i współtwórcy FishingSim.
+Copyright © 2026 Krystian Naskręski. **Wszelkie prawa zastrzeżone.**
 
-FishingSim jest wolnym oprogramowaniem: możesz go rozpowszechniać i zmieniać na warunkach **GNU General Public
-License** w wersji 3 albo (według Twojego wyboru) dowolnej późniejszej wersji, opublikowanej przez Free Software
-Foundation. Program jest udostępniany bez żadnej gwarancji. Pełny tekst licencji jest w pliku [`LICENSE`](LICENSE)
-(oficjalny tekst angielski jest jedynym wiążącym).
-
-Licencja obejmuje cały projekt: kod C#, shadery, sceny i dane (`.tscn`, `.tres`, `.json`), narzędzia w `tools/` oraz
-modele i tekstury ryb wygenerowane tymi narzędziami.
-
-**Co wolno:** używać gry w dowolnym celu (także komercyjnym), kopiować ją, badać kod, zmieniać go i rozpowszechniać,
-odpłatnie lub za darmo.
-
-**Co trzeba**, gdy rozpowszechniasz grę albo jej zmienioną wersję (udostępniasz plik, sprzedajesz, wrzucasz do
-internetu):
-- udostępnić całą wersję na tej samej licencji GPL 3.0 lub nowszej, razem z jej kodem źródłowym (albo pisemną ofertą
-  jego udostępnienia);
-- zachować informacje o prawach autorskich i licencji, a zmienione pliki oznaczyć jako zmienione, z datą zmiany;
-- nie dodawać ograniczeń, których GPL nie przewiduje (np. zakazu dalszego kopiowania).
-
-Zmian, których nie rozpowszechniasz (np. własna wersja do grania w domu), nie musisz nikomu udostępniać.
-
-**Wkład w projekt:** wysyłając zmiany (pull request), zgadzasz się, że są one udostępniane na tej samej licencji
-(GPL 3.0 lub nowszej).
+Fishing Sim jest oprogramowaniem prywatnym (zastrzeżonym), własnością Krystiana Naskręskiego. Kod źródłowy, shadery,
+sceny, dane, narzędzia, modele, tekstury i pozostałe pliki projektu nie są udostępniane na żadnej wolnej ani otwartej
+licencji: bez pisemnej zgody właściciela nie wolno ich kopiować, rozpowszechniać, sprzedawać, zmieniać ani tworzyć na
+ich podstawie własnych wersji. Pełne warunki są w pliku [`LICENSE`](LICENSE).
 
 **Marki sprzętu w grze są zmyślone.** Nazwy producentów wędek, kołowrotków, żyłek i przynęt (Loirette, Nordvik,
 Saimaa Craft, Kawase, Bayou Bill, Highland Fly Co., Vistula, Kraken, Glasswater, Ostoja, Kaminari, Borealis, Ironwood,
@@ -481,8 +463,8 @@ znakami towarowymi żadnej firmy ani ich przeróbkami. Ewentualna zbieżność z
 
 ### Elementy i materiały innych autorów
 - **Silnik Godot** (licencja MIT, © Juan Linietsky, Ariel Manzur i współtwórcy Godot Engine) i **.NET** (licencja MIT,
-  © .NET Foundation): wbudowane w zbudowaną grę. Licencja MIT jest zgodna z GPL. Rozpowszechniając zbudowaną grę,
-  dołącz informację o licencji Godota (<https://godotengine.org/license>), np. w pliku obok gry lub w napisach.
+  © .NET Foundation): wbudowane w zbudowaną grę. Licencja MIT pozwala używać ich w grze zamkniętej. Rozpowszechniając
+  zbudowaną grę, dołącz informację o licencji Godota (<https://godotengine.org/license>), np. w pliku obok gry lub w napisach.
 - **Proporcje ryb** zmierzono na ilustracjach z [AtlasRyb.online](https://atlasryb.online) (licencja CC BY-NC-SA).
   Do projektu trafiły wyłącznie liczby (obrysy ciała, położenie płetw i oka, barwy), nie ilustracje. Źródła każdego
   gatunku są w [`assets/fish/CREDITS.md`](assets/fish/CREDITS.md).
@@ -494,8 +476,8 @@ znakami towarowymi żadnej firmy ani ich przeróbkami. Ewentualna zbieżność z
   Premium; każdy przedmiot w sklepie ma swój model (`RodData.Model`, `ReelData.Model`), wędki są pocięte na odcinki
   i rozciągane do swojej długości, kołowrotki na korpus, rotor, kabłąk i korbę.
 - **Modele ryb z Meshy AI** (`assets/fish/meshy/<id>.glb`, wszystkie 66 gatunków) wygenerował autor projektu w Meshy AI
-  (obraz → 3D) z własnych obrazów na płatnym planie Premium, więc należą do autora i są częścią projektu na licencji
-  GPL; zastępują w grze modele z `assets/fish/models` (te zostają jako zapas). Szczegóły i warunki w
+  (obraz → 3D) z własnych obrazów na płatnym planie Premium, więc należą do autora i są częścią projektu (wszelkie prawa
+  zastrzeżone); zastępują w grze modele z `assets/fish/models` (te zostają jako zapas). Szczegóły i warunki w
   [`assets/fish/meshy/CREDITS.md`](assets/fish/meshy/CREDITS.md).
 - **Barwy i kształty części gatunków** zmierzono na zdjęciach z Wikimedia Commons na wolnych licencjach. Same zdjęcia
   nie są częścią projektu; autorzy i licencje są w `assets/fish/CREDITS.md` i w atlasie ryb w grze.

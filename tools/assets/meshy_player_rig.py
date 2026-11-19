@@ -541,7 +541,7 @@ def write(names, G, R, RN, UV, I, J, W, images, group, armpit):
     info = {"id": ID, "sex": "M", "hair": [], "materials": {"body": entry, "skin": casual["skin"], "outfit": sleeve},
             "pelvis_scale": worker.get("pelvis_scale", 1.0),
             "author": "the FishingSim author (made with Meshy AI on a paid plan), rigged by tools/assets/meshy_player_rig.py",
-            "licence": "GPL-3.0-or-later (part of FishingSim)", "skeleton": "mh_male_worker (MakeHuman CC0 / Quaternius CC0)"}
+            "licence": "All rights reserved, Krystian Naskręski (part of FishingSim)", "skeleton": "mh_male_worker (MakeHuman CC0 / Quaternius CC0)"}
     with open(os.path.join(OUT, f"{ID}.json"), "w") as f:
         json.dump(info, f, indent=1, ensure_ascii=False)
     print(f"{path}: {os.path.getsize(path) / 1e6:.2f} MB", flush=True)
