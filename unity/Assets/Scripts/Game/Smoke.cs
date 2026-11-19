@@ -24,6 +24,7 @@ namespace FishingSim.Game
         private IEnumerator Start()
         {
             float started = Time.realtimeSinceStartup;
+            Debug.Log($"SMOKE app {Application.companyName} / {Application.productName} {Application.version}, data {Application.persistentDataPath}, gpu {SystemInfo.graphicsDeviceName} ({SystemInfo.graphicsDeviceType})");
             bool ok = true;
             while (!Ready())
             {

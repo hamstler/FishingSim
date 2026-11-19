@@ -551,6 +551,8 @@ namespace FishingSim.Game
 
         public void Reset()
         {
+            if (_bobber == null)
+                return;   // not built yet (Start runs after the game's first map load begins)
             _bobber.gameObject.SetActive(false);
             _line.gameObject.SetActive(false);
             _dip = 0f;
