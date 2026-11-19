@@ -1,0 +1,18 @@
+{
+ "$type": "LineData",
+ "DisplayName": "Plecionka jedwabna",
+ "Kind": 1,
+ "Strength": 18.0,
+ "Visibility": 1.0,
+ "Stretch": 0.03,
+ "Price": 480,
+ "RequiredLevel": 5,
+ "Description": "Bardzo mocna i cienka plecionka z jedwabiu.",
+ "Diameter": 0.28,
+ "LineColor": {
+  "R": 0.97,
+  "G": 0.95,
+  "B": 0.9,
+  "A": 1.0
+ }
+}

@@ -1,0 +1,9 @@
+{
+ "$type": "AccessoryData",
+ "DisplayName": "Wodery z natłuszczonej skóry",
+ "Kind": 5,
+ "Power": 1.2,
+ "Description": "Wejdziesz do wody aż po pas (do 1,2 m), bliżej ryb.",
+ "Price": 90,
+ "RequiredLevel": 2
+}

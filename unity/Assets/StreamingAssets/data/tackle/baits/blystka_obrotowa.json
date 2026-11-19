@@ -1,0 +1,30 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Błystka obrotowa z listkiem",
+ "Kind": 3,
+ "AffinityAs": "spinner",
+ "AffinityScale": 1.0,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 40,
+ "RequiredLevel": 2,
+ "Description": "Wirujący listek błyska w wodzie: okonie, pstrągi i klenie.",
+ "Shape": "round",
+ "LureColor": {
+  "R": 0.92,
+  "G": 0.74,
+  "B": 0.32,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.85,
+  "G": 0.12,
+  "B": 0.1,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": true,
+ "SizeCm": 4.5,
+ "WeightG": 4
+}

@@ -1,0 +1,18 @@
+{
+ "$type": "LineData",
+ "DisplayName": "Kraken Braid X4 0,16 mm, szara",
+ "Kind": 1,
+ "Strength": 13.3,
+ "Visibility": 1.08,
+ "Stretch": 0.05,
+ "Diameter": 0.16,
+ "LineColor": {
+  "R": 0.55,
+  "G": 0.57,
+  "B": 0.6,
+  "A": 1.0
+ },
+ "Price": 99,
+ "RequiredLevel": 2,
+ "Description": "Bardzo mocna jak na swoją grubość i nierozciągliwa: daleki rzut i pewne zacięcie, ale zrywy idą prosto w wędkę."
+}

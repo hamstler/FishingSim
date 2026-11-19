@@ -1,0 +1,23 @@
+{
+ "$type": "TournamentData",
+ "DisplayName": "Karpiowy Maraton",
+ "Description": "Najdłuższe zawody na Stawie Karpiowym: cztery najcięższe ryby i najlepsi rywale.",
+ "LocationName": "Staw Karpiowy",
+ "RequiredLevel": 3,
+ "EntryFee": 50,
+ "DurationMinutes": 8.0,
+ "CountedFish": 4,
+ "BotCount": 7,
+ "BotSkillMin": 0.45,
+ "BotSkillMax": 0.85,
+ "PrizeMoney": [
+  600,
+  300,
+  150
+ ],
+ "PrizeXp": [
+  220,
+  110,
+  50
+ ]
+}

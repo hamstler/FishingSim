@@ -1,0 +1,13 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Ochotka",
+ "Kind": 0,
+ "AffinityAs": "maggot",
+ "AffinityScale": 1.25,
+ "Reusable": false,
+ "StartCount": 30,
+ "PackSize": 15,
+ "Price": 15,
+ "RequiredLevel": 2,
+ "Description": "Czerwone larwy z mułu; płocie i leszcze za nimi przepadają."
+}

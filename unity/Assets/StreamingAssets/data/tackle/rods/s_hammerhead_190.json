@@ -1,0 +1,27 @@
+{
+ "$type": "RodData",
+ "DisplayName": "Ironwood Hammerhead 1,9 m · ciężki spinning (krótka)",
+ "Kind": 1,
+ "CastMult": 1.02,
+ "MaxLoad": 15.6,
+ "ShockAbsorb": 0.0632,
+ "Action": 0.2,
+ "Price": 670,
+ "RequiredLevel": 6,
+ "Description": "Sztywny kij na duże woblery, jerki i grube szczupaki. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy.",
+ "BlankColor": {
+  "R": 0.3,
+  "G": 0.07,
+  "B": 0.08,
+  "A": 1.0
+ },
+ "WhipColor": {
+  "R": 0.08,
+  "G": 0.08,
+  "B": 0.08,
+  "A": 1.0
+ },
+ "FoamGrip": true,
+ "Length": 1.9,
+ "Model": "rods/spin_ironwood"
+}

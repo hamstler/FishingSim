@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Loirette Ronde · Obrotówka okrągła nr 1, tygrysia fluo",
+ "Kind": 3,
+ "AffinityAs": "spinner",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 25,
+ "RequiredLevel": 1,
+ "Description": "Okrągłe skrzydełko wiruje szeroko i pracuje już przy wolnym zwijaniu. 3 g, 3,5 cm.",
+ "Shape": "round",
+ "LureColor": {
+  "R": 0.45,
+  "G": 0.9,
+  "B": 0.15,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 1.0,
+  "G": 0.55,
+  "B": 0.08,
+  "A": 1.0
+ },
+ "Pattern": "bars",
+ "Metallic": false,
+ "SizeCm": 3.5,
+ "WeightG": 3,
+ "SinkScale": 1,
+ "SinkOffset": 0,
+ "DepthScale": 1,
+ "DepthOffset": 0
+}

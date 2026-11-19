@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Kawase Nami Swim · Swimbait łamany 16 cm, płoć",
+ "Kind": 3,
+ "AffinityAs": "wobbler",
+ "AffinityScale": 1.15,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 180,
+ "RequiredLevel": 5,
+ "Description": "Trzyczęściowa rybka na zawiasach płynie esowato jak prawdziwa: duże szczupaki i sumy.",
+ "Shape": "swimbait",
+ "LureColor": {
+  "R": 0.3,
+  "G": 0.38,
+  "B": 0.5,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.86,
+  "G": 0.88,
+  "B": 0.9,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": false,
+ "SizeCm": 16,
+ "WeightG": 45,
+ "SinkScale": 1,
+ "SinkOffset": 0.2,
+ "DepthScale": 1.2,
+ "DepthOffset": 0
+}

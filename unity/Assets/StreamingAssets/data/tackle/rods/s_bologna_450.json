@@ -1,0 +1,27 @@
+{
+ "$type": "RodData",
+ "DisplayName": "Fjordline Bologna 4,5 m · bolonka (długa)",
+ "Kind": 0,
+ "CastMult": 1.21,
+ "MaxLoad": 3.88,
+ "ShockAbsorb": 0.326,
+ "Action": 0.3,
+ "Price": 230,
+ "RequiredLevel": 2,
+ "Description": "Bolonka na spławik z przelotkami na wysokich stopkach: rzeka i głębsze stanowiska. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy.",
+ "BlankColor": {
+  "R": 0.6,
+  "G": 0.54,
+  "B": 0.42,
+  "A": 1.0
+ },
+ "WhipColor": {
+  "R": 0.42,
+  "G": 0.26,
+  "B": 0.14,
+  "A": 1.0
+ },
+ "FoamGrip": false,
+ "Length": 4.5,
+ "Model": "rods/float_fjordline"
+}

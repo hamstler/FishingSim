@@ -1,0 +1,9 @@
+{
+ "$type": "KeepnetData",
+ "DisplayName": "Wiklinowy sadz na karpie",
+ "MaxFish": 40,
+ "MaxKg": 60.0,
+ "ConditionLossPerHour": 0.02,
+ "Price": 260,
+ "RequiredLevel": 4
+}

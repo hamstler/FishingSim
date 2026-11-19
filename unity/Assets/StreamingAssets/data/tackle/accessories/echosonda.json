@@ -1,0 +1,9 @@
+{
+ "$type": "AccessoryData",
+ "DisplayName": "Echosonda przenośna",
+ "Kind": 15,
+ "Power": 1.0,
+ "Description": "Przetwornik za burtą łódki: pokazuje głębokość, kształt dna i ryby pod łodzią.",
+ "Price": 140,
+ "RequiredLevel": 1
+}

@@ -1,0 +1,10 @@
+{
+ "$type": "LeaderData",
+ "DisplayName": "Przypon z kutego drutu",
+ "Strength": 16.0,
+ "Visibility": 1.4,
+ "BiteProof": 1.0,
+ "Price": 90,
+ "RequiredLevel": 3,
+ "Description": "Żadne zęby go nie przetną. Dobrze widoczny."
+}

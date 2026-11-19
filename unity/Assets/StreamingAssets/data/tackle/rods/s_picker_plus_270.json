@@ -1,0 +1,27 @@
+{
+ "$type": "RodData",
+ "DisplayName": "Ostoja Picker Plus 2,7 m · lekki gruntowy (średnia)",
+ "Kind": 2,
+ "CastMult": 1.05,
+ "MaxLoad": 4.5,
+ "ShockAbsorb": 0.27,
+ "Action": 0.7,
+ "Price": 170,
+ "RequiredLevel": 1,
+ "Description": "Lekki picker na płocie i krąpie blisko brzegu: czuła biała szczytówka. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy.",
+ "BlankColor": {
+  "R": 0.18,
+  "G": 0.22,
+  "B": 0.14,
+  "A": 1.0
+ },
+ "WhipColor": {
+  "R": 0.78,
+  "G": 0.62,
+  "B": 0.3,
+  "A": 1.0
+ },
+ "FoamGrip": false,
+ "Length": 2.7,
+ "Model": "rods/feeder_ostoja"
+}

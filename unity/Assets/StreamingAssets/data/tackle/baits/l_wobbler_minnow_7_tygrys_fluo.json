@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Saimaa Craft Salmi · Wobler pływający 7 cm, tygrys fluo",
+ "Kind": 3,
+ "AffinityAs": "wobbler",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 80,
+ "RequiredLevel": 2,
+ "Description": "Smukła rybka ze sterem: wypływa, gdy stoi, schodzi na ok. 0,8 m przy zwijaniu.",
+ "Shape": "minnow",
+ "LureColor": {
+  "R": 0.4,
+  "G": 0.85,
+  "B": 0.2,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 1.0,
+  "G": 0.7,
+  "B": 0.1,
+  "A": 1.0
+ },
+ "Pattern": "bars",
+ "Metallic": false,
+ "SizeCm": 7,
+ "WeightG": 7,
+ "SinkScale": 1,
+ "SinkOffset": 0,
+ "DepthScale": 1,
+ "DepthOffset": 0
+}

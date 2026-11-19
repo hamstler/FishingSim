@@ -1,0 +1,9 @@
+{
+ "$type": "AccessoryData",
+ "DisplayName": "Kapelusz z szerokim rondem",
+ "Kind": 0,
+ "Power": 12.0,
+ "Description": "Cień ronda tłumi odblaski: ryby widać dalej i głębiej.",
+ "Price": 70,
+ "RequiredLevel": 1
+}

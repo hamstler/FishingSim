@@ -1,0 +1,63 @@
+{
+ "$type": "FishSpecies",
+ "SpeciesName": "Palia",
+ "LatinName": "Salvelinus alpinus",
+ "Description": "Zimnolubny łososiowaty głębokich jezior górskich, z jasnymi plamkami i czerwonym brzuchem.",
+ "MinWeight": 0.2,
+ "MaxWeight": 4.0,
+ "Rarity": 0.4,
+ "PullFactor": 1.2,
+ "Aggression": 0.6,
+ "StaminaDrain": 0.11,
+ "MouthSize": 4.0,
+ "BaitAffinity": {
+  "worm": 1.2,
+  "corn": 0.0,
+  "bread": 0.0,
+  "boilie": 0.0,
+  "livebait": 0.9,
+  "maggot": 0.8,
+  "insect": 1.0,
+  "spinner": 1.31,
+  "spoon": 0.74,
+  "wobbler": 0.97,
+  "softbait": 0.72,
+  "fly": 0.9
+ },
+ "MinDepth": 4.0,
+ "MaxDepth": 16.0,
+ "DayActivity": 1.0,
+ "NightActivity": 0.5,
+ "TwilightBonus": 1.3,
+ "WeatherPref": {
+  "clear": 1.0,
+  "cloudy": 1.0,
+  "rain": 1.0
+ },
+ "RunLengthMult": 1.0,
+ "BurstMult": 1.5,
+ "BurstRate": 1.0,
+ "LengthRef": 0.38,
+ "BodyDepth": 0.2,
+ "DorsalPos": 0.5,
+ "BackColor": {
+  "R": 0.25,
+  "G": 0.3,
+  "B": 0.3,
+  "A": 1.0
+ },
+ "BellyColor": {
+  "R": 0.95,
+  "G": 0.5,
+  "B": 0.3,
+  "A": 1.0
+ },
+ "FinColor": {
+  "R": 0.9,
+  "G": 0.4,
+  "B": 0.3,
+  "A": 1.0
+ },
+ "PricePerKg": 60.0,
+ "TrophyWeight": 0.0
+}

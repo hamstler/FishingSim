@@ -1,0 +1,18 @@
+{
+ "$type": "LineData",
+ "DisplayName": "Vistula Mono 0,35 mm, zielona",
+ "Kind": 0,
+ "Strength": 12.9,
+ "Visibility": 0.98,
+ "Stretch": 0.55,
+ "Diameter": 0.35,
+ "LineColor": {
+  "R": 0.45,
+  "G": 0.62,
+  "B": 0.42,
+  "A": 1.0
+ },
+ "Price": 59,
+ "RequiredLevel": 2,
+ "Description": "Rozciągliwa żyłka pochłania zrywy ryby i unosi się lekko na wodzie."
+}

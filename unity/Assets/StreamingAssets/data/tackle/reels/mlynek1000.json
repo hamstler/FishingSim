@@ -1,0 +1,23 @@
+{
+ "$type": "ReelData",
+ "DisplayName": "Hokuto Sora 1000 · drewniany kołowrotek",
+ "DragMax": 2.0,
+ "ReelSpeed": 1.9,
+ "LineCapacity": 60.0,
+ "Price": 35,
+ "RequiredLevel": 1,
+ "Description": "Prosty kołowrotek z drewna na małe ryby.",
+ "BodyColor": {
+  "R": 0.25,
+  "G": 0.25,
+  "B": 0.27,
+  "A": 1.0
+ },
+ "TrimColor": {
+  "R": 0.6,
+  "G": 0.6,
+  "B": 0.62,
+  "A": 1.0
+ },
+ "Model": "reels/small_hokuto"
+}

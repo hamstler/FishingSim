@@ -1,0 +1,63 @@
+{
+ "$type": "FishSpecies",
+ "SpeciesName": "Orfa",
+ "LatinName": "Leuciscus idus var. orfus",
+ "Description": "Złotopomarańczowa odmiana jazia, ozdoba stawów dworskich. Pływa przy powierzchni i widać ją z daleka.",
+ "MinWeight": 0.3,
+ "MaxWeight": 3.0,
+ "Rarity": 0.4,
+ "PullFactor": 1.1,
+ "Aggression": 0.55,
+ "StaminaDrain": 0.11,
+ "MouthSize": 4.0,
+ "BaitAffinity": {
+  "worm": 0.8,
+  "corn": 0.0,
+  "bread": 1.4,
+  "boilie": 0.0,
+  "livebait": 0.0,
+  "maggot": 1.2,
+  "insect": 1.2,
+  "spinner": 0.72,
+  "spoon": 0.0,
+  "wobbler": 0.3,
+  "softbait": 0.0,
+  "fly": 1.19
+ },
+ "MinDepth": 0.3,
+ "MaxDepth": 2.5,
+ "DayActivity": 1.3,
+ "NightActivity": 0.3,
+ "TwilightBonus": 1.1,
+ "WeatherPref": {
+  "clear": 1.3,
+  "cloudy": 1.0,
+  "rain": 0.8
+ },
+ "RunLengthMult": 1.0,
+ "BurstMult": 1.5,
+ "BurstRate": 1.0,
+ "LengthRef": 0.42,
+ "BodyDepth": 0.24,
+ "DorsalPos": 0.48,
+ "BackColor": {
+  "R": 0.95,
+  "G": 0.5,
+  "B": 0.15,
+  "A": 1.0
+ },
+ "BellyColor": {
+  "R": 0.98,
+  "G": 0.85,
+  "B": 0.6,
+  "A": 1.0
+ },
+ "FinColor": {
+  "R": 0.95,
+  "G": 0.45,
+  "B": 0.2,
+  "A": 1.0
+ },
+ "PricePerKg": 15.0,
+ "TrophyWeight": 0.0
+}

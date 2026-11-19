@@ -1,0 +1,13 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Gotowany groch",
+ "Kind": 1,
+ "AffinityAs": "corn",
+ "AffinityScale": 1.05,
+ "Reusable": false,
+ "StartCount": 24,
+ "PackSize": 12,
+ "Price": 14,
+ "RequiredLevel": 2,
+ "Description": "Twardy, dobrze trzyma się haczyka."
+}

@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Bayou Bill Curly · Twister 4 cm, główka 3 g, biały",
+ "Kind": 3,
+ "AffinityAs": "softbait",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 12,
+ "RequiredLevel": 1,
+ "Description": "Sierpowaty ogonek wije się przy najwolniejszym prowadzeniu: okonie i sandacze.",
+ "Shape": "twister",
+ "LureColor": {
+  "R": 0.95,
+  "G": 0.95,
+  "B": 0.93,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.8,
+  "G": 0.8,
+  "B": 0.8,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": false,
+ "SizeCm": 4,
+ "WeightG": 3,
+ "SinkScale": 0.8,
+ "SinkOffset": 0,
+ "DepthScale": 1,
+ "DepthOffset": 0
+}

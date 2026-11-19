@@ -1,0 +1,30 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Srebrna błystka mistrza",
+ "Kind": 3,
+ "AffinityAs": "spoon",
+ "AffinityScale": 1.3,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 160,
+ "RequiredLevel": 5,
+ "Description": "Kuta ze srebra: błyszczy nawet w mętnej wodzie.",
+ "Shape": "classic",
+ "LureColor": {
+  "R": 0.88,
+  "G": 0.89,
+  "B": 0.92,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.85,
+  "G": 0.12,
+  "B": 0.1,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": true,
+ "SizeCm": 6,
+ "WeightG": 14
+}

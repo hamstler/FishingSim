@@ -1,0 +1,23 @@
+{
+ "$type": "TournamentData",
+ "DisplayName": "Poranny Puchar Płoci",
+ "Description": "Szybkie zawody na Jeziorze Zielonym: liczy się suma pięciu najcięższych ryb. Dobre na rozgrzewkę.",
+ "LocationName": "Jezioro Zielone",
+ "RequiredLevel": 1,
+ "EntryFee": 10,
+ "DurationMinutes": 6.0,
+ "CountedFish": 5,
+ "BotCount": 5,
+ "BotSkillMin": 0.25,
+ "BotSkillMax": 0.65,
+ "PrizeMoney": [
+  120,
+  60,
+  30
+ ],
+ "PrizeXp": [
+  60,
+  30,
+  15
+ ]
+}

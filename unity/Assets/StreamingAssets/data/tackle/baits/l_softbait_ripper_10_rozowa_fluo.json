@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Bayou Bill Paddle · Ripper 10 cm, główka 15 g, różowa fluo",
+ "Kind": 3,
+ "AffinityAs": "softbait",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 28,
+ "RequiredLevel": 2,
+ "Description": "Guma z ogonkiem-kopytkiem na jigowej główce: spada do dna i bierze na opadzie (metoda stop and go).",
+ "Shape": "ripper",
+ "LureColor": {
+  "R": 1.0,
+  "G": 0.4,
+  "B": 0.65,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 1.0,
+  "G": 0.95,
+  "B": 0.95,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": false,
+ "SizeCm": 10,
+ "WeightG": 15,
+ "SinkScale": 1.6,
+ "SinkOffset": 0,
+ "DepthScale": 1,
+ "DepthOffset": 0
+}

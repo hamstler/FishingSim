@@ -1,0 +1,18 @@
+{
+ "$type": "LineData",
+ "DisplayName": "Vistula Mono 0,2 mm, brązowa",
+ "Kind": 0,
+ "Strength": 4.2,
+ "Visibility": 0.92,
+ "Stretch": 0.55,
+ "Diameter": 0.2,
+ "LineColor": {
+  "R": 0.55,
+  "G": 0.42,
+  "B": 0.28,
+  "A": 1.0
+ },
+ "Price": 24,
+ "RequiredLevel": 1,
+ "Description": "Rozciągliwa żyłka pochłania zrywy ryby i unosi się lekko na wodzie."
+}

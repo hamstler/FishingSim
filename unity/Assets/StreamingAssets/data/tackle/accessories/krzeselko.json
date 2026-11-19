@@ -1,0 +1,9 @@
+{
+ "$type": "AccessoryData",
+ "DisplayName": "Zydel wędkarski",
+ "Kind": 3,
+ "Power": 1.0,
+ "Description": "Usiądź i czekaj na branie: czas płynie cztery razy szybciej (nie podczas turnieju).",
+ "Price": 55,
+ "RequiredLevel": 2
+}

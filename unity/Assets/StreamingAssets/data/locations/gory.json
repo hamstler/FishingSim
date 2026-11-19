@@ -1,0 +1,163 @@
+{
+ "$type": "LocationData",
+ "DisplayName": "Górskie Jezioro",
+ "Description": "Chłodne jezioro wśród sosen i skał. Głębokie, czyste, z dużymi szczupakami.",
+ "RequiredLevel": 4,
+ "OutlineCz": -58.0,
+ "OutlineRx": 85.0,
+ "OutlineRz": 60.0,
+ "Slope": 0.2,
+ "MaxDepth": 12.0,
+ "HolePos": {
+  "X": 10.0,
+  "Y": -45.0
+ },
+ "HoleDepth": 4.0,
+ "HoleRadius": 10.0,
+ "BarPos": {
+  "X": -20.0,
+  "Y": -25.0
+ },
+ "BarHeight": 2.0,
+ "BarRadius": 7.0,
+ "Abundance": {
+  "Płoć": 0.5,
+  "Leszcz": 0.6,
+  "Karp": 0.3,
+  "Szczupak": 1.5,
+  "Okoń": 1.0,
+  "Pstrąg potokowy": 1.4,
+  "Palia": 0.8,
+  "Lipień": 1.0,
+  "Głowacica": 0.35,
+  "Troć jeziorowa": 0.5,
+  "Sielawa": 1.2,
+  "Sieja": 0.7,
+  "Miętus": 0.8,
+  "Strzebla potokowa": 1.2,
+  "Głowacz białopłetwy": 0.8,
+  "Kleń": 0.4,
+  "Jelec": 0.4,
+  "Jazgarz": 0.4,
+  "Brzana": 0.2,
+  "Świnka": 0.2,
+  "Łosoś": 0.3,
+  "Pstrąg tęczowy": 1.0,
+  "Pstrąg źródlany": 0.9,
+  "Troć wędrowna": 0.25,
+  "Śliz": 1.0,
+  "Brzanka": 0.8,
+  "Głowacz pręgopłetwy": 0.8,
+  "Kiełb białopłetwy": 0.7,
+  "Czop": 0.35,
+  "Sterlet": 0.2
+ },
+ "GrassColor": {
+  "R": 0.3,
+  "G": 0.4,
+  "B": 0.22,
+  "A": 1.0
+ },
+ "DarkGrassColor": {
+  "R": 0.17,
+  "G": 0.25,
+  "B": 0.15,
+  "A": 1.0
+ },
+ "SandColor": {
+  "R": 0.52,
+  "G": 0.51,
+  "B": 0.46,
+  "A": 1.0
+ },
+ "PathColor": {
+  "R": 0.46,
+  "G": 0.42,
+  "B": 0.36,
+  "A": 1.0
+ },
+ "WaterShallowColor": {
+  "R": 0.06,
+  "G": 0.23,
+  "B": 0.25,
+  "A": 1.0
+ },
+ "WaterDeepColor": {
+  "R": 0.012,
+  "G": 0.06,
+  "B": 0.1,
+  "A": 1.0
+ },
+ "FogBoost": 0.0015,
+ "RimHeight": 130.0,
+ "SnowLine": 34.0,
+ "RockLine": 12.0,
+ "HillScale": 2.3,
+ "TreeDensity": 0.9,
+ "TreeMix": {
+  "pine": 1.0,
+  "spruce": 0.8,
+  "birch": 0.3
+ },
+ "BushDensity": 0.6,
+ "FlowerDensity": 0.5,
+ "LilyDensity": 0.15,
+ "ReedDensity": 0.3,
+ "RockDensity": 2.6,
+ "PlazaCenter": {
+  "X": 0.0,
+  "Y": 26.0
+ },
+ "VillageStyle": "mountain",
+ "Streets": [
+  "-62,30,62,30",
+  "0,26,0,54"
+ ],
+ "Buildings": [
+  "general,-20,26",
+  "office,22,24",
+  "fishbuyer,2,42",
+  "busstop,8,13",
+  "house,-42,42",
+  "lamp,0,12",
+  "lamp,0,22",
+  "lamp,0,34",
+  "bench,-5,17",
+  "crates,-14,34",
+  "signpost,0,9",
+  "fence,26,48,0",
+  "cabin,-50,20",
+  "cabin,46,40",
+  "cabin,-30,58",
+  "cabin,30,60",
+  "cabin,58,20",
+  "stonehouse,-62,46",
+  "smokehouse,-8,58",
+  "woodpile,-40,30",
+  "woodpile,40,26",
+  "well,-8,34",
+  "markettent,16,54",
+  "cart,-24,18",
+  "tent,60,6",
+  "tent,-66,8",
+  "villager,-12,20",
+  "villager,16,31",
+  "villager,-30,30",
+  "villager,24,8",
+  "villager,6,50"
+ ],
+ "Lobes": [
+  "-52,-132,20,40"
+ ],
+ "Islands": [
+  "22,-88,6",
+  "38,-76,3.5"
+ ],
+ "Landmarks": [
+  "waterfall,-52,-174,0",
+  "rocks,22,-88",
+  "rocks,38,-76"
+ ],
+ "WaterClarity": 6.0,
+ "WaterTemperature": 11.5
+}

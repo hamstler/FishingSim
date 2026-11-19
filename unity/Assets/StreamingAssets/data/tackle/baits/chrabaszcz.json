@@ -1,0 +1,13 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Chrabąszcz",
+ "Kind": 0,
+ "AffinityAs": "insect",
+ "AffinityScale": 1.2,
+ "Reusable": false,
+ "StartCount": 16,
+ "PackSize": 8,
+ "Price": 20,
+ "RequiredLevel": 2,
+ "Description": "Tłusty chrząszcz na powierzchni: klenie, jazie i pstrągi."
+}

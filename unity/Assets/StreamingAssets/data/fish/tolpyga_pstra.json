@@ -1,0 +1,63 @@
+{
+ "$type": "FishSpecies",
+ "SpeciesName": "Tołpyga pstra",
+ "LatinName": "Hypophthalmichthys nobilis",
+ "Description": "Ma wielką głowę i ciemne, marmurkowe plamy na boku. Zjada zooplankton; dorasta do rozmiarów, które łamią wędki.",
+ "MinWeight": 3.0,
+ "MaxWeight": 35.0,
+ "Rarity": 0.25,
+ "PullFactor": 1.5,
+ "Aggression": 0.6,
+ "StaminaDrain": 0.08,
+ "MouthSize": 7.0,
+ "BaitAffinity": {
+  "worm": 0.0,
+  "corn": 0.7,
+  "bread": 1.5,
+  "boilie": 0.8,
+  "livebait": 0.0,
+  "maggot": 0.0,
+  "insect": 0.0,
+  "spinner": 0.0,
+  "spoon": 0.0,
+  "wobbler": 0.0,
+  "softbait": 0.0,
+  "fly": 0.0
+ },
+ "MinDepth": 0.8,
+ "MaxDepth": 4.0,
+ "DayActivity": 1.1,
+ "NightActivity": 0.5,
+ "TwilightBonus": 1.0,
+ "WeatherPref": {
+  "clear": 1.2,
+  "cloudy": 1.0,
+  "rain": 0.9
+ },
+ "RunLengthMult": 1.5,
+ "BurstMult": 1.4,
+ "BurstRate": 0.8,
+ "LengthRef": 0.37,
+ "BodyDepth": 0.27,
+ "DorsalPos": 0.45,
+ "BackColor": {
+  "R": 0.38,
+  "G": 0.4,
+  "B": 0.38,
+  "A": 1.0
+ },
+ "BellyColor": {
+  "R": 0.86,
+  "G": 0.84,
+  "B": 0.8,
+  "A": 1.0
+ },
+ "FinColor": {
+  "R": 0.4,
+  "G": 0.4,
+  "B": 0.38,
+  "A": 1.0
+ },
+ "PricePerKg": 14.0,
+ "TrophyWeight": 0.0
+}

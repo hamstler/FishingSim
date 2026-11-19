@@ -1,0 +1,63 @@
+{
+ "$type": "FishSpecies",
+ "SpeciesName": "Bass wielkogębowy",
+ "LatinName": "Micropterus salmoides",
+ "Description": "Amerykański okoniowaty z wielkim pyskiem i ciemnym pasem wzdłuż boku. Atakuje z zarośli, po zacięciu skacze i trzepie łbem.",
+ "MinWeight": 0.2,
+ "MaxWeight": 4.5,
+ "Rarity": 0.6,
+ "PullFactor": 1.25,
+ "Aggression": 0.9,
+ "StaminaDrain": 0.13,
+ "MouthSize": 6.0,
+ "BaitAffinity": {
+  "worm": 1.2,
+  "corn": 0.0,
+  "bread": 0.0,
+  "boilie": 0.0,
+  "livebait": 1.6,
+  "maggot": 0.0,
+  "insect": 1.0,
+  "spinner": 1.63,
+  "spoon": 1.2,
+  "wobbler": 1.99,
+  "softbait": 1.66,
+  "fly": 0.9
+ },
+ "MinDepth": 0.5,
+ "MaxDepth": 4.0,
+ "DayActivity": 1.2,
+ "NightActivity": 0.4,
+ "TwilightBonus": 1.6,
+ "WeatherPref": {
+  "clear": 1.2,
+  "cloudy": 1.1,
+  "rain": 0.8
+ },
+ "RunLengthMult": 0.9,
+ "BurstMult": 1.8,
+ "BurstRate": 1.4,
+ "LengthRef": 0.37,
+ "BodyDepth": 0.26,
+ "DorsalPos": 0.42,
+ "BackColor": {
+  "R": 0.28,
+  "G": 0.38,
+  "B": 0.18,
+  "A": 1.0
+ },
+ "BellyColor": {
+  "R": 0.88,
+  "G": 0.86,
+  "B": 0.7,
+  "A": 1.0
+ },
+ "FinColor": {
+  "R": 0.4,
+  "G": 0.45,
+  "B": 0.3,
+  "A": 1.0
+ },
+ "PricePerKg": 30.0,
+ "TrophyWeight": 0.0
+}

@@ -1,0 +1,30 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Mucha z piór koguta",
+ "Kind": 3,
+ "AffinityAs": "fly",
+ "AffinityScale": 1.0,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 20,
+ "RequiredLevel": 2,
+ "Description": "Lekka mucha na powierzchnię: pstrągi, lipienie i klenie.",
+ "Shape": "dry",
+ "LureColor": {
+  "R": 0.25,
+  "G": 0.2,
+  "B": 0.15,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.75,
+  "G": 0.45,
+  "B": 0.2,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": false,
+ "SizeCm": 1.8,
+ "WeightG": 0.3
+}

@@ -1,0 +1,27 @@
+{
+ "$type": "RodData",
+ "DisplayName": "Ironwood Silurus Pro 3 m · sumowy (średnia)",
+ "Kind": 2,
+ "CastMult": 1.05,
+ "MaxLoad": 20,
+ "ShockAbsorb": 0.1,
+ "Action": 0.9,
+ "Price": 1050,
+ "RequiredLevel": 7,
+ "Description": "Gruby kij z mocnymi przelotkami na sumy i największe karpie. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy.",
+ "BlankColor": {
+  "R": 0.3,
+  "G": 0.3,
+  "B": 0.32,
+  "A": 1.0
+ },
+ "WhipColor": {
+  "R": 0.06,
+  "G": 0.06,
+  "B": 0.06,
+  "A": 1.0
+ },
+ "FoamGrip": true,
+ "Length": 3,
+ "Model": "rods/feeder_ironwood"
+}

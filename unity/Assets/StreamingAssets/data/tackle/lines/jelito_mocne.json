@@ -1,0 +1,18 @@
+{
+ "$type": "LineData",
+ "DisplayName": "Linka z jelita, mocna",
+ "Kind": 0,
+ "Strength": 7.0,
+ "Visibility": 0.95,
+ "Stretch": 0.45,
+ "Price": 90,
+ "RequiredLevel": 3,
+ "Description": "Grubsza linka z jelita na większe ryby.",
+ "Diameter": 0.32,
+ "LineColor": {
+  "R": 0.85,
+  "G": 0.66,
+  "B": 0.38,
+  "A": 1.0
+ }
+}

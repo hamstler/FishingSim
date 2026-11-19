@@ -1,0 +1,63 @@
+{
+ "$type": "FishSpecies",
+ "SpeciesName": "Karaś złocisty",
+ "LatinName": "Carassius carassius",
+ "Description": "Złocisty, wysoki karaś znoszący nawet przyduchę. Mieszka w małych, zarośniętych stawach i bierze delikatnie.",
+ "MinWeight": 0.1,
+ "MaxWeight": 2.0,
+ "Rarity": 1.2,
+ "PullFactor": 0.9,
+ "Aggression": 0.3,
+ "StaminaDrain": 0.09,
+ "MouthSize": 3.0,
+ "BaitAffinity": {
+  "worm": 1.2,
+  "corn": 1.0,
+  "bread": 1.4,
+  "boilie": 0.0,
+  "livebait": 0.0,
+  "maggot": 1.2,
+  "insect": 0.0,
+  "spinner": 0.0,
+  "spoon": 0.0,
+  "wobbler": 0.0,
+  "softbait": 0.0,
+  "fly": 0.0
+ },
+ "MinDepth": 0.3,
+ "MaxDepth": 3.0,
+ "DayActivity": 1.0,
+ "NightActivity": 0.6,
+ "TwilightBonus": 1.3,
+ "WeatherPref": {
+  "clear": 1.0,
+  "cloudy": 1.0,
+  "rain": 1.0
+ },
+ "RunLengthMult": 1.0,
+ "BurstMult": 1.5,
+ "BurstRate": 1.0,
+ "LengthRef": 0.32,
+ "BodyDepth": 0.42,
+ "DorsalPos": 0.5,
+ "BackColor": {
+  "R": 0.45,
+  "G": 0.38,
+  "B": 0.15,
+  "A": 1.0
+ },
+ "BellyColor": {
+  "R": 0.85,
+  "G": 0.7,
+  "B": 0.35,
+  "A": 1.0
+ },
+ "FinColor": {
+  "R": 0.6,
+  "G": 0.4,
+  "B": 0.2,
+  "A": 1.0
+ },
+ "PricePerKg": 14.0,
+ "TrophyWeight": 0.0
+}

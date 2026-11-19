@@ -1,0 +1,18 @@
+{
+ "$type": "LineData",
+ "DisplayName": "Linka z końskiego włosia",
+ "Strength": 5.0,
+ "Visibility": 1.0,
+ "Price": 15,
+ "RequiredLevel": 1,
+ "Kind": 0,
+ "Stretch": 0.55,
+ "Description": "Zwykła linka z końskiego włosia. Rozciąga się i tłumi zrywy ryby.",
+ "Diameter": 0.25,
+ "LineColor": {
+  "R": 0.86,
+  "G": 0.84,
+  "B": 0.76,
+  "A": 1.0
+ }
+}

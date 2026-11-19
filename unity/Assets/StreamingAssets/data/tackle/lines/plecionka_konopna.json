@@ -1,0 +1,18 @@
+{
+ "$type": "LineData",
+ "DisplayName": "Plecionka konopna",
+ "Kind": 1,
+ "Strength": 9.0,
+ "Visibility": 1.25,
+ "Stretch": 0.05,
+ "Price": 70,
+ "RequiredLevel": 2,
+ "Description": "Tania i mocna, ale gruba i dobrze widoczna.",
+ "Diameter": 0.4,
+ "LineColor": {
+  "R": 0.6,
+  "G": 0.58,
+  "B": 0.4,
+  "A": 1.0
+ }
+}

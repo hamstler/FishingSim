@@ -1,0 +1,9 @@
+{
+ "$type": "AccessoryData",
+ "DisplayName": "Wypychacz do haczyków",
+ "Kind": 14,
+ "Power": 1.0,
+ "Description": "Połknięty haczyk wyjmuje szybko i delikatnie: ryba krócej jest bez wody i mniej cierpi.",
+ "Price": 6,
+ "RequiredLevel": 1
+}

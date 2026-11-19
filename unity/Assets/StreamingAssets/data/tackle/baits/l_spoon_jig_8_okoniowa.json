@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Nordvik Stål Jig · Pilker 40 g, okoniowa",
+ "Kind": 3,
+ "AffinityAs": "spoon",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 55,
+ "RequiredLevel": 3,
+ "Description": "Ciężka, smukła blacha do łowienia pionowego i dalekich rzutów: opada jak kamień, podrywana błyska przy dnie.",
+ "Shape": "jig",
+ "LureColor": {
+  "R": 0.55,
+  "G": 0.62,
+  "B": 0.2,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.95,
+  "G": 0.75,
+  "B": 0.15,
+  "A": 1.0
+ },
+ "Pattern": "bars",
+ "Metallic": false,
+ "SizeCm": 8,
+ "WeightG": 40,
+ "SinkScale": 2.2,
+ "SinkOffset": 0,
+ "DepthScale": 1.4,
+ "DepthOffset": 0
+}

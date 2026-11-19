@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Bayou Bill Curly · Twister 6 cm, główka 7 g, zielony fluo",
+ "Kind": 3,
+ "AffinityAs": "softbait",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 16,
+ "RequiredLevel": 1,
+ "Description": "Sierpowaty ogonek wije się przy najwolniejszym prowadzeniu: okonie i sandacze.",
+ "Shape": "twister",
+ "LureColor": {
+  "R": 0.3,
+  "G": 0.95,
+  "B": 0.3,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.1,
+  "G": 0.4,
+  "B": 0.1,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": false,
+ "SizeCm": 6,
+ "WeightG": 7,
+ "SinkScale": 1.07,
+ "SinkOffset": 0,
+ "DepthScale": 1,
+ "DepthOffset": 0
+}

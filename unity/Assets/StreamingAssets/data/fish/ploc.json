@@ -1,0 +1,62 @@
+{
+ "$type": "FishSpecies",
+ "SpeciesName": "Płoć",
+ "LatinName": "Rutilus rutilus",
+ "Description": "Najpospolitsza ryba naszych wód: srebrna, z czerwonym okiem i pomarańczowymi płetwami. Żeruje w ławicach przy dnie i w toni, bierze na białe robaki i chleb.",
+ "MinWeight": 0.1,
+ "MaxWeight": 0.9,
+ "Rarity": 3.0,
+ "PullFactor": 0.8,
+ "Aggression": 0.4,
+ "StaminaDrain": 0.1,
+ "MouthSize": 2.0,
+ "BaitAffinity": {
+  "worm": 1.0,
+  "corn": 0.6,
+  "bread": 1.5,
+  "boilie": 0.1,
+  "livebait": 0.0,
+  "maggot": 1.4,
+  "insect": 0.5,
+  "spinner": 0.3,
+  "spoon": 0.0,
+  "wobbler": 0.12,
+  "softbait": 0.0,
+  "fly": 0.45
+ },
+ "MinDepth": 0.5,
+ "MaxDepth": 4.0,
+ "DayActivity": 1.0,
+ "NightActivity": 0.3,
+ "TwilightBonus": 1.2,
+ "WeatherPref": {
+  "clear": 1.0,
+  "cloudy": 1.1,
+  "rain": 0.8
+ },
+ "RunLengthMult": 0.7,
+ "BurstMult": 1.3,
+ "BurstRate": 1.3,
+ "LengthRef": 0.41,
+ "BodyDepth": 0.24,
+ "DorsalPos": 0.5,
+ "BackColor": {
+  "R": 0.33,
+  "G": 0.38,
+  "B": 0.3,
+  "A": 1.0
+ },
+ "BellyColor": {
+  "R": 0.86,
+  "G": 0.88,
+  "B": 0.86,
+  "A": 1.0
+ },
+ "FinColor": {
+  "R": 0.85,
+  "G": 0.3,
+  "B": 0.25,
+  "A": 1.0
+ },
+ "PricePerKg": 12.0
+}

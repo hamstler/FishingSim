@@ -1,0 +1,30 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Malowana rybka z drewna",
+ "Kind": 3,
+ "AffinityAs": "wobbler",
+ "AffinityScale": 1.0,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 70,
+ "RequiredLevel": 3,
+ "Description": "Wiosłuje w wodzie jak prawdziwa ryba.",
+ "Shape": "minnow",
+ "LureColor": {
+  "R": 0.42,
+  "G": 0.55,
+  "B": 0.18,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.95,
+  "G": 0.78,
+  "B": 0.2,
+  "A": 1.0
+ },
+ "Pattern": "bars",
+ "Metallic": false,
+ "SizeCm": 6,
+ "WeightG": 6
+}

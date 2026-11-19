@@ -1,0 +1,9 @@
+{
+ "$type": "AccessoryData",
+ "DisplayName": "Krętlik z agrafką",
+ "Kind": 13,
+ "Power": 1.0,
+ "Description": "Obraca się zamiast żyłki: obrotówka i wahadłówka prawie jej nie skręcają, więc rzuty nie kończą się brodą.",
+ "Price": 8,
+ "RequiredLevel": 1
+}

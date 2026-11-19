@@ -1,0 +1,9 @@
+{
+ "$type": "AccessoryData",
+ "DisplayName": "Siatka na owady",
+ "Kind": 9,
+ "Power": 1.0,
+ "Description": "Machnij nad wodą o zmierzchu, gdy tańczą jętki, a w dzień po łące za konikami polnymi. Q zmienia narzędzie w ręku.",
+ "Price": 55,
+ "RequiredLevel": 1
+}

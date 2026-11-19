@@ -1,0 +1,23 @@
+{
+ "$type": "ReelData",
+ "DisplayName": "Hokuto Kaiten 4000 FD · uniwersalny",
+ "DragMax": 7.0,
+ "ReelSpeed": 3.6,
+ "LineCapacity": 160.0,
+ "Price": 420,
+ "RequiredLevel": 4,
+ "Description": "Średni kołowrotek z przednim hamulcem: spinning, feeder i spławik.",
+ "BodyColor": {
+  "R": 0.22,
+  "G": 0.23,
+  "B": 0.25,
+  "A": 1.0
+ },
+ "TrimColor": {
+  "R": 0.75,
+  "G": 0.15,
+  "B": 0.1,
+  "A": 1.0
+ },
+ "Model": "reels/medium_hokuto"
+}

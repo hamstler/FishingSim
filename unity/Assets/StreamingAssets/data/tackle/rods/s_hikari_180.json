@@ -1,0 +1,27 @@
+{
+ "$type": "RodData",
+ "DisplayName": "Hokuto Hikari UL 1,8 m · ultralekki spinning (krótka)",
+ "Kind": 1,
+ "CastMult": 0.919,
+ "MaxLoad": 3.08,
+ "ShockAbsorb": 0.223,
+ "Action": 0.35,
+ "Price": 210,
+ "RequiredLevel": 2,
+ "Description": "Delikatny ultralight z cienką szczytówką: pstrągi, okonie i drobne obrotówki. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy.",
+ "BlankColor": {
+  "R": 0.55,
+  "G": 0.58,
+  "B": 0.6,
+  "A": 1.0
+ },
+ "WhipColor": {
+  "R": 0.92,
+  "G": 0.92,
+  "B": 0.9,
+  "A": 1.0
+ },
+ "FoamGrip": false,
+ "Length": 1.8,
+ "Model": "rods/spin_hokuto"
+}

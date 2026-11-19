@@ -1,0 +1,9 @@
+{
+ "$type": "AccessoryData",
+ "DisplayName": "Gęsi smalec do kołowrotka",
+ "Kind": 7,
+ "Power": 0.12,
+ "Description": "Nasmarowany kołowrotek zwija o jedną ósmą szybciej.",
+ "Price": 15,
+ "RequiredLevel": 1
+}

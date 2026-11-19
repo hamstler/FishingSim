@@ -1,0 +1,9 @@
+{
+ "$type": "AccessoryData",
+ "DisplayName": "Dębowe wiadro na żywce",
+ "Kind": 4,
+ "Power": 1.0,
+ "Description": "Żywce dłużej żyją: co trzeci zużyty żywiec wraca do wiadra.",
+ "Price": 30,
+ "RequiredLevel": 3
+}

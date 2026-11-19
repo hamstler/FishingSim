@@ -1,0 +1,51 @@
+using FishingSim.Compat;
+
+namespace FishingSim.Data;
+
+/// <summary>What an accessory does. New kinds need handling where their effect applies (see docs/ROZWOJ.md).</summary>
+public enum AccessoryKind
+{
+    /// <summary>Okulary polaryzacyjne: cut the glare, fish are visible deeper and further away.</summary>
+    PolarizedGlasses,
+    /// <summary>Latarka czołowa: light at night.</summary>
+    Headlamp,
+    /// <summary>Podpórka z dzwoneczkiem: the rod laid down (Z) rests on it and its bell rings at every bite (several rods: planned).</summary>
+    RodPod,
+    /// <summary>Krzesełko: resting speeds up the clock (planned).</summary>
+    Chair,
+    /// <summary>Wiadro na przynęty: keeps live bait alive longer (planned).</summary>
+    BaitBucket,
+    /// <summary>Wodery: wade deeper (Power = how deep, in metres).</summary>
+    Waders,
+    /// <summary>Osełka: sharper hooks set better (Power = extra share of strikes that hold).</summary>
+    HookHone,
+    /// <summary>Smalec do kołowrotka: the reel winds faster (Power = extra share of speed).</summary>
+    ReelGrease,
+    /// <summary>Łopata: a hand tool (Q) to dig for worms, night crawlers and grubs (Core/Camp/Digging).</summary>
+    Shovel,
+    /// <summary>Siatka na owady: a hand tool (Q) to catch mayflies, grasshoppers and chafers (Core/Camp/Sweeping).</summary>
+    InsectNet,
+    /// <summary>Garnek: cook fish soup over a campfire (Core/Camp/Cooking).</summary>
+    CookingPot,
+    /// <summary>Podrywka: a hand tool (Q) lowered into the water from the bank to catch live bait (Core/Camp/LiftNetting).</summary>
+    LiftNet,
+    /// <summary>Świetlik: a glowing tip for the float and the quiver tip, so bites show after dark.</summary>
+    GlowTip,
+    /// <summary>Krętlik z agrafką: a swivel ahead of the lure takes most of the line twist (Core/Methods/LineTwist).</summary>
+    Swivel,
+    /// <summary>Wypychacz: takes a swallowed hook out quickly and gently (Core/Methods/Unhooking).</summary>
+    Disgorger,
+    /// <summary>Echosonda: in the boat, the depth under it, the bottom's profile and the fish below (UI/EchoSounder).</summary>
+    EchoSounder,
+}
+
+/// <summary>Any other accessory. Owning one is enough for it to work (they are not equipped in a slot).</summary>
+[GlobalClass]
+public partial class AccessoryData : TackleItem
+{
+    [Export] public AccessoryKind Kind { get; set; }
+
+    /// <summary>Strength of the effect; meaning depends on <see cref="Kind"/> (e.g. extra visibility in metres).</summary>
+    [Export] public float Power { get; set; } = 1f;
+
+}

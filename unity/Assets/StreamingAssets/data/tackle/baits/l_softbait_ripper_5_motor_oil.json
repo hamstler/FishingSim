@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Bayou Bill Paddle · Ripper 5 cm, główka 5 g, motor oil",
+ "Kind": 3,
+ "AffinityAs": "softbait",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 15,
+ "RequiredLevel": 1,
+ "Description": "Guma z ogonkiem-kopytkiem na jigowej główce: spada do dna i bierze na opadzie (metoda stop and go).",
+ "Shape": "ripper",
+ "LureColor": {
+  "R": 0.35,
+  "G": 0.3,
+  "B": 0.12,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.9,
+  "G": 0.7,
+  "B": 0.2,
+  "A": 1.0
+ },
+ "Pattern": "glitter",
+ "Metallic": false,
+ "SizeCm": 5,
+ "WeightG": 5,
+ "SinkScale": 0.933,
+ "SinkOffset": 0,
+ "DepthScale": 1,
+ "DepthOffset": 0
+}

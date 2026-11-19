@@ -1,0 +1,9 @@
+{
+ "$type": "KeepnetData",
+ "DisplayName": "Lniana siatka 3 m",
+ "MaxFish": 30,
+ "MaxKg": 25.0,
+ "ConditionLossPerHour": 0.035,
+ "Price": 90,
+ "RequiredLevel": 2
+}

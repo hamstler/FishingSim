@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Nordvik Stål Jig · Pilker 20 g, srebrna",
+ "Kind": 3,
+ "AffinityAs": "spoon",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 40,
+ "RequiredLevel": 2,
+ "Description": "Ciężka, smukła blacha do łowienia pionowego i dalekich rzutów: opada jak kamień, podrywana błyska przy dnie.",
+ "Shape": "jig",
+ "LureColor": {
+  "R": 0.86,
+  "G": 0.87,
+  "B": 0.9,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.85,
+  "G": 0.12,
+  "B": 0.1,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": true,
+ "SizeCm": 6,
+ "WeightG": 20,
+ "SinkScale": 2.2,
+ "SinkOffset": 0,
+ "DepthScale": 1.4,
+ "DepthOffset": 0
+}

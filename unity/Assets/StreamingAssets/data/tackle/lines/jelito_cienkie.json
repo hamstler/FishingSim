@@ -1,0 +1,18 @@
+{
+ "$type": "LineData",
+ "DisplayName": "Linka z jelita, cienka",
+ "Kind": 0,
+ "Strength": 3.5,
+ "Visibility": 0.75,
+ "Stretch": 0.5,
+ "Price": 35,
+ "RequiredLevel": 2,
+ "Description": "Linka z jelita: przezroczysta i elastyczna.",
+ "Diameter": 0.2,
+ "LineColor": {
+  "R": 0.88,
+  "G": 0.7,
+  "B": 0.42,
+  "A": 1.0
+ }
+}

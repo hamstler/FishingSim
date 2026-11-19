@@ -1,0 +1,30 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Błystka wahadłowa z mosiądzu",
+ "Kind": 3,
+ "AffinityAs": "spoon",
+ "AffinityScale": 1.0,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 45,
+ "RequiredLevel": 2,
+ "Description": "Kołysze się jak ranna rybka: szczupaki i bolenie.",
+ "Shape": "classic",
+ "LureColor": {
+  "R": 0.9,
+  "G": 0.72,
+  "B": 0.35,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.85,
+  "G": 0.12,
+  "B": 0.1,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": true,
+ "SizeCm": 6,
+ "WeightG": 14
+}

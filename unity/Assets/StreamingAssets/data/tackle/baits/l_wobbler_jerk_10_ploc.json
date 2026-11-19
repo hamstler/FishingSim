@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Saimaa Craft Hauki Jerk · Jerk tonący 10 cm, płoć",
+ "Kind": 3,
+ "AffinityAs": "wobbler",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 130,
+ "RequiredLevel": 4,
+ "Description": "Bez steru: tonie i ucieka w bok przy każdym szarpnięciu (PPM). Na szczupaki.",
+ "Shape": "jerk",
+ "LureColor": {
+  "R": 0.3,
+  "G": 0.38,
+  "B": 0.5,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.86,
+  "G": 0.88,
+  "B": 0.9,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": false,
+ "SizeCm": 10,
+ "WeightG": 22,
+ "SinkScale": 1,
+ "SinkOffset": 0.55,
+ "DepthScale": 0.4,
+ "DepthOffset": 0
+}

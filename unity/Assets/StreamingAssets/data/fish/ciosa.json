@@ -1,0 +1,63 @@
+{
+ "$type": "FishSpecies",
+ "SpeciesName": "Ciosa",
+ "LatinName": "Pelecus cultratus",
+ "Description": "Ryba o kształcie noża, z prostym grzbietem i wygiętym brzuchem. Żeruje przy powierzchni.",
+ "MinWeight": 0.2,
+ "MaxWeight": 1.5,
+ "Rarity": 0.5,
+ "PullFactor": 0.8,
+ "Aggression": 0.5,
+ "StaminaDrain": 0.11,
+ "MouthSize": 2.0,
+ "BaitAffinity": {
+  "worm": 0.8,
+  "corn": 0.0,
+  "bread": 0.0,
+  "boilie": 0.0,
+  "livebait": 0.3,
+  "maggot": 1.3,
+  "insect": 1.2,
+  "spinner": 0.89,
+  "spoon": 0.22,
+  "wobbler": 0.54,
+  "softbait": 0.24,
+  "fly": 1.08
+ },
+ "MinDepth": 0.3,
+ "MaxDepth": 4.0,
+ "DayActivity": 1.0,
+ "NightActivity": 0.5,
+ "TwilightBonus": 1.3,
+ "WeatherPref": {
+  "clear": 1.0,
+  "cloudy": 1.0,
+  "rain": 1.0
+ },
+ "RunLengthMult": 1.0,
+ "BurstMult": 1.5,
+ "BurstRate": 1.0,
+ "LengthRef": 0.38,
+ "BodyDepth": 0.18,
+ "DorsalPos": 0.8,
+ "BackColor": {
+  "R": 0.35,
+  "G": 0.38,
+  "B": 0.33,
+  "A": 1.0
+ },
+ "BellyColor": {
+  "R": 0.9,
+  "G": 0.9,
+  "B": 0.88,
+  "A": 1.0
+ },
+ "FinColor": {
+  "R": 0.6,
+  "G": 0.5,
+  "B": 0.45,
+  "A": 1.0
+ },
+ "PricePerKg": 9.0,
+ "TrophyWeight": 0.0
+}

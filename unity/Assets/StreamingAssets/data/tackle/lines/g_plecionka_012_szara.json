@@ -1,0 +1,18 @@
+{
+ "$type": "LineData",
+ "DisplayName": "Kraken Braid X8 0,12 mm, szara",
+ "Kind": 1,
+ "Strength": 7.5,
+ "Visibility": 1.06,
+ "Stretch": 0.05,
+ "Diameter": 0.12,
+ "LineColor": {
+  "R": 0.55,
+  "G": 0.57,
+  "B": 0.6,
+  "A": 1.0
+ },
+ "Price": 64,
+ "RequiredLevel": 2,
+ "Description": "Bardzo mocna jak na swoją grubość i nierozciągliwa: daleki rzut i pewne zacięcie, ale zrywy idą prosto w wędkę."
+}

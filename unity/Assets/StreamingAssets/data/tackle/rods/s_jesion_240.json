@@ -1,0 +1,27 @@
+{
+ "$type": "RodData",
+ "DisplayName": "Ostoja Jesion 2,4 m · drewniana spławikówka (krótka)",
+ "Kind": 0,
+ "CastMult": 0.753,
+ "MaxLoad": 3.7,
+ "ShockAbsorb": 0.257,
+ "Action": 0.5,
+ "Price": 60,
+ "RequiredLevel": 1,
+ "Description": "Prosta wędka z jesionu ze sznurkowymi owijkami: dobra na początek. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy.",
+ "BlankColor": {
+  "R": 0.42,
+  "G": 0.27,
+  "B": 0.14,
+  "A": 1.0
+ },
+ "WhipColor": {
+  "R": 0.6,
+  "G": 0.5,
+  "B": 0.35,
+  "A": 1.0
+ },
+ "FoamGrip": false,
+ "Length": 2.4,
+ "Model": "rods/float_ostoja"
+}

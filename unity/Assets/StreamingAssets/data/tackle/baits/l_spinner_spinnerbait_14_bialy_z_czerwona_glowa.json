@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Bayou Bill Reed Blade · Spinnerbait 14 g, biały z czerwoną głową",
+ "Kind": 3,
+ "AffinityAs": "spinner",
+ "AffinityScale": 1.1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 70,
+ "RequiredLevel": 3,
+ "Description": "Ramię z dwoma skrzydełkami nad główką ze spódniczką: przechodzi przez zielsko bez zaczepów. Na szczupaki.",
+ "Shape": "spinnerbait",
+ "LureColor": {
+  "R": 0.95,
+  "G": 0.95,
+  "B": 0.93,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.85,
+  "G": 0.1,
+  "B": 0.08,
+  "A": 1.0
+ },
+ "Pattern": "redhead",
+ "Metallic": false,
+ "SizeCm": 9,
+ "WeightG": 14,
+ "SinkScale": 1.2,
+ "SinkOffset": 0,
+ "DepthScale": 1,
+ "DepthOffset": 0
+}
