@@ -61,12 +61,13 @@ Shader "FS/Water"
                 // fine ripples on top
                 float t = _Time.y;
                 float2 p = i.wpos.xz;
-                sl += float2(cos(p.x * 7.3 + t * 3.1) + cos(p.x * 5.1 - p.y * 4.3 + t * 2.3), cos(p.y * 6.7 + t * 2.7) + cos(p.y * 9.1 + p.x * 3.3 - t * 3.7)) * 0.025;
+                sl += float2(cos(p.x * 7.3 + t * 3.1) + cos(p.x * 5.1 - p.y * 4.3 + t * 2.3), cos(p.y * 6.7 + t * 2.7) + cos(p.y * 9.1 + p.x * 3.3 - t * 3.7)) * 0.012;
+                sl *= 0.6;
                 float3 n = normalize(float3(-sl.x, 1, -sl.y));
                 float3 v = normalize(_WorldSpaceCameraPos - i.wpos);
-                float fres = 0.02 + 0.98 * pow(1 - saturate(dot(n, v)), 5);
+                float fres = 0.02 + 0.6 * pow(1 - saturate(dot(n, v)), 5);
                 float3 r = reflect(-v, n);
-                float3 sky = lerp(_SkyHorizon.rgb, _SkyTop.rgb, saturate(r.y * 2.5));
+                float3 sky = lerp(_SkyHorizon.rgb, _SkyTop.rgb, saturate(r.y * 2.5)) * 0.75;
                 float sceneZ = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE_PROJ(_CameraDepthTexture, UNITY_PROJ_COORD(i.scr)));
                 float thick = max(sceneZ - i.scr.w, 0);
                 float deep = 1 - exp(-thick / max(_Clarity, 0.1));
