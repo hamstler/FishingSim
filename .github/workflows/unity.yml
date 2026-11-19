@@ -30,6 +30,7 @@ jobs:
           sparse-checkout: |
             unity
             .github
+            tools/release
       - uses: actions/cache@v4
         with:
           path: unity/Library
@@ -43,6 +44,9 @@ jobs:
           projectPath: unity
           targetPlatform: ${{ matrix.target }}
           unityVersion: 6000.0.64f1
+          buildName: FishingSim
+          buildMethod: FishingSim.EditorTools.BuildGame.Build
+          versioning: None
       - uses: actions/upload-artifact@v4
         with:
           name: FishingSim-unity-${{ matrix.target }}
