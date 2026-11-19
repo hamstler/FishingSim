@@ -71,6 +71,7 @@ namespace FishingSim.Game
             fish.AddComponent<MeshRenderer>().sharedMaterial = Materials.Lit(0.55f, 0.08f);
             fish.SetActive(false);
             ApplyTackle();
+            ShowRod(Player.enabled);
         }
 
         // ------------------------------------------------------------------ visuals
@@ -154,6 +155,13 @@ namespace FishingSim.Game
             _line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             _line.receiveShadows = false;
             go.SetActive(false);
+        }
+
+        /// <summary>The rod shows only in play (the menu's flying camera carries it otherwise).</summary>
+        public void ShowRod(bool show)
+        {
+            if (_rodRoot != null)
+                _rodRoot.gameObject.SetActive(show);
         }
 
         // ------------------------------------------------------------------ tackle

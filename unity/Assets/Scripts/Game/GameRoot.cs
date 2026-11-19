@@ -139,6 +139,8 @@ namespace FishingSim.Game
             _screen = play ? Screen.Play : Screen.Menu;
             if (play)
                 EnterPlay();
+            else
+                SetCursor(false);
         }
 
         private void EnterPlay()
@@ -152,6 +154,8 @@ namespace FishingSim.Game
 
         private void SetCursor(bool captured)
         {
+            _player.enabled = _screen == Screen.Play;
+            _rod.ShowRod(_screen == Screen.Play);
             Cursor.lockState = captured ? CursorLockMode.Locked : CursorLockMode.None;
             Cursor.visible = !captured;
             _player.Frozen = !captured;
@@ -450,6 +454,7 @@ namespace FishingSim.Game
                             _profile.Save();
                             _panel = Panel.None;
                             _screen = Screen.Menu;
+                            _player.Camera.transform.localPosition = new Vector3(0f, Player.EyeHeight, 0f);
                             SetCursor(false);
                             _player.Frozen = true;
                             _rod.Blocked = true;
@@ -491,10 +496,10 @@ namespace FishingSim.Game
         private void Row(ref float y, Rect r, string label, string value, Action<int> change)
         {
             GUI.Label(new Rect(r.x, y + S(8), r.width * 0.5f, S(32)), label, _text);
-            if (GUI.Button(new Rect(r.x + r.width * 0.5f, y, S(44), S(44)), "◀", _button))
+            if (GUI.Button(new Rect(r.x + r.width * 0.5f, y, S(44), S(44)), "<", _button))
                 change(-1);
             GUI.Label(new Rect(r.x + r.width * 0.5f + S(52), y + S(8), r.width * 0.5f - S(110), S(32)), value, _text);
-            if (GUI.Button(new Rect(r.x + r.width - S(44), y, S(44), S(44)), "▶", _button))
+            if (GUI.Button(new Rect(r.x + r.width - S(44), y, S(44), S(44)), ">", _button))
                 change(1);
             y += S(56);
         }
