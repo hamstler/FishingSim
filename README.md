@@ -246,12 +246,12 @@ tekstur po pierwszym uruchomieniu) i najwolniejsze systemy gry w milisekundach n
 
 **Minimalistyczny interfejs:** podczas zwykłego rozglądania na ekranie jest tylko mała kropka celownika. Stan wędki i cienki pasek napięcia pojawiają się w trakcie łowienia, sakiewka i siatka na chwilę po zmianie, a sprzęt na chwilę po przełączeniu. Tab pokazuje wszystko naraz, H sterowanie.
 
-Symulator wędkarski w Godot 4.3 (.NET) napisany w całości w C#. Poza kodem są shadery (`shaders/*.gdshader`: niebo, woda, teren, liście, trawa, gwiazdy, deszcz, wodospad), bo shadery w Godocie piszą się w jego własnym języku, oraz pliki scen i danych (`.tscn`, `.tres`).
+Symulator wędkarski w Godot 4.7 (.NET) napisany w całości w C#. Poza kodem są shadery (`shaders/*.gdshader`: niebo, woda, teren, liście, trawa, gwiazdy, deszcz, wodospad), bo shadery w Godocie piszą się w jego własnym języku, oraz pliki scen i danych (`.tscn`, `.tres`).
 
 ## Budowanie i uruchamianie
 
 ### Czego potrzebujesz
-- **Godot 4.3 w wersji .NET** (na stronie Godota: „Godot Engine - .NET”, wersja 4.3-stable). Zwykły Godot bez .NET nie
+- **Godot 4.7.2 w wersji .NET** (na stronie Godota: „Godot Engine - .NET”, wersja 4.7.2-stable). Zwykły Godot bez .NET nie
   zbuduje gry, bo cały kod jest w C#.
 - **.NET SDK 8.0** (`dotnet --version` powinno pokazać 8.x).
 - **Git**, żeby pobrać repozytorium. Repozytorium z całą historią zajmuje ok. 750 MB, głównie przez modele ryb
@@ -284,7 +284,7 @@ godot --path .
 
 ### Zbudowanie gry do pliku wykonywalnego (eksport)
 1. Zainstaluj szablony eksportu dla tej samej wersji: w edytorze **Editor → Manage Export Templates → Download and
-   Install** (szablony „4.3.stable.mono”).
+   Install** (szablony „4.7.2.stable.mono”).
 2. **Project → Export**: projekt ma gotowe ustawienia dla **Windows** i **Linux** (`export_presets.cfg`). Wybierz jedno
    i kliknij **Export Project**. Gra trafi do `build/windows/` albo `build/linux/` (katalog `build/` nie jest w
    repozytorium).
