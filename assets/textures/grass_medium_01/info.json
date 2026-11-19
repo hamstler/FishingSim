@@ -1,0 +1,28 @@
+{
+ "id": "grass_medium_01",
+ "name": "Grass Medium 01",
+ "authors": [
+  "Rob Tuytel",
+  "Rico Cilliers"
+ ],
+ "licence": "CC0 1.0 (public domain)",
+ "source": "https://polyhaven.com/a/grass_medium_01",
+ "cells": [
+  {
+   "width": 0.984375,
+   "height": 0.490234375
+  },
+  {
+   "width": 0.984375,
+   "height": 0.49609375
+  },
+  {
+   "width": 0.984375,
+   "height": 0.3046875
+  },
+  {
+   "width": 0.984375,
+   "height": 0.490234375
+  }
+ ]
+}

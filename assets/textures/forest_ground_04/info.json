@@ -1,0 +1,15 @@
+{
+ "id": "forest_ground_04",
+ "name": "Forest Ground 04",
+ "authors": [
+  "Rob Tuytel",
+  "Rico Cilliers"
+ ],
+ "metres": [
+  3.1500000953674316,
+  3.1500000953674316
+ ],
+ "licence": "CC0 1.0 (public domain)",
+ "source": "https://polyhaven.com/a/forest_ground_04",
+ "grey": false
+}

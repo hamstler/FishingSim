@@ -707,6 +707,91 @@ public static class TreeFactory
     /// <summary>The short meadow grass around the player (Graphics/GrassField): many thin blades per clump.</summary>
     public static ArrayMesh MeadowClump() => _meadow ??= BladeClump(17, 16, 0.3f, 0.016f, 0.22f);
 
+    // ------------------------------------------------------------------ photographed grass cards
+    private const string CardDir = "res://assets/textures/grass_medium_01";
+    private const int CardVersion = 1;
+    private static ArrayMesh? _cards;
+    private static ShaderMaterial? _cardMaterial;
+    private static bool _cardTried;
+
+    /// <summary>True when the photographed clump atlas (tools/assets/grass_cards.py) is there and pictures are drawn.</summary>
+    public static bool HasGrassCards => !Graphics.Renderer.IsHeadless && FileAccess.FileExists($"{CardDir}/cards.webp");
+
+    /// <summary>
+    /// A meadow clump of three crossed vertical cards (0, 60 and 120 degrees) for shaders/grass_card.gdshader: 6
+    /// triangles instead of the hundreds of the curved blades. 0.72 m wide, 0.36 m high (the atlas cells are about twice
+    /// as wide as high; the shader fits each card to its cell's height). UV: x across, y = 0 at the top.
+    /// </summary>
+    public static ArrayMesh MeadowCards()
+    {
+        if (_cards != null)
+            return _cards;
+        var st = new SurfaceTool();
+        st.Begin(Mesh.PrimitiveType.Triangles);
+        const float half = 0.36f, height = 0.36f;
+        for (int k = 0; k < 3; k++)
+        {
+            float a = k * Mathf.Pi / 3f;
+            var across = new Vector3(MathF.Cos(a), 0f, MathF.Sin(a)) * half;
+            var facing = new Vector3(-MathF.Sin(a), 0f, MathF.Cos(a));
+            // Normals lean up (lit like the lawn they make), a little towards each card's face.
+            var n = (Vector3.Up * 0.8f + facing * 0.2f).Normalized();
+            var bl = -across;
+            var br = across;
+            var tl = -across + Vector3.Up * height;
+            var tr = across + Vector3.Up * height;
+            void V(Vector3 p, float u, float v)
+            {
+                st.SetNormal(n);
+                st.SetUV(new Vector2(u, v));
+                st.AddVertex(p);
+            }
+            V(bl, 0f, 1f); V(tl, 0f, 0f); V(tr, 1f, 0f);
+            V(bl, 0f, 1f); V(tr, 1f, 0f); V(br, 1f, 1f);
+        }
+        return _cards = st.Commit();
+    }
+
+    /// <summary>The material of <see cref="MeadowCards"/>: the CC0 clump atlas (block compressed, alpha coverage kept
+    /// in the mip levels), its cells' sizes and average colour; null without the atlas or a screen.</summary>
+    public static ShaderMaterial? GrassCardMaterial()
+    {
+        if (_cardTried)
+            return _cardMaterial;
+        _cardTried = true;
+        if (!HasGrassCards)
+            return null;
+        string path = $"{CardDir}/cards.webp";
+        long bytes;
+        using (var f = FileAccess.Open(path, FileAccess.ModeFlags.Read))
+            bytes = (long)(f?.GetLength() ?? 0);
+        var (img, mean) = Graphics.TextureStore.Get($"grass_cards_{bytes}", CardVersion, Graphics.BlockCompress.Kind.ColourAlpha, () =>
+        {
+            var image = new Image();
+            image.LoadWebpFromBuffer(FileAccess.GetFileAsBytes(path));
+            image.Convert(Image.Format.Rgba8);
+            return image;
+        }, prepare: i => ProceduralTextures.PreserveAlphaCoverage(i, 0.5f));
+        var heights = new float[] { 0.5f, 0.5f, 0.5f, 0.5f };
+        var widths = new float[] { 1f, 1f, 1f, 1f };
+        if (Json.ParseString(FileAccess.GetFileAsString($"{CardDir}/info.json")).AsGodotDictionary() is { } info
+            && info.TryGetValue("cells", out var cv) && cv.AsGodotArray() is { } cells)
+            for (int i = 0; i < Math.Min(4, cells.Count); i++)
+            {
+                var c = cells[i].AsGodotDictionary();
+                heights[i] = (float)c["height"].AsDouble();
+                widths[i] = (float)c["width"].AsDouble();
+            }
+        _cardMaterial = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/grass_card.gdshader") };
+        _cardMaterial.SetShaderParameter("cards", ImageTexture.CreateFromImage(img));
+        _cardMaterial.SetShaderParameter("cell_height", new Vector4(heights[0], heights[1], heights[2], heights[3]));
+        _cardMaterial.SetShaderParameter("cell_width", new Vector4(widths[0], widths[1], widths[2], widths[3]));
+        _cardMaterial.SetShaderParameter("card_mean", new Vector3(mean.R, mean.G, mean.B));
+        _cardMaterial.SetShaderParameter("gust_noise", ProceduralTextures.Noise(61, 0.01f, 256, octaves: 3));
+        _cardMaterial.SetShaderParameter("noise_tex", ProceduralTextures.Noise(17, 0.01f, 1024));
+        return _cardMaterial;
+    }
+
 
     public static CylinderMesh Reed() => new() { TopRadius = 0.004f, BottomRadius = 0.014f, Height = 1.5f, RadialSegments = 4, Rings = 1 };
 

@@ -17,8 +17,9 @@ namespace FishingSim.Fishing;
 public partial class FirstPersonBody : Node3D
 {
     // The rod in front of the body, a little right of the middle, so the left hand reaches the crank on the reel's left.
-    private static readonly Vector3 RigBasePosition = new(0.07f, -0.195f, -0.35f);
-    private static readonly Vector3 RigBaseRotation = new(Mathf.DegToRad(-78f), 0f, 0f);
+    private static readonly Vector3 RigBasePosition = new(0.035f, -0.165f, -0.3f);
+    private static readonly Vector3 RigBaseRotation = new(Mathf.DegToRad(-60f), 0f, 0f);
+    private static readonly float RigRoll = Mathf.DegToRad(30f);
     private static readonly Vector3 WristLocal = new(0.055f, 0.03f, -0.01f);
     private static readonly Vector3 LeftRest = new(-0.3f, -0.75f, -0.25f);
 
@@ -54,6 +55,9 @@ public partial class FirstPersonBody : Node3D
     /// <summary>Where the camera sits on the model (its eyes), in the model's own space (it faces +Z).</summary>
     private static readonly Vector3 Eyes = new(0f, 1.655f, 0.075f);
     private const float Lean = 0.2f;
+
+    /// <summary>The player's own body (assets/characters/player_angler.glb): its "Arms" mesh is what the angler sees.</summary>
+    public const string PlayerModel = "player_angler";
 
     // The right hand's grip in rod-rig space (rod along +Y, reel hanging at -Z, +X to the right): the palm faces the
     // blank from the right, the knuckles run forward and down, so the fingers wrap under the handle.
@@ -111,7 +115,10 @@ public partial class FirstPersonBody : Node3D
     /// <summary>The villager's arms, if the model can be shown; false leaves the built hands to do.</summary>
     private bool BuildArms()
     {
-        var look = new Appearance("male_ranger", 0, null, Colors.White, new Color(1f, 0.97f, 0.95f), false, false, Colors.White);
+        // The user's Meshy fisherman rigged onto the villagers' skeleton (tools/assets/meshy_player_rig.py); the
+        // Quaternius ranger's arms without it.
+        string id = CharacterAsset.Has(PlayerModel) ? PlayerModel : "male_ranger";
+        var look = new Appearance(id, 0, null, Colors.White, id == PlayerModel ? new Color(0.86f, 0.74f, 0.64f) : new Color(1f, 0.97f, 0.95f), false, false, Colors.White);
         if (CharacterAsset.Create(look, idle: null) is not { } body || CharacterAsset.SkeletonOf(body) is not { } skeleton)
             return false;
         foreach (var node in body.FindChildren("*", "MeshInstance3D", true, false))
@@ -191,6 +198,9 @@ public partial class FirstPersonBody : Node3D
         _raise = Mathf.MoveToward(_raise, Math.Clamp(RaiseSource?.Invoke() ?? 0f, 0f, 1f), dt * 4f);
         _rig.Position = RigBasePosition + new Vector3(pose.ArmSwing * 0.02f, pose.ArmLift * 0.06f + _raise * 0.07f, pose.Lean * 0.2f + _raise * 0.06f);
         _rig.Rotation = RigBaseRotation + new Vector3(pose.ArmLift * 0.3f + _raise * 0.65f, 0f, pose.ArmSwing * 0.04f);
+        // Turned about the rod's own axis so the reel hangs out to the left, towards the left hand on the crank, and
+        // shows beside the handle instead of hiding under the hands.
+        _rig.Basis *= new Basis(Vector3.Up, RigRoll);
 
         if (_ik != null)
         {

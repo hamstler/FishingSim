@@ -123,6 +123,8 @@ def write_credits():
         p = os.path.join(ROOT, tid, "info.json")
         if os.path.exists(p):
             m = json.load(open(p))
+            if 'id' not in m:
+                continue
             rows.append(f"| {m['id']} | {m['name']} | {', '.join(m['authors'])} | {m['licence']} | {m['source']} |")
     with open(os.path.join(ROOT, "CREDITS.md"), "w") as f:
         f.write("# Tekstury z Poly Haven\n\nWszystkie na licencji CC0 1.0 (domena publiczna): wolno ich używać w każdym celu, także komercyjnym, "
@@ -134,6 +136,8 @@ def write_credits():
         for name in sorted(os.listdir(MODELS)):
             if name.endswith(".json"):
                 m = json.load(open(os.path.join(MODELS, name)))
+                if 'id' not in m:     # a reel's frame (rods/reels), not a Poly Haven model
+                    continue
                 rows.append(f"| {m['id']} | {m['name']} | {', '.join(m['authors'])} | {m['licence']} | {m['source']} |")
     if rows:
         with open(os.path.join(ROOT, "CREDITS.md"), "a") as f:
