@@ -69,7 +69,7 @@ public static class HitchLog
             + $"{RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalDrawCallsInFrame)} wywołań, "
             + $"GPU {RenderingServer.ViewportGetMeasuredRenderTimeGpu(Engine.GetMainLoop() is SceneTree t ? t.Root.GetViewportRid() : default):0.0} ms, "
             + $"VRAM {Performance.GetMonitor(Performance.Monitor.RenderVideoMemUsed) / 1048576.0:0} MB, "
-            + $"RAM {OS.GetStaticMemoryUsage() / 1048576.0:0} MB, .NET {GC.GetTotalMemory(false) / 1048576.0:0} MB\n");
+            + $"RAM {System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / 1048576.0:0} MB, .NET {GC.GetTotalMemory(false) / 1048576.0:0} MB\n");
         System.Threading.ThreadPool.GetAvailableThreads(out int free, out _);
         System.Threading.ThreadPool.GetMaxThreads(out int max, out _);
         sb.Append($"  wątki w tle: {max - free}\n");
