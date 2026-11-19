@@ -294,6 +294,12 @@ public static class CharacterAsset
                     m.Clearcoat = 1f;
                     m.ClearcoatRoughness = 0.04f;
                     break;
+                case "body":
+                    // The player's Meshy body (one picture for skin and clothes): two-sided like Meshy's own material,
+                    // a few of its triangles wind the other way.
+                    // No rim: the forearms right before the eyes glowed pink in the evening sun.
+                    m.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+                    break;
                 case "shoes" or "hat":
                     m.RimEnabled = true;
                     m.Rim = 0.2f;

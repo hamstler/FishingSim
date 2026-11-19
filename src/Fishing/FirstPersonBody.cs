@@ -55,6 +55,9 @@ public partial class FirstPersonBody : Node3D
     private static readonly Vector3 Eyes = new(0f, 1.655f, 0.075f);
     private const float Lean = 0.2f;
 
+    /// <summary>The player's own body (assets/characters/player_angler.glb): its "Arms" mesh is what the angler sees.</summary>
+    public const string PlayerModel = "player_angler";
+
     // The right hand's grip in rod-rig space (rod along +Y, reel hanging at -Z, +X to the right): the palm faces the
     // blank from the right, the knuckles run forward and down, so the fingers wrap under the handle.
     private static readonly Vector3 GripHandle = RodRig.GripPoint;
@@ -111,7 +114,10 @@ public partial class FirstPersonBody : Node3D
     /// <summary>The villager's arms, if the model can be shown; false leaves the built hands to do.</summary>
     private bool BuildArms()
     {
-        var look = new Appearance("male_ranger", 0, null, Colors.White, new Color(1f, 0.97f, 0.95f), false, false, Colors.White);
+        // The user's Meshy fisherman rigged onto the villagers' skeleton (tools/assets/meshy_player_rig.py); the
+        // Quaternius ranger's arms without it.
+        string id = CharacterAsset.Has(PlayerModel) ? PlayerModel : "male_ranger";
+        var look = new Appearance(id, 0, null, Colors.White, id == PlayerModel ? Colors.White : new Color(1f, 0.97f, 0.95f), false, false, Colors.White);
         if (CharacterAsset.Create(look, idle: null) is not { } body || CharacterAsset.SkeletonOf(body) is not { } skeleton)
             return false;
         foreach (var node in body.FindChildren("*", "MeshInstance3D", true, false))
