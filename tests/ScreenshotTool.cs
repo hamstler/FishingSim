@@ -507,7 +507,7 @@ public partial class ScreenshotTool : Node
         if (System.Environment.GetEnvironmentVariable("FISHSIM_LOOK_BUILDING") is { Length: > 0 } kindName)
         {
             var bed = main.GetChildren().OfType<LakeBed>().First();
-            var target = main.FindChildren("*", "Building", true, false).OfType<Building>()
+            var target = main.FindChildren("*", "", true, false).OfType<Building>()
                 .FirstOrDefault(b => b.Spec != null && b.Spec.Kind.ToString() == kindName);
             if (target == null)
                 GD.Print($"LOOK_BUILDING: no {kindName}");
