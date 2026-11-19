@@ -170,9 +170,13 @@ void fragment() {
 	rough = mix(rough, 0.35, wet * (1.0 - step(height, -0.05)));
 	// The swash: the water's edge runs up the gentle beach and back with the swell, leaving a glossy film just above
 	// the water that dries as it drains (low roughness, a little darker).
-	float swell = water_height(wpos.xz);
-	float above = height - swell;
-	float film = (1.0 - smoothstep(0.0, 0.05 + water_amp * 0.6, above)) * step(-0.02, above);
+	// (the eight wave sums only near the water line: the rest of the map, the hills and the mountains skip them)
+	float film = 0.0;
+	if (abs(height) < 1.2) {
+		float swell = water_height(wpos.xz);
+		float above = height - swell;
+		film = (1.0 - smoothstep(0.0, 0.05 + water_amp * 0.6, above)) * step(-0.02, above);
+	}
 	base *= 1.0 - 0.12 * film;
 	rough = mix(rough, 0.12, film);
 	// The drift line: a thin, broken band of dark bits (reed stalks, leaves) where the highest waves left them, on

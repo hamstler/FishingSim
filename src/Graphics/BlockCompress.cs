@@ -53,7 +53,7 @@ public static class BlockCompress
             int srcOffset = sl == 0 ? 0 : (int)source.GetMipmapOffset(sl);
             int dstOffset = level == 0 ? 0 : (int)layout.GetMipmapOffset(level);
             int bw = Math.Max((Math.Max(w >> level, 1) + 3) / 4, 1), bh = Math.Max((Math.Max(h >> level, 1) + 3) / 4, 1);
-            Parallel.For(0, bh, by =>
+            Parallel.For(0, bh, FishingSim.Graphics.Workers.Options, by =>
             {
                 Span<byte> block = stackalloc byte[64];
                 for (int bx = 0; bx < bw; bx++)

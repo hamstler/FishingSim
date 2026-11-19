@@ -410,6 +410,7 @@ public partial class Npc : Node3D
     private float _headYaw;
 
     private AnimationPlayer? _animator;
+    private PelvisFit? _pelvis;
     private HeadLook? _look;
     private bool _greets, _greeted;
     private float _check, _nextGesture = 8f + GD.Randf() * 20f, _distance = 999f;
@@ -426,6 +427,9 @@ public partial class Npc : Node3D
         _gestures = gestures;
         if (CharacterAsset.SkeletonOf(model) is { } skeleton)
         {
+            foreach (var child in skeleton.GetChildren())
+                if (child is PelvisFit fit)
+                    _pelvis = fit;
             // Busy hands keep their eyes on the work.
             _look = new HeadLook { Wander = idle.StartsWith("Farm_") ? 0f : 1f };
             skeleton.AddChild(_look);
@@ -474,6 +478,10 @@ public partial class Npc : Node3D
             bool near = _distance < 70f * view;
             if (_animator!.Active != near)
                 _animator.Active = near;
+            // The pelvis fit only follows the animation: a still (far) figure keeps the pose it was left in, and an
+            // active modifier made the skeleton re-pose and re-skin every frame for every villager on the map.
+            if (_pelvis != null && _pelvis.Active != near)
+                _pelvis.Active = near;
             bool shown = _distance < 150f * view;
             if (Visible != shown)
                 Visible = shown;

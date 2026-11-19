@@ -72,7 +72,7 @@ public partial class SoundEngine : Node
             return;
         _player = new AudioStreamPlayer
         {
-            Stream = new AudioStreamGenerator { MixRate = MixRate, BufferLength = 0.15f },
+            Stream = new AudioStreamGenerator { MixRate = MixRate, BufferLength = 0.3f },   // 0.15 s ran dry (crackles) on frames over ~150 ms
             VolumeDb = -4f,
         };
         AddChild(_player);

@@ -72,7 +72,7 @@ public static class FinPainter
             FinKind.Pectoral => 14, FinKind.Pelvic => 9, FinKind.Continuous => 70, _ => 0,
         };
         var rgba = new byte[w * h * 4];
-        Parallel.For(0, h, y =>
+        Parallel.For(0, h, FishingSim.Graphics.Workers.Options, y =>
         {
             float v = (y + 0.5f) / h;                          // 0 = base, 1 = edge (rows top to bottom)
             for (int x = 0; x < w; x++)

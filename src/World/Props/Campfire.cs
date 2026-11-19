@@ -153,7 +153,7 @@ public partial class Campfire : Node3D
         _light = new OmniLight3D
         {
             Position = new Vector3(0f, 0.6f, 0f), LightColor = new Color(1f, 0.6f, 0.28f), OmniRange = 9f, OmniAttenuation = 1.6f,
-            ShadowEnabled = true, LightEnergy = 0f,
+            ShadowEnabled = Graphics.GraphicsQuality.PointShadows, LightEnergy = 0f,
         };
         AddChild(_light);
         _strength = Lit ? 1f : 0f;
@@ -293,8 +293,15 @@ public partial class Campfire : Node3D
         Apply();
     }
 
+    private readonly List<ShaderMaterial> _flameMaterials = new();
+    private float _applied = -1f;
+
     private void Apply()
     {
+        // A cold fire (out and settled) has nothing to update each frame.
+        if (_strength <= 0f && _applied == 0f)
+            return;
+        _applied = _strength;
         if (_embers.MaterialOverride is StandardMaterial3D em)
             em.EmissionEnergyMultiplier = 0.4f + _strength * 2.4f * (0.85f + 0.15f * MathF.Sin(_time * 3.1f + _seed));
         if (_flames == null)
@@ -302,9 +309,12 @@ public partial class Campfire : Node3D
         float flicker = 0.85f + 0.1f * MathF.Sin(_time * 13f + _seed) + 0.05f * MathF.Sin(_time * 31f);
         _flames.Visible = _strength > 0.02f;
         _flames.Scale = new Vector3(1f, 0.3f + 0.7f * _strength, 1f);
-        foreach (var n in _flames.GetChildren())
-            if (n is MeshInstance3D { MaterialOverride: ShaderMaterial m })
-                m.SetShaderParameter("strength", _strength * flicker);
+        if (_flameMaterials.Count == 0)            // found once (GetChildren allocated an array every frame)
+            foreach (var n in _flames.GetChildren())
+                if (n is MeshInstance3D { MaterialOverride: ShaderMaterial m })
+                    _flameMaterials.Add(m);
+        foreach (var m in _flameMaterials)
+            m.SetShaderParameter("strength", _strength * flicker);
         if (_light != null)
         {
             _light.LightEnergy = _strength * 2.2f * flicker;

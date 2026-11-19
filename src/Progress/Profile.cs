@@ -517,7 +517,14 @@ public sealed class Profile
             {
                 var eq = EquippedFor(slot);
                 if (eq.TryGetValue(key, out var id) && map.TryGetValue(id, out var to))
-                    eq[key] = to;
+                {
+                    // Two retired items can share a successor: a rod or reel is mounted on one slot only, so a later
+                    // slot that would get the same one is left empty (the angler picks another in the shop).
+                    bool taken = false;
+                    for (int other = 0; other < slot; other++)
+                        taken |= EquippedFor(other).GetValueOrDefault(key) == to;
+                    eq[key] = taken ? "" : to;
+                }
             }
         }
     }
