@@ -236,14 +236,21 @@ public sealed class ProgressSuite : ITestSuite
 
         var gq = typeof(FishingSim.Graphics.GraphicsQuality);
         FishingSim.Graphics.GraphicsQuality.Set(FishingSim.Graphics.QualityLevel.High);
-        t.Check(!FishingSim.Graphics.GraphicsQuality.Custom && FishingSim.Graphics.GraphicsQuality.TextureLimit == 1024, "the High preset: 1K textures (every preset), not custom");
+        t.Check(!FishingSim.Graphics.GraphicsQuality.Custom && FishingSim.Graphics.GraphicsQuality.TextureLimit == 4096, "the High preset: 4K textures, not custom");
         FishingSim.Graphics.GraphicsQuality.SetStep(FishingSim.Graphics.GraphicsQuality.Shadows, 0);
         t.Check(FishingSim.Graphics.GraphicsQuality.Custom, "changing one setting makes the preset custom");
         FishingSim.Graphics.GraphicsQuality.SetStep(FishingSim.Graphics.GraphicsQuality.Shadows, 99);
         t.Check(FishingSim.Graphics.GraphicsQuality.Shadows.Value == FishingSim.Graphics.GraphicsQuality.Shadows.Steps.Length - 1, "a step is clamped at the last one");
         FishingSim.Graphics.GraphicsQuality.Set(FishingSim.Graphics.QualityLevel.Ultra);
-        t.Check(FishingSim.Graphics.GraphicsQuality.TextureLimit == 1024 && FishingSim.Graphics.GraphicsQuality.WaterReflectionSteps == 32 && !FishingSim.Graphics.GraphicsQuality.Custom,
-            "Ultra: 1K textures too, full water reflections");
+        t.Check(FishingSim.Graphics.GraphicsQuality.TextureLimit == 8192 && FishingSim.Graphics.GraphicsQuality.PaintSize == 4096
+            && FishingSim.Graphics.GraphicsQuality.WaterReflectionSteps == 32 && !FishingSim.Graphics.GraphicsQuality.Custom,
+            "Ultra: 8K textures (painted at 4K), full water reflections");
+        FishingSim.Graphics.GraphicsQuality.Set(FishingSim.Graphics.QualityLevel.Medium);
+        t.Check(FishingSim.Graphics.GraphicsQuality.TextureLimit == 2048, "Medium: 2K textures");
+        FishingSim.Graphics.GraphicsQuality.Set(FishingSim.Graphics.QualityLevel.UltraLow);
+        t.Check(FishingSim.Graphics.GraphicsQuality.TextureLimit == 1024 && FishingSim.Graphics.GraphicsQuality.Shadows.Value == 0
+            && !FishingSim.Graphics.GraphicsQuality.FishShadows && FishingSim.Graphics.GraphicsQuality.Title(FishingSim.Graphics.QualityLevel.UltraLow) == "Ultra niska",
+            "Ultra Low: 1K textures, no sun shadows");
         FishingSim.Graphics.GraphicsQuality.Set(FishingSim.Graphics.QualityLevel.Low);
         t.Check(FishingSim.Graphics.GraphicsQuality.GrassRadius == 0f && FishingSim.Graphics.GraphicsQuality.TextureLimit == 1024, "Low: no grass blades, 1K textures");
         FishingSim.Graphics.GraphicsQuality.Set(FishingSim.Graphics.QualityLevel.High);

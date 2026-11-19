@@ -87,7 +87,7 @@ public static class ProceduralTextures
     }
 
     /// <summary>Leaf pictures are painted at four times the size of the original 512-pixel designs.</summary>
-    private const float LK = 1f;      // 1K leaf atlas (512 px cells), needles/fern 256x1024
+    private static readonly float LK = GraphicsQuality.PaintSize / 1024f;      // 1K: leaf atlas 1024 (512 px cells), needles/fern 256x1024; x LK up to 4K
 
     /// <summary>Bump when a leaf, needle or fern design changes.</summary>
     private const int LeafVersion = 3;
@@ -111,11 +111,11 @@ public static class ProceduralTextures
     {
         foreach (bool needles in new[] { false, true })
             Picture(ClusterName(needles), () => PaintCluster(needles));
-        const int w = (int)(256 * LK), h = (int)(1024 * LK);
+        int w = (int)(256 * LK), h = (int)(1024 * LK);
         Picture($"fern_{w}x{h}", () => PaintFern(w, h));
     }
 
-    private const int LeafCell = (int)(512 * LK);
+    private static readonly int LeafCell = (int)(512 * LK);
 
     private static string ClusterName(bool needles) => needles ? $"needles_{LeafCell}" : $"leaves_{LeafCell * 2}";
 
@@ -261,10 +261,10 @@ public static class ProceduralTextures
     /// </summary>
     public static Texture2D FernFrond()
     {
-        const string key = "fern";
+        string key = $"fern_{(int)(1024 * LK)}";
         if (Cache.TryGetValue(key, out var t))
             return t;
-        const int w = (int)(256 * LK), h = (int)(1024 * LK);
+        int w = (int)(256 * LK), h = (int)(1024 * LK);
         var tex = Painted($"fern_{w}x{h}", () => PaintFern(w, h));
         Cache[key] = tex;
         return tex;

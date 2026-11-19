@@ -55,7 +55,7 @@ public partial class GraphicsPanel : Control
         // The preset: all effects at once.
         Row(grid, "Jakość (zestaw)", "Ustawia wszystkie efekty naraz. Każdą opcję poniżej można potem zmienić osobno.",
             () => GraphicsQuality.Custom ? $"Własne (od: {GraphicsQuality.Title(GraphicsQuality.Level)})" : GraphicsQuality.Title(GraphicsQuality.Level),
-            () => (int)GraphicsQuality.Level, 4, i => GraphicsQuality.Set((QualityLevel)i));
+            () => (int)GraphicsQuality.Level, GraphicsQuality.LevelCount, i => GraphicsQuality.Set((QualityLevel)i));
         Section(grid, "Efekty");
         foreach (var st in GraphicsQuality.Settings)
         {

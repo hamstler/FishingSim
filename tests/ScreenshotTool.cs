@@ -46,7 +46,7 @@ public partial class ScreenshotTool : Node
         GetWindow().Size = size;
         // FISHSIM_QUALITY=0..3 picks the graphics quality (Niska..Ultra) for this run.
         if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_QUALITY"), out int qualitySetting))
-            FishingSim.Graphics.GraphicsQuality.Set((FishingSim.Graphics.QualityLevel)Math.Clamp(qualitySetting, 0, 3));
+            FishingSim.Graphics.GraphicsQuality.Set((FishingSim.Graphics.QualityLevel)Math.Clamp(qualitySetting + 1, 0, FishingSim.Graphics.GraphicsQuality.LevelCount - 1));
         // FISHSIM_VIEW=0..3 picks the view distance (Bliski..Bardzo daleki) for this run.
         if (int.TryParse(System.Environment.GetEnvironmentVariable("FISHSIM_VIEW"), out int viewSetting))
             FishingSim.Graphics.GraphicsQuality.SetView((FishingSim.Graphics.ViewDistance)Math.Clamp(viewSetting, 0, 3));

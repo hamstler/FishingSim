@@ -12,10 +12,10 @@ namespace FishingSim.World.Props;
 /// </summary>
 public static class Textures
 {
-    public const int Size = 1024;
+    public static readonly int Size = Graphics.GraphicsQuality.PaintSize;     // fixed for the run (Textures setting, <= 4K)
 
     /// <summary>Scale of the original 256-pixel designs: every distance in pixels is multiplied by this.</summary>
-    private const float S = Size / 256f;
+    private static readonly float S = Size / 256f;
 
     /// <summary>Texture repeats per metre for triplanar mapping (one tile = 2 m).</summary>
     public const float TriplanarScale = 0.5f;
