@@ -139,7 +139,7 @@ public partial class Building : Node3D
     private bool Mergeable(Node node)
     {
         for (var n = node; n != null && n != this; n = n.GetParent())
-            if ((n is Node3D n3 && _spinners.Contains(n3)) || n is Skeleton3D || n is Label3D
+            if ((n is Node3D n3 && _spinners.Contains(n3)) || n is Skeleton3D || n is Label3D || n.HasMeta("no_merge")
                 || n.GetScript().VariantType != Variant.Type.Nil)
                 return false;
         return true;

@@ -165,7 +165,7 @@ public static partial class BuildingFactory
     }
 
     /// <summary>The shopkeeper of a functional building: beside the door, or behind the counter of a stall.</summary>
-    private static void AddKeeper(Building b, BuildingKind kind, int variant)
+    private static void AddKeeper(Building b, BuildingKind kind, int variant, float? modelFront = null)
     {
         var (pos, yaw) = kind switch
         {
@@ -178,6 +178,9 @@ public static partial class BuildingFactory
             BuildingKind.Smokehouse => (new Vector3(2.1f, 0f, 2.5f), -20f),
             _ => (new Vector3(1.5f, 0f, 4.4f), 0f),
         };
+        // In front of a Meshy model's door (its depth differs from the procedural building's), beside the door.
+        if (modelFront is float mf)
+            pos = new Vector3(pos.X == 0f ? 1.5f : pos.X, 0f, mf + 0.9f);
         var keeper = People.Create(People.KeeperOf(kind), variant);
         keeper.Position = pos;
         keeper.RotationDegrees = new Vector3(0f, yaw, 0f);

@@ -359,11 +359,15 @@ public partial class FirstPersonBody : Node3D
         ik.Left.ThumbOn = onCrank > 0.5f && _leftOnFish < 0.5f
             ? _rig.ToGlobal(_rig.KnobAt(_crank) + new Vector3(-0.004f, 0f, 0.0125f))
             : null;
-        // On the crank the fingers close round the knob and stop on it.
+        // On the crank the fingers close round the knob and stop on it. Only the knob: it keeps its place in the hand
+        // as the crank turns, so the fingers hold one curl (ArmIK reuses the search); the crank's arm and the reel's
+        // body swept through the hand with every turn and the fingers twitched as they re-closed on them each frame.
         ik.Left.Obstacles.Clear();
         if (_leftOnReel > 0.5f && _leftOnFish < 0.5f)
-            foreach (var (a, b, r) in _rig.CrankObstacles(_crank))
-                ik.Left.Obstacles.Add(new ArmIK.Capsule(_rig.ToGlobal(a), _rig.ToGlobal(b), r));
+        {
+            var (a, b, r) = _rig.KnobObstacle(_crank);
+            ik.Left.Obstacles.Add(new ArmIK.Capsule(_rig.ToGlobal(a), _rig.ToGlobal(b), r));
+        }
     }
 
     private static float Smooth01(float x) => x * x * (3f - 2f * x);

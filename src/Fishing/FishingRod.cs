@@ -2525,12 +2525,28 @@ public partial class FishingRod : Node3D
     /// <summary>The line is held taut by the retrieve (tests).</summary>
     public bool DrawnTight => _drawTight > 0.5f;
 
+    /// <summary>The line inside the rod (spool, guides, tip-top) for the ribbon; filled by RodRig.LinePath.</summary>
+    private readonly Vector3[] _inRod = new Vector3[16];
+
     private void UpdateLine(float dt)
     {
         _lineMesh.ClearSurfaces();
         bool drawing = Reeling && State is RodState.Waiting or RodState.Nibble or RodState.Bite && Slack < 0.08f;
         _drawTight = Mathf.MoveToward(_drawTight, drawing ? 1f : 0f, dt * (drawing ? 6f : 1.5f));
-        if (State is RodState.Idle or RodState.Charging or RodState.Landed or RodState.Broken)
+        bool outside = State is not (RodState.Idle or RodState.Charging or RodState.Landed or RodState.Broken);
+        // The spool empties as the line goes out and fills as it is wound back.
+        float capacity = MathF.Max(Loadout.Reel?.LineCapacity ?? 100f, 10f);
+        _rig.SetSpoolFill(1f - (outside ? MathF.Min(_lineLength, capacity) : 0f) / capacity);
+        // From the spool through the guides to the tip-top, whenever the rod is held or rests (bent with the blank).
+        var eyeAll = (GetViewport()?.GetCamera3D() ?? _camera).GlobalPosition;
+        var lineData = Loadout.Line;
+        if (_rig.Visible && State != RodState.Broken && lineData != null)
+        {
+            int n = _rig.LinePath(_inRod);
+            if (n >= 2)
+                DrawStrip(_inRod, n, lineData.LineColor, lineData.Diameter, eyeAll, false);
+        }
+        if (!outside)
         {
             _ropeLive = false;
             return;
@@ -2590,17 +2606,21 @@ public partial class FishingRod : Node3D
         var line = Loadout.Line;
         bool multi = line.ItemId.Contains("wielokolorowa");
         var colour = line.LineColor.Lerp(new Color(1f, 0.2f, 0.15f), Math.Clamp((ratio - 0.5f) * 2f, 0f, 1f));
-        float d = line.Diameter;
-        // The ribbon faces whichever camera draws the frame.
-        var eye = (GetViewport()?.GetCamera3D() ?? _camera).GlobalPosition;
+        DrawStrip(pts, pts.Length, colour, line.Diameter, eyeAll, multi);
+    }
+
+    /// <summary>One camera-facing ribbon through <paramref name="count"/> points of <paramref name="pts"/> (no
+    /// allocation): width by the line's diameter and the distance, multicolour braids in metre bands.</summary>
+    private void DrawStrip(ReadOnlySpan<Vector3> pts, int count, Color colour, float d, Vector3 eye, bool multi)
+    {
         _lineMesh.SurfaceBegin(Mesh.PrimitiveType.TriangleStrip, _lineMaterial);
         float along = 0f;
-        for (int i = 0; i < pts.Length; i++)
+        for (int i = 0; i < count; i++)
         {
             var p = pts[i];
-            var tangent = i < pts.Length - 1 ? pts[i + 1] - p : p - pts[i - 1];
+            var tangent = i < count - 1 ? pts[i + 1] - p : p - pts[i - 1];
             if (tangent.LengthSquared() < 1e-10f)
-                tangent = b - a;
+                tangent = pts[count - 1] - pts[0];
             var toEye = eye - p;
             var side = tangent.Cross(toEye);
             side = side.LengthSquared() > 1e-12f ? side.Normalized() : Vector3.Up;
@@ -2617,7 +2637,7 @@ public partial class FishingRod : Node3D
             _lineMesh.SurfaceSetColor(c);
             _lineMesh.SurfaceSetNormal(dirN);
             _lineMesh.SurfaceAddVertex(p + side * half);
-            if (i < pts.Length - 1)
+            if (i < count - 1)
                 along += (pts[i + 1] - p).Length();
         }
         _lineMesh.SurfaceEnd();
