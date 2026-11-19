@@ -2,11 +2,15 @@
 
     python3 -I tools/assets/meshy_fish.py FOLDER_ID [--size 2048] [--triangles 30000] [--only id,id]
     python3 -I tools/assets/meshy_fish.py --file IN.glb OUT.glb [--size 2048] [--triangles N] [--keep-mr]   (one prop)
+    python3 -I tools/assets/meshy_fish.py FOLDER_ID --bake [--only id,id]   (bake the originals onto the models in place)
 
 The folder holds one sub-folder per species (Meshy_AI_<Name>_3D_...), each with one .glb (~49 MB: three 4K PNGs).
 Each model is rewritten as assets/fish/meshy/<id>.glb: a mesh over --triangles collapsed to it in Blender
 (tools/assets/meshy_decimate.py), the colour and normal pictures
 re-encoded as WebP (EXT_texture_webp) at --size, the unused metallic-roughness picture dropped.
+--bake keeps each species' collapsed mesh (assets/fish/meshy/<id>.glb) and bakes the downloaded original onto it
+(tools/assets/meshy_bake.py: colour with ambient occlusion and a tangent normal map from the original's surface, on a
+clean UV layout), then re-encodes it the same way.
 """
 import io, json, re, shutil, struct, subprocess, sys, tempfile, unicodedata, urllib.request, os
 from PIL import Image
@@ -185,6 +189,7 @@ def main():
     size = int(args[args.index("--size") + 1]) if "--size" in args else 2048
     target = int(args[args.index("--triangles") + 1]) if "--triangles" in args else 30000
     only = set(args[args.index("--only") + 1].split(",")) if "--only" in args else None
+    bake = "--bake" in args
     ids = species_ids()
     os.makedirs(OUT, exist_ok=True)
     for fid, title in listing(folder):
@@ -208,7 +213,19 @@ def main():
             print("not a glb:", title)
             continue
         tris = triangles(raw)
-        if tris > target:
+        low = os.path.join(OUT, sid + ".glb")
+        if bake and os.path.exists(low):
+            with tempfile.TemporaryDirectory() as work:
+                tmp, out = os.path.join(work, "in.glb"), os.path.join(work, "out.glb")
+                open(tmp, "wb").write(raw)
+                r = subprocess.run(["blender", "-b", "--python-exit-code", "1", "-P",
+                                    os.path.join(ROOT, "tools", "assets", "meshy_bake.py"), "--", tmp, low, out, str(size)],
+                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                if r.returncode != 0:
+                    print("bake failed:", sid, r.stdout[-2000:], flush=True)
+                    continue
+                raw2 = open(out, "rb").read()
+        elif tris > target:
             with tempfile.TemporaryDirectory() as work:
                 tmp, out = os.path.join(work, "in.glb"), os.path.join(work, "out.glb")
                 open(tmp, "wb").write(raw)

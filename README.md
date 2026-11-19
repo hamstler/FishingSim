@@ -299,12 +299,20 @@ godot --headless --path . --export-release "Windows" build/windows/FishingSim.ex
 ```bash
 godot --headless --path . --export-release "Linux" build/linux/FishingSim.x86_64
 ```
-Zbudowana gra to plik wykonywalny, plik `.pck` z zasobami (ok. 350 MB, głównie modele ryb) i katalog
+Zbudowana gra to plik wykonywalny, plik `.pck` z zasobami (ok. 870 MB: modele ryb, budynków, wędek i postaci) i katalog
 `data_FishingSim_*` z bibliotekami .NET. Rozpowszechniaj je razem.
 
 Ustawienia eksportu dołączają katalog `assets/fish` (modele ryb i pomiary gatunków, gra wczytuje je dopiero w trakcie
 działania) i pomijają `tools/`, `tests/` i `docs/`. Modele `.glb` mają pliki `.import` z `importer="keep"`, więc edytor
 ich nie importuje, a eksport dołącza je bez zmian.
+
+### Wydanie na GitHubie (instalatory)
+Workflow `.github/workflows/release.yml` buduje grę w GitHub Actions i publikuje wydanie z plikami:
+`FishingSim-<wersja>-windows-setup.exe` (instalator Inno Setup ze skrótem w menu Start i na pulpicie),
+`FishingSim-<wersja>-windows-x86_64.zip`, `fishingsim_<wersja>_amd64.deb` (`sudo apt install ./fishingsim_*.deb`,
+uruchamianie poleceniem `fishingsim` albo z menu) i `FishingSim-<wersja>-linux-x86_64.tar.gz`. Uruchamia się go
+przez wypchnięcie tagu `v*` (wersja z tagu), ręcznie (Actions → Release → Run workflow) albo commitem, którego opis
+zawiera `[release]` (wersja z `tools/release/VERSION`). Skrypt instalatora i paczek: `tools/release/`.
 
 ### Przebudowa modeli ryb (opcjonalnie)
 Gotowe modele są w repozytorium, więc do zbudowania gry nie są potrzebne żadne dodatkowe narzędzia. Kto chce zmienić
