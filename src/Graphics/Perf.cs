@@ -21,6 +21,22 @@ public static class Perf
 
     private static readonly Dictionary<string, double> Window = new();
 
+    /// <summary>Set by the hitch diary: the scopes also add up per frame (<see cref="TakeFrame"/>).</summary>
+    public static bool Tracking { get; set; }
+
+    private static readonly Dictionary<string, double> FrameWindow = new();
+
+    /// <summary>The milliseconds each scope took since the last call (largest first), for the hitch diary.</summary>
+    public static void TakeFrame(List<(string Name, double Ms)> into)
+    {
+        into.Clear();
+        foreach (var kv in FrameWindow)
+            into.Add((kv.Key, kv.Value));
+        into.Sort((a, b) => b.Ms.CompareTo(a.Ms));
+        foreach (var (name, _) in into)
+            FrameWindow[name] = 0.0;
+    }
+
     /// <summary>Hands over the milliseconds each scope took since the last call (largest first) and starts again.</summary>
     public static void TakeWindow(List<(string Name, double Ms)> into)
     {
@@ -50,6 +66,8 @@ public static class Perf
             double ms = (Stopwatch.GetTimestamp() - _start) * 1000.0 / Stopwatch.Frequency;
             if (Live)
                 Window[_name] = Window.GetValueOrDefault(_name) + ms;
+            if (Tracking)
+                FrameWindow[_name] = FrameWindow.GetValueOrDefault(_name) + ms;
             if (!Enabled)
                 return;
             if (!Samples.TryGetValue(_name, out var list))
@@ -58,7 +76,7 @@ public static class Perf
         }
     }
 
-    public static ScopeTimer Scope(string name) => new(Enabled || Live ? name : null);
+    public static ScopeTimer Scope(string name) => new(Enabled || Live || Tracking ? name : null);
 
     public static string Report() => string.Join("\n", Samples.OrderByDescending(kv => kv.Value.Sum()).Select(kv =>
     {

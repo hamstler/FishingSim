@@ -147,11 +147,28 @@ public partial class IconStudio : Node
         return ImageTexture.CreateFromImage(img);
     }
 
+    /// <summary>A map is being played (set by Main): photos are then taken only while the shop is open.</summary>
+    public static bool InWorld { get; set; }
+
+    /// <summary>The shop is on screen (set by Shop).</summary>
+    public static bool ShopOpen { get; set; }
+
+    /// <summary>Frames left before the next photo: each one loads a model and waits for the GPU (a stall).</summary>
+    private int _cooldown;
+
     public override void _Process(double delta)
     {
         if (_busy || _queue.Count == 0)
             return;
+        // Never while the angler plays: a photo loads a rod or reel model, renders it and reads it back, a hitch of tens
+        // of milliseconds (shipped items come from assets/icons; this only covers anything not photographed yet).
+        if (InWorld && !ShopOpen)
+            return;
+        if (_cooldown-- > 0)
+            return;
+        _cooldown = 8;
         var job = _queue.Dequeue();
+        HitchLog.Note($"icon photo {job.File.GetFile()}");
         Take(job.File, job.Target, job.Shot, job.Item);
     }
 
