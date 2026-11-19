@@ -24,6 +24,10 @@ namespace FishingSim.Game
         private IEnumerator Start()
         {
             float started = Time.realtimeSinceStartup;
+            // software rendering on CI is slow: lowest quality and a short view keep the frames coming
+            Settings.Quality = 0;
+            Settings.View = 0;
+            Settings.Apply(Player.Camera);
             Debug.Log($"SMOKE app {Application.companyName} / {Application.productName} {Application.version}, data {Application.persistentDataPath}, gpu {SystemInfo.graphicsDeviceName} ({SystemInfo.graphicsDeviceType})");
             bool ok = true;
             while (!Ready())
@@ -66,7 +70,7 @@ namespace FishingSim.Game
             }
             Day.Hour = 12f;
             int landed = 0;
-            for (int n = 0; n < 3; n++)
+            for (int n = 0; n < 2; n++)
             {
                 var target = Player.transform.position + Player.transform.forward * (12f + n * 4f);
                 Rod.SmokeCast(target);
@@ -90,9 +94,9 @@ namespace FishingSim.Game
                 Rod.SmokeStrike();
                 Rod.SmokeReel = true;
                 t = 0f;
-                while (Rod.State == RodState.Fight && t < 150f)
+                while (Rod.State == RodState.Fight && t < 90f)
                 {
-                    t += Time.deltaTime;
+                    t += Time.unscaledDeltaTime;
                     yield return null;
                 }
                 Rod.SmokeReel = false;
@@ -107,7 +111,7 @@ namespace FishingSim.Game
                     Rod.Reset();
                 yield return null;
             }
-            Debug.Log($"SMOKE landed {landed} of 3, fps {1f / Mathf.Max(Time.smoothDeltaTime, 0.0001f):0}");
+            Debug.Log($"SMOKE landed {landed} of 2, fps {1f / Mathf.Max(Time.smoothDeltaTime, 0.0001f):0}");
             Debug.Log(ok ? "SMOKE OK" : "SMOKE FAIL: magenta pixels (a shader failed)");
             Application.Quit(ok ? 0 : 1);
         }

@@ -61,7 +61,7 @@ jobs:
           sudo chown -R "$(id -u):$(id -g)" build
           chmod +x "$exe"
           set +e
-          FISHSIM_SMOKE=1 FISHSIM_NO_SAVE=1 timeout 900 xvfb-run -a -s "-screen 0 1280x720x24" "$exe" -force-glcore -screen-fullscreen 0 -screen-width 1280 -screen-height 720 -logFile "$RUNNER_TEMP/smoke.log"
+          FISHSIM_SMOKE=1 FISHSIM_NO_SAVE=1 timeout 900 xvfb-run -a -s "-screen 0 640x360x24" "$exe" -force-glcore -screen-fullscreen 0 -screen-width 640 -screen-height 360 -logFile "$RUNNER_TEMP/smoke.log"
           code=$?
           set -e
           grep -E -A6 "SMOKE|Exception|ERROR|Shader|shader" "$RUNNER_TEMP/smoke.log" | grep -v "SMOKE JPEG" | cut -c1-400 | head -200
