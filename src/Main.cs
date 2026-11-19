@@ -70,6 +70,7 @@ public partial class Main : Node3D
 
     public override void _Ready()
     {
+        World.Props.BuildingFactory.RegisterModelFronts();
         GD.Randomize();
 
         string user = Session.IsLoggedIn ? Session.Username : "admin";

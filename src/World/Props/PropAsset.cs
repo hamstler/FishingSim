@@ -25,6 +25,9 @@ public static class PropAsset
     /// when the model is missing or there is no screen.</summary>
     public static IReadOnlyDictionary<string, Mesh>? Named(string id) => Load(id)?.Named;
 
+    /// <summary>The model's bounds in its own units (null when missing or headless).</summary>
+    public static Aabb? BoundsOf(string id) => Load(id)?.Bounds;
+
     private static readonly Dictionary<string, Model?> Cache = new();
 
     private static string PathOf(string id) => $"res://assets/models/{id}.glb";

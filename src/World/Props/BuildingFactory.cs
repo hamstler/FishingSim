@@ -31,6 +31,8 @@ public static partial class BuildingFactory
     public static Building Create(BuildingSpec spec, int variant)
     {
         var b = new Building { Spec = spec, Title = TitleFor(spec.Kind) };
+        if (MeshyBuilding(b, spec, variant))
+            return b;
         if (CreateVillagePiece(b, spec, variant))
             return b;
         switch (spec.Kind)
@@ -106,6 +108,101 @@ public static partial class BuildingFactory
         if (spec.IsFunctional)
             AddKeeper(b, spec.Kind, variant);
         return b;
+    }
+
+    // ------------------------------------------------------------------ the user's Meshy buildings
+    /// <summary>A Meshy model standing for a kind of building: its id under assets/models, its size in metres (the
+    /// longest side of its footprint, or its height for the windmill and the well), the turn that brings its front (door)
+    /// to +Z, and the sign over the door (null: none).</summary>
+    private sealed record MeshyLook(string Id, float Size, bool ByHeight, float Yaw, string? Sign, float Front = 0f);
+
+    private static readonly Dictionary<BuildingKind, MeshyLook> MeshyBuildings = new()
+    {
+        [BuildingKind.Tackle] = new("buildings/kram_wedkarski", 10f, false, 0f, "KRAM WĘDKARSKI", 5.0f),
+        [BuildingKind.General] = new("buildings/kram_wedkarski", 10f, false, 0f, "KRAM I PRZYNĘTY", 5.0f),
+        [BuildingKind.Bait] = new("buildings/kram_z_przynetami", 7f, false, 0f, "PRZYNĘTY", 3.5f),
+        [BuildingKind.FishBuyer] = new("buildings/skup_ryb", 8f, false, 0f, null, 2.46f),
+        [BuildingKind.Market] = new("buildings/targ_rybny", 9f, false, 0f, "TARG RYBNY", 3.28f),
+        [BuildingKind.Office] = new("buildings/gildia_wedkarzy", 12f, false, 0f, "GILDIA WĘDKARZY", 6.0f),
+        [BuildingKind.BusStop] = new("buildings/postoj_wozow", 5f, false, 0f, null, 1.94f),
+        [BuildingKind.Smokehouse] = new("buildings/wedzarnia", 4.2f, false, 0f, null, 2.1f),
+        [BuildingKind.House] = new("buildings/dom_mur_pruski", 12f, false, 0f, null, 6.0f),
+        [BuildingKind.Cabin] = new("buildings/chata_z_bali", 9f, false, 0f, null, 4.5f),
+        [BuildingKind.RedHouse] = new("buildings/czerwony_dom_skandynawski", 11f, false, 0f, null, 4.72f),
+        [BuildingKind.StoneHouse] = new("buildings/kamienny_dom_lupek", 10f, false, 0f, null, 3.11f),
+        [BuildingKind.Barn] = new("buildings/stodola", 16f, false, -90f, null, 8.0f),     // its doors are on the gable at +X
+        [BuildingKind.Windmill] = new("buildings/wiatrak_kozlak", 14f, true, -90f, null),     // drawn with its sails to +X
+        [BuildingKind.Boathouse] = new("buildings/szopa_na_lodzie", 10f, false, 0f, null, 2.5f),
+        [BuildingKind.Well] = new("buildings/studnia_z_daszkiem", 3.2f, true, 0f, null),
+    };
+
+    /// <summary>
+    /// Tells BuildingSpec.DoorPoint how far in front of each modelled building its door path ends (the half depth the
+    /// table's Front gives, measured from the models with tools/assets/prop_qa.py, plus 1.6 m): the Meshy buildings are
+    /// deeper than the procedural ones, whose 5.2 m reach ended inside them. Called on the main thread before a map is
+    /// built; nothing is registered without a screen (headless keeps the procedural buildings).
+    /// </summary>
+    public static void RegisterModelFronts()
+    {
+        if (Renderer.IsHeadless)
+            return;
+        foreach (var (kind, look) in MeshyBuildings)
+            if (look.Front > 0f && FileAccess.FileExists($"res://assets/models/{look.Id}.glb"))
+                BuildingSpec.ModelReach[kind] = look.Front + 1.6f;
+    }
+
+    /// <summary>Whether a kind is drawn from the user's Meshy model (present and a screen to draw it).</summary>
+    public static bool HasMeshy(BuildingKind kind) =>
+        MeshyBuildings.TryGetValue(kind, out var look) && PropAsset.BoundsOf(look.Id) != null;
+
+    /// <summary>
+    /// The building from the user's Meshy model (tools/assets/meshy_fish.py --file, decimated): scaled to its size,
+    /// turned so the door faces +Z, with a box collider round its footprint, the sign over the door, a warm lamp at the
+    /// door by night and, for the trades, the keeper; false (the procedural building is made) without the model.
+    /// The model's parts keep their generated LODs (marked no_merge: Building.MergeStatic would join them away).
+    /// </summary>
+    private static bool MeshyBuilding(Building b, BuildingSpec spec, int variant)
+    {
+        if (!MeshyBuildings.TryGetValue(spec.Kind, out var look) || PropAsset.BoundsOf(look.Id) is not Aabb bounds)
+            return false;
+        bool across = MathF.Abs(MathF.Sin(Mathf.DegToRad(look.Yaw))) > 0.7f;
+        float w = across ? bounds.Size.Z : bounds.Size.X, d = across ? bounds.Size.X : bounds.Size.Z;
+        float k = look.ByHeight ? look.Size / MathF.Max(bounds.Size.Y, 1e-3f) : look.Size / MathF.Max(MathF.Max(w, d), 1e-3f);
+        if (PropAsset.Create(look.Id, scale: k) is not { } model)
+            return false;
+        model.RotationDegrees = new Vector3(0f, look.Yaw, 0f);
+        foreach (var node in model.FindChildren("*", "MeshInstance3D", true, false))
+            node.SetMeta("no_merge", true);
+        b.AddChild(model);
+        float W = w * k, D = d * k, H = bounds.Size.Y * k, front = D / 2f;
+        // Walls only: the walkable part is the floor plan, a little inside the eaves.
+        Collider(b, new Vector3(W * 0.86f, H * 0.7f, D * 0.86f), new Vector3(0f, H * 0.35f, 0f));
+        if (look.Sign != null)
+        {
+            float signY = Math.Min(2.75f, H * 0.55f);
+            var board = new Vector2(Math.Min(look.Sign.Length * 0.16f + 0.7f, W * 0.6f), 0.42f);
+            Box(b, new Vector3(board.X, board.Y, 0.12f), new Vector3(0, signY, front + 0.2f), SignBoard());
+            Label(b, look.Sign, new Vector3(0, signY, front + 0.265f), board);
+        }
+        if (spec.Kind is not (BuildingKind.Well or BuildingKind.Windmill))
+        {
+            var lamp = new OmniLight3D
+            {
+                LightColor = new Color(1f, 0.78f, 0.45f), OmniRange = 9f, LightEnergy = 0f, ShadowEnabled = false,
+                Position = new Vector3(0, Math.Min(2.8f, H * 0.6f), front + 1.2f),
+            };
+            b.AddChild(lamp);
+            b.AddLight(lamp);
+        }
+        if (spec.Kind == BuildingKind.Smokehouse)
+        {
+            var smoke = Props.Campfire.ChimneySmoke();
+            smoke.Position = new Vector3(0f, H + 0.3f, 0f);
+            b.AddChild(smoke);
+        }
+        if (spec.IsFunctional || spec.Kind == BuildingKind.Smokehouse)
+            AddKeeper(b, spec.Kind, variant, front);
+        return true;
     }
 
     // ------------------------------------------------------------------ materials

@@ -64,10 +64,13 @@ public sealed record BuildingSpec(BuildingKind Kind, Vector2 Position, float? Ya
     }
 
     /// <summary>Where the door is on the ground (a few metres in front of the building).</summary>
+    /// <summary>Door reach of the kinds drawn from a model (World/Props/BuildingFactory.RegisterModelFronts).</summary>
+    public static readonly System.Collections.Generic.Dictionary<BuildingKind, float> ModelReach = new();
+
     public Vector2 DoorPoint(Vector2 plaza)
     {
         float yaw = FacingYaw(plaza);
-        float reach = Kind switch
+        float reach = ModelReach.TryGetValue(Kind, out float modelled) ? modelled : Kind switch
         {
             BuildingKind.BusStop => 2.4f, BuildingKind.Windmill => 4f, BuildingKind.Smokehouse => 3.6f, BuildingKind.Tent => 3f,
             BuildingKind.MarketTent or BuildingKind.Stall => 3.4f, _ => 5.2f,

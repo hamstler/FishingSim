@@ -18,7 +18,7 @@ public partial class IconStudio : Node
     public enum Shot { Lure, Plate, Rod, Reel }
 
     /// <summary>Bump when the models or the studio change.</summary>
-    public const int Version = 8;
+    public const int Version = 9;     // 9: small_fjordline re-cut (its whole crank arm turns)
     private const int RenderSize = 512;
     private const string Dir = "user://texcache/icons";
 

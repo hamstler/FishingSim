@@ -51,11 +51,18 @@ public partial class RodRig : Node3D
 
     /// <summary>What the hand on the crank must not enter (rig space): the knob, the crank arm, the reel's body
     /// (this rig's reel: the built one or the modelled one).</summary>
+    /// <summary>The crank knob alone as a capsule (rig space): what the left hand's fingers close on.</summary>
+    public (Vector3 A, Vector3 B, float Radius) KnobObstacle(float angle)
+    {
+        var knob = KnobAt(angle);
+        return (knob + new Vector3(0.012f, 0f, 0f), knob - new Vector3(0.012f, 0f, 0f), 0.0085f);
+    }
+
     public IEnumerable<(Vector3 A, Vector3 B, float Radius)> CrankObstacles(float angle)
     {
         var knob = KnobAt(angle);
         var body = ModelledReel ? _modelBodyCentre : ReelBody;
-        yield return (knob + new Vector3(0.012f, 0f, 0f), knob - new Vector3(0.012f, 0f, 0f), 0.0085f);
+        yield return KnobObstacle(angle);
         yield return (CrankAxis + new Vector3(-0.008f, 0f, 0f), knob + new Vector3(0.018f, 0f, 0f), 0.0045f);
         yield return (body + new Vector3(0, -0.02f, 0), body + new Vector3(0, 0.07f, 0), 0.024f);
     }
@@ -120,6 +127,66 @@ public partial class RodRig : Node3D
     }
 
     private Node3D? _modelRotor, _modelCrank, _modelBail, _modelReelBody;
+
+    private static readonly Dictionary<string, (Mesh Body, Mesh? Shell, float Radius)> SpoolShells = new();
+
+    /// <summary>
+    /// Splits a modelled reel's body into the wound line on its spool (the triangles in front of the rotor, 14-31.5 mm
+    /// off the spool's axis, facing outwards) and the rest; cached per model. The rest keeps every other surface as is.
+    /// </summary>
+    private static (Mesh Body, Mesh? Shell, float Radius) SpoolShellOf(string id, Mesh body, Vector3 rotor)
+    {
+        if (SpoolShells.TryGetValue(id, out var done))
+            return done;
+        var rest = new ArrayMesh();
+        var shell = new ArrayMesh();
+        float radius = 0f;
+        for (int si = 0; si < body.GetSurfaceCount(); si++)
+        {
+            var arrays = body.SurfaceGetArrays(si);
+            var material = body.SurfaceGetMaterial(si);
+            var verts = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
+            var normals = arrays[(int)Mesh.ArrayType.Normal].AsVector3Array();
+            var index = arrays[(int)Mesh.ArrayType.Index].AsInt32Array();
+            if (index.Length == 0 || normals.Length != verts.Length)
+            {
+                rest.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
+                rest.SurfaceSetMaterial(rest.GetSurfaceCount() - 1, material);
+                continue;
+            }
+            var keep = new List<int>(index.Length);
+            var cut = new List<int>();
+            for (int t = 0; t + 2 < index.Length; t += 3)
+            {
+                var c = (verts[index[t]] + verts[index[t + 1]] + verts[index[t + 2]]) / 3f;
+                var n = normals[index[t]] + normals[index[t + 1]] + normals[index[t + 2]];
+                var radial = new Vector3(c.X - rotor.X, 0f, c.Z - rotor.Z);
+                float r = radial.Length(), dy = c.Y - rotor.Y;
+                bool line = dy > 0.033f && dy < 0.056f && r > 0.014f && r < 0.0315f
+                    && n.LengthSquared() > 1e-8f && radial.Normalized().Dot(n.Normalized()) > 0.6f;
+                var into = line ? cut : keep;
+                into.Add(index[t]); into.Add(index[t + 1]); into.Add(index[t + 2]);
+                if (line)
+                    radius = MathF.Max(radius, r);
+            }
+            foreach (var (mesh, list) in new[] { (rest, keep), (shell, cut) })
+            {
+                if (list.Count == 0)
+                    continue;
+                var copy = new Godot.Collections.Array();
+                copy.Resize(arrays.Count);
+                for (int k = 0; k < arrays.Count; k++)
+                    copy[k] = arrays[k];
+                copy[(int)Mesh.ArrayType.Index] = list.ToArray();
+                mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, copy);
+                mesh.SurfaceSetMaterial(mesh.GetSurfaceCount() - 1, material);
+            }
+        }
+        // Too few triangles: no recognisable wound line on this model; leave the body whole.
+        var result = shell.GetSurfaceCount() > 0 && radius > 0f ? ((Mesh)rest, (Mesh?)shell, radius) : (body, null, 0f);
+        SpoolShells[id] = result;
+        return result;
+    }
     private Vector3 _bailAxis = Vector3.Right, _modelBodyCentre;
 
     /// <summary>Screenshots: FISHSIM_BAIL=0..1 holds the bail at least this far open.</summary>
@@ -186,7 +253,14 @@ public partial class RodRig : Node3D
             _blankMeshes.Add(blankMesh);
             _blankMaterial = blank;
             if (guides.TryGetValue(i, out var g))
+            {
                 Guide(proc, SegmentLength * 0.55f, Mathf.Lerp(r0, r1, 0.55f), g.Ring, g.Height, chrome, whip);
+                // Where the line runs through this guide (the ring's middle; under proc, so it follows ApplyLength and
+                // stays put for a modelled rod whose own guides hang in the same places).
+                var mark = new Node3D { Name = $"LineGuide{i}", Position = new Vector3(0, SegmentLength * 0.55f, -Mathf.Lerp(r0, r1, 0.55f) - g.Height) };
+                proc.AddChild(mark);
+                _lineGuides.Add(mark);
+            }
             if (i == 0)
             {
                 // A decorative whipping above the fore grip and the hook keeper.
@@ -217,6 +291,46 @@ public partial class RodRig : Node3D
     }
 
     private Node3D? _procHandle, _builtReel;
+    private readonly List<Node3D> _lineGuides = new();
+    private Node3D _builtLineExit = null!;
+    private MeshInstance3D? _builtSpoolLine;
+    private Vector3 _modelLineExit;
+    private float _spoolFill = 1f;
+
+    /// <summary>
+    /// The line inside the rod, in world space: from the spool (where it leaves the lip towards the first guide)
+    /// through every guide's ring to the tip-top; returns how many points it wrote (FishingRod.UpdateLine draws it).
+    /// </summary>
+    public int LinePath(Vector3[] into)
+    {
+        int n = 0;
+        if (into.Length < _lineGuides.Count + 2)
+            return 0;
+        into[n++] = ModelledReel ? ToGlobal(_modelLineExit) : _builtLineExit.GlobalPosition;
+        foreach (var g in _lineGuides)
+            into[n++] = g.GlobalPosition;
+        into[n++] = Tip.GlobalPosition;
+        return n;
+    }
+
+    /// <summary>How full the spool is (0 empty .. 1 full): the wound line shrinks towards the spool's core as it is
+    /// cast out and grows back as it is reeled in (FishingRod: 1 - line out / the reel's capacity).</summary>
+    public void SetSpoolFill(float fill)
+    {
+        fill = Math.Clamp(fill, 0f, 1f);
+        if (MathF.Abs(fill - _spoolFill) < 0.002f)
+            return;
+        _spoolFill = fill;
+        float k = Mathf.Lerp(SpoolCore, 1f, fill);
+        if (_builtSpoolLine != null)
+            _builtSpoolLine.Scale = new Vector3(k, 1f, k);
+        if (_modelSpoolLine != null)
+            _modelSpoolLine.Scale = new Vector3(k, 1f, k);
+    }
+
+    /// <summary>The wound line's radius on an empty spool, as a share of the full one (the core under the line).</summary>
+    private const float SpoolCore = 0.62f;
+    private Node3D? _modelSpoolLine;
     private readonly List<Node3D> _procSections = new();
     private readonly List<MeshInstance3D> _modelSections = new();
     private bool _quiverOn;
@@ -316,7 +430,9 @@ public partial class RodRig : Node3D
         Drop(_modelReelBody);
         Drop(_modelRotor);
         Drop(_modelCrank);
+        Drop(_modelSpoolLine);
         _modelReelBody = _modelRotor = _modelCrank = _modelBail = null;
+        _modelSpoolLine = null;
         ModelledReel = false;
         _builtReel!.Visible = true;
         CrankAxis = BuiltCrankAxis;
@@ -329,7 +445,20 @@ public partial class RodRig : Node3D
         ModelledReel = true;
         _builtReel.Visible = false;
         var off = GeometryInstance3D.ShadowCastingSetting.Off;
-        AddChild(_modelReelBody = new MeshInstance3D { Name = "ModelReel", Mesh = body, CastShadow = off });
+        // The wound line is cut out of the body into its own shell that shrinks towards the spool's axis as line goes
+        // out (SetSpoolFill); the line leaves the spool's lip towards the rod.
+        var (rest, shell, shellRadius) = SpoolShellOf(id, body, f.Rotor);
+        AddChild(_modelReelBody = new MeshInstance3D { Name = "ModelReel", Mesh = rest, CastShadow = off });
+        _modelSpoolLine = null;
+        if (shell != null)
+        {
+            _modelSpoolLine = new Node3D { Name = "ModelSpoolLine", Position = new Vector3(f.Rotor.X, 0f, f.Rotor.Z) };
+            _modelSpoolLine.AddChild(new MeshInstance3D { Mesh = shell, Position = new Vector3(-f.Rotor.X, 0f, -f.Rotor.Z), CastShadow = off });
+            AddChild(_modelSpoolLine);
+            float k = Mathf.Lerp(SpoolCore, 1f, _spoolFill);
+            _modelSpoolLine.Scale = new Vector3(k, 1f, k);
+        }
+        _modelLineExit = f.Rotor + new Vector3(0f, 0.045f, shellRadius > 0f ? shellRadius : 0.028f);
         _modelRotor = new Node3D { Name = "ModelRotor", Position = f.Rotor };
         _modelRotor.AddChild(new MeshInstance3D { Mesh = rotor, CastShadow = off });
         AddChild(_modelRotor);
@@ -550,7 +679,9 @@ public partial class RodRig : Node3D
         Cyl(_bail, 0.004f, 0.004f, 0.007f, new Vector3(bailR, bailY - 0.022f, 0f), trim, 12).RotationDegrees = new Vector3(0, 0, 90f);       // line roller
         var spool = ReelBody + new Vector3(0, 0.066f, 0);
         Cyl(reel, 0.024f, 0.024f, 0.006f, spool + new Vector3(0, -0.012f, 0), trim, 24);     // skirt
-        Cyl(reel, 0.0205f, 0.0205f, 0.018f, spool, line, 24);                                // the line
+        _builtSpoolLine = Cyl(reel, 0.0205f, 0.0205f, 0.018f, spool, line, 24);              // the line
+        _builtLineExit = new Node3D { Name = "LineExit", Position = spool + new Vector3(0, 0.009f, 0.021f) };
+        reel.AddChild(_builtLineExit);
         Cyl(reel, 0.0228f, 0.0228f, 0.004f, spool + new Vector3(0, 0.011f, 0), trim, 24);    // front lip
         Cyl(reel, 0.0085f, 0.0095f, 0.014f, spool + new Vector3(0, 0.02f, 0), dark, 16);     // drag knob
         for (int i = 0; i < 10; i++)

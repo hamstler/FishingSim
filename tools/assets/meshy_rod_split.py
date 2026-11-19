@@ -142,7 +142,7 @@ REELS = {
     "meshy_reel": {},
     "medium_hokuto": dict(turn=-90.0, crank_left=-0.046, no_bail=True, lip=0.165),
     "small_hokuto": dict(crank_left=-0.034, bail_back=0.140, bail_front=0.166, bail_radius=0.034, bail_from=40.0, bail_to=265.0),
-    "small_fjordline": dict(crank_left=-0.046, bail_back=0.140, bail_front=0.170, bail_radius=0.038, bail_from=315.0, bail_to=220.0),
+    "small_fjordline": dict(crank_left=-0.036, bail_back=0.140, bail_front=0.170, bail_radius=0.038, bail_from=315.0, bail_to=220.0),
     "baitrunner_kaminari": dict(crank_left=-0.050, bail_back=0.150, bail_front=0.170, bail_radius=0.037,
                                 bail_from=100.0, bail_to=290.0),
     "big_ironwood": dict(crank_left=-0.034, bail_from=300.0, bail_to=235.0),
