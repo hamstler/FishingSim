@@ -21,7 +21,7 @@ public sealed record Appearance(string Model, int OutfitVariant, string? Hair, C
 /// </summary>
 public static class CharacterAsset
 {
-    private const int Version = 1;
+    private const int Version = 2;     // 2: cloth pictures toned down (ClothGrade)
 
     public static readonly string[] Models = { "male_peasant", "female_peasant", "male_ranger", "female_ranger",
         "mh_male_worker", "mh_male_casual", "mh_male_denim", "mh_male_old", "mh_female_casual", "mh_female_middle" };
@@ -143,6 +143,8 @@ public static class CharacterAsset
                 var image = new Image();
                 image.LoadWebpFromBuffer(FileAccess.GetFileAsBytes(path));
                 image.Convert(Image.Format.Rgba8);
+                if (IsCloth(name))
+                    ClothGrade(image);
                 return image;
             }, normalMap: normal);
             if (cacheOnly)
@@ -152,6 +154,38 @@ public static class CharacterAsset
             return tex;
         }
     }
+
+    /// <summary>Clothes, hats and shoes (MakeHuman's pictures: the worker's overalls are a saturated light blue, the
+    /// shirts paper white), toned down as they are read.</summary>
+    private static bool IsCloth(string name) =>
+        name.StartsWith("mh_") && (name.EndsWith("_outfit_a") || name.EndsWith("_hat_a") || name.EndsWith("_shoes_a"));
+
+    /// <summary>Worn, dyed cloth instead of fresh catalogue colours: saturation down to <see cref="ClothSaturation"/> and
+    /// the highlights rolled off towards <see cref="ClothWhite"/>, so white shirts and bright denim stop glowing in the
+    /// sun far away (the small figure turns into one flat bright spot there). Dark cloth stays as it is.</summary>
+    private static void ClothGrade(Image image)
+    {
+        byte[] px = image.GetData();
+        for (int i = 0; i < px.Length; i += 4)
+        {
+            float r = px[i] / 255f, g = px[i + 1] / 255f, b = px[i + 2] / 255f;
+            float y = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+            // Soft knee: unchanged below Knee, then easing towards ClothWhite.
+            float yk = y <= ClothKnee ? y : ClothKnee + (ClothWhite - ClothKnee) * (1f - MathF.Exp(-(y - ClothKnee) / (ClothWhite - ClothKnee)));
+            float k = y > 1e-4f ? yk / y : 1f;
+            r = (y + (r - y) * ClothSaturation) * k;
+            g = (y + (g - y) * ClothSaturation) * k;
+            b = (y + (b - y) * ClothSaturation) * k;
+            px[i] = (byte)Math.Clamp(r * 255f + 0.5f, 0f, 255f);
+            px[i + 1] = (byte)Math.Clamp(g * 255f + 0.5f, 0f, 255f);
+            px[i + 2] = (byte)Math.Clamp(b * 255f + 0.5f, 0f, 255f);
+        }
+        image.SetData(image.GetWidth(), image.GetHeight(), image.HasMipmaps(), image.GetFormat(), px);
+    }
+
+    private const float ClothSaturation = 0.6f;
+    private const float ClothKnee = 0.35f;
+    private const float ClothWhite = 0.62f;
 
     /// <summary>FISHSIM_NPC_PLAIN=1 (screenshots): no baked shade and no skin relief, to compare.</summary>
     private static readonly bool Plain = System.Environment.GetEnvironmentVariable("FISHSIM_NPC_PLAIN") == "1";
@@ -245,10 +279,11 @@ public static class CharacterAsset
                     // Open collars, cuffs and hems show the cloth's inner side.
                     m.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
                     // Woven cloth catches the light at grazing angles (fibre sheen), so folds and seams read in shade.
+                    // Kept faint: on a small figure far away the rim brightened the whole silhouette.
                     m.RimEnabled = true;
-                    m.Rim = 0.35f;
+                    m.Rim = 0.12f;
                     m.RimTint = 0.55f;
-                    m.MetallicSpecular = 0.25f;
+                    m.MetallicSpecular = 0.2f;
                     break;
                 case "eye":
                     // A wet eye: a sharp clear-coat highlight over the iris; the pack's irises are painted bright, so a little
