@@ -168,7 +168,7 @@ void fragment() {
 	// Far reflection: where the screen-space march found nothing (the far shore, the sky above it), the mirrored ray
 	// is followed to whatever the screen shows in its direction (two steps to settle on that point's distance): the
 	// twilight sky, the tree line, the lit windows lie mirrored on the water as on a real lake.
-	if (fresnel > 0.02 && hit < 0.99) {
+	if (ssr_steps > 0 && fresnel > 0.02 && hit < 0.99) {   // "Tylko niebo" (Low): sky only, no far shore either
 		vec3 R = reflect(-V, N);
 		float D = 80.0;
 		vec3 sp = vec3(-1.0);

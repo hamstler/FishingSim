@@ -106,7 +106,7 @@ public static class FishSkin
             if (!Light.ContainsKey(sp.SpeciesName) && todo.TrueForAll(t => t.SpeciesName != sp.SpeciesName))
                 todo.Add(sp);
         var images = new Image[todo.Count];
-        Parallel.For(0, todo.Count, i => images[i] = PaintImages(todo[i], LightWidth, LightHeight, normals: false).Albedo);
+        Parallel.For(0, todo.Count, FishingSim.Graphics.Workers.Options, i => images[i] = PaintImages(todo[i], LightWidth, LightHeight, normals: false).Albedo);
         for (int i = 0; i < todo.Count; i++)
             Light[todo[i].SpeciesName] = ImageTexture.CreateFromImage(images[i]);
     }
@@ -171,7 +171,7 @@ public static class FishSkin
         var painter = new Painter(sp, StyleOf(sp));
         var rgb = new byte[w * h * 3];
         var height = normals ? new float[w * h] : null;
-        Parallel.For(0, h, y =>
+        Parallel.For(0, h, FishingSim.Graphics.Workers.Options, y =>
         {
             float v = 1f - (y + 0.5f) / h;                        // 1 = top of the back, 0 = belly
             for (int x = 0; x < w; x++)
@@ -194,7 +194,7 @@ public static class FishSkin
         // Normal map from the bump heights (scale edges, scutes), strength scaled to the texel size.
         var nrm = new byte[w * h * 3];
         float strength = w / 512f * 1.6f;
-        Parallel.For(0, h, y =>
+        Parallel.For(0, h, FishingSim.Graphics.Workers.Options, y =>
         {
             int ym = Math.Max(y - 1, 0), yp = Math.Min(y + 1, h - 1);
             for (int x = 0; x < w; x++)

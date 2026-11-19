@@ -87,10 +87,10 @@ public static class ProceduralTextures
     }
 
     /// <summary>Leaf pictures are painted at four times the size of the original 512-pixel designs.</summary>
-    private const float LK = 4f;
+    private const float LK = 1f;      // 1K leaf atlas (512 px cells), needles/fern 256x1024
 
     /// <summary>Bump when a leaf, needle or fern design changes.</summary>
-    private const int LeafVersion = 2;
+    private const int LeafVersion = 3;
 
     /// <summary>
     /// An alpha-tested picture (leaves, needles, fern): from the compressed disk cache, or painted, its mipmaps keeping

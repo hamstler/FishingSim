@@ -129,7 +129,7 @@ public partial class Water : MeshInstance3D
             waves[i] = (kx, kz, 0.9f / MathF.Pow(len, 1.4f), (float)rng.NextDouble() * Mathf.Tau);
         }
         var slopes = new float[size * size * 2];
-        System.Threading.Tasks.Parallel.For(0, size, y =>
+        System.Threading.Tasks.Parallel.For(0, size, FishingSim.Graphics.Workers.Options, y =>
         {
             for (int x = 0; x < size; x++)
             {

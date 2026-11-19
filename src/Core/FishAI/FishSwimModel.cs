@@ -172,7 +172,9 @@ public sealed class FishSwimModel
         // watched); walking and running spook them further and further out.
         float spook = SpookRadius * (0.25f + 0.85f * MathF.Min(threatSpeed / 3f, 1.5f));
         // Shoal-mates are looked up per school, not across the whole lake (150 fish: 150 x school size, not 150²).
-        _bySchool.Clear();
+        // The lists are kept and only emptied (a new list per school every frame was 40-60 allocations a frame).
+        foreach (var list in _bySchool.Values)
+            list.Clear();
         foreach (var a in _agents)
         {
             if (!_bySchool.TryGetValue(a.School, out var list))

@@ -95,7 +95,7 @@ public static class LurePainter
     {
         var px = new Texel[w * h];
         var spots = Spots(s);
-        Parallel.For(0, h, y =>
+        Parallel.For(0, h, FishingSim.Graphics.Workers.Options, y =>
         {
             for (int x = 0; x < w; x++)
             {
@@ -424,7 +424,7 @@ public static class LurePainter
         var alb = new byte[w * h * 4];
         var orm = new byte[w * h * 4];
         var nrm = new byte[w * h * 4];
-        Parallel.For(0, h, y =>
+        Parallel.For(0, h, FishingSim.Graphics.Workers.Options, y =>
         {
             for (int x = 0; x < w; x++)
             {

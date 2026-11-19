@@ -58,7 +58,7 @@ public static class MapPreview
         var height = new float[gw * gh];
         var ground = new Vector3[w * h];
         int bands = Math.Clamp(System.Environment.ProcessorCount, 1, 8);
-        System.Threading.Tasks.Parallel.For(0, bands, b =>
+        System.Threading.Tasks.Parallel.For(0, bands, FishingSim.Graphics.Workers.Options, b =>
         {
             var bed = new LakeBed();
             for (int gy = b * gh / bands; gy < (b + 1) * gh / bands; gy++)
@@ -87,7 +87,7 @@ public static class MapPreview
         var forestTint = new Color(0.2f, 0.36f, 0.17f);
         var pathTint = new Color(0.8f, 0.68f, 0.47f);
         var sandTint = new Color(0.84f, 0.77f, 0.56f);
-        System.Threading.Tasks.Parallel.For(0, h, py =>
+        System.Threading.Tasks.Parallel.For(0, h, FishingSim.Graphics.Workers.Options, py =>
         {
             for (int px = 0; px < w; px++)
             {

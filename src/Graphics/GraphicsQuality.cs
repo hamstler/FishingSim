@@ -49,8 +49,9 @@ public static class GraphicsQuality
         }
     }
 
-    public static readonly Setting Textures = new("textures", "Tekstury", "Rozdzielczość tekstur świata (4K zajmuje 4x więcej pamięci niż 2K). Pełna zmiana po ponownym wczytaniu mapy.",
-        new[] { "1K (niska)", "2K (wysoka)", "4K (ultra)" }, new[] { 0, 1, 2, 2 });
+    // Every preset reads and paints the world's textures at 1K (the user's choice: memory and the first start on weak PCs).
+    public static readonly Setting Textures = new("textures", "Tekstury", "Rozdzielczość tekstur świata: 1K przy każdym ustawieniu.",
+        new[] { "1K" }, new[] { 0, 0, 0, 0 });
     public static readonly Setting Shadows = new("shadows", "Cienie", "Zasięg i ostrość cieni od słońca.",
         new[] { "Wyłączone", "Niskie", "Średnie", "Wysokie", "Ultra" }, new[] { 1, 2, 3, 4 });
     // No MSAA: in Godot 4.3 it leaves the depth texture the water reads empty (no refraction, no bottom, no shore).
@@ -234,8 +235,12 @@ public static class GraphicsQuality
         _ => 1.3f,
     };
 
-    /// <summary>The largest texture side kept by the Textures setting: 1024, 2048 or 4096.</summary>
-    public static int TextureLimit => 1024 << V(Textures);
+    /// <summary>Point lights (campfires, the head lamp) cast shadows only from the High shadow step up: each one
+    /// re-renders the scene round it whenever anything there moves.</summary>
+    public static bool PointShadows => V(Shadows) >= 3;
+
+    /// <summary>The largest texture side: 1024 at every setting.</summary>
+    public static int TextureLimit => 1024;
 
     /// <summary>Screen-space reflection steps of the water by the Reflections setting (0 = the sky only).</summary>
     public static int WaterReflectionSteps => V(Reflections) switch { 0 => 0, 1 => 12, 2 => 20, _ => 32 };
@@ -420,7 +425,19 @@ public static class GraphicsQuality
         float scale = RenderScale / 100f;
         vp.Scaling3DMode = scale < 0.999f ? Viewport.Scaling3DModeEnum.Fsr : Viewport.Scaling3DModeEnum.Bilinear;
         vp.Scaling3DScale = scale;
+        // Weak GPUs (the Low preset): no sharpening mip bias (project.godot's -0.5 costs texture bandwidth on every
+        // surface; the 16x anisotropy is a project setting Godot 4.3 cannot change per viewport), meshes drop to
+        // their LODs sooner, the softest shadow filters off.
+        bool low = Level == QualityLevel.Low;
+        vp.TextureMipmapBias = low ? 0f : -0.5f;
+        vp.MeshLodThreshold = low ? 3f : 1f;
+        var filter = low ? RenderingServer.ShadowQuality.Hard : V(Shadows) >= 3 ? RenderingServer.ShadowQuality.SoftMedium : RenderingServer.ShadowQuality.SoftLow;
+        RenderingServer.DirectionalSoftShadowFilterSetQuality(filter);
+        RenderingServer.PositionalSoftShadowFilterSetQuality(filter);
     }
+
+    /// <summary>Fish under the water cast shadows except on Low (they are barely seen from above the surface).</summary>
+    public static bool FishShadows => Level != QualityLevel.Low;
 
     public static void ApplySun(DirectionalLight3D sun)
     {

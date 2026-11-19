@@ -13,7 +13,7 @@ namespace FishingSim.Graphics;
 /// </summary>
 public static class PhotoTextures
 {
-    private const int Version = 2;     // 2: the 4K sets
+    private const int Version = 3;     // 3: the sets read at 1K (MaxSide)
 
     public sealed record Photo(Texture2D Albedo, Texture2D Normal, float Metres);
 
@@ -42,8 +42,18 @@ public static class PhotoTextures
         if (img.LoadWebpFromBuffer(FileAccess.GetFileAsBytes(path)) != Error.Ok)
             return null;
         img.Convert(Image.Format.Rgba8);
+        // Every texture is 1K now (GraphicsQuality.TextureLimit): the 4K photographs are shrunk as they are decoded,
+        // so nothing larger is ever compressed or cached.
+        if (img.GetWidth() > MaxSide || img.GetHeight() > MaxSide)
+        {
+            float k = (float)MaxSide / Math.Max(img.GetWidth(), img.GetHeight());
+            img.Resize(Math.Max(1, (int)(img.GetWidth() * k)), Math.Max(1, (int)(img.GetHeight() * k)), Image.Interpolation.Lanczos);
+        }
         return img;
     }
+
+    /// <summary>The largest side a photographed set is read at.</summary>
+    public const int MaxSide = 1024;
 
     /// <summary>Decodes and compresses every set into the disk cache (no textures are made: safe on a worker thread).</summary>
     public static void Prewarm()

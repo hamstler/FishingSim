@@ -12,7 +12,7 @@ namespace FishingSim.World.Props;
 /// </summary>
 public static class Textures
 {
-    public const int Size = 4096;
+    public const int Size = 1024;
 
     /// <summary>Scale of the original 256-pixel designs: every distance in pixels is multiplied by this.</summary>
     private const float S = Size / 256f;
@@ -191,7 +191,7 @@ public static class Textures
         return n * 2f - 1f;
     }
 
-    private static void Rows(Action<int> row) => Parallel.For(0, Size, row);
+    private static void Rows(Action<int> row) => Parallel.For(0, Size, FishingSim.Graphics.Workers.Options, row);
 
     // ------------------------------------------------------------------ textures
     /// <summary>Horizontal boards with wavy grain, knots and dark seams.</summary>
@@ -336,7 +336,7 @@ public static class Textures
                 float tone = rng.RandfRange(0.62f, 1.0f);
                 float cx = x + w * 0.5f, cy = r * rh + rh * 0.5f;
                 int x0 = x, row = r;
-                Parallel.For(r * rh, (r + 1) * rh, py =>
+                Parallel.For(r * rh, (r + 1) * rh, FishingSim.Graphics.Workers.Options, py =>
                 {
                     for (int px = x0; px < x0 + w; px++)
                     {

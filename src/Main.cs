@@ -361,7 +361,7 @@ public partial class Main : Node3D
                 LightColor = new Color(1f, 0.72f, 0.4f),
                 OmniRange = 9f,
                 OmniAttenuation = 1.4f,
-                ShadowEnabled = true,
+                ShadowEnabled = Graphics.GraphicsQuality.PointShadows,
                 Position = new Vector3(-0.35f, 1.05f, -0.25f),
             };
             Player.AddChild(_lantern);
@@ -492,6 +492,12 @@ public partial class Main : Node3D
     {
         if (what == NotificationWMCloseRequest)
             Save();
+        // Minimised or behind another window, the game draws 10 frames a second (a laptop's battery and fan); back
+        // in focus the angler's own limit returns.
+        else if (what == NotificationApplicationFocusOut && !Graphics.Renderer.IsHeadless)
+            Engine.MaxFps = 10;
+        else if (what == NotificationApplicationFocusIn && !Graphics.Renderer.IsHeadless)
+            Graphics.GraphicsQuality.ApplyDisplay();
     }
 
     public override void _ExitTree()

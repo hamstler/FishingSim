@@ -48,7 +48,11 @@ public partial class Building : Node3D
             m.EmissionEnergyMultiplier = 0.2f + night * 2.2f;
         }
         for (int i = 0; i < _lights.Count; i++)
+        {
             _lights[i].LightEnergy = night * 1.1f * _weights[i];
+            // By day the lights are out of the scene (Forward+ still binned and looped over lights with no energy).
+            _lights[i].Visible = night > 0.02f;
+        }
     }
 
     private float _night;

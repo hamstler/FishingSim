@@ -100,7 +100,9 @@ public static class PropAsset
             var node = images[ii]!;
             var view = views[(int)node["bufferView"]!]!;
             int offset = (int?)view["byteOffset"] ?? 0, length = (int)view["byteLength"]!;
-            var (img, _) = TextureStore.Get($"prop_{id}_{ii}", Version, kind, () =>
+            // The key is a flat file name (ids like "rods/carp_kaminari" made user://texcache/prop_rods/..., a folder
+            // that never existed, so nothing was cached), with the model's size: a rebuilt model never meets old pictures.
+            var (img, _) = TextureStore.Get($"prop_{id.Replace('/', '_')}_{glb.Length}_{ii}", Version, kind, () =>
             {
                 var bytes = new byte[length];
                 Array.Copy(glb, bin + offset, bytes, 0, length);
@@ -172,6 +174,10 @@ public static class PropAsset
             };
             if (mesh is not ArrayMesh am || node is not Node3D n3)
                 continue;
+            // Props seen from afar (the Meshy anglers 60k triangles, barrels, the fire pit...) get distance LODs like
+            // the fish (FishAsset.WithLods); the rod and reel in the angler's hands are always close and keep theirs.
+            if (!id.StartsWith("rods/") && !id.StartsWith("reels/") && WithLods(am) is { } lodded)
+                am = lodded;
             for (int s = 0; s < am.GetSurfaceCount(); s++)
             {
                 string name = am.SurfaceGetMaterial(s)?.ResourceName ?? "";
@@ -187,6 +193,31 @@ public static class PropAsset
         }
         root.Free();
         return parts.Count == 0 ? null : new Model(parts, bounds, named);
+    }
+
+    /// <summary>The mesh again with generated LODs (Godot picks one by its size on screen; runtime-loaded glTF gets
+    /// none), or null when it is small or the conversion fails.</summary>
+    private static ArrayMesh? WithLods(ArrayMesh am)
+    {
+        int vertices = 0;
+        for (int s = 0; s < am.GetSurfaceCount(); s++)
+            vertices += am.SurfaceGetArrayLen(s);
+        if (vertices <= 1500)
+            return null;
+        try
+        {
+            using var im = new ImporterMesh();
+            for (int s = 0; s < am.GetSurfaceCount(); s++)
+                im.AddSurface(am.SurfaceGetPrimitiveType(s), am.SurfaceGetArrays(s), material: am.SurfaceGetMaterial(s),
+                    name: am.SurfaceGetName(s));
+            im.GenerateLods(25f, 60f, new Godot.Collections.Array());
+            return im.GetMesh();
+        }
+        catch (Exception e)
+        {
+            GD.PushWarning($"PropAsset LODs: {e.Message}");
+            return null;
+        }
     }
 
     private static Transform3D GlobalOf(Node3D n, Node3D root)

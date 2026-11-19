@@ -16,7 +16,7 @@ namespace FishingSim.World.Props;
 public static class GroundTextures
 {
     /// <summary>Pixels across one tile (2 m): 2048 px per metre.</summary>
-    public const int Size = 4096;
+    public const int Size = 1024;
     public const float TileMetres = 2f;
     private const int CacheVersion = 4;
 
@@ -37,8 +37,8 @@ public static class GroundTextures
 
     /// <summary>The photographed grounds and barks at full 4K (2048 px per metre); TextureStore.MaxSize reads them
     /// smaller on the lower quality settings (the top mipmap levels are skipped).</summary>
-    public const int PhotoSize = 4096;
-    private const int PhotoVersion = 2;
+    public const int PhotoSize = 1024;
+    private const int PhotoVersion = 3;     // 3: painted and decoded at 1K
 
     private static bool UsePhotos => Array.TrueForAll(Photos, Graphics.PhotoTextures.Has);
 
@@ -233,7 +233,7 @@ public static class GroundTextures
                 return;
             const int bands = 32;
             const int rows = Size / bands;
-            Parallel.For(0, bands, b =>
+            Parallel.For(0, bands, FishingSim.Graphics.Workers.Options, b =>
             {
                 int y0 = b * rows, y1 = y0 + rows;
                 var view = new Sheet(this, y0, y1);
@@ -262,7 +262,7 @@ public static class GroundTextures
             H[i] += (h - H[i]) * cover;
         }
 
-        public void Fill(Func<int, int, (Color C, float H)> paint) => Parallel.For(0, Size, y =>
+        public void Fill(Func<int, int, (Color C, float H)> paint) => Parallel.For(0, Size, FishingSim.Graphics.Workers.Options, y =>
         {
             for (int x = 0; x < Size; x++)
             {
@@ -284,7 +284,7 @@ public static class GroundTextures
             var a = new byte[N * 4];
             var n = new byte[N * 4];
             float bump = Bump * K;       // the same relief spreads over K times as many pixels
-            Parallel.For(0, Size, y =>
+            Parallel.For(0, Size, FishingSim.Graphics.Workers.Options, y =>
             {
                 for (int x = 0; x < Size; x++)
                 {
@@ -314,7 +314,7 @@ public static class GroundTextures
             var tmp = new float[N];
             var dst = new float[N];
             float k = 1f / (2 * r + 1);
-            Parallel.For(0, Size, y =>
+            Parallel.For(0, Size, FishingSim.Graphics.Workers.Options, y =>
             {
                 float sum = 0f;
                 for (int dx = -r; dx <= r; dx++)
@@ -325,7 +325,7 @@ public static class GroundTextures
                     sum += src[At(x + r + 1, y)] - src[At(x - r, y)];
                 }
             });
-            Parallel.For(0, Size, x =>
+            Parallel.For(0, Size, FishingSim.Graphics.Workers.Options, x =>
             {
                 float sum = 0f;
                 for (int dy = -r; dy <= r; dy++)
@@ -832,12 +832,12 @@ public static class GroundTextures
         // Moss cushions (over the needles painted so far).
         s.Flush();
         var moss = new float[Size * Size];
-        Parallel.For(0, Size, y =>
+        Parallel.For(0, Size, FishingSim.Graphics.Workers.Options, y =>
         {
             for (int x = 0; x < Size; x++)
                 moss[y * Size + x] = Fbm(x, y, 5, 5, 23) + (Value(x, y, 128, 27) - 0.5f) * 0.05f;
         });
-        Parallel.For(0, Size, y =>
+        Parallel.For(0, Size, FishingSim.Graphics.Workers.Options, y =>
         {
             for (int x = 0; x < Size; x++)
             {

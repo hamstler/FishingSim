@@ -379,6 +379,9 @@ public partial class FishPopulation : Node3D
                     continue;
                 model = FishModel.Create(sp, a.Weight, detailed: true);
                 model.Scale = Vector3.One * ViewScale;
+                if (!Graphics.GraphicsQuality.FishShadows)
+                    foreach (var n in model.FindChildren("*", "GeometryInstance3D", true, false))
+                        ((GeometryInstance3D)n).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
                 AddChild(model);
                 _close[a.Id] = model;
                 madeOne = true;
