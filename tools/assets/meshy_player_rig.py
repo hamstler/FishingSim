@@ -378,6 +378,80 @@ def save_picture(img, name, normal=False, size=2048, mask=None):
     return name
 
 
+ARMS_SRC = "mh_male_casual"       # long sleeves to the wrist (male_casualsuit05) and MakeHuman hands
+
+
+def fp_arms(G):
+    """mh_male_casual's hands and forearms (its skin) and its sleeves (outfit), moved onto the worker's skeleton
+    (quaternius.rebind: same 65 joints, the worker's T-pose) and then into the fitted pose like the rest of the body.
+    Yields ((positions, normals, uv, joints, weights, triangles), material index)."""
+    ref = qt.Gltf(REF)
+    dst_names, dst_ibm = ref.joints()
+    src = qt.Gltf(os.path.join(OUT, f"{ARMS_SRC}.glb"))
+    src_names, src_ibm = src.joints()
+    rest = np.array([np.linalg.inv(m)[:3, 3] for m in dst_ibm])
+    shoulder = {s: rest[dst_names.index(f"upperarm_{s}")] for s in "lr"}
+    elbow = {s: rest[dst_names.index(f"lowerarm_{s}")] for s in "lr"}
+    keep_joint = ("lowerarm", "hand") + FINGERS
+    for node_name, material in (("Head", 1), ("Outfit", 2)):
+        node = next(n for n in src.j["nodes"] if n.get("name") == node_name and "mesh" in n)     # (a joint is called Head too)
+        prim = src.j["meshes"][node["mesh"]]["primitives"][0]
+        a = prim["attributes"]
+        P = src.read(a["POSITION"]).astype(np.float64)
+        N = src.read(a["NORMAL"]).astype(np.float64)
+        UV = src.read(a["TEXCOORD_0"]).astype(np.float64)
+        J = src.read(a["JOINTS_0"]).astype(np.int64)
+        W = src.read(a["WEIGHTS_0"]).astype(np.float64)
+        W /= np.maximum(W.sum(1, keepdims=True), 1e-9)
+        I = src.read(prim["indices"]).astype(np.int64).reshape(-1, 3)
+        P, N, J = qt.rebind(P, N, J, W, src_names, src_ibm, dst_names, dst_ibm)
+        dom = [dst_names[j] for j in J[np.arange(len(J)), np.argmax(W, 1)]]
+        keep = np.array([d.startswith(keep_joint) for d in dom])
+        if material == 2:
+            # The sleeve from just above the elbow (the shoulder end swings far under the IK, right by the camera).
+            for side in "lr":
+                up = np.array([d == f"upperarm_{side}" for d in dom])
+                along = ((P - shoulder[side]) @ (elbow[side] - shoulder[side])) / np.dot(elbow[side] - shoulder[side], elbow[side] - shoulder[side])
+                keep |= up & (along > 0.55)
+        tri = I[keep[I].all(1)]
+        used, inv = np.unique(tri.reshape(-1), return_inverse=True)
+        tri = inv.reshape(-1, 3)
+        P, N, UV, J, W = P[used], N[used], UV[used], J[used], W[used]
+        # Into the fitted pose (the skin's bind pose).
+        M = np.einsum("vk,vkab->vab", W, G[J])
+        P = np.einsum("vab,vb->va", M[:, :3, :3], P) + M[:, :3, 3]
+        N = np.einsum("vab,vb->va", M[:, :3, :3], N)
+        N /= np.maximum(np.linalg.norm(N, axis=1, keepdims=True), 1e-9)
+        yield (P, N, UV, J, W, tri), material
+
+
+def flannel(name, meshy_picture, size=1024, repeats=32):
+    """A tileable flannel check in the Meshy shirt's colours (navy ground, brown and rust bands, thin cream lines),
+    woven: each thread colour shows where its warp or weft lies on top (a 2/2 twill), with a soft fibre noise."""
+    navy, brown, rust, cream = (np.array(c, np.float32) for c in ((34, 38, 56), (70, 46, 34), (148, 78, 44), (150, 136, 112)))
+    cell = size // repeats
+    def stripes(n):
+        t = (np.arange(n) % cell) / cell
+        col = np.empty((n, 3), np.float32)
+        col[:] = navy
+        col[(t > 0.08) & (t < 0.38)] = brown
+        col[(t > 0.18) & (t < 0.28)] = rust
+        col[(np.abs(t - 0.62) < 0.012) | (np.abs(t - 0.7) < 0.012)] = cream
+        col[(t > 0.78) & (t < 0.86)] = brown * 0.8 + navy * 0.2
+        return col
+    warp = stripes(size)[None, :, :].repeat(size, 0)
+    weft = stripes(size)[:, None, :].repeat(size, 1)
+    y, x = np.mgrid[0:size, 0:size]
+    twill = ((x + y) // 2) % 2 == 0
+    img = np.where(twill[..., None], warp, weft) * 0.62 + (warp + weft) * 0.19
+    rng = np.random.default_rng(3)
+    img *= (0.92 + 0.16 * rng.random((size, size, 1))).astype(np.float32)
+    path = os.path.join(OUT, "textures", f"{name}.webp")
+    Image.fromarray(np.clip(img, 0, 255).astype(np.uint8)).save(path, "WEBP", quality=88, method=6)
+    qt.keep(path)
+    return name
+
+
 def write(names, G, R, RN, UV, I, J, W, images, group, armpit):
     """The mesh stays in its own pose; the skin's inverse bind matrices are the fitted pose's (each joint's T-pose frame
     carried by the fit), so the animations and the arm IK deform it only by how far they stray from that pose. Unposing
@@ -415,7 +489,7 @@ def write(names, G, R, RN, UV, I, J, W, images, group, armpit):
         vert_arm &= ~((J[:, 0] == ju) & (along < 0.45))
     tri_arm = vert_arm[I].sum(1) >= 2
     meshes = []
-    for mesh_name, sel in (("Arms", tri_arm), ("Body", ~tri_arm)):
+    for mesh_name, sel in (("Arms_Meshy", tri_arm), ("Body", ~tri_arm)):
         tris = I[sel]
         used, inv = np.unique(tris.reshape(-1), return_inverse=True)
         tri = inv.reshape(-1, 3).astype(np.uint32)
@@ -432,10 +506,27 @@ def write(names, G, R, RN, UV, I, J, W, images, group, armpit):
         nodes.append({"name": mesh_name, "mesh": len(meshes) - 1, "skin": 0})
         nodes[armature].setdefault("children", []).append(len(nodes) - 1)
         print(f"  {mesh_name}: {len(used)} vertices, {len(tri)} triangles", flush=True)
+    # The arms seen in first person: MakeHuman hands with real finger bones (the arm IK closes them round the handle
+    # and the crank knob) in long flannel sleeves; Meshy's fists are closed for good and could not hold anything.
+    prims = []
+    for part, material in fp_arms(G):
+        P, Nn, U, Jj, Ww, tri = part
+        T = qt.tangents(P.astype(np.float64), Nn.astype(np.float64), U.astype(np.float64), tri.astype(np.int64))
+        prims.append({"attributes": {"POSITION": w.add(P.astype(np.float32), "VEC3", 5126, 34962, minmax=True),
+                                     "NORMAL": w.add(Nn.astype(np.float32), "VEC3", 5126, 34962),
+                                     "TANGENT": w.add(T.astype(np.float32), "VEC4", 5126, 34962),
+                                     "TEXCOORD_0": w.add(U.astype(np.float32), "VEC2", 5126, 34962),
+                                     "JOINTS_0": w.add(Jj.astype(np.uint8), "VEC4", 5121, 34962),
+                                     "WEIGHTS_0": w.add(Ww.astype(np.float32), "VEC4", 5126, 34962)},
+                      "indices": w.add(tri.reshape(-1).astype(np.uint32), "SCALAR", 5125, 34963), "material": material})
+        print(f"  Arms ({['body', 'skin', 'outfit'][material]}): {len(P)} vertices, {len(tri)} triangles", flush=True)
+    meshes.append({"name": "Arms", "primitives": prims})
+    nodes.append({"name": "Arms", "mesh": len(meshes) - 1, "skin": 0})
+    nodes[armature].setdefault("children", []).append(len(nodes) - 1)
     roots = [i for i, n in enumerate(nodes) if n.get("name") == "Armature"]
     gltf = {"asset": {"version": "2.0", "generator": "FishingSim tools/assets/meshy_player_rig.py"}, "scene": 0,
             "scenes": [{"name": ID, "nodes": roots}], "nodes": nodes, "meshes": meshes, "skins": [skin],
-            "materials": [{"name": "body"}]}
+            "materials": [{"name": "body"}, {"name": "skin"}, {"name": "outfit"}]}
     path = os.path.join(OUT, f"{ID}.glb")
     w.save(path, gltf)
     mask = islands_mask(UV, I, images[0].size)
@@ -443,7 +534,12 @@ def write(names, G, R, RN, UV, I, J, W, images, group, armpit):
     if len(images) > 1:
         entry["normal"] = save_picture(images[1], f"{ID}_body_n", normal=True, mask=mask)
     worker = json.load(open(os.path.join(OUT, "mh_male_worker.json")))
-    info = {"id": ID, "sex": "M", "hair": [], "materials": {"body": entry}, "pelvis_scale": worker.get("pelvis_scale", 1.0),
+    casual = json.load(open(os.path.join(OUT, f"{ARMS_SRC}.json")))["materials"]
+    sleeve = {"roughness_value": 0.9, "albedo": [flannel(f"{ID}_sleeve_a", images[0])]}
+    if "normal" in casual["outfit"]:
+        sleeve["normal"] = casual["outfit"]["normal"]
+    info = {"id": ID, "sex": "M", "hair": [], "materials": {"body": entry, "skin": casual["skin"], "outfit": sleeve},
+            "pelvis_scale": worker.get("pelvis_scale", 1.0),
             "author": "the FishingSim author (made with Meshy AI on a paid plan), rigged by tools/assets/meshy_player_rig.py",
             "licence": "GPL-3.0-or-later (part of FishingSim)", "skeleton": "mh_male_worker (MakeHuman CC0 / Quaternius CC0)"}
     with open(os.path.join(OUT, f"{ID}.json"), "w") as f:

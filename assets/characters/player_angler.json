@@ -9,6 +9,21 @@
     "player_angler_body_a"
    ],
    "normal": "player_angler_body_n"
+  },
+  "skin": {
+   "roughness_value": 0.55,
+   "albedo": [
+    "mh_male_casual_skin_a"
+   ],
+   "ao": "mh_male_casual_skin_o",
+   "normal": "mh_male_casual_skin_n"
+  },
+  "outfit": {
+   "roughness_value": 0.9,
+   "albedo": [
+    "player_angler_sleeve_a"
+   ],
+   "normal": "mh_male_casual_outfit_n"
   }
  },
  "pelvis_scale": 1.0179,
