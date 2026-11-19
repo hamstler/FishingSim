@@ -3,7 +3,7 @@
 Welds a Meshy model's seam-split mesh and collapses it to about TRIANGLES triangles (UVs kept) and writes it back as a
 .glb with its pictures.
 
-With "seams" the borders of the UV islands are kept where they are (a vertex group of every vertex on an edge whose two
+With "seams" the borders of the UV islands are kept (nearly) where they are (a vertex group of every vertex on an edge whose two
 faces disagree on the UVs, left out of the collapse): the collapse can then never drag a picture across a seam, so the
 model keeps the original's texture exactly (the plain weld + collapse smeared the logs and planks of the buildings)."""
 import sys, bpy, bmesh
@@ -41,7 +41,9 @@ for ob in [o for o in bpy.context.scene.objects if o.type == "MESH"]:
         m.ratio = target / tris
         m.use_collapse_triangulate = True
         if seam:
-            ob.vertex_groups.new(name="seam").add(list(seam), 1.0, "REPLACE")
+            # Half weight: the borders still collapse, but last and least (a full lock kept 5.4 of 7.8 M triangles of a
+            # house with many small UV islands; at 0.5 it reached 1 M and still looked like the original).
+            ob.vertex_groups.new(name="seam").add(list(seam), 0.5, "REPLACE")
             m.vertex_group = "seam"
             m.invert_vertex_group = True       # only the vertices off the seams collapse
             m.vertex_group_factor = 1.0
