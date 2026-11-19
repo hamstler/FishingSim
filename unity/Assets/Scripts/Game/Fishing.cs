@@ -215,7 +215,7 @@ namespace FishingSim.Game
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             _stateTime += dt;
             bool canAct = !Blocked && Cursor.lockState == CursorLockMode.Locked;
-            bool lmbDown = canAct && Input.GetMouseButtonDown(0), lmb = canAct && Input.GetMouseButton(0), lmbUp = canAct && Input.GetMouseButtonUp(0);
+            bool lmbDown = canAct && Input.GetMouseButtonDown(0), lmb = canAct && Input.GetMouseButton(0) || SmokeReel, lmbUp = canAct && Input.GetMouseButtonUp(0);
             bool rmbDown = canAct && Input.GetMouseButtonDown(1), rmb = canAct && Input.GetMouseButton(1);
             if (canAct)
                 DragSetting = Mathf.Clamp01(DragSetting + Input.mouseScrollDelta.y * 0.05f);
@@ -301,6 +301,34 @@ namespace FishingSim.Game
                 NewBiteTimer();
                 Set(RodState.Waiting);
             }
+        }
+
+        // ------------------------------------------------------------------ automated test (Smoke)
+        /// <summary>Held down by the smoke test: reels as if the left button were held.</summary>
+        public bool SmokeReel { get; set; }
+
+        /// <summary>Puts the end tackle at a point of the lake as if cast there.</summary>
+        public void SmokeCast(Vector3 target)
+        {
+            ApplyTackle();
+            _origin = Player.transform.position;
+            DepthHere = -World.Lake.HeightAt(target.x, target.z);
+            _bobber.position = new Vector3(target.x, 0f, target.z);
+            _bobber.gameObject.SetActive(true);
+            _line.gameObject.SetActive(true);
+            _lineSlack = 1f;
+            NewBiteTimer();
+            Set(RodState.Waiting);
+        }
+
+        /// <summary>Makes the bite clock run out now.</summary>
+        public void SmokeBiteNow() => _biteTimer = 0f;
+
+        /// <summary>Strikes at the bite (always hooks).</summary>
+        public void SmokeStrike()
+        {
+            if (State == RodState.Bite && Species != null)
+                StartFight(1f);
         }
 
         private void NewBiteTimer()

@@ -83,6 +83,15 @@ namespace FishingSim.Game
             _rod.Blocked = true;
             if (_locations.Count > 0)
                 StartCoroutine(LoadMap(Mathf.Clamp(_profile.Location, 0, _locations.Count - 1), false));
+            if (Smoke.Enabled)
+            {
+                var smoke = gameObject.AddComponent<Smoke>();
+                smoke.Ready = () => _world.Ready && _screen == Screen.Menu;
+                smoke.EnterPlay = EnterPlay;
+                smoke.Rod = _rod;
+                smoke.Player = _player;
+                smoke.Day = _day;
+            }
         }
 
         private void OnDestroy() => Application.logMessageReceived -= OnLog;

@@ -1,0 +1,128 @@
+using System;
+using System.Collections;
+using System.Text;
+using UnityEngine;
+
+namespace FishingSim.Game
+{
+    /// <summary>
+    /// An automated check run by CI on the Linux build (FISHSIM_SMOKE=1): waits for the map, looks at a frame (mean
+    /// colour, share of magenta = a shader that failed), fishes a few times through the real code (cast, bite, strike,
+    /// reel until the fight ends) and prints SMOKE lines, a small JPEG of the frame in base64, then quits (exit 0 on
+    /// success, 1 on failure).
+    /// </summary>
+    public sealed class Smoke : MonoBehaviour
+    {
+        public Func<bool> Ready { get; set; } = () => false;
+        public Action EnterPlay { get; set; } = () => { };
+        public Fishing Rod { get; set; } = null!;
+        public Player Player { get; set; } = null!;
+        public DayCycle Day { get; set; } = null!;
+
+        public static bool Enabled => Environment.GetEnvironmentVariable("FISHSIM_SMOKE") == "1";
+
+        private IEnumerator Start()
+        {
+            float started = Time.realtimeSinceStartup;
+            bool ok = true;
+            while (!Ready())
+            {
+                if (Time.realtimeSinceStartup - started > 240f)
+                {
+                    Debug.Log("SMOKE FAIL: the map did not load in 240 s");
+                    Application.Quit(1);
+                    yield break;
+                }
+                yield return null;
+            }
+            Debug.Log($"SMOKE map loaded in {Time.realtimeSinceStartup - started:0.0} s");
+            EnterPlay();
+            foreach (float hour in new[] { 12f, 7f, 20.5f })
+            {
+                Day.Hour = hour;
+                Day.Apply();
+                for (int i = 0; i < 20; i++)
+                    yield return null;
+                yield return new WaitForEndOfFrame();
+                var shot = ScreenCapture.CaptureScreenshotAsTexture();
+                var px = shot.GetPixels32();
+                long r = 0, g = 0, b = 0;
+                int magenta = 0;
+                foreach (var p in px)
+                {
+                    r += p.r; g += p.g; b += p.b;
+                    if (p.r > 200 && p.g < 60 && p.b > 200)
+                        magenta++;
+                }
+                float share = magenta / (float)px.Length;
+                Debug.Log($"SMOKE frame {hour:0.0} h {shot.width}x{shot.height}: mean {r / px.Length},{g / px.Length},{b / px.Length}, magenta {share:P1}");
+                if (share > 0.01f)
+                    ok = false;
+                var small = Downscale(shot, 320, 180);
+                Debug.Log($"SMOKE JPEG {hour:0.0} {Convert.ToBase64String(small.EncodeToJPG(70))}");
+                Destroy(shot);
+                Destroy(small);
+            }
+            Day.Hour = 12f;
+            int landed = 0;
+            for (int n = 0; n < 6; n++)
+            {
+                var target = Player.transform.position + Player.transform.forward * (12f + n * 4f);
+                Rod.SmokeCast(target);
+                Rod.SmokeBiteNow();
+                float t = 0f;
+                while (Rod.State != RodState.Bite && t < 15f)
+                {
+                    if (Rod.State == RodState.Waiting)
+                        Rod.SmokeBiteNow();
+                    t += Time.deltaTime;
+                    yield return null;
+                }
+                if (Rod.State != RodState.Bite)
+                {
+                    Debug.Log($"SMOKE cast {n}: no bite ({Rod.State})");
+                    Rod.Reset();
+                    continue;
+                }
+                string species = Rod.Species?.SpeciesName ?? "?";
+                float weight = Rod.Weight;
+                Rod.SmokeStrike();
+                Rod.SmokeReel = true;
+                t = 0f;
+                while (Rod.State == RodState.Fight && t < 120f)
+                {
+                    t += Time.deltaTime;
+                    yield return null;
+                }
+                Rod.SmokeReel = false;
+                Debug.Log($"SMOKE cast {n}: {species} {weight:0.000} kg, fight {t:0.0} s -> {Rod.State}");
+                if (Rod.State == RodState.Landed)
+                {
+                    landed++;
+                    yield return new WaitForEndOfFrame();
+                    Rod.Decide(false);
+                }
+                else
+                    Rod.Reset();
+                yield return null;
+            }
+            Debug.Log($"SMOKE landed {landed} of 6, fps {1f / Mathf.Max(Time.smoothDeltaTime, 0.0001f):0}");
+            Debug.Log(ok ? "SMOKE OK" : "SMOKE FAIL: magenta pixels (a shader failed)");
+            Application.Quit(ok ? 0 : 1);
+        }
+
+        private static Texture2D Downscale(Texture2D src, int w, int h)
+        {
+            var rt = RenderTexture.GetTemporary(w, h, 0);
+            Graphics.Blit(src, rt);
+            var prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            var dst = new Texture2D(w, h, TextureFormat.RGB24, false);
+            dst.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+            dst.Apply();
+            RenderTexture.active = prev;
+            RenderTexture.ReleaseTemporary(rt);
+            return dst;
+        }
+    }
+}
