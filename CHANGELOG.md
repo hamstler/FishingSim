@@ -1,5 +1,10 @@
 # Zmiany
 
+## 0.9.2 (Unity 6)
+- Pierwsza wersja na silniku Unity 6 (DirectX 11 na Windows, bez Vulkana, z którym wiązały się awarie przy starcie).
+- Grywalne: 4 łowiska (teren i jezioro z tych samych wzorów co w wersji Godot), woda, niebo, pora dnia i pogoda, las, pomost; zarzucanie, branie, zacięcie, hol (te same modele brań i holu), siatka, skup, sklep (wędki, kołowrotki, żyłki, haczyki, przynęty), rekordy, ustawienia grafiki, zapis gry.
+- Jeszcze nie przeniesione z wersji Godot: modele Meshy (ryby, budynki, wędki, kołowrotki), wioska i mieszkańcy, łódka, obóz, narzędzia, dźwięk, ręce wędkarza.
+
 ## 0.9.1
 - Budynki z Meshy w pełnej jakości: tekstury 4K i 0,45–1 mln trójkątów (granice UV nieruszane, więc obraz się nie rozmazuje), wyglądają jak oryginały.
 - Gotowe siatki z LOD-ami zapisywane w pamięci podręcznej (szybsze kolejne wczytania).
