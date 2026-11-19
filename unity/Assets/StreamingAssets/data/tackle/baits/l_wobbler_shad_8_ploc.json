@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Saimaa Craft Kuha Shad · Wobler shad 8 cm, płoć",
+ "Kind": 3,
+ "AffinityAs": "wobbler",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 95,
+ "RequiredLevel": 3,
+ "Description": "Wysoka, krępa rybka ze średnim sterem: mocna praca, schodzi do ok. 1,1 m.",
+ "Shape": "shad",
+ "LureColor": {
+  "R": 0.3,
+  "G": 0.38,
+  "B": 0.5,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.86,
+  "G": 0.88,
+  "B": 0.9,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": false,
+ "SizeCm": 8,
+ "WeightG": 12,
+ "SinkScale": 1,
+ "SinkOffset": 0,
+ "DepthScale": 1.4,
+ "DepthOffset": 0
+}

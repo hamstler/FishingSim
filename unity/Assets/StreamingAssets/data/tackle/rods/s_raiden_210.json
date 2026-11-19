@@ -1,0 +1,27 @@
+{
+ "$type": "RodData",
+ "DisplayName": "Kaminari Raiden 2,1 m · spinning (krótka)",
+ "Kind": 1,
+ "CastMult": 1.12,
+ "MaxLoad": 7.24,
+ "ShockAbsorb": 0.109,
+ "Action": 0.25,
+ "Price": 300,
+ "RequiredLevel": 3,
+ "Description": "Szybki, uniwersalny spinning na okonie, sandacze i średnie szczupaki. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy.",
+ "BlankColor": {
+  "R": 0.06,
+  "G": 0.08,
+  "B": 0.18,
+  "A": 1.0
+ },
+ "WhipColor": {
+  "R": 0.8,
+  "G": 0.82,
+  "B": 0.86,
+  "A": 1.0
+ },
+ "FoamGrip": true,
+ "Length": 2.1,
+ "Model": "rods/spin_kaminari"
+}

@@ -14,7 +14,8 @@
 AppId={{6C0E1A7B-5F38-4F2B-9E0D-3B7E2F1A9C44}
 AppName=Fishing Sim
 AppVersion={#AppVersion}
-AppPublisher=FishingSim
+AppPublisher=Krystian Naskręski
+AppCopyright=Copyright (c) 2026 Krystian Naskręski. Wszelkie prawa zastrzeżone.
 DefaultDirName={autopf}\FishingSim
 DefaultGroupName=Fishing Sim
 DisableProgramGroupPage=yes

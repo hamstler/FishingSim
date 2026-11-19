@@ -1,0 +1,63 @@
+{
+ "$type": "FishSpecies",
+ "SpeciesName": "Amur biały",
+ "LatinName": "Ctenopharyngodon idella",
+ "Description": "Roślinożerca z Azji, wpuszczany do stawów, by oczyszczał je z zielska. Wydłużony, z dużą łuską; po zacięciu odpływa z ogromną siłą.",
+ "MinWeight": 2.0,
+ "MaxWeight": 30.0,
+ "Rarity": 0.5,
+ "PullFactor": 1.55,
+ "Aggression": 0.7,
+ "StaminaDrain": 0.09,
+ "MouthSize": 7.0,
+ "BaitAffinity": {
+  "worm": 0.3,
+  "corn": 1.8,
+  "bread": 1.2,
+  "boilie": 1.2,
+  "livebait": 0.0,
+  "maggot": 0.0,
+  "insect": 0.0,
+  "spinner": 0.0,
+  "spoon": 0.0,
+  "wobbler": 0.0,
+  "softbait": 0.0,
+  "fly": 0.0
+ },
+ "MinDepth": 0.5,
+ "MaxDepth": 4.0,
+ "DayActivity": 1.3,
+ "NightActivity": 0.5,
+ "TwilightBonus": 1.1,
+ "WeatherPref": {
+  "clear": 1.3,
+  "cloudy": 1.0,
+  "rain": 0.8
+ },
+ "RunLengthMult": 1.6,
+ "BurstMult": 1.4,
+ "BurstRate": 0.8,
+ "LengthRef": 0.39,
+ "BodyDepth": 0.2,
+ "DorsalPos": 0.45,
+ "BackColor": {
+  "R": 0.42,
+  "G": 0.44,
+  "B": 0.36,
+  "A": 1.0
+ },
+ "BellyColor": {
+  "R": 0.88,
+  "G": 0.86,
+  "B": 0.78,
+  "A": 1.0
+ },
+ "FinColor": {
+  "R": 0.45,
+  "G": 0.45,
+  "B": 0.4,
+  "A": 1.0
+ },
+ "PricePerKg": 18.0,
+ "TrophyWeight": 0.0
+}

@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Kawase Shindō Vib · Cykada-wibrator 7 cm, tygrys fluo",
+ "Kind": 3,
+ "AffinityAs": "wobbler",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 95,
+ "RequiredLevel": 3,
+ "Description": "Bezsterowy, tonący wibrator: drży przy każdym zwijaniu i rzuca się bardzo daleko. Sandacze i okonie w toni.",
+ "Shape": "vib",
+ "LureColor": {
+  "R": 0.4,
+  "G": 0.85,
+  "B": 0.2,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 1.0,
+  "G": 0.7,
+  "B": 0.1,
+  "A": 1.0
+ },
+ "Pattern": "bars",
+ "Metallic": false,
+ "SizeCm": 7,
+ "WeightG": 18,
+ "SinkScale": 1,
+ "SinkOffset": 0.6,
+ "DepthScale": 0.9,
+ "DepthOffset": 0
+}

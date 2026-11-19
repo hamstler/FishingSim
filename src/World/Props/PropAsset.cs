@@ -66,7 +66,9 @@ public static class PropAsset
             {
                 try
                 {
+                    long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
                     model = Build(id);
+                    HitchLog.Note($"model {id} wczytany w {(System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency:0} ms");
                 }
                 catch (Exception e)
                 {

@@ -1,0 +1,63 @@
+{
+ "$type": "FishSpecies",
+ "SpeciesName": "Kleń",
+ "LatinName": "Squalius cephalus",
+ "Description": "Szerokogłowy wszystkożerca rzek z ciemno obrysowaną łuską. Zjada owady, owoce, a nawet małe ryby.",
+ "MinWeight": 0.2,
+ "MaxWeight": 4.0,
+ "Rarity": 0.8,
+ "PullFactor": 1.2,
+ "Aggression": 0.6,
+ "StaminaDrain": 0.11,
+ "MouthSize": 5.0,
+ "BaitAffinity": {
+  "worm": 1.1,
+  "corn": 0.0,
+  "bread": 1.2,
+  "boilie": 0.0,
+  "livebait": 0.3,
+  "maggot": 0.9,
+  "insect": 1.6,
+  "spinner": 1.24,
+  "spoon": 0.22,
+  "wobbler": 0.77,
+  "softbait": 0.24,
+  "fly": 1.73
+ },
+ "MinDepth": 0.3,
+ "MaxDepth": 3.0,
+ "DayActivity": 1.0,
+ "NightActivity": 0.5,
+ "TwilightBonus": 1.3,
+ "WeatherPref": {
+  "clear": 1.0,
+  "cloudy": 1.0,
+  "rain": 1.0
+ },
+ "RunLengthMult": 1.0,
+ "BurstMult": 1.5,
+ "BurstRate": 1.0,
+ "LengthRef": 0.38,
+ "BodyDepth": 0.22,
+ "DorsalPos": 0.5,
+ "BackColor": {
+  "R": 0.28,
+  "G": 0.3,
+  "B": 0.27,
+  "A": 1.0
+ },
+ "BellyColor": {
+  "R": 0.86,
+  "G": 0.84,
+  "B": 0.78,
+  "A": 1.0
+ },
+ "FinColor": {
+  "R": 0.75,
+  "G": 0.4,
+  "B": 0.25,
+  "A": 1.0
+ },
+ "PricePerKg": 15.0,
+ "TrophyWeight": 0.0
+}

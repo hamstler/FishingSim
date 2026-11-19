@@ -1,0 +1,63 @@
+{
+ "$type": "FishSpecies",
+ "SpeciesName": "Tołpyga biała",
+ "LatinName": "Hypophthalmichthys molitrix",
+ "Description": "Srebrzysta ryba o nisko osadzonych oczach, filtruje fitoplankton. Spłoszona potrafi wyskakiwać wysoko nad wodę.",
+ "MinWeight": 2.0,
+ "MaxWeight": 25.0,
+ "Rarity": 0.4,
+ "PullFactor": 1.5,
+ "Aggression": 0.75,
+ "StaminaDrain": 0.1,
+ "MouthSize": 6.0,
+ "BaitAffinity": {
+  "worm": 0.0,
+  "corn": 0.8,
+  "bread": 1.6,
+  "boilie": 0.6,
+  "livebait": 0.0,
+  "maggot": 0.0,
+  "insect": 0.0,
+  "spinner": 0.0,
+  "spoon": 0.0,
+  "wobbler": 0.0,
+  "softbait": 0.0,
+  "fly": 0.0
+ },
+ "MinDepth": 0.5,
+ "MaxDepth": 3.5,
+ "DayActivity": 1.2,
+ "NightActivity": 0.4,
+ "TwilightBonus": 1.0,
+ "WeatherPref": {
+  "clear": 1.3,
+  "cloudy": 1.0,
+  "rain": 0.9
+ },
+ "RunLengthMult": 1.4,
+ "BurstMult": 1.6,
+ "BurstRate": 1.0,
+ "LengthRef": 0.35,
+ "BodyDepth": 0.27,
+ "DorsalPos": 0.45,
+ "BackColor": {
+  "R": 0.55,
+  "G": 0.6,
+  "B": 0.62,
+  "A": 1.0
+ },
+ "BellyColor": {
+  "R": 0.94,
+  "G": 0.94,
+  "B": 0.94,
+  "A": 1.0
+ },
+ "FinColor": {
+  "R": 0.6,
+  "G": 0.6,
+  "B": 0.62,
+  "A": 1.0
+ },
+ "PricePerKg": 12.0,
+ "TrophyWeight": 0.0
+}

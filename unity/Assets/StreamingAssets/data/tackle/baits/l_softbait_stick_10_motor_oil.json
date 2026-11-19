@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Bayou Bill Stik · Gumowy stick 10 cm, obciążenie 5 g, motor oil",
+ "Kind": 3,
+ "AffinityAs": "softbait",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 20,
+ "RequiredLevel": 2,
+ "Description": "Prosty, ciężki wałek bez ogonka: opada drżąc, na zestawie bez zaczepów. Okonie i klenie przy zielsku.",
+ "Shape": "stick",
+ "LureColor": {
+  "R": 0.35,
+  "G": 0.3,
+  "B": 0.12,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.9,
+  "G": 0.7,
+  "B": 0.2,
+  "A": 1.0
+ },
+ "Pattern": "glitter",
+ "Metallic": false,
+ "SizeCm": 10,
+ "WeightG": 5,
+ "SinkScale": 0.833,
+ "SinkOffset": 0,
+ "DepthScale": 1,
+ "DepthOffset": 0
+}

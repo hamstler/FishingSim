@@ -1,0 +1,63 @@
+{
+ "$type": "FishSpecies",
+ "SpeciesName": "Lin",
+ "LatinName": "Tinca tinca",
+ "Description": "Oliwkowozłoty mieszkaniec zarośniętych, mulistych stawów, z drobną łuską i czerwonym okiem. Bierze ostrożnie, o świcie.",
+ "MinWeight": 0.3,
+ "MaxWeight": 4.0,
+ "Rarity": 1.0,
+ "PullFactor": 1.1,
+ "Aggression": 0.3,
+ "StaminaDrain": 0.08,
+ "MouthSize": 5.0,
+ "BaitAffinity": {
+  "worm": 1.6,
+  "corn": 0.8,
+  "bread": 0.6,
+  "boilie": 0.0,
+  "livebait": 0.0,
+  "maggot": 1.0,
+  "insect": 0.0,
+  "spinner": 0.0,
+  "spoon": 0.0,
+  "wobbler": 0.0,
+  "softbait": 0.0,
+  "fly": 0.0
+ },
+ "MinDepth": 0.5,
+ "MaxDepth": 4.0,
+ "DayActivity": 0.6,
+ "NightActivity": 1.0,
+ "TwilightBonus": 1.5,
+ "WeatherPref": {
+  "clear": 0.9,
+  "cloudy": 1.2,
+  "rain": 1.1
+ },
+ "RunLengthMult": 1.0,
+ "BurstMult": 1.5,
+ "BurstRate": 1.0,
+ "LengthRef": 0.33,
+ "BodyDepth": 0.3,
+ "DorsalPos": 0.5,
+ "BackColor": {
+  "R": 0.2,
+  "G": 0.32,
+  "B": 0.12,
+  "A": 1.0
+ },
+ "BellyColor": {
+  "R": 0.6,
+  "G": 0.6,
+  "B": 0.3,
+  "A": 1.0
+ },
+ "FinColor": {
+  "R": 0.2,
+  "G": 0.28,
+  "B": 0.12,
+  "A": 1.0
+ },
+ "PricePerKg": 30.0,
+ "TrophyWeight": 0.0
+}

@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Highland Fly Co. · Nimfa: zielona larwa, zielona",
+ "Kind": 3,
+ "AffinityAs": "fly",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 14,
+ "RequiredLevel": 1,
+ "Description": "Tonie powoli i płynie pół metra pod powierzchnią jak larwa owada.",
+ "Shape": "nymph",
+ "LureColor": {
+  "R": 0.35,
+  "G": 0.6,
+  "B": 0.25,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.2,
+  "G": 0.3,
+  "B": 0.15,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": false,
+ "SizeCm": 1.8,
+ "WeightG": 0.8,
+ "SinkScale": 1,
+ "SinkOffset": 0.25,
+ "DepthScale": 1,
+ "DepthOffset": 0.5
+}

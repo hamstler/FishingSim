@@ -1,0 +1,23 @@
+{
+ "$type": "ReelData",
+ "DisplayName": "Kaminari Long Cast 5000 · wolny bieg",
+ "DragMax": 10.0,
+ "ReelSpeed": 3.4,
+ "LineCapacity": 260.0,
+ "Price": 680,
+ "RequiredLevel": 5,
+ "Description": "Długa stożkowa szpula do dalekich rzutów i wolny bieg na karpie.",
+ "BodyColor": {
+  "R": 0.06,
+  "G": 0.06,
+  "B": 0.07,
+  "A": 1.0
+ },
+ "TrimColor": {
+  "R": 0.78,
+  "G": 0.78,
+  "B": 0.8,
+  "A": 1.0
+ },
+ "Model": "reels/baitrunner_kaminari"
+}

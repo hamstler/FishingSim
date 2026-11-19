@@ -1,0 +1,10 @@
+{
+ "$type": "LeaderData",
+ "DisplayName": "Przypon z cienkiego włosia",
+ "Strength": 2.2,
+ "Visibility": 0.7,
+ "BiteProof": 0.0,
+ "Price": 6,
+ "RequiredLevel": 1,
+ "Description": "Prawie niewidoczny dla płochliwych ryb, ale słaby."
+}

@@ -20,6 +20,37 @@ public static class CrashLog
         try { System.IO.File.Delete(Flag); } catch (Exception) { }
     }
 
+    /// <summary>
+    /// The previous session's Godot log (rotated to godot&lt;date&gt;.log when this one started) reports a corrupt shader
+    /// cache ("Malformed smolv": a user's RTX 3080 showed it without any crash, so the crash flag never cleared it).
+    /// </summary>
+    private static bool LastLogShowsBadCache()
+    {
+        try
+        {
+            string dir = ProjectSettings.GlobalizePath("user://logs");
+            if (!System.IO.Directory.Exists(dir))
+                return false;
+            string? newest = null;
+            var newestTime = DateTime.MinValue;
+            foreach (string file in System.IO.Directory.EnumerateFiles(dir, "godot*.log"))
+            {
+                if (System.IO.Path.GetFileName(file) == "godot.log")
+                    continue;
+                var t = System.IO.File.GetLastWriteTimeUtc(file);
+                if (t > newestTime)
+                    (newest, newestTime) = (file, t);
+            }
+            if (newest == null || new System.IO.FileInfo(newest).Length > 32 << 20)
+                return false;
+            return System.IO.File.ReadAllText(newest).Contains("Malformed smolv");
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     public static void Install()
     {
         if (_installed)
@@ -29,7 +60,7 @@ public static class CrashLog
         // and pipeline caches may be half written (Godot then fails on "Malformed smolv" at every start), so they go.
         try
         {
-            if (System.IO.File.Exists(Flag))
+            if (System.IO.File.Exists(Flag) || LastLogShowsBadCache())
                 foreach (var dir in new[] { "user://shader_cache", "user://vulkan" })
                 {
                     string full = ProjectSettings.GlobalizePath(dir);

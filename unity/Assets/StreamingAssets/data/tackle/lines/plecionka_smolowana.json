@@ -1,0 +1,18 @@
+{
+ "$type": "LineData",
+ "DisplayName": "Plecionka smołowana na sumy",
+ "Kind": 1,
+ "Strength": 26.0,
+ "Visibility": 1.35,
+ "Stretch": 0.02,
+ "Price": 700,
+ "RequiredLevel": 6,
+ "Description": "Smołowana plecionka na sumy: najmocniejsza, ale widoczna z daleka.",
+ "Diameter": 0.35,
+ "LineColor": {
+  "R": 0.18,
+  "G": 0.16,
+  "B": 0.14,
+  "A": 1.0
+ }
+}

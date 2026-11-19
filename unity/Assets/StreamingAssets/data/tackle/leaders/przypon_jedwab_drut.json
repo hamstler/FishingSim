@@ -1,0 +1,10 @@
+{
+ "$type": "LeaderData",
+ "DisplayName": "Przypon jedwabny z drutem",
+ "Strength": 12.0,
+ "Visibility": 0.95,
+ "BiteProof": 0.95,
+ "Price": 220,
+ "RequiredLevel": 5,
+ "Description": "Jedwab owinięty cienkim drutem: mocny, odporny na zęby i mało widoczny."
+}

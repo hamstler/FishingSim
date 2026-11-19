@@ -1,0 +1,9 @@
+{
+ "$type": "AccessoryData",
+ "DisplayName": "Łopata z jesionowym trzonkiem",
+ "Kind": 8,
+ "Power": 1.0,
+ "Description": "Kop w wilgotnej ziemi: robaki na łące i przy brzegu, pędraki w lesie, rosówki nocą i po deszczu. Q zmienia narzędzie w ręku.",
+ "Price": 40,
+ "RequiredLevel": 1
+}

@@ -1,0 +1,13 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Kulka pływająca z korkiem",
+ "Kind": 2,
+ "AffinityAs": "boilie",
+ "AffinityScale": 1.2,
+ "Reusable": false,
+ "StartCount": 16,
+ "PackSize": 8,
+ "Price": 80,
+ "RequiredLevel": 4,
+ "Description": "Unosi się nad dnem, gdzie karp ją łatwo znajdzie."
+}

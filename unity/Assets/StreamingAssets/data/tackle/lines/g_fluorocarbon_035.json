@@ -1,0 +1,18 @@
+{
+ "$type": "LineData",
+ "DisplayName": "Glasswater Fluorocarbon 0,35 mm",
+ "Kind": 2,
+ "Strength": 11,
+ "Visibility": 0.76,
+ "Stretch": 0.4,
+ "Diameter": 0.35,
+ "LineColor": {
+  "R": 0.85,
+  "G": 0.9,
+  "B": 0.95,
+  "A": 1.0
+ },
+ "Price": 129,
+ "RequiredLevel": 4,
+ "Description": "Prawie niewidoczny w wodzie, twardy i tonący: dla płochliwych ryb."
+}

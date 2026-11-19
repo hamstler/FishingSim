@@ -1,0 +1,13 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Ciasto z mąki i miodu",
+ "Kind": 1,
+ "AffinityAs": "bread",
+ "AffinityScale": 1.15,
+ "Reusable": false,
+ "StartCount": 20,
+ "PackSize": 10,
+ "Price": 10,
+ "RequiredLevel": 1,
+ "Description": "Słodkie ciasto lepsze od chleba."
+}

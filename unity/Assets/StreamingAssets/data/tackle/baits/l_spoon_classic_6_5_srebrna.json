@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Nordvik Fjell · Wahadłówka klasyczna 18 g, srebrna",
+ "Kind": 3,
+ "AffinityAs": "spoon",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 42,
+ "RequiredLevel": 2,
+ "Description": "Wygięta blacha kołysze się na boki i błyska: szczupak, okoń, boleń. 6,5 cm.",
+ "Shape": "classic",
+ "LureColor": {
+  "R": 0.86,
+  "G": 0.87,
+  "B": 0.9,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.85,
+  "G": 0.12,
+  "B": 0.1,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": true,
+ "SizeCm": 6.5,
+ "WeightG": 18,
+ "SinkScale": 1.16,
+ "SinkOffset": 0,
+ "DepthScale": 1,
+ "DepthOffset": 0
+}

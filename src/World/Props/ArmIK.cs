@@ -183,7 +183,7 @@ public partial class ArmIK : SkeletonModifier3D
         return new Basis(axis / s, MathF.Atan2(s, c)) * b;
     }
 
-    public override void _ProcessModification()
+    public override void _ProcessModificationWithDelta(double delta)
     {
         using var perfScope = Graphics.Perf.Scope("arm-ik");
         var sk = GetSkeleton();

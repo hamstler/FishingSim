@@ -1,0 +1,8 @@
+{
+ "$type": "LandingNetData",
+ "DisplayName": "Kasarek na długim drzewcu",
+ "MaxWeight": 7.0,
+ "Reach": 3.0,
+ "Price": 110,
+ "RequiredLevel": 2
+}

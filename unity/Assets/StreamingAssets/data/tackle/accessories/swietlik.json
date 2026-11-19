@@ -1,0 +1,9 @@
+{
+ "$type": "AccessoryData",
+ "DisplayName": "Świetlik na spławik i szczytówkę",
+ "Kind": 12,
+ "Power": 1.0,
+ "Description": "Zielona świecąca końcówka: po zmroku widać spławik i szczytówkę, bez niej nocą widać je tylko w świetle latarni.",
+ "Price": 25,
+ "RequiredLevel": 1
+}

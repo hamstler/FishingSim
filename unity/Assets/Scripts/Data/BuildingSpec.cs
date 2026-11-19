@@ -1,0 +1,80 @@
+using System;
+using System.Globalization;
+using FishingSim.Compat;
+
+namespace FishingSim.Data;
+
+/// <summary>What a building or prop is. Functional kinds can be entered (E); the rest is scenery.</summary>
+public enum BuildingKind
+{
+    // functional
+    Tackle, Bait, FishBuyer, Market, General, Office, BusStop,
+    // scenery
+    House, Barn, Windmill, Boathouse, Haystack, Lamp, Bench, Boat, Crates, Signpost, Fence,
+    Cabin, RedHouse, StoneHouse, Smokehouse, Tent, MarketTent, Stall, Well, Woodpile, DryingRack, Cart, Villager,
+}
+
+/// <summary>A building or prop placed on a map, parsed from the "kind,x,z[,yaw]" strings in <see cref="LocationData.Buildings"/>.</summary>
+public sealed record BuildingSpec(BuildingKind Kind, Vector2 Position, float? YawDegrees)
+{
+    public static BuildingSpec? Parse(string text)
+    {
+        var parts = System.Array.ConvertAll(text.Split(','), s => s.Trim());
+        if (parts.Length < 3 || !Enum.TryParse<BuildingKind>(parts[0], ignoreCase: true, out var kind))
+            return null;
+        if (!float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float x)
+            || !float.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float z))
+            return null;
+        float? yaw = parts.Length > 3 && float.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out float y) ? y : null;
+        return new BuildingSpec(kind, new Vector2(x, z), yaw);
+    }
+
+    public bool IsFunctional => Kind <= BuildingKind.BusStop;
+
+    /// <summary>Somebody lives here: the house gets a path to its door.</summary>
+    public bool IsDwelling => Kind is BuildingKind.House or BuildingKind.Cabin or BuildingKind.RedHouse or BuildingKind.StoneHouse
+        or BuildingKind.Smokehouse or BuildingKind.Boathouse;
+
+    /// <summary>Radius of the flat pad (m) the terrain is levelled to; 0 for small props.</summary>
+    public float PadRadius => Kind switch
+    {
+        BuildingKind.Tackle or BuildingKind.General or BuildingKind.Office => 9f,
+        BuildingKind.Bait or BuildingKind.FishBuyer => 7f,
+        BuildingKind.Market => 8f,
+        BuildingKind.House or BuildingKind.Boathouse or BuildingKind.RedHouse => 8f,
+        BuildingKind.Cabin or BuildingKind.StoneHouse => 7f,
+        BuildingKind.Smokehouse => 4.5f,
+        BuildingKind.MarketTent => 4f,
+        BuildingKind.Tent => 3.5f,
+        BuildingKind.Stall => 3f,
+        BuildingKind.Well => 2.5f,
+        BuildingKind.Barn => 10f,
+        BuildingKind.Windmill => 6f,
+        BuildingKind.BusStop => 4f,
+        _ => 0f,
+    };
+
+    /// <summary>Yaw (radians) that makes the building's front (+Z) face <paramref name="plaza"/>, unless a yaw was given.</summary>
+    public float FacingYaw(Vector2 plaza)
+    {
+        if (YawDegrees is float deg)
+            return Mathf.DegToRad(deg);
+        var d = plaza - Position;
+        return d.LengthSquared() < 1f ? 0f : MathF.Atan2(d.X, d.Y);
+    }
+
+    /// <summary>Where the door is on the ground (a few metres in front of the building).</summary>
+    /// <summary>Door reach of the kinds drawn from a model (World/Props/BuildingFactory.RegisterModelFronts).</summary>
+    public static readonly System.Collections.Generic.Dictionary<BuildingKind, float> ModelReach = new();
+
+    public Vector2 DoorPoint(Vector2 plaza)
+    {
+        float yaw = FacingYaw(plaza);
+        float reach = ModelReach.TryGetValue(Kind, out float modelled) ? modelled : Kind switch
+        {
+            BuildingKind.BusStop => 2.4f, BuildingKind.Windmill => 4f, BuildingKind.Smokehouse => 3.6f, BuildingKind.Tent => 3f,
+            BuildingKind.MarketTent or BuildingKind.Stall => 3.4f, _ => 5.2f,
+        };
+        return Position + new Vector2(MathF.Sin(yaw), MathF.Cos(yaw)) * reach;
+    }
+}

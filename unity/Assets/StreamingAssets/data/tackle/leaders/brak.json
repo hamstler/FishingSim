@@ -1,0 +1,10 @@
+{
+ "$type": "LeaderData",
+ "DisplayName": "Bez przyponu",
+ "Strength": 999.0,
+ "Visibility": 0.0,
+ "BiteProof": 0.0,
+ "Price": 0,
+ "RequiredLevel": 1,
+ "Description": "Linka idzie prosto do haczyka."
+}

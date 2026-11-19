@@ -1,0 +1,27 @@
+{
+ "$type": "RodData",
+ "DisplayName": "Borealis Nordlys Feeder 3 m · feeder (krótka)",
+ "Kind": 2,
+ "CastMult": 1.12,
+ "MaxLoad": 8.37,
+ "ShockAbsorb": 0.176,
+ "Action": 0.6,
+ "Price": 335,
+ "RequiredLevel": 3,
+ "Description": "Feeder z pomarańczową szczytówką na leszcze, karasie i liny z koszyka. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy.",
+ "BlankColor": {
+  "R": 0.05,
+  "G": 0.05,
+  "B": 0.06,
+  "A": 1.0
+ },
+ "WhipColor": {
+  "R": 0.85,
+  "G": 0.12,
+  "B": 0.1,
+  "A": 1.0
+ },
+ "FoamGrip": true,
+ "Length": 3,
+ "Model": "rods/feeder_borealis"
+}

@@ -1,0 +1,9 @@
+{
+ "$type": "AccessoryData",
+ "DisplayName": "Podrywka",
+ "Kind": 11,
+ "Power": 1.0,
+ "Description": "Kwadratowa siatka na skrzyżowanych pałąkach, na długiej tyczce. Opuść ją z brzegu lub pomostu, odczekaj i poderwij: drobnica (ukleje, płotki, kiełbie) to żywce na szczupaka i sandacza. Najlepiej o świcie i zmierzchu, nad pokruszonym chlebem. Q zmienia narzędzie w ręku.",
+ "Price": 70,
+ "RequiredLevel": 2
+}

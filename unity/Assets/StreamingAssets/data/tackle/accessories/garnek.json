@@ -1,0 +1,9 @@
+{
+ "$type": "AccessoryData",
+ "DisplayName": "Żeliwny garnek",
+ "Kind": 10,
+ "Power": 1.0,
+ "Description": "Zawieś nad ogniskiem i ugotuj zupę rybną: syci na długo i lepiej się łowi.",
+ "Price": 45,
+ "RequiredLevel": 1
+}

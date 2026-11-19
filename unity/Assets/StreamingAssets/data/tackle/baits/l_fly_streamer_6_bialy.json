@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Highland Fly Co. · Streamer 6 cm, biały",
+ "Kind": 3,
+ "AffinityAs": "fly",
+ "AffinityScale": 1.1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 22,
+ "RequiredLevel": 2,
+ "Description": "Długie pióra udają małą rybkę: pstrągi, okonie i szczupaki.",
+ "Shape": "streamer",
+ "LureColor": {
+  "R": 0.95,
+  "G": 0.95,
+  "B": 0.92,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.75,
+  "G": 0.75,
+  "B": 0.8,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": false,
+ "SizeCm": 6,
+ "WeightG": 2.5,
+ "SinkScale": 1,
+ "SinkOffset": 0.4,
+ "DepthScale": 1,
+ "DepthOffset": 0.9
+}

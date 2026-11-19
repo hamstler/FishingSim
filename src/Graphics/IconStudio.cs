@@ -21,6 +21,7 @@ public partial class IconStudio : Node
     public const int Version = 9;     // 9: small_fjordline re-cut (its whole crank arm turns)
     private const int RenderSize = 512;
     private const string Dir = "user://texcache/icons";
+    private const string BundledDir = "res://assets/icons";
 
     private static IconStudio? _instance;
     private static readonly HashSet<string> Requested = new();
@@ -40,7 +41,21 @@ public partial class IconStudio : Node
     {
         if (!Available || !Requested.Add(key))
             return;
-        string file = $"{Dir}/{Sanitise(key)}_{Hash(signature):x8}_v{Version}.png";
+        string name = $"{Sanitise(key)}_{Hash(signature):x8}_v{Version}.png";
+        string file = $"{Dir}/{name}";
+        // Photos shipped with the game (assets/icons: every shop item, taken by screenshot mode 16 arg 2 and copied from
+        // user://texcache/icons): the shop no longer loads each rod and reel model and renders it on the angler's
+        // machine (a user's recording showed 16-37 FPS for seconds after leaving the tackle shop).
+        string bundled = $"{BundledDir}/{name}";
+        if (FileAccess.FileExists(bundled))
+        {
+            var img = new Image();
+            if (img.LoadPngFromBuffer(FileAccess.GetFileAsBytes(bundled)) == Error.Ok && !img.IsEmpty())
+            {
+                target.SetImage(img);
+                return;
+            }
+        }
         if (FileAccess.FileExists(file))
         {
             var img = Image.LoadFromFile(ProjectSettings.GlobalizePath(file));
@@ -132,11 +147,28 @@ public partial class IconStudio : Node
         return ImageTexture.CreateFromImage(img);
     }
 
+    /// <summary>A map is being played (set by Main): photos are then taken only while the shop is open.</summary>
+    public static bool InWorld { get; set; }
+
+    /// <summary>The shop is on screen (set by Shop).</summary>
+    public static bool ShopOpen { get; set; }
+
+    /// <summary>Frames left before the next photo: each one loads a model and waits for the GPU (a stall).</summary>
+    private int _cooldown;
+
     public override void _Process(double delta)
     {
         if (_busy || _queue.Count == 0)
             return;
+        // Never while the angler plays: a photo loads a rod or reel model, renders it and reads it back, a hitch of tens
+        // of milliseconds (shipped items come from assets/icons; this only covers anything not photographed yet).
+        if (InWorld && !ShopOpen)
+            return;
+        if (_cooldown-- > 0)
+            return;
+        _cooldown = 8;
         var job = _queue.Dequeue();
+        HitchLog.Note($"icon photo {job.File.GetFile()}");
         Take(job.File, job.Target, job.Shot, job.Item);
     }
 

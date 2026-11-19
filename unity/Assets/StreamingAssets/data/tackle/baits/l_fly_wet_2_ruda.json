@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Highland Fly Co. · Mucha mokra: rudy, ruda",
+ "Kind": 3,
+ "AffinityAs": "fly",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 14,
+ "RequiredLevel": 2,
+ "Description": "Tonie tuż pod powierzchnię i płynie z nurtem: lipienie i pstrągi.",
+ "Shape": "wet",
+ "LureColor": {
+  "R": 0.7,
+  "G": 0.35,
+  "B": 0.15,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.9,
+  "G": 0.7,
+  "B": 0.3,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": false,
+ "SizeCm": 2,
+ "WeightG": 0.6,
+ "SinkScale": 1,
+ "SinkOffset": 0.15,
+ "DepthScale": 1,
+ "DepthOffset": 0.3
+}

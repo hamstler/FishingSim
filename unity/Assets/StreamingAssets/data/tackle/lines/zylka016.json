@@ -1,0 +1,18 @@
+{
+ "$type": "LineData",
+ "DisplayName": "Cienka linka z końskiego włosia",
+ "Strength": 2.8,
+ "Visibility": 0.85,
+ "Price": 10,
+ "RequiredLevel": 1,
+ "Kind": 0,
+ "Stretch": 0.55,
+ "Description": "Cienka i mało widoczna, ale słaba.",
+ "Diameter": 0.16,
+ "LineColor": {
+  "R": 0.88,
+  "G": 0.86,
+  "B": 0.8,
+  "A": 1.0
+ }
+}

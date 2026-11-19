@@ -1,0 +1,23 @@
+{
+ "$type": "ReelData",
+ "DisplayName": "Ironwood Titan 8000 · bęben sumowy",
+ "DragMax": 14.0,
+ "ReelSpeed": 2.6,
+ "LineCapacity": 220.0,
+ "Price": 980,
+ "RequiredLevel": 6,
+ "Description": "Ogromny bęben z mocnym hamulcem: dla sumów i jesiotrów.",
+ "BodyColor": {
+  "R": 0.1,
+  "G": 0.12,
+  "B": 0.18,
+  "A": 1.0
+ },
+ "TrimColor": {
+  "R": 0.7,
+  "G": 0.7,
+  "B": 0.72,
+  "A": 1.0
+ },
+ "Model": "reels/big_ironwood"
+}

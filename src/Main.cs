@@ -70,6 +70,8 @@ public partial class Main : Node3D
 
     public override void _Ready()
     {
+        Graphics.IconStudio.InWorld = true;
+        Graphics.HitchLog.Reset();
         World.Props.BuildingFactory.RegisterModelFronts();
         GD.Randomize();
 
@@ -444,6 +446,7 @@ public partial class Main : Node3D
 
     private void RespawnPlayer()
     {
+        Graphics.HitchLog.Reset();
         Player.Respawn();
         Rod.ResetToIdle();
     }
@@ -473,6 +476,7 @@ public partial class Main : Node3D
 
     public override void _Process(double delta)
     {
+        Graphics.HitchLog.Frame();
         using var perfScope = Graphics.Perf.Scope("main");
         bool still = new Vector2(Player.Velocity.X, Player.Velocity.Z).Length() < 0.1f;
         bool canRest = Rod.State == RodState.Waiting && still && _gear.Has(AccessoryKind.Chair) && Tournaments.Active == null;
@@ -503,6 +507,7 @@ public partial class Main : Node3D
 
     public override void _ExitTree()
     {
+        Graphics.IconStudio.InWorld = false;
         if (_villagerSaid != null)
             World.Props.Wanderer.Said -= _villagerSaid;
         _profile.Changed -= Save;

@@ -1,0 +1,9 @@
+{
+ "$type": "KeepnetData",
+ "DisplayName": "Lniana siatka (mała)",
+ "MaxFish": 15,
+ "MaxKg": 10.0,
+ "ConditionLossPerHour": 0.05,
+ "Price": 0,
+ "RequiredLevel": 1
+}

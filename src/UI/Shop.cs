@@ -116,6 +116,7 @@ public partial class Shop : CanvasLayer
     // ------------------------------------------------------------------ layout
     public override void _Ready()
     {
+        VisibilityChanged += () => Graphics.IconStudio.ShopOpen = Visible;
         Layer = 10;
         Visible = false;
         var dim = new ColorRect { Color = new Color(0.02f, 0.03f, 0.04f, 0.62f) };

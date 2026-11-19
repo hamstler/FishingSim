@@ -1,0 +1,23 @@
+{
+ "$type": "ReelData",
+ "DisplayName": "Fjordline Lett 2500 · lekki spinningowy",
+ "DragMax": 4.0,
+ "ReelSpeed": 3.7,
+ "LineCapacity": 100.0,
+ "Price": 220,
+ "RequiredLevel": 2,
+ "Description": "Lekki kołowrotek z drewnianą gałką: ultralight i lekki spławik.",
+ "BodyColor": {
+  "R": 0.12,
+  "G": 0.18,
+  "B": 0.12,
+  "A": 1.0
+ },
+ "TrimColor": {
+  "R": 0.78,
+  "G": 0.6,
+  "B": 0.3,
+  "A": 1.0
+ },
+ "Model": "reels/small_fjordline"
+}

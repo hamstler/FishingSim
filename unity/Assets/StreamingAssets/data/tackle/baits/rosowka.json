@@ -1,0 +1,13 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Rosówka",
+ "Kind": 0,
+ "AffinityAs": "worm",
+ "AffinityScale": 1.15,
+ "Reusable": false,
+ "StartCount": 16,
+ "PackSize": 8,
+ "Price": 18,
+ "RequiredLevel": 2,
+ "Description": "Gruba dżdżownica wykopana nocą: większe ryby chętniej ją biorą."
+}

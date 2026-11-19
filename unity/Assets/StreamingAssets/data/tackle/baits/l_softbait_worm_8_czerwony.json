@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Bayou Bill Crawler · Gumowy robak 8 cm, główka 5 g, czerwony",
+ "Kind": 3,
+ "AffinityAs": "softbait",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 18,
+ "RequiredLevel": 1,
+ "Description": "Wije się przy dnie jak prawdziwy robak: leszcze, okonie, klenie.",
+ "Shape": "worm",
+ "LureColor": {
+  "R": 0.8,
+  "G": 0.1,
+  "B": 0.08,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.3,
+  "G": 0.05,
+  "B": 0.05,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": false,
+ "SizeCm": 8,
+ "WeightG": 5,
+ "SinkScale": 0.9,
+ "SinkOffset": 0,
+ "DepthScale": 1,
+ "DepthOffset": 0
+}

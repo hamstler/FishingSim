@@ -1,0 +1,63 @@
+{
+ "$type": "FishSpecies",
+ "SpeciesName": "Słonecznica",
+ "LatinName": "Leucaspius delineatus",
+ "Description": "Drobna, srebrzysta rybka z błękitną smugą wzdłuż boku, pływająca stadkami tuż pod powierzchnią stawów.",
+ "MinWeight": 0.002,
+ "MaxWeight": 0.012,
+ "Rarity": 1.3,
+ "PullFactor": 0.4,
+ "Aggression": 0.5,
+ "StaminaDrain": 0.11,
+ "MouthSize": 1.0,
+ "BaitAffinity": {
+  "worm": 0.0,
+  "corn": 0.0,
+  "bread": 1.2,
+  "boilie": 0.0,
+  "livebait": 0.0,
+  "maggot": 1.6,
+  "insect": 0.8,
+  "spinner": 0.48,
+  "spoon": 0.0,
+  "wobbler": 0.2,
+  "softbait": 0.0,
+  "fly": 0.86
+ },
+ "MinDepth": 0.1,
+ "MaxDepth": 1.5,
+ "DayActivity": 1.3,
+ "NightActivity": 0.2,
+ "TwilightBonus": 1.1,
+ "WeatherPref": {
+  "clear": 1.2,
+  "cloudy": 1.0,
+  "rain": 0.8
+ },
+ "RunLengthMult": 1.0,
+ "BurstMult": 1.5,
+ "BurstRate": 1.0,
+ "LengthRef": 0.41,
+ "BodyDepth": 0.2,
+ "DorsalPos": 0.55,
+ "BackColor": {
+  "R": 0.5,
+  "G": 0.6,
+  "B": 0.58,
+  "A": 1.0
+ },
+ "BellyColor": {
+  "R": 0.94,
+  "G": 0.95,
+  "B": 0.96,
+  "A": 1.0
+ },
+ "FinColor": {
+  "R": 0.8,
+  "G": 0.82,
+  "B": 0.8,
+  "A": 1.0
+ },
+ "PricePerKg": 3.0,
+ "TrophyWeight": 0.0
+}

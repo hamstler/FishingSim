@@ -1,0 +1,9 @@
+{
+ "$type": "AccessoryData",
+ "DisplayName": "Podpórka z dzwoneczkiem",
+ "Kind": 2,
+ "Power": 1.0,
+ "Description": "Metalowa podpórka pod wędkę (Z) z dzwoneczkiem, który dzwoni, gdy ryba dotknie przynęty. Bez niej wędkę kładzie się na patyku z leszczyny.",
+ "Price": 35,
+ "RequiredLevel": 2
+}

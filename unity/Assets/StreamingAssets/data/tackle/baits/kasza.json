@@ -1,0 +1,13 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Kasza jęczmienna",
+ "Kind": 1,
+ "AffinityAs": "corn",
+ "AffinityScale": 0.95,
+ "Reusable": false,
+ "StartCount": 30,
+ "PackSize": 15,
+ "Price": 8,
+ "RequiredLevel": 1,
+ "Description": "Tania przynęta na drobnicę."
+}

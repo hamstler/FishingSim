@@ -1,0 +1,27 @@
+{
+ "$type": "RodData",
+ "DisplayName": "Kaminari Koi 3,9 m · karpiówka (długa)",
+ "Kind": 3,
+ "CastMult": 1.28,
+ "MaxLoad": 11.8,
+ "ShockAbsorb": 0.127,
+ "Action": 0.8,
+ "Price": 745,
+ "RequiredLevel": 5,
+ "Description": "Nowoczesna karpiówka z krótką rękojeścią: dalekie rzuty ciężkimi zestawami. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy.",
+ "BlankColor": {
+  "R": 0.05,
+  "G": 0.05,
+  "B": 0.05,
+  "A": 1.0
+ },
+ "WhipColor": {
+  "R": 0.85,
+  "G": 0.12,
+  "B": 0.1,
+  "A": 1.0
+ },
+ "FoamGrip": true,
+ "Length": 3.9,
+ "Model": "rods/carp_kaminari"
+}

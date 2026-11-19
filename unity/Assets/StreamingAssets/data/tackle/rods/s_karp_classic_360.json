@@ -1,0 +1,27 @@
+{
+ "$type": "RodData",
+ "DisplayName": "Ostoja Karp Classic 3,6 m · karpiówka (średnia)",
+ "Kind": 3,
+ "CastMult": 1.1,
+ "MaxLoad": 10,
+ "ShockAbsorb": 0.14,
+ "Action": 0.85,
+ "Price": 420,
+ "RequiredLevel": 4,
+ "Description": "Klasyczna, paraboliczna karpiówka z pełną pianką. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy.",
+ "BlankColor": {
+  "R": 0.08,
+  "G": 0.16,
+  "B": 0.1,
+  "A": 1.0
+ },
+ "WhipColor": {
+  "R": 0.78,
+  "G": 0.62,
+  "B": 0.3,
+  "A": 1.0
+ },
+ "FoamGrip": true,
+ "Length": 3.6,
+ "Model": "rods/carp_ostoja"
+}

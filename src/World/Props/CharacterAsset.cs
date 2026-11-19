@@ -406,7 +406,7 @@ public partial class PelvisFit : SkeletonModifier3D
 
     public float Factor { get; set; } = 1f;
 
-    public override void _ProcessModification()
+    public override void _ProcessModificationWithDelta(double delta)
     {
         var sk = GetSkeleton();
         if (sk == null)
@@ -428,7 +428,7 @@ public partial class HeadLook : SkeletonModifier3D
     /// <summary>How far the look about wanders (0 for someone busy at work).</summary>
     public float Wander { get; set; } = 1f;
 
-    public override void _ProcessModification()
+    public override void _ProcessModificationWithDelta(double delta)
     {
         using var perfScope = Graphics.Perf.Scope("head-look");
         var sk = GetSkeleton();

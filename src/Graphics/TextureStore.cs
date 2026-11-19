@@ -67,11 +67,13 @@ public static class TextureStore
     }
 
     /// <summary>
-    /// The largest texture side kept in memory by the graphics quality: Low 1024, Medium and High 2048, Ultra 4096 (the 4K photo sets cost four times the memory).
-    /// Bigger pictures lose their top mipmap levels as they are read (a quarter of the memory per level; nothing is
-    /// repainted). Takes effect for textures loaded after a change (restart for the whole world).
+    /// The largest texture side kept in memory: the Textures setting (1K .. 8K), fixed for the run like
+    /// GraphicsQuality.PaintSize. Bigger pictures lose their top mipmap levels as they are read (a quarter of the memory
+    /// per level; nothing is repainted). A change applies after a restart: read live, the ground layers loaded before
+    /// and after a change in the menu came out in two sizes and their texture array failed ("All images must share the
+    /// same dimensions", a user's log).
     /// </summary>
-    public static int MaxSize => GraphicsQuality.TextureLimit;
+    public static readonly int MaxSize = GraphicsQuality.TextureLimit;
 
     /// <summary>How many top mipmap levels to drop from a picture of this size (0 = keep it whole).</summary>
     private static int Limit(int w, int h, bool mips)

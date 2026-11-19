@@ -1,0 +1,13 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Jętka",
+ "Kind": 0,
+ "AffinityAs": "insect",
+ "AffinityScale": 1.35,
+ "Reusable": false,
+ "StartCount": 0,
+ "PackSize": 6,
+ "Price": 22,
+ "RequiredLevel": 1,
+ "Description": "Delikatna jętka złapana siatką nad wodą o zmierzchu: pstrągi, lipienie, klenie i jelce nie przepuszczą."
+}

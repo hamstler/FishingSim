@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Saimaa Craft Salmi · Wobler pływający 5 cm, płoć",
+ "Kind": 3,
+ "AffinityAs": "wobbler",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 60,
+ "RequiredLevel": 1,
+ "Description": "Smukła rybka ze sterem: wypływa, gdy stoi, schodzi na ok. 0,5 m przy zwijaniu.",
+ "Shape": "minnow",
+ "LureColor": {
+  "R": 0.3,
+  "G": 0.38,
+  "B": 0.5,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.86,
+  "G": 0.88,
+  "B": 0.9,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": false,
+ "SizeCm": 5,
+ "WeightG": 4,
+ "SinkScale": 1,
+ "SinkOffset": 0,
+ "DepthScale": 0.6,
+ "DepthOffset": 0
+}

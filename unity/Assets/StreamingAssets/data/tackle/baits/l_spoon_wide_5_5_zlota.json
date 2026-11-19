@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Nordvik Brede · Wahadłówka szeroka 8 g, złota",
+ "Kind": 3,
+ "AffinityAs": "spoon",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 32,
+ "RequiredLevel": 1,
+ "Description": "Szeroka blacha chodzi płytko i wolno, szerokim łukiem: dobra nad zielskiem.",
+ "Shape": "wide",
+ "LureColor": {
+  "R": 0.92,
+  "G": 0.74,
+  "B": 0.32,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.85,
+  "G": 0.12,
+  "B": 0.1,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": true,
+ "SizeCm": 5.5,
+ "WeightG": 8,
+ "SinkScale": 0.6,
+ "SinkOffset": 0,
+ "DepthScale": 0.6,
+ "DepthOffset": 0
+}

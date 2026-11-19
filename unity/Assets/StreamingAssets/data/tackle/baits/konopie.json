@@ -1,0 +1,13 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Ziarno konopi",
+ "Kind": 2,
+ "AffinityAs": "corn",
+ "AffinityScale": 1.2,
+ "Reusable": false,
+ "StartCount": 40,
+ "PackSize": 20,
+ "Price": 18,
+ "RequiredLevel": 2,
+ "Description": "Ulubione ziarno płoci i karpi."
+}

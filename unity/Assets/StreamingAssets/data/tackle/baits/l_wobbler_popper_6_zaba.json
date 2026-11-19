@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Bayou Bill Chug · Popper powierzchniowy 6 cm, żaba",
+ "Kind": 3,
+ "AffinityAs": "wobbler",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 70,
+ "RequiredLevel": 2,
+ "Description": "Wklęsły pyszczek chlapie po powierzchni przy podszarpnięciach: bolenie, klenie i szczupaki o zmierzchu.",
+ "Shape": "popper",
+ "LureColor": {
+  "R": 0.3,
+  "G": 0.6,
+  "B": 0.2,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.95,
+  "G": 0.9,
+  "B": 0.4,
+  "A": 1.0
+ },
+ "Pattern": "dots",
+ "Metallic": false,
+ "SizeCm": 6,
+ "WeightG": 9,
+ "SinkScale": 1,
+ "SinkOffset": 0,
+ "DepthScale": 0,
+ "DepthOffset": 0
+}

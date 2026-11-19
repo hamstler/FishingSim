@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Highland Fly Co. · Mucha sucha: jętka, jasna",
+ "Kind": 3,
+ "AffinityAs": "fly",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 12,
+ "RequiredLevel": 1,
+ "Description": "Unosi się na powierzchni jak owad, który wpadł do wody: pstrągi, klenie, jelce.",
+ "Shape": "dry",
+ "LureColor": {
+  "R": 0.85,
+  "G": 0.82,
+  "B": 0.6,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.7,
+  "G": 0.65,
+  "B": 0.5,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": false,
+ "SizeCm": 1.5,
+ "WeightG": 0.3,
+ "SinkScale": 1,
+ "SinkOffset": 0,
+ "DepthScale": 1,
+ "DepthOffset": 0
+}

@@ -1,0 +1,161 @@
+{
+ "$type": "LocationData",
+ "DisplayName": "Staw Karpiowy",
+ "OutlineCz": -45.0,
+ "OutlineRx": 60.0,
+ "OutlineRz": 45.0,
+ "Slope": 0.08,
+ "MaxDepth": 3.5,
+ "HolePos": {
+  "X": 0.0,
+  "Y": -28.0
+ },
+ "HoleDepth": 1.5,
+ "HoleRadius": 6.0,
+ "BarPos": {
+  "X": 10.0,
+  "Y": -15.0
+ },
+ "BarHeight": 0.8,
+ "BarRadius": 5.0,
+ "Abundance": {
+  "Płoć": 0.6,
+  "Leszcz": 0.5,
+  "Karp": 2.0,
+  "Szczupak": 0.15,
+  "Lin": 1.2,
+  "Karaś złocisty": 1.5,
+  "Karaś srebrzysty": 1.4,
+  "Krąp": 0.5,
+  "Wzdręga": 0.5,
+  "Okoń": 0.4,
+  "Sum": 0.1,
+  "Różanka": 0.6,
+  "Piskorz": 0.3,
+  "Karp lustrzeń": 1.6,
+  "Amur biały": 0.8,
+  "Tołpyga biała": 0.6,
+  "Tołpyga pstra": 0.5,
+  "Sumik karłowaty": 1.0,
+  "Słonecznica": 1.0,
+  "Koza": 0.6,
+  "Orfa": 0.5,
+  "Pstrąg tęczowy": 0.3
+ },
+ "RequiredLevel": 3,
+ "Description": "Mały, płytki staw pełen karpi. Spokojne łowisko dla cierpliwych.",
+ "GrassColor": {
+  "R": 0.4,
+  "G": 0.54,
+  "B": 0.18,
+  "A": 1.0
+ },
+ "DarkGrassColor": {
+  "R": 0.24,
+  "G": 0.4,
+  "B": 0.12,
+  "A": 1.0
+ },
+ "SandColor": {
+  "R": 0.52,
+  "G": 0.47,
+  "B": 0.37,
+  "A": 1.0
+ },
+ "PathColor": {
+  "R": 0.55,
+  "G": 0.44,
+  "B": 0.28,
+  "A": 1.0
+ },
+ "WaterShallowColor": {
+  "R": 0.105,
+  "G": 0.16,
+  "B": 0.1,
+  "A": 1.0
+ },
+ "WaterDeepColor": {
+  "R": 0.03,
+  "G": 0.05,
+  "B": 0.035,
+  "A": 1.0
+ },
+ "FogBoost": 0.0,
+ "RimHeight": 50.0,
+ "SnowLine": 999.0,
+ "RockLine": 30.0,
+ "HillScale": 0.6,
+ "TreeDensity": 0.45,
+ "TreeMix": {
+  "oak": 1.0,
+  "birch": 0.4,
+  "spruce": 0.1
+ },
+ "BushDensity": 1.2,
+ "FlowerDensity": 2.5,
+ "LilyDensity": 1.4,
+ "ReedDensity": 1.5,
+ "RockDensity": 0.3,
+ "PlazaCenter": {
+  "X": 0.0,
+  "Y": 22.0
+ },
+ "VillageStyle": "farm",
+ "Streets": [
+  "-64,26,64,26",
+  "0,22,0,58"
+ ],
+ "Buildings": [
+  "general,-16,22",
+  "office,16,20",
+  "busstop,6,10",
+  "house,28,36",
+  "barn,-32,38",
+  "windmill,42,14",
+  "haystack,-8,42",
+  "haystack,-3,45",
+  "haystack,2,42",
+  "lamp,0,12",
+  "lamp,0,22",
+  "lamp,-8,22",
+  "lamp,8,22",
+  "bench,-3,15",
+  "crates,-22,29",
+  "signpost,0,8",
+  "fence,-44,28,0",
+  "fence,8,50,0",
+  "redhouse,-52,32",
+  "redhouse,54,36",
+  "redhouse,-24,58",
+  "redhouse,26,58",
+  "redhouse,-62,12",
+  "house,64,16",
+  "stall,8,31",
+  "markettent,-6,52",
+  "well,-7,32",
+  "cart,-24,30",
+  "cart,36,24",
+  "woodpile,44,50",
+  "woodpile,-44,50",
+  "tent,-60,2",
+  "tent,66,4",
+  "smokehouse,-38,9",
+  "villager,-26,26",
+  "villager,20,28",
+  "villager,3,15",
+  "villager,-12,46",
+  "villager,40,42"
+ ],
+ "Squareness": 3.0,
+ "Lobes": [
+  "-90,-45,17,26"
+ ],
+ "Landmarks": [
+  "dike,0,-95,0,64",
+  "platforms,60,-20,-90",
+  "platforms,60,-58,-90",
+  "platforms,-60,-30,90"
+ ],
+ "WaterClarity": 2.2,
+ "WaterTemperature": 21.5
+}

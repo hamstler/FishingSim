@@ -1,0 +1,10 @@
+{
+ "$type": "LeaderData",
+ "DisplayName": "Przypon z mosiężnego drutu",
+ "Strength": 9.0,
+ "Visibility": 1.25,
+ "BiteProof": 0.85,
+ "Price": 40,
+ "RequiredLevel": 2,
+ "Description": "Szczupak rzadko go przegryzie; ryby go jednak widzą."
+}

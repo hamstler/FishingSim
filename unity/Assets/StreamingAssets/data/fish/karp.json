@@ -1,0 +1,62 @@
+{
+ "$type": "FishSpecies",
+ "SpeciesName": "Karp",
+ "LatinName": "Cyprinus carpio",
+ "Description": "Hodowany od średniowiecza w klasztornych stawach. Silny, wytrwały i podejrzliwy; potrafi walczyć wiele minut.",
+ "MinWeight": 2.0,
+ "MaxWeight": 15.0,
+ "Rarity": 1.0,
+ "PullFactor": 1.5,
+ "Aggression": 0.8,
+ "StaminaDrain": 0.12,
+ "MouthSize": 7.0,
+ "BaitAffinity": {
+  "worm": 0.6,
+  "corn": 1.5,
+  "bread": 0.4,
+  "boilie": 2.0,
+  "livebait": 0.0,
+  "maggot": 0.5,
+  "insect": 0.0,
+  "spinner": 0.0,
+  "spoon": 0.0,
+  "wobbler": 0.0,
+  "softbait": 0.0,
+  "fly": 0.0
+ },
+ "MinDepth": 1.0,
+ "MaxDepth": 6.0,
+ "DayActivity": 1.0,
+ "NightActivity": 0.8,
+ "TwilightBonus": 1.3,
+ "WeatherPref": {
+  "clear": 1.0,
+  "cloudy": 1.2,
+  "rain": 0.9
+ },
+ "RunLengthMult": 1.5,
+ "BurstMult": 1.3,
+ "BurstRate": 0.8,
+ "LengthRef": 0.42,
+ "BodyDepth": 0.28,
+ "DorsalPos": 0.45,
+ "BackColor": {
+  "R": 0.4,
+  "G": 0.33,
+  "B": 0.15,
+  "A": 1.0
+ },
+ "BellyColor": {
+  "R": 0.85,
+  "G": 0.75,
+  "B": 0.45,
+  "A": 1.0
+ },
+ "FinColor": {
+  "R": 0.5,
+  "G": 0.38,
+  "B": 0.2,
+  "A": 1.0
+ },
+ "PricePerKg": 25.0
+}

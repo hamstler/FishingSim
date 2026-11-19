@@ -465,9 +465,11 @@ public sealed class FishAsset
     /// <summary>Uploads a prepared model (main thread) and lets go of its decoded pictures.</summary>
     private static FishAsset? Load(string path, Prepared? prepared)
     {
+        bool onMain = prepared == null;
         prepared ??= Prepare(path);
         if (prepared == null)
             return null;
+        long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
         try
         {
             return Build(prepared);
@@ -476,6 +478,9 @@ public sealed class FishAsset
         {
             // The textures hold their own copies; the decoded pictures' native memory goes now, not at finalisation.
             prepared.DisposeImages();
+            Graphics.HitchLog.Note($"ryba {System.IO.Path.GetFileNameWithoutExtension(path)} wysłana do karty w "
+                + $"{(System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency:0} ms"
+                + (onMain ? " (wczytana w głównym wątku)" : ""));
         }
     }
 

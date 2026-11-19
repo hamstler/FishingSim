@@ -1,0 +1,27 @@
+{
+ "$type": "RodData",
+ "DisplayName": "Borealis Fjell Match 3,9 m · odległościówka (krótka)",
+ "Kind": 0,
+ "CastMult": 1.27,
+ "MaxLoad": 4.58,
+ "ShockAbsorb": 0.285,
+ "Action": 0.4,
+ "Price": 300,
+ "RequiredLevel": 3,
+ "Description": "Długa odległościówka na daleki spławik: płocie, leszcze i jazie. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy.",
+ "BlankColor": {
+  "R": 0.06,
+  "G": 0.08,
+  "B": 0.2,
+  "A": 1.0
+ },
+ "WhipColor": {
+  "R": 0.78,
+  "G": 0.62,
+  "B": 0.3,
+  "A": 1.0
+ },
+ "FoamGrip": false,
+ "Length": 3.9,
+ "Model": "rods/float_borealis"
+}

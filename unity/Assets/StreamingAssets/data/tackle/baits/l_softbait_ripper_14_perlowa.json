@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Bayou Bill Paddle · Ripper szczupakowy 14 cm, główka 25 g, perłowa",
+ "Kind": 3,
+ "AffinityAs": "softbait",
+ "AffinityScale": 1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 45,
+ "RequiredLevel": 4,
+ "Description": "Duża guma na szczupaki i sandacze z głębokiej wody.",
+ "Shape": "ripper",
+ "LureColor": {
+  "R": 0.93,
+  "G": 0.92,
+  "B": 0.88,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.75,
+  "G": 0.75,
+  "B": 0.8,
+  "A": 1.0
+ },
+ "Pattern": "glitter",
+ "Metallic": false,
+ "SizeCm": 14,
+ "WeightG": 25,
+ "SinkScale": 1.8,
+ "SinkOffset": 0,
+ "DepthScale": 1,
+ "DepthOffset": 0
+}

@@ -1,0 +1,63 @@
+{
+ "$type": "FishSpecies",
+ "SpeciesName": "Węgorz",
+ "LatinName": "Anguilla anguilla",
+ "Description": "Wężowata ryba, która wędruje na tarło aż do Morza Sargassowego. Nocny łowca, twardy w holu.",
+ "MinWeight": 0.3,
+ "MaxWeight": 4.0,
+ "Rarity": 0.4,
+ "PullFactor": 1.2,
+ "Aggression": 0.6,
+ "StaminaDrain": 0.07,
+ "MouthSize": 5.0,
+ "BaitAffinity": {
+  "worm": 1.8,
+  "corn": 0.0,
+  "bread": 0.0,
+  "boilie": 0.0,
+  "livebait": 1.2,
+  "maggot": 0.0,
+  "insect": 0.0,
+  "spinner": 0.0,
+  "spoon": 0.0,
+  "wobbler": 0.0,
+  "softbait": 0.0,
+  "fly": 0.0
+ },
+ "MinDepth": 0.5,
+ "MaxDepth": 10.0,
+ "DayActivity": 0.2,
+ "NightActivity": 1.8,
+ "TwilightBonus": 1.2,
+ "WeatherPref": {
+  "clear": 0.9,
+  "cloudy": 1.1,
+  "rain": 1.4
+ },
+ "RunLengthMult": 1.2,
+ "BurstMult": 1.5,
+ "BurstRate": 1.0,
+ "LengthRef": 0.6,
+ "BodyDepth": 0.07,
+ "DorsalPos": 0.2,
+ "BackColor": {
+  "R": 0.18,
+  "G": 0.2,
+  "B": 0.12,
+  "A": 1.0
+ },
+ "BellyColor": {
+  "R": 0.65,
+  "G": 0.62,
+  "B": 0.45,
+  "A": 1.0
+ },
+ "FinColor": {
+  "R": 0.2,
+  "G": 0.2,
+  "B": 0.12,
+  "A": 1.0
+ },
+ "PricePerKg": 45.0,
+ "TrophyWeight": 0.0
+}

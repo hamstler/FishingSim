@@ -1,0 +1,34 @@
+{
+ "$type": "BaitData",
+ "DisplayName": "Bayou Bill Lily Frog · Żaba pływająca 6 cm, żółty",
+ "Kind": 3,
+ "AffinityAs": "softbait",
+ "AffinityScale": 1.1,
+ "Reusable": true,
+ "StartCount": 1,
+ "PackSize": 1,
+ "Price": 48,
+ "RequiredLevel": 3,
+ "Description": "Pusta guma z ukrytymi hakami ślizga się po liściach grążeli: szczupaki w płyciznach z zielskiem.",
+ "Shape": "frog",
+ "LureColor": {
+  "R": 1.0,
+  "G": 0.85,
+  "B": 0.1,
+  "A": 1.0
+ },
+ "AccentColor": {
+  "R": 0.85,
+  "G": 0.3,
+  "B": 0.1,
+  "A": 1.0
+ },
+ "Pattern": "plain",
+ "Metallic": false,
+ "SizeCm": 6,
+ "WeightG": 14,
+ "SinkScale": 0,
+ "SinkOffset": 0,
+ "DepthScale": 0,
+ "DepthOffset": 0
+}
