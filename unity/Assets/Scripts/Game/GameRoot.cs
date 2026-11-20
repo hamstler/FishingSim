@@ -35,6 +35,7 @@ namespace FishingSim.Game
         private Village _village = null!;
         private Village.Door? _nearDoor;
         private Camp _camp = null!;
+        private People _people = null!;
         private Boat _boat = null!;
         private Sound _sound = null!;
         private string _hint = "";
@@ -78,6 +79,7 @@ namespace FishingSim.Game
             _world = new GameObject("World").AddComponent<WorldView>();
             _village = new GameObject("Village").AddComponent<Village>();
             _camp = new GameObject("Camp").AddComponent<Camp>();
+            _people = new GameObject("People").AddComponent<People>();
             _boat = new GameObject("Boat").AddComponent<Boat>();
             var player = new GameObject("Angler");
             _player = player.AddComponent<Player>();
@@ -171,6 +173,7 @@ namespace FishingSim.Game
                 try
                 {
                     _camp.Build(_world.Lake);
+                    _people.Build(_world.Lake, _village, _camp);
                 }
                 catch (Exception e)
                 {
@@ -251,6 +254,7 @@ namespace FishingSim.Game
             _village.SetNight(_day.Night);
             Campfire.ClockNow = _profile.Clock;
             _camp.Regrow(_profile.Clock);
+            _people.Tick(Time.deltaTime, _day.Hour);
             _boat.Tick(Time.deltaTime, _panel == Panel.None && _rod.State == RodState.Idle);
             FindInteraction();
             if (_panel == Panel.None && _interact != null && Input.GetKeyDown(KeyCode.E))
