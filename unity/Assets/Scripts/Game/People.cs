@@ -206,7 +206,26 @@ namespace FishingSim.Game
             }
         }
 
-        public static void DressModel(GameObject go, string model, string? json) => Dress(go, model, json);
+        public static void DressModel(GameObject go, string model, string? json)
+        {
+            Dress(go, model, json);
+            // the angler's own hands: FirstPersonBody's SkinTint (the MakeHuman skin pictures are pale)
+            if (model == "player_angler")
+            {
+                var block = new MaterialPropertyBlock();
+                foreach (var r in go.GetComponentsInChildren<Renderer>())
+                {
+                    var mats = r.sharedMaterials;
+                    for (int i = 0; i < mats.Length; i++)
+                        if (mats[i] != null && mats[i].name.EndsWith("/skin"))
+                        {
+                            block.Clear();
+                            block.SetColor("_Color", new Color(0.86f, 0.74f, 0.64f));
+                            r.SetPropertyBlock(block, i);
+                        }
+                }
+            }
+        }
 
         /// <summary>Gives each surface its material from the model's json (slots: skin, eye, hair1, outfit, shoes, hat...).</summary>
         private static void Dress(GameObject go, string model, string? json)
@@ -268,6 +287,10 @@ namespace FishingSim.Game
                                 break;
                             case "eye":
                                 m.SetColor("_Color", new Color(0.72f, 0.72f, 0.72f)); m.SetFloat("_Spec", 0.8f); m.SetFloat("_Clearcoat", 1f);
+                                break;
+                            case "body":
+                                // the player's Meshy body: two-sided like Meshy's material, no rim (FirstPersonBody)
+                                m.SetFloat("_Cull", 0f);
                                 break;
                             case "shoes" or "hat":
                                 m.SetFloat("_Rim", 0.2f); m.SetFloat("_RimTint", 0.6f);

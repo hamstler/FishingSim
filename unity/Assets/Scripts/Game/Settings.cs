@@ -53,7 +53,7 @@ namespace FishingSim.Game
             QualitySettings.shadowCascades = Quality >= 3 ? 4 : Quality == 2 ? 2 : 1;
             QualitySettings.antiAliasing = Quality switch { <= 1 => 0, 2 => 2, 3 => 4, _ => 8 };
             QualitySettings.anisotropicFiltering = Quality >= 2 ? AnisotropicFiltering.ForceEnable : AnisotropicFiltering.Enable;
-            QualitySettings.pixelLightCount = 2;
+            QualitySettings.pixelLightCount = Quality switch { <= 1 => 2, 2 => 4, _ => 8 };   // lamps, windows and campfires light their surroundings per pixel
             QualitySettings.softParticles = false;
             QualitySettings.lodBias = 1f + Quality * 0.25f;
             if (Screen.fullScreen != Fullscreen)
