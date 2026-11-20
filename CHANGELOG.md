@@ -1,5 +1,15 @@
 # Zmiany
 
+## 0.9.4 (Unity 6)
+- Grafika przenoszona z wersji Godot: teren z siedmiu fotograficznych warstw (trawa, ściółka, piasek, ścieżki, dno, skały, śnieg), woda z falami Gerstnera, załamaniem światła, kolorem toni i pianą przy brzegu.
+- Las jak w Godocie: świerki, sosny, dęby, brzozy i wierzby z kory ze zdjęć i koron z malowanych liści, krzewy, leszczyna, paprocie, głazy z mchem, kępy trawy wokół gracza.
+- Rośliny przy wodzie: trzciny z pałkami, sitowie, żółte irysy, kwiaty, grzybienie białe i żółte, rdestnica.
+- Niebo z rozpraszaniem światła i chmurami, łuna o zmierzchu, gwiazdy; słońce, księżyc i mgła według pory dnia; poranne opary nad wodą; deszcz i burze z błyskawicami.
+- Ryby widoczne w jeziorze, kręgi po żerujących rybach, mewy, jętki wieczorem.
+- Charakterystyczne miejsca map: ruina wieży na wyspie, kaplica, chata na palach, grobla ze śluzą i pomostami, wodospad, skałki.
+- Wykończenie obrazu: cieniowanie AO, poświata, tonemapping ACES i nordycka gradacja kolorów.
+- Mieszkańcy: własny kolor włosów i odcień skóry, połysk skóry, tkanin i włosów, przytłumione kolory ubrań.
+
 ## 0.9.3 (Unity 6)
 - Modele z Meshy: 66 gatunków ryb (hol, panel złowionej ryby), budynki wsi, wędki i kołowrotki (obracający się rotor i korbka).
 - Wioska z mapy (wyrównany teren pod budynkami, ulice, latarnie nocą); E: sklep, skup, targ, gildia, wędzarnia.
