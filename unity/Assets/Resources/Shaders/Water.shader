@@ -47,6 +47,7 @@ Shader "FS/Water"
             float _Clarity, _Wind, _Rain, _Detail, _SsrSteps, _MaxDepth;
             float4 _SkyTop, _SkyHorizon, _SunTint;
             float3 _SunDirection;
+            float _WaterDebug;
 
             struct v2f
             {
@@ -247,6 +248,13 @@ Shader "FS/Water"
                 float dd = ndh * ndh * (a2 - 1.0) + 1.0;
                 float ggx = a2 / (3.14159 * dd * dd + 1e-5);
                 col += _LightColor0.rgb * ggx * fresnel * ndl * shore * (1.0 - foam) * 0.25;
+                if (_WaterDebug > 0.5)
+                {
+                    if (_WaterDebug < 1.5) return float4(saturate(thickness / 10.0).xxx, 1);
+                    if (_WaterDebug < 2.5) return float4(refracted, 1);
+                    if (_WaterDebug < 3.5) return float4(fresnel.xxx, 1);
+                    return float4(saturate(LinearEyeDepth(SAMPLE_DEPTH_TEXTURE_LOD(_CameraDepthTexture, float4(suv, 0, 0))) / 50.0).xxx, 1);
+                }
                 UNITY_APPLY_FOG(i.fogCoord, col);
                 return float4(col, 1.0);
             }

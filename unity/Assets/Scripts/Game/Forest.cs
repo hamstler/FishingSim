@@ -20,6 +20,16 @@ namespace FishingSim.Game
         private const float Cell = 64f, TreeNearRange = 130f;
         private static readonly string[] Kinds = { "spruce", "oak", "birch", "pine", "willow" };
 
+        /// <summary>The small plants: mesh, drawn up to (m, x FoliageRange), floating on the water.</summary>
+        private static readonly (string Kind, float Range, bool Floating)[] SmallKinds =
+        {
+            ("reed", 260f, false), ("cattail", 200f, false), ("rush", 140f, false), ("iris", 120f, false), ("irisflower", 120f, false),
+            ("flower", 80f, false), ("tuft", 90f, false), ("fern", 90f, false),
+            ("lilypad", 160f, true), ("pondweed", 120f, true), ("lilyflower", 160f, true), ("yellowlily", 160f, true),
+        };
+        private const int Reed = 15, Cattail = 16, Rush = 17, Iris = 18, IrisFlower = 19, Flower = 20, Tuft = 21, Fern = 22,
+            LilyPad = 23, Pondweed = 24, LilyFlower = 25, YellowLily = 26;
+
         private sealed class Batch
         {
             public Mesh Near = null!;
@@ -47,6 +57,9 @@ namespace FishingSim.Game
 
         public bool Ready { get; private set; }
 
+        /// <summary>The lily and pondweed patches (x, z, radius): cover for the fish.</summary>
+        public static List<(float X, float Z, float Radius)> WeedBeds { get; } = new();
+
         public static float FoliageRange => Settings.Quality switch { 0 => 0.45f, 1 => 0.65f, 2 => 0.85f, _ => 1f };
         public static float GrassRadius => Settings.Quality switch { 0 => 0f, 1 => 18f, 2 => 28f, _ => 40f } * (Settings.View switch { 0 => 0.75f, 1 => 1f, _ => 1.2f });
         public static float ViewFactor => Settings.View switch { 0 => 0.6f, 1 => 0.85f, _ => 1.1f };
@@ -67,6 +80,9 @@ namespace FishingSim.Game
             _lake = lake;
             foreach (var kind in Kinds)
                 Plants.Get(kind);   // meshes are made on the main thread; the worker only reads their lifts
+            WeedBeds.Clear();
+            foreach (var (kind, _, _) in SmallKinds)
+                Plants.SmallPlant(kind);
             var job = Task.Run(() => Place(lake));
             while (!job.IsCompleted)
                 yield return null;
@@ -76,7 +92,7 @@ namespace FishingSim.Game
             solids.AddRange(trunkSolids);
 
             // groups: 0..4 trunks, 5..9 crowns, 10 bush, 11 hazel, 12..14 boulders
-            var groups = new List<Item>[15];
+            var groups = new List<Item>[15 + SmallKinds.Length];
             for (int g = 0; g < groups.Length; g++)
                 groups[g] = new List<Item>();
             foreach (var it in items)
@@ -95,6 +111,11 @@ namespace FishingSim.Game
             AddCells(groups[11], Plants.Get("hazel").Crown, null, LeafMaterial(), 220f * FoliageRange, 0f, true);
             for (int v = 0; v < 3; v++)
                 AddCells(groups[12 + v], Plants.Boulder(v), null, RockMaterial(), 900f, 0f, true);
+            for (int k = 0; k < SmallKinds.Length; k++)
+            {
+                var (kind, range, floating) = SmallKinds[k];
+                AddCells(groups[15 + k], Plants.SmallPlant(kind), null, PlantMaterial(floating), range * FoliageRange, 0f, false, 48f);
+            }
             Ready = true;
         }
 
@@ -105,8 +126,9 @@ namespace FishingSim.Game
             _grassCentre = new Vector2(1e9f, 1e9f);
         }
 
-        private void AddCells(List<Item> items, Mesh near, Mesh? far, Material mat, float range, float maxRange, bool shadows)
+        private void AddCells(List<Item> items, Mesh near, Mesh? far, Material mat, float range, float maxRange, bool shadows, float cellSize = Cell)
         {
+            float Cell = cellSize;
             var cells = new Dictionary<(int, int), List<Item>>();
             foreach (var it in items)
             {
@@ -316,6 +338,165 @@ namespace FishingSim.Game
                     new Vector3(sc, sc * R(rng, 0.9f, 1.3f), sc)), Tint(new Color(0.26f, 0.42f, 0.13f), R(rng, -0.05f, 0.05f))));
             }
 
+            // ---- the small plants (Scenery.ScatterGroundCover's flowers and tufts, ferns round the trees, ScatterReeds,
+            // ScatterShoreline, ScatterWaterPlants); colours are the Godot ones, made linear for FS/Plant
+            Vector4 Lin(Color c) { var l = Col.Lin(c); return new Vector4(l.r, l.g, l.b, 1f); }
+            Vector4 Tn(Color c, float t) => Lin(new Color(c.r + t, c.g + t, c.b + t));
+            Matrix4x4 Yaw(Vector3 at, Vector3 scale) => Matrix4x4.TRS(at, Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f), scale);
+            Color[] palette = { new(0.97f, 0.97f, 0.92f), new(0.98f, 0.85f, 0.2f), new(0.92f, 0.4f, 0.6f), new(0.6f, 0.4f, 0.85f), new(0.9f, 0.25f, 0.2f) };
+            int maxFlowers = (int)(3400 * loc.FlowerDensity), maxTufts = (int)(7000 * Math.Max(loc.BushDensity, 0.7f)), flowers = 0, tufts = 0;
+            for (int i = 0; i < 90000 && (flowers < maxFlowers || tufts < maxTufts); i++)
+            {
+                float x = R(rng, Lake.XMin, Lake.XMax), z = R(rng, Lake.ZMin, Lake.ZMax);
+                float roll = (float)rng.NextDouble(), s = R(rng, 0.7f, 1.4f);
+                float edge = lake.PlayDistance(x, z);
+                if (edge > 3f)
+                    continue;
+                if (edge > -30f)
+                    roll *= 0.4f;
+                if (roll < 0.12f)
+                    continue;   // the bushes' share (placed above)
+                float h = lake.HeightAt(x, z);
+                if (h < 1.0f || h > highest || !Clear(lake, x, z, 1.5f, 1.6f))
+                    continue;
+                float patch = lake.NoiseAt(x * 3f + 40f, z * 3f - 70f);
+                if (roll < 0.4f && patch > 0f && flowers < maxFlowers)
+                {
+                    items.Add(new Item(Flower, Yaw(new Vector3(x, h - 0.03f, z), new Vector3(s, s * R(rng, 0.7f, 1.3f), s)), Lin(palette[rng.Next(palette.Length)])));
+                    flowers++;
+                }
+                else if (tufts < maxTufts && patch > -0.35f)
+                {
+                    var g = new Color(loc.GrassColor.R, loc.GrassColor.G, loc.GrassColor.B);
+                    items.Add(new Item(Tuft, Yaw(new Vector3(x, h - 0.05f, z), new Vector3(s, s * 1.2f, s)), Tn(Color.Lerp(g, new Color(0.5f, 0.65f, 0.25f), 0.35f), R(rng, -0.06f, 0.06f))));
+                    tufts++;
+                }
+            }
+            foreach (var (tx, tz, kind) in spots)
+            {
+                if (kind == "willow")
+                    continue;
+                int nf = kind == "pine" ? 1 : rng.Next(1, 5);
+                for (int f = 0; f < nf; f++)
+                {
+                    float a = (float)rng.NextDouble() * Mathf.PI * 2f, dd = R(rng, 0.8f, 3.5f);
+                    float x = tx + MathF.Cos(a) * dd, z = tz + MathF.Sin(a) * dd;
+                    float h = lake.HeightAt(x, z);
+                    if (h < 1.1f || !Clear(lake, x, z, 1.5f, 1.6f))
+                        continue;
+                    float sc = R(rng, 0.7f, 1.3f);
+                    items.Add(new Item(Fern, Yaw(new Vector3(x, h - 0.03f, z), Vector3.one * sc), Tn(new Color(0.28f, 0.48f, 0.15f), R(rng, -0.06f, 0.04f))));
+                }
+            }
+
+            // shorelines: the lake, its bays, its islands
+            var shores = new List<(float X, float Z, float Rx, float Rz, bool Island)> { (0f, loc.OutlineCz, loc.OutlineRx, loc.OutlineRz, false) };
+            foreach (var entry in loc.Lobes)
+                if (Data.LocationData.Numbers(entry) is { Length: >= 4 } l)
+                    shores.Add((l[0], l[1], l[2], l[3], false));
+            foreach (var entry in loc.Islands)
+                if (Data.LocationData.Numbers(entry) is { Length: >= 3 } il)
+                    shores.Add((il[0], il[1], il[2], il[2], true));
+            (float X, float Z, float Rx, float Rz, bool Island) Shore(float main) =>
+                shores.Count == 1 || rng.NextDouble() < main ? shores[0] : shores[rng.Next(1, shores.Count)];
+            static bool NearPier(float x, float z) => MathF.Abs(x) < 12f && z > -18f;
+
+            int maxReeds = (int)(4200 * Math.Min(loc.ReedDensity, 2f)), reeds = 0;
+            for (int tries = 0; reeds < maxReeds && tries < 90000; tries++)
+            {
+                var sh = Shore(0.5f);
+                float angle = (float)rng.NextDouble() * Mathf.PI * 2f;
+                float shrink = sh.Island ? R(rng, 1f, 1.6f) : R(rng, 0.85f, 1.04f);
+                float x = sh.X + sh.Rx * shrink * MathF.Cos(angle), z = sh.Z + sh.Rz * shrink * MathF.Sin(angle);
+                if (MathF.Abs(x) < 9f && z > -14f)
+                    continue;
+                float d = lake.DepthAt(x, z);
+                if (d < 0.15f || d > 0.9f || lake.ForestDensity(x * 1.7f, z * 1.7f) < 0f)
+                    continue;
+                for (int k = 0; k < 5; k++)
+                {
+                    float rx = x + R(rng, -0.8f, 0.8f), rz = z + R(rng, -0.8f, 0.8f);
+                    float hh = R(rng, 0.9f, 1.5f) / 1.42f;
+                    var rot = Quaternion.Euler(R(rng, -7f, 7f), (float)rng.NextDouble() * 360f, R(rng, -7f, 7f));
+                    var origin = new Vector3(rx, -lake.DepthAt(rx, rz), rz);
+                    items.Add(new Item(Reed, Matrix4x4.TRS(origin, rot, new Vector3(1f, hh, 1f)), Tn(new Color(0.42f, 0.5f, 0.2f), R(rng, -0.05f, 0.05f))));
+                    if (rng.NextDouble() < 0.35f)
+                        items.Add(new Item(Cattail, Matrix4x4.TRS(origin + rot * (Vector3.up * 1.3f * hh), rot, Vector3.one), Lin(new Color(0.3f, 0.17f, 0.08f))));
+                    reeds++;
+                }
+            }
+
+            int maxRushes = (int)(1400 * Math.Clamp(loc.ReedDensity, 0.3f, 2f)), maxIrises = (int)(320 * Math.Max(loc.ReedDensity, 0.2f)), rushes = 0, irises = 0;
+            for (int tries = 0; (rushes < maxRushes || irises < maxIrises) && tries < 60000; tries++)
+            {
+                var sh = Shore(0.6f);
+                float angle = (float)rng.NextDouble() * Mathf.PI * 2f;
+                float shrink = sh.Island ? R(rng, 0.95f, 1.25f) : R(rng, 0.93f, 1.08f);
+                float x = sh.X + sh.Rx * shrink * MathF.Cos(angle), z = sh.Z + sh.Rz * shrink * MathF.Sin(angle);
+                if (NearPier(x, z))
+                    continue;
+                float inside = lake.InsideMetres(x, z), depth = lake.DepthAt(x, z);
+                if (inside > 0f && depth > 0f && depth < 0.35f && rushes < maxRushes)
+                {
+                    float sc = R(rng, 0.7f, 1.3f);
+                    items.Add(new Item(Rush, Yaw(new Vector3(x, -depth, z), new Vector3(sc, sc * R(rng, 0.9f, 1.4f), sc)), Tn(new Color(0.22f, 0.34f, 0.13f), R(rng, -0.04f, 0.04f))));
+                    rushes++;
+                }
+                else if (inside > -2.5f && inside < 0.4f && irises < maxIrises && lake.NoiseAt(x * 2f - 30f, z * 2f + 11f) > 0.1f && Clear(lake, x, z, 1.5f, 1.6f))
+                {
+                    float h = MathF.Max(lake.HeightAt(x, z), -depth), sc = R(rng, 0.8f, 1.2f);
+                    items.Add(new Item(Iris, Yaw(new Vector3(x, h - 0.02f, z), Vector3.one * sc), Tn(new Color(0.3f, 0.45f, 0.18f), R(rng, -0.04f, 0.04f))));
+                    if (rng.NextDouble() < 0.7f)
+                        items.Add(new Item(IrisFlower, Yaw(new Vector3(x + 0.05f, h - 0.02f, z), Vector3.one * sc), Lin(new Color(0.98f, 0.84f, 0.15f))));
+                    irises++;
+                }
+            }
+
+            int patches = (int)MathF.Round(30 * loc.LilyDensity), weedPatches = (int)MathF.Round(22 * loc.LilyDensity), made = 0, madeWeeds = 0;
+            for (int tries = 0; (made < patches || madeWeeds < weedPatches) && tries < 20000; tries++)
+            {
+                bool weed = made >= patches || (madeWeeds < weedPatches && rng.NextDouble() < 0.4f);
+                var sh = Shore(0.45f);
+                float angle = (float)rng.NextDouble() * Mathf.PI * 2f;
+                float shrink = sh.Island ? R(rng, 1.1f, 1.8f) : R(rng, 0.72f, 0.97f);
+                float cx = sh.X + sh.Rx * shrink * MathF.Cos(angle), cz = sh.Z + sh.Rz * shrink * MathF.Sin(angle);
+                if (NearPier(cx, cz))
+                    continue;
+                float depth = lake.DepthAt(cx, cz);
+                if (weed ? depth < 0.9f || depth > 3.2f : depth < 0.4f || depth > 2.2f)
+                    continue;
+                if (weed) madeWeeds++; else made++;
+                float radius = R(rng, 1.6f, weed ? 3.5f : 5f);
+                WeedBeds.Add((cx, cz, radius));
+                int count = (int)(radius * radius * R(rng, weed ? 0.9f : 2.2f, weed ? 1.6f : 3.6f));
+                bool yellowPatch = !weed && rng.NextDouble() < 0.3f;
+                for (int k = 0; k < count; k++)
+                {
+                    float a = (float)rng.NextDouble() * Mathf.PI * 2f, d = radius * MathF.Sqrt((float)rng.NextDouble());
+                    float x = cx + MathF.Cos(a) * d, z = cz + MathF.Sin(a) * d;
+                    float dd = lake.DepthAt(x, z);
+                    if (dd < 0.25f || dd > 3.4f || NearPier(x, z))
+                        continue;
+                    if (weed)
+                    {
+                        float sc = R(rng, 0.8f, 1.3f);
+                        items.Add(new Item(Pondweed, Yaw(new Vector3(x, 0.002f, z), new Vector3(sc, 1f, sc)), Tn(Color.white, R(rng, -0.12f, 0.02f))));
+                        continue;
+                    }
+                    float r = R(rng, 0.15f, yellowPatch ? 0.26f : 0.34f);
+                    items.Add(new Item(LilyPad, Yaw(new Vector3(x, 0.004f * (k % 4), z), new Vector3(r, 1f, r)), Tn(Color.white, R(rng, -0.2f, 0f))));
+                    if (rng.NextDouble() < (yellowPatch ? 0.12f : 0.14f))
+                    {
+                        var at = new Vector3(x + R(rng, -0.05f, 0.05f), 0.018f, z + R(rng, -0.05f, 0.05f));
+                        var sc = Vector3.one * R(rng, 0.85f, 1.25f);
+                        if (yellowPatch)
+                            items.Add(new Item(YellowLily, Yaw(at + Vector3.up * 0.03f, sc), Vector4.one));
+                        else
+                            items.Add(new Item(LilyFlower, Yaw(at, sc), rng.NextDouble() < 0.25f ? Lin(new Color(1f, 0.82f, 0.88f)) : Vector4.one));
+                    }
+                }
+            }
+
             // boulders by the shore and on the hills
             int maxRocks = (int)(160 * loc.RockDensity), rocks = 0;
             float size = loc.RockDensity > 1.5f ? 1.7f : 1f;
@@ -361,6 +542,19 @@ namespace FishingSim.Game
 
         private Material LeafMaterial() => _foliage ??= new Material(FindShader("FS/Foliage")) { name = "Leaves", enableInstancing = true, mainTexture = LeafPainter.Leaves };
         private Material NeedleMaterial() => _needles ??= new Material(FindShader("FS/Foliage")) { name = "Needles", enableInstancing = true, mainTexture = LeafPainter.Needles };
+
+        private readonly Material?[] _plant = new Material?[2];
+
+        private Material PlantMaterial(bool floating)
+        {
+            int i = floating ? 1 : 0;
+            if (_plant[i] != null)
+                return _plant[i]!;
+            var m = new Material(FindShader("FS/Plant")) { name = floating ? "Floating" : "Plant", enableInstancing = true };
+            m.SetFloat("_Float", floating ? 1f : 0f);
+            m.SetFloat("_Gloss", floating ? 0.45f : 0.2f);
+            return _plant[i] = m;
+        }
 
         private Material RockMaterial()
         {

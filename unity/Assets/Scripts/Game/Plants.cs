@@ -283,5 +283,210 @@ namespace FishingSim.Game
             m.RecalculateBounds();
             return m;
         }
+
+        // ---------------------------------------------------------------- small plants (FS/Plant: vertex colour x tint)
+        private static readonly Dictionary<string, Mesh> Small = new();
+
+        public static Mesh SmallPlant(string kind)
+        {
+            if (Small.TryGetValue(kind, out var m))
+                return m;
+            var k = new MeshKit();
+            var rng = new Random(kind.GetHashCode() & 0xFFFF);
+            switch (kind)
+            {
+                case "reed":
+                    for (int i = 0; i < 3; i++)
+                    {
+                        var lean = new Vector3(R(rng, -0.12f, 0.12f), 0f, R(rng, -0.12f, 0.12f));
+                        LeafBlade(k, new Vector3(R(rng, -0.04f, 0.04f), 0f, R(rng, -0.04f, 0.04f)), Vector3.up * R(rng, 1.3f, 1.55f) + lean, 0.014f, 0.75f);
+                    }
+                    break;
+                case "cattail":
+                    k.Tube(new Vector3(0f, 0f, 0f), new Vector3(0f, 0.13f, 0f), 0.022f, 0.02f, 6, new Color(1f, 1f, 1f, 0.15f), new Color(1f, 1f, 1f, 0.1f), true);
+                    k.Tube(new Vector3(0f, 0.13f, 0f), new Vector3(0f, 0.2f, 0f), 0.004f, 0.002f, 4, new Color(1f, 1f, 1f, 0.1f), new Color(1f, 1f, 1f, 0f));
+                    break;
+                case "rush":
+                    for (int i = 0; i < 14; i++)
+                    {
+                        float a = R(rng, 0f, Mathf.PI * 2f), r = R(rng, 0f, 0.09f);
+                        var root = new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r);
+                        var tip = root * 3f + Vector3.up * R(rng, 0.5f, 0.9f);
+                        LeafBlade(k, root, tip, 0.006f, R(rng, 0.8f, 1f));
+                    }
+                    break;
+                case "iris":
+                    for (int i = 0; i < 7; i++)
+                    {
+                        float a = i / 7f * Mathf.PI * 2f + R(rng, -0.2f, 0.2f);
+                        var dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+                        LeafBlade(k, dir * 0.02f, dir * R(rng, 0.12f, 0.22f) + Vector3.up * R(rng, 0.55f, 0.8f), 0.022f, R(rng, 0.85f, 1f));
+                    }
+                    break;
+                case "irisflower":
+                    Flower(k, rng, 3, 0.85f, 0.07f, 0.045f);
+                    break;
+                case "flower":
+                    Flower(k, rng, 5, 0.32f, 0.035f, 0.03f);
+                    break;
+                case "tuft":
+                    for (int i = 0; i < 9; i++)
+                    {
+                        float a = R(rng, 0f, Mathf.PI * 2f), r = R(rng, 0f, 0.12f);
+                        var root = new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r);
+                        LeafBlade(k, root, root * 2.5f + Vector3.up * R(rng, 0.22f, 0.42f), 0.012f, R(rng, 0.75f, 1f));
+                    }
+                    break;
+                case "fern":
+                    for (int i = 0; i < 7; i++)
+                        Frond(k, i / 7f * Mathf.PI * 2f + R(rng, -0.25f, 0.25f), R(rng, 0.45f, 0.7f), R(rng, 0.35f, 0.6f));
+                    break;
+                case "lilypad":
+                    Pad(k);
+                    break;
+                case "pondweed":
+                    for (int i = 0; i < 6; i++)
+                    {
+                        float a = i / 6f * Mathf.PI * 2f + R(rng, -0.3f, 0.3f);
+                        FloatLeaf(k, new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * R(rng, 0.05f, 0.25f), a + R(rng, -0.5f, 0.5f), R(rng, 0.07f, 0.11f), 0.025f,
+                            new Color(0.34f, 0.36f, 0.14f, 1f));
+                    }
+                    break;
+                case "lilyflower":
+                    for (int ring = 0; ring < 2; ring++)
+                        for (int i = 0; i < 8; i++)
+                        {
+                            float a = (i + ring * 0.5f) / 8f * Mathf.PI * 2f;
+                            Petal(k, a, ring == 0 ? 0.075f : 0.055f, ring == 0 ? 0.02f : 0.045f, ring == 0 ? 0.35f : 0.8f, new Color(0.97f, 0.97f, 0.94f, 1f));
+                        }
+                    k.Tube(Vector3.zero, new Vector3(0f, 0.04f, 0f), 0.018f, 0.012f, 6, new Color(0.95f, 0.78f, 0.15f, 1f), new Color(0.98f, 0.85f, 0.2f, 1f), true);
+                    break;
+                case "yellowlily":
+                    for (int i = 0; i < 5; i++)
+                        Petal(k, i / 5f * Mathf.PI * 2f, 0.035f, 0.005f, 1.1f, new Color(0.98f, 0.82f, 0.12f, 1f));
+                    break;
+            }
+            var mesh = k.ToMesh(kind);
+            return Small[kind] = mesh;
+        }
+
+        private static float R(Random rng, float a, float b) => a + (float)rng.NextDouble() * (b - a);
+
+        /// <summary>A tapering blade from root to tip (normals leaning up), the tip free in the wind.</summary>
+        private static void LeafBlade(MeshKit k, Vector3 root, Vector3 tip, float width, float shade)
+        {
+            var dir = tip - root;
+            var side = Vector3.Cross(dir, Vector3.up).normalized;
+            if (side.sqrMagnitude < 0.01f)
+                side = Vector3.right;
+            var n = Vector3.Lerp(Vector3.Cross(side, dir).normalized, Vector3.up, 0.5f).normalized;
+            if (n.y < 0f)
+                n = -n;
+            var mid = root + dir * 0.5f + Vector3.Cross(dir.normalized, side) * dir.magnitude * 0.04f;
+            Color c0 = new(shade * 0.55f, shade * 0.55f, shade * 0.55f, 1f), c1 = new(shade * 0.85f, shade * 0.85f, shade * 0.85f, 0.55f), c2 = new(shade, shade, shade, 0f);
+            int a = k.Add(root - side * width, n, c0);
+            k.Add(root + side * width, n, c0);
+            k.Add(mid + side * width * 0.8f, n, c1);
+            k.Add(mid - side * width * 0.8f, n, c1);
+            k.Add(tip, n, c2);
+            k.Tri(a, a + 3, a + 2);
+            k.Tri(a, a + 2, a + 1);
+            k.Tri(a + 3, a + 4, a + 2);
+        }
+
+        private static void Flower(MeshKit k, Random rng, int heads, float height, float radius, float spread)
+        {
+            var stem = new Color(0.25f, 0.38f, 0.14f, 1f);
+            for (int h = 0; h < heads; h++)
+            {
+                var top = new Vector3(R(rng, -spread, spread), height * R(rng, 0.75f, 1f), R(rng, -spread, spread));
+                LeafBlade(k, Vector3.zero, top, 0.004f, 0.6f);
+                for (int i = 0; i < 2; i++)
+                    k.C[k.C.Count - 1 - i] = stem;
+                for (int p = 0; p < 5; p++)
+                {
+                    float a = p / 5f * Mathf.PI * 2f + R(rng, 0f, 1f);
+                    var d = new Vector3(Mathf.Cos(a), 0.25f, Mathf.Sin(a)) * radius;
+                    var s = new Vector3(-Mathf.Sin(a), 0f, Mathf.Cos(a)) * radius * 0.45f;
+                    var col = new Color(1f, 1f, 1f, 0.05f);
+                    int c = k.Add(top, Vector3.up, col);
+                    k.Add(top + d - s, Vector3.up, col);
+                    k.Add(top + d * 1.15f, Vector3.up, col);
+                    k.Add(top + d + s, Vector3.up, col);
+                    k.Tri(c, c + 1, c + 2);
+                    k.Tri(c, c + 2, c + 3);
+                }
+            }
+        }
+
+        private static void Frond(MeshKit k, float yaw, float length, float rise)
+        {
+            var dir = new Vector3(Mathf.Cos(yaw), 0f, Mathf.Sin(yaw));
+            var side = new Vector3(-dir.z, 0f, dir.x);
+            const int steps = 8;
+            int prev = -1;
+            for (int i = 0; i <= steps; i++)
+            {
+                float t = i / (float)steps;
+                var p = dir * length * t + Vector3.up * (rise * Mathf.Sin(t * Mathf.PI * 0.8f) - 0.1f * t * t);
+                float w = 0.11f * Mathf.Sin(Mathf.Min(t * 1.2f, 1f) * Mathf.PI) + 0.01f;
+                float shade = 0.6f + 0.4f * t;
+                var c = new Color(shade, shade, shade, 1f - t);
+                var n = Vector3.Lerp(Vector3.up, -dir, 0.3f * t).normalized;
+                int a = k.Add(p - side * w, n, c);
+                k.Add(p, n + Vector3.up * 0.3f, c * 1.05f);
+                k.Add(p + side * w, n, c);
+                if (prev >= 0)
+                {
+                    k.Tri(prev, a, prev + 1); k.Tri(prev + 1, a, a + 1);
+                    k.Tri(prev + 1, a + 1, prev + 2); k.Tri(prev + 2, a + 1, a + 2);
+                }
+                prev = a;
+            }
+        }
+
+        /// <summary>A round lily pad of unit radius with its notch, flat on y = 0.</summary>
+        private static void Pad(MeshKit k)
+        {
+            const int segs = 18;
+            var green = new Color(0.2f, 0.36f, 0.12f, 1f);
+            var rim = new Color(0.26f, 0.4f, 0.14f, 1f);
+            int centre = k.Add(Vector3.zero, Vector3.up, green);
+            int first = k.Count;
+            for (int i = 0; i <= segs; i++)
+            {
+                float a = 0.25f + i / (float)segs * (Mathf.PI * 2f - 0.5f);
+                k.Add(new Vector3(Mathf.Cos(a), 0.004f, Mathf.Sin(a)), Vector3.up, rim);
+            }
+            for (int i = 0; i < segs; i++)
+                k.Tri(centre, first + i + 1, first + i);
+        }
+
+        private static void FloatLeaf(MeshKit k, Vector3 at, float yaw, float length, float width, Color c)
+        {
+            var d = new Vector3(Mathf.Cos(yaw), 0f, Mathf.Sin(yaw)) * length;
+            var s = new Vector3(-Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)) * width;
+            int a = k.Add(at, Vector3.up, c);
+            k.Add(at + d * 0.5f + s, Vector3.up, c);
+            k.Add(at + d, Vector3.up, c);
+            k.Add(at + d * 0.5f - s, Vector3.up, c);
+            k.Tri(a, a + 2, a + 1);
+            k.Tri(a, a + 3, a + 2);
+        }
+
+        private static void Petal(MeshKit k, float yaw, float length, float lift, float cup, Color c)
+        {
+            var d = new Vector3(Mathf.Cos(yaw), 0f, Mathf.Sin(yaw));
+            var s = new Vector3(-d.z, 0f, d.x) * length * 0.32f;
+            var tip = d * length + Vector3.up * (lift + length * cup * 0.5f);
+            var mid = d * length * 0.5f + Vector3.up * (lift + length * cup * 0.15f);
+            var n = (Vector3.up - d * 0.3f).normalized;
+            int a = k.Add(Vector3.up * lift, n, c);
+            k.Add(mid + s, n, c);
+            k.Add(tip, n, c);
+            k.Add(mid - s, n, c);
+            k.Tri(a, a + 2, a + 1);
+            k.Tri(a, a + 3, a + 2);
+        }
     }
 }

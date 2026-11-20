@@ -1,7 +1,7 @@
 // The Godot game's environment finish (GraphicsQuality.ApplyEnvironment): screen-space ambient occlusion from the
 // depth buffer, glow over an HDR threshold of 1.15 blended as soft light, ACES tonemapping with white 6 (Godot's
 // formula), contrast 1.12, saturation 1.1 and the Nordic colour correction (per channel through a 1D gradient: teal
-// shadows, warm highlights), in Godot's order (tonemap -> sRGB -> adjustments -> correction).
+// shadows, warm highlights), the time of day's exposure (SkyController: 1.9 at night .. 1.05 by day), in Godot's order (tonemap -> sRGB -> adjustments -> correction).
 Shader "Hidden/FS/Post"
 {
     Properties { _MainTex ("", 2D) = "black" {} }
@@ -10,7 +10,7 @@ Shader "Hidden/FS/Post"
     sampler2D _MainTex, _Bloom, _Grade, _AO;
     float4 _MainTex_TexelSize;
     UNITY_DECLARE_DEPTH_TEXTURE(_CameraDepthTexture);
-    float _Threshold, _GlowIntensity, _AOStrength, _AORadius, _Contrast, _Saturation, _White, _UseAO;
+    float _SceneExposure, _Threshold, _GlowIntensity, _AOStrength, _AORadius, _Contrast, _Saturation, _White, _UseAO;
 
     struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
     v2f vert(appdata_img v) { v2f o; o.pos = UnityObjectToClipPos(v.vertex); o.uv = v.texcoord; return o; }
@@ -81,14 +81,15 @@ Shader "Hidden/FS/Post"
     // 4: composite
     float4 Composite(v2f i) : SV_Target
     {
-        float3 c = tex2D(_MainTex, i.uv).rgb;
+        float exposure = _SceneExposure > 0 ? _SceneExposure : 1.0;
+        float3 c = tex2D(_MainTex, i.uv).rgb * exposure;
         if (_UseAO > 0.5)
         {
             float ao = tex2D(_AO, i.uv).r;
             c *= lerp(1, ao, 0.85);
         }
         c = Aces(max(c, 0), _White);
-        float3 g = saturate(Aces(tex2D(_Bloom, i.uv).rgb * _GlowIntensity, _White));
+        float3 g = saturate(Aces(tex2D(_Bloom, i.uv).rgb * _GlowIntensity * exposure, _White));
         c = saturate(LinearToGammaSpace(saturate(c)));
         g = LinearToGammaSpace(g) * 0.5 + 0.5;
         c = float3(SoftLight(c.r, g.r), SoftLight(c.g, g.g), SoftLight(c.b, g.b));

@@ -31,6 +31,7 @@ namespace FishingSim.Game
         private WorldView _world = null!;
         private Player _player = null!;
         private Fishing _rod = null!;
+        private Swimmers? _swimmers;
         private DayCycle _day = null!;
         private Village _village = null!;
         private Village.Door? _nearDoor;
@@ -219,6 +220,11 @@ namespace FishingSim.Game
                 _player.Solids.AddRange(_world.Solids);
                 _loadedLocation = index;
                 _day.Water = _world.WaterMaterial;
+                _day.BuildEffects();
+                _swimmers ??= new GameObject("Swimmers").AddComponent<Swimmers>();
+                _swimmers.Watcher = _player.transform;
+                _swimmers.Clarity = _locations[index].WaterClarity;
+                _swimmers.Populate(_world.Lake, Tackle.AllSpecies);
                 GC.Collect();
             }
             _profile.Location = index;

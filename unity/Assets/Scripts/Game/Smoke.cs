@@ -80,6 +80,39 @@ namespace FishingSim.Game
                 Destroy(shot);
                 Destroy(small);
             }
+            // rain over the lake
+            Player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
+            Day.SetWeather(Core.Weather.Rain);
+            Day.Hour = 15f;
+            for (int i = 0; i < 30; i++)
+                yield return null;
+            Day.Apply();
+            yield return new WaitForEndOfFrame();
+            {
+                var shot = ScreenCapture.CaptureScreenshotAsTexture();
+                var small = Downscale(shot, 320, 180);
+                Debug.Log($"SMOKE JPEG rain {Convert.ToBase64String(small.EncodeToJPG(70))}");
+                Destroy(shot);
+                Destroy(small);
+            }
+            Day.SetWeather(Core.Weather.Clear);
+            // the water's inner values at the pier (thickness, refraction, Fresnel, scene depth)
+            Player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
+            Day.Hour = 12f;
+            Day.Apply();
+            for (int k = 1; k <= 4; k++)
+            {
+                Shader.SetGlobalFloat("_WaterDebug", k);
+                for (int i = 0; i < 5; i++)
+                    yield return null;
+                yield return new WaitForEndOfFrame();
+                var shot = ScreenCapture.CaptureScreenshotAsTexture();
+                var small = Downscale(shot, 320, 180);
+                Debug.Log($"SMOKE JPEG water{k} {Convert.ToBase64String(small.EncodeToJPG(70))}");
+                Destroy(shot);
+                Destroy(small);
+            }
+            Shader.SetGlobalFloat("_WaterDebug", 0f);
             Debug.Log($"SMOKE people: {UnityEngine.Object.FindObjectsByType<Person>(FindObjectsSortMode.None).Length}, anims loaded {ModelLibrary.Has("characters/anims_male")}, arms {GameObject.Find("AnglerArms") != null}");
             Debug.Log($"SMOKE models: fish {ModelLibrary.Has("fish/okon")}, building {ModelLibrary.Has("buildings/dom_mur_pruski")}, rod {ModelLibrary.Has("rods/float_ostoja")}, reel {ModelLibrary.Has("reels/small_hokuto")}");
             // the village's heavy models slow software rendering down: hide it for the fishing part

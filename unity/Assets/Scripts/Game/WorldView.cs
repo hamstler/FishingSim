@@ -332,8 +332,7 @@ namespace FishingSim.Game
                         continue;
                     float h = lake.HeightAt(x, z);
                     float r = Hash(gx, gz, 13);
-                    if (h < -0.05f && h > -0.9f && r < 0.5f && Mathf.Abs(x) > 3f)
-                        Reeds(grass, new Vector3(x, h, z), gx * 17 + gz);
+
                 }
             return (solid, leaves, grass);
         }
