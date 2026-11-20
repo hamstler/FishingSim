@@ -588,8 +588,13 @@ namespace FishingSim.Game
 
         private float S(float v) => v * _scale;
 
+        /// <summary>Screenshots of the scenery only (the smoke test's menu-picture views).</summary>
+        public static bool HideHud { get; set; }
+
         private void OnGUI()
         {
+            if (HideHud)
+                return;
             Styles();
             float w = UnityEngine.Screen.width, h = UnityEngine.Screen.height;
             if (_error.Length > 0)

@@ -64,6 +64,14 @@ namespace FishingSim.Game
             Apply();
         }
 
+        /// <summary>Turns the view (degrees; pitch down positive) without moving.</summary>
+        public void Look(float yawDegrees, float pitchDegrees)
+        {
+            _yaw = yawDegrees;
+            _pitch = pitchDegrees;
+            Apply();
+        }
+
         public Vector3 Eye => Camera.transform.position;
         public Vector3 Forward => Camera.transform.forward;
 

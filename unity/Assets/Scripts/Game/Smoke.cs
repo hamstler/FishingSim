@@ -96,23 +96,37 @@ namespace FishingSim.Game
                 Destroy(small);
             }
             Day.SetWeather(Core.Weather.Clear);
-            // the water's inner values at the pier (thickness, refraction, Fresnel, scene depth)
-            Player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
-            Day.Hour = 12f;
-            Day.Apply();
-            for (int k = 1; k <= 4; k++)
+            // the Godot menu pictures' views (screenshot mode 0, FISHSIM_SCENIC=1, FISHSIM_CAM_LIFT=7, yaw 30, pitch -6,
+            // High quality): the same place and hour, to compare side by side with assets/menu/<map>_10/_17.webp
+            int quality = Settings.Quality;
+            Settings.Quality = 3;
+            Settings.Apply(Player.Camera);
+            GameRoot.HideHud = true;
+            // no rod, hands or arms in these pictures
+            var hidden = new System.Collections.Generic.List<Renderer>();
+            foreach (var r in Player.Camera.GetComponentsInChildren<Renderer>())
+                if (r.enabled) { r.enabled = false; hidden.Add(r); }
+            if (GameObject.Find("AnglerArms") is { } arms)
+                foreach (var r in arms.GetComponentsInChildren<Renderer>())
+                    if (r.enabled) { r.enabled = false; hidden.Add(r); }
+            foreach (var (hour, name) in new[] { (10f, "menu10"), (17f, "menu17") })
             {
-                Shader.SetGlobalFloat("_WaterDebug", k);
-                for (int i = 0; i < 5; i++)
+                Player.Place(new Vector3(0f, WorldView.PierDeck + 7f, -3.5f), 210f);
+                Player.Look(210f, 6f);
+                Day.Hour = hour;
+                Day.Apply();
+                for (int i = 0; i < 30; i++)
                     yield return null;
                 yield return new WaitForEndOfFrame();
                 var shot = ScreenCapture.CaptureScreenshotAsTexture();
-                var small = Downscale(shot, 320, 180);
-                Debug.Log($"SMOKE JPEG water{k} {Convert.ToBase64String(small.EncodeToJPG(70))}");
+                Debug.Log($"SMOKE JPEG {name} {Convert.ToBase64String(shot.EncodeToJPG(85))}");
                 Destroy(shot);
-                Destroy(small);
             }
-            Shader.SetGlobalFloat("_WaterDebug", 0f);
+            GameRoot.HideHud = false;
+            foreach (var r in hidden)
+                r.enabled = true;
+            Settings.Quality = quality;
+            Settings.Apply(Player.Camera);
             Debug.Log($"SMOKE people: {UnityEngine.Object.FindObjectsByType<Person>(FindObjectsSortMode.None).Length}, anims loaded {ModelLibrary.Has("characters/anims_male")}, arms {GameObject.Find("AnglerArms") != null}");
             Debug.Log($"SMOKE models: fish {ModelLibrary.Has("fish/okon")}, building {ModelLibrary.Has("buildings/dom_mur_pruski")}, rod {ModelLibrary.Has("rods/float_ostoja")}, reel {ModelLibrary.Has("reels/small_hokuto")}");
             // the village's heavy models slow software rendering down: hide it for the fishing part
