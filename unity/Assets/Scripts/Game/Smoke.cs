@@ -22,12 +22,31 @@ namespace FishingSim.Game
 
         public static bool Enabled => Environment.GetEnvironmentVariable("FISHSIM_SMOKE") == "1";
 
+        /// <summary>FISHSIM_SMOKE_DIR=folder: every shot is also saved there as a full-size PNG (local test runs).</summary>
+        private static void SaveFull(Texture2D shot, string name)
+        {
+            string? dir = Environment.GetEnvironmentVariable("FISHSIM_SMOKE_DIR");
+            if (string.IsNullOrEmpty(dir))
+                return;
+            try
+            {
+                System.IO.Directory.CreateDirectory(dir);
+                System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, name + ".png"), shot.EncodeToPNG());
+                Debug.Log($"SMOKE PNG {System.IO.Path.Combine(dir, name + ".png")}");
+            }
+            catch (Exception e)
+            {
+                Debug.Log($"SMOKE PNG failed: {e.Message}");
+            }
+        }
+
         private IEnumerator Start()
         {
             float started = Time.realtimeSinceStartup;
             // software rendering on CI is slow: lowest quality and a short view keep the frames coming
-            Settings.Quality = 0;
-            Settings.View = 0;
+            // (on a real graphics card: FISHSIM_SMOKE_QUALITY=0..4 and FISHSIM_SMOKE_VIEW=0..2)
+            Settings.Quality = int.TryParse(Environment.GetEnvironmentVariable("FISHSIM_SMOKE_QUALITY"), out int q) ? Mathf.Clamp(q, 0, 4) : 0;
+            Settings.View = int.TryParse(Environment.GetEnvironmentVariable("FISHSIM_SMOKE_VIEW"), out int v) ? Mathf.Clamp(v, 0, 2) : 0;
             Settings.Apply(Player.Camera);
             Debug.Log($"SMOKE app {Application.companyName} / {Application.productName} {Application.version}, data {Application.persistentDataPath}, gpu {SystemInfo.graphicsDeviceName} ({SystemInfo.graphicsDeviceType})");
             bool ok = true;
@@ -62,6 +81,7 @@ namespace FishingSim.Game
                     yield return null;
                 yield return new WaitForEndOfFrame();
                 var shot = ScreenCapture.CaptureScreenshotAsTexture();
+                SaveFull(shot, name);
                 var px = shot.GetPixels32();
                 long r = 0, g = 0, b = 0;
                 int magenta = 0;
@@ -90,6 +110,7 @@ namespace FishingSim.Game
             yield return new WaitForEndOfFrame();
             {
                 var shot = ScreenCapture.CaptureScreenshotAsTexture();
+                SaveFull(shot, "rain");
                 var small = Downscale(shot, 320, 180);
                 Debug.Log($"SMOKE JPEG rain {Convert.ToBase64String(small.EncodeToJPG(70))}");
                 Destroy(shot);
@@ -119,6 +140,7 @@ namespace FishingSim.Game
                     yield return null;
                 yield return new WaitForEndOfFrame();
                 var shot = ScreenCapture.CaptureScreenshotAsTexture();
+                SaveFull(shot, name);
                 Debug.Log($"SMOKE JPEG {name} {Convert.ToBase64String(shot.EncodeToJPG(85))}");
                 Destroy(shot);
             }
