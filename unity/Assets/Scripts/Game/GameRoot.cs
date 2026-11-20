@@ -196,15 +196,18 @@ namespace FishingSim.Game
                     }
                     yield return step;
                 }
-                // the village's buildings and its people
-                var needed = Village.ModelIds(_world.Lake).ToList();
+                // the village's buildings and its people (not for the smoke test's hands-only run: only the rod matters)
+                bool village = !(Smoke.Enabled && Smoke.HandsOnly);
+                var needed = village ? Village.ModelIds(_world.Lake).ToList() : new List<string>();
                 needed.AddRange(ModelLibrary.IdsIn("characters"));
                 needed.Add("stone_fire_pit");
                 needed.AddRange(Anglers.ModelIds);
-                yield return ModelLibrary.Preload(needed);
+                if (village)
+                    yield return ModelLibrary.Preload(needed);
                 try
                 {
-                    _village.Build(_world.Lake);
+                    if (village)
+                        _village.Build(_world.Lake);
                 }
                 catch (Exception e)
                 {
@@ -212,8 +215,11 @@ namespace FishingSim.Game
                 }
                 try
                 {
-                    _camp.Build(_world.Lake);
-                    _people.Build(_world.Lake, _village, _camp);
+                    if (village)
+                    {
+                        _camp.Build(_world.Lake);
+                        _people.Build(_world.Lake, _village, _camp);
+                    }
                 }
                 catch (Exception e)
                 {

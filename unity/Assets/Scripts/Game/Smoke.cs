@@ -72,6 +72,16 @@ namespace FishingSim.Game
             }
             Debug.Log($"SMOKE map loaded in {Time.realtimeSinceStartup - started:0.0} s");
             EnterPlay();
+            if (HandsOnly)
+            {
+                Settings.Quality = 3;
+                Settings.Apply(Player.Camera);
+                Day.SetWeatherNow(Core.Weather.Clear);
+                yield return HandShots(true);
+                Debug.Log("SMOKE OK (hands only)");
+                Application.Quit(0);
+                yield break;
+            }
             var views = new (float Hour, string Name, Vector3 At, float Yaw)[]
             {
                 (12f, "pier", new Vector3(0f, WorldView.PierDeck, 4.5f), 180f),
@@ -110,54 +120,7 @@ namespace FishingSim.Game
                 Destroy(shot);
                 Destroy(small);
             }
-            // the hands on the rod and the reel's crank, looking a little down (FirstPersonBody's grips)
-            {
-                Player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
-                Player.Look(180f, 22f);
-                Day.Hour = 12f;
-                Day.Apply();
-                for (int i = 0; i < 20; i++)
-                    yield return null;
-                yield return new WaitForEndOfFrame();
-                var shot = ScreenCapture.CaptureScreenshotAsTexture();
-                SaveFull(shot, "hands");
-                Destroy(shot);
-                if (GameObject.Find("AnglerArms")?.GetComponent<AnglerArms>() is { } anglerArms)
-                    Debug.Log($"SMOKE arms: {anglerArms.Report()}");
-                // close-ups of the grips from cameras beside the rod (FISHSIM_CLOSEUP in the Godot game): the right
-                // hand on the handle from its right, both hands from ahead, the crank hand from the left
-                var eye = Player.Camera.transform;
-                var right = Rod.GripRight.position;
-                var left = Rod.GripLeft.position;
-                var mid = (right + left) * 0.5f;
-                var closeViews = new (string Name, Vector3 At, Vector3 Look)[]
-                {
-                    ("grip_right", right + eye.right * 0.3f + eye.up * 0.06f + eye.forward * 0.04f, right),
-                    ("grip_front", mid + eye.forward * 0.5f + eye.up * 0.12f, mid),
-                    ("grip_left", left - eye.right * 0.3f + eye.up * 0.08f + eye.forward * 0.06f, left),
-                    ("grip_below", mid - eye.up * 0.35f + eye.forward * 0.12f, mid),
-                };
-                var close = new GameObject("CloseUp").AddComponent<Camera>();
-                close.depth = Player.Camera.depth + 1f;
-                close.cullingMask = Player.Camera.cullingMask;
-                close.nearClipPlane = 0.01f;
-                close.fieldOfView = 40f;
-                close.allowHDR = true;
-                close.depthTextureMode |= DepthTextureMode.Depth;
-                close.gameObject.AddComponent<PostFx>();
-                foreach (var (shotName, from, target) in closeViews)
-                {
-                    close.transform.SetPositionAndRotation(from, Quaternion.LookRotation(target - from, eye.up));
-                    for (int i = 0; i < 3; i++)
-                        yield return null;
-                    yield return new WaitForEndOfFrame();
-                    var c = ScreenCapture.CaptureScreenshotAsTexture();
-                    SaveFull(c, shotName);
-                    Destroy(c);
-                }
-                Destroy(close.gameObject);
-                Player.Look(180f, 0f);
-            }
+            yield return HandShots(false);
             // rain over the lake
             Player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
             Day.SetWeather(Core.Weather.Rain);
@@ -288,6 +251,110 @@ namespace FishingSim.Game
             Debug.Log($"SMOKE landed {landed} of 2, fps {1f / Mathf.Max(Time.smoothDeltaTime, 0.0001f):0}");
             Debug.Log(ok ? "SMOKE OK" : "SMOKE FAIL: magenta pixels (a shader failed)");
             Application.Quit(ok ? 0 : 1);
+        }
+
+        /// <summary>FISHSIM_SMOKE_HANDS=1: only the hands on the rod (while their grips are being fitted).</summary>
+        public static bool HandsOnly => Environment.GetEnvironmentVariable("FISHSIM_SMOKE_HANDS") == "1";
+
+        /// <summary>
+        /// The hands on the rod and the reel's crank, looking a little down (FirstPersonBody's grips), close-ups of the
+        /// grips, and with <paramref name="reeling"/> a cast and a few frames of the left hand turning the crank.
+        /// </summary>
+        private IEnumerator HandShots(bool reeling)
+        {
+            // the rod's, the reel's and the angler's models first (the hands-only run skips the village, so the map is
+            // ready before them and the first shots showed the built rod with no arms)
+            float since = Time.realtimeSinceStartup;
+            while ((!ModelLibrary.Has("characters/player_angler") || !ModelLibrary.Has("rods/float_ostoja") || !ModelLibrary.Has("reels/small_hokuto")
+                    || GameObject.Find("AnglerArms") == null) && Time.realtimeSinceStartup - since < 60f)
+                yield return null;
+            Rod.ApplyTackle();
+            Player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
+            Player.Look(180f, 22f);
+            Day.Hour = 12f;
+            Day.Apply();
+            for (int i = 0; i < 20; i++)
+                yield return null;
+            yield return new WaitForEndOfFrame();
+            var shot = ScreenCapture.CaptureScreenshotAsTexture();
+            SaveFull(shot, "hands");
+            Destroy(shot);
+            if (GameObject.Find("AnglerArms")?.GetComponent<AnglerArms>() is { } anglerArms)
+            {
+                Debug.Log($"SMOKE arms: {anglerArms.Report()}");
+            }
+            // close-ups of the grips from cameras beside the rod (FISHSIM_CLOSEUP in the Godot game): the right
+            // hand on the handle from its right, both hands from ahead, the crank hand from the left
+            var eye = Player.Camera.transform;
+            var right = Rod.GripRight.position;
+            var left = Rod.GripLeft.position;
+            var mid = (right + left) * 0.5f;
+            var closeViews = new (string Name, Vector3 At, Vector3 Look)[]
+            {
+                ("grip_right", right + eye.right * 0.3f + eye.up * 0.06f + eye.forward * 0.04f, right),
+                ("grip_front", mid + eye.forward * 0.5f + eye.up * 0.12f, mid),
+                ("grip_left", left - eye.right * 0.3f + eye.up * 0.08f + eye.forward * 0.06f, left),
+                ("grip_below", mid - eye.up * 0.35f + eye.forward * 0.12f, mid),
+            };
+            var close = new GameObject("CloseUp").AddComponent<Camera>();
+            close.depth = Player.Camera.depth + 1f;
+            close.cullingMask = Player.Camera.cullingMask;
+            close.nearClipPlane = 0.01f;
+            close.fieldOfView = 40f;
+            close.allowHDR = true;
+            close.depthTextureMode |= DepthTextureMode.Depth;
+            close.gameObject.AddComponent<PostFx>();
+            foreach (var (shotName, from, target) in closeViews)
+            {
+                close.transform.SetPositionAndRotation(from, Quaternion.LookRotation(target - from, eye.up));
+                for (int i = 0; i < 3; i++)
+                    yield return null;
+                yield return new WaitForEndOfFrame();
+                var c = ScreenCapture.CaptureScreenshotAsTexture();
+                SaveFull(c, shotName);
+                Destroy(c);
+            }
+            Destroy(close.gameObject);
+            Player.Look(180f, 0f);
+        
+            if (!reeling)
+                yield break;
+            // the crank turning: cast, then reel and watch the left hand from beside the reel (reel_0..5)
+            Player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
+            Rod.SmokeCast(Player.transform.position + Player.transform.forward * 14f);
+            float waited = 0f;
+            while (Rod.State != RodState.Waiting && waited < 12f)
+            {
+                waited += Time.unscaledDeltaTime;
+                yield return null;
+            }
+            Rod.SmokeReel = true;
+            var cam = new GameObject("ReelCloseUp").AddComponent<Camera>();
+            cam.depth = Player.Camera.depth + 1f;
+            cam.cullingMask = Player.Camera.cullingMask;
+            cam.nearClipPlane = 0.01f;
+            cam.fieldOfView = 40f;
+            cam.allowHDR = true;
+            cam.depthTextureMode |= DepthTextureMode.Depth;
+            cam.gameObject.AddComponent<PostFx>();
+            for (int n = 0; n < 6; n++)
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    var view = Player.Camera.transform;
+                    var knob = Rod.GripLeft.position;
+                    var from = knob - view.right * 0.32f + view.up * 0.1f + view.forward * 0.1f;
+                    cam.transform.SetPositionAndRotation(from, Quaternion.LookRotation(knob - from, view.up));
+                    yield return null;
+                }
+                yield return new WaitForEndOfFrame();
+                var c = ScreenCapture.CaptureScreenshotAsTexture();
+                SaveFull(c, "reel_" + n);
+                Destroy(c);
+            }
+            Rod.SmokeReel = false;
+            Destroy(cam.gameObject);
+            Debug.Log($"SMOKE reeling: state {Rod.State} after the cast ({waited:0.0} s)");
         }
 
         private static Texture2D Downscale(Texture2D src, int w, int h)

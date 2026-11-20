@@ -311,15 +311,16 @@ namespace FishingSim.Game
         private string _shownRod = "", _shownReel = "";
 
         /// <summary>
-        /// FirstPersonBody's framing (the user's reference: the rod up the middle, the hands and the reel near the bottom
-        /// centre): the rig 3.5 cm right of the eyes, 16.5 cm below and 30 cm ahead, the blank 30 degrees up, rolled 30
-        /// degrees about its axis so the reel hangs out to the left beside the handle.
+        /// The framing of the user's reference (a Russian Fishing 4 clip): the rod comes in from the lower right, the
+        /// handle under the right forearm, and rises steeply towards the middle; the reel hangs under it, a little to the
+        /// left, its crank reached by the left hand from the lower left. The rig 11 cm right of the eyes, 20 cm below and
+        /// 30 cm ahead, the blank 38 degrees up and turned 12 degrees in, rolled 12 degrees.
         /// </summary>
-        private static readonly Vector3 RigBasePosition = new(0.035f, -0.165f, 0.3f);
-        private const float RigPitch = -30f, RigRoll = -30f;
+        private static readonly Vector3 RigBasePosition = new(0.11f, -0.2f, 0.3f);
+        private const float RigPitch = -38f, RigYaw = -12f, RigRoll = -12f;
 
         /// <summary>The rig's rest turn, pitched further up by <paramref name="lift"/> degrees (negative = up).</summary>
-        private static Quaternion RigRest(float lift) => Quaternion.Euler(RigPitch + lift, 0f, 0f) * Quaternion.AngleAxis(RigRoll, Vector3.forward);
+        private static Quaternion RigRest(float lift) => Quaternion.Euler(RigPitch + lift, RigYaw, 0f) * Quaternion.AngleAxis(RigRoll, Vector3.forward);
 
         private void BuildRod()
         {

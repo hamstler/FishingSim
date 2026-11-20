@@ -37,6 +37,9 @@ namespace FishingSim.Game
         {
             public Transform Upper = null!, Lower = null!, Wrist = null!;
             public Vector3 FingersLocal, PalmLocal;     // in the hand bone's space, from the rest pose
+            public float IndexSign = 1f;                // which way of fingers x palm the index finger (the thumb) lies
+            public float Knuckles = 0.1f;               // wrist to the middle finger's knuckle (m)
+            public GripState Grip = new();
             public readonly List<Transform[]> Fingers = new();   // index, middle, ring, pinky: 01, 02, 03, leaf
             public Transform[]? Thumb;                  // 01, 02, 03, leaf
         }
@@ -98,6 +101,16 @@ namespace FishingSim.Game
             hand.FingersLocal = wrist.InverseTransformDirection(fingers.normalized);
             // (as imported the rest palms face up: read as down, the grips showed the palms and the fingers curled away)
             hand.PalmLocal = wrist.InverseTransformDirection(Vector3.ProjectOnPlane(model.up, fingers).normalized);
+            hand.Knuckles = fingers.magnitude;
+            // the index finger's side of the hand, read from the model (not from a cross product's handedness)
+            var index = ModelLibrary.Find(model, "index_01_" + side);
+            if (index != null && middle != null)
+            {
+                var indexSide = index.position - middle.position;
+                var fl = fingers.normalized;
+                var pl = Vector3.ProjectOnPlane(model.up, fingers).normalized;
+                hand.IndexSign = Vector3.Dot(indexSide, Vector3.Cross(fl, pl)) >= 0f ? 1f : -1f;
+            }
             return hand;
         }
 
@@ -134,53 +147,166 @@ namespace FishingSim.Game
                 PinchKnob(_left, cam);
         }
 
-        /// <summary>The right hand round the handle (FirstPersonBody: the seat grip).</summary>
+        /// <summary>
+        /// The right hand round the reel seat (FirstPersonBody: BarGrip): every way the hand can lie round the handle is
+        /// tried (turned round it, the handle slanting 20-55 degrees across the palm, slid a little along it), the palm on
+        /// the handle's right side, the index finger and the thumb towards the tip; for each the elbow is placed where
+        /// the arm puts it and the way with the straightest wrist (and a forearm not twisted past its turn) is taken,
+        /// eased from last frame's. Then the arm reaches, half the hand's turn goes into the forearm, and the fingers close.
+        /// </summary>
         private void HoldHandle(Hand h, Transform cam)
         {
             var frame = Rod.GripRight.parent;
             var along = frame.up;                       // the blank's axis, butt to tip
             var top = frame.forward;                    // away from the reel
             var at = frame.TransformPoint(new Vector3(0f, Rod.GripRight.localPosition.y, 0f));
-            // the rig's own side axis (GripPalm runs along it), the one on the camera's right: the camera's right itself
-            // is nearly the fingers' way once the rig is rolled, and the palm projected from it turned up
             var side = Vector3.Dot(frame.right, cam.right) >= 0f ? frame.right : -frame.right;
-            // the hand on the handle's right side, its fingers running down past the handle towards the reel
-            // (GripFingers (0.05, 0.18, -1): towards the reel, a little forward), the palm against the handle
-            var fingers = (-top * 1f + along * 0.18f + side * 0.05f).normalized;
-            var palm = Vector3.ProjectOnPlane(-side, fingers).normalized;
-            var wrist = at - palm * (HandleRadius + PalmDepth) - fingers * 0.05f;
-            var pole = h.Upper.position - cam.up * 0.5f + cam.right * 0.35f;
-            Solve(h.Upper, h.Lower, h.Wrist, wrist, pole);
-            Turn(h, fingers, palm);
-            // fingers round the handle (the index a little less: it rests ahead of the reel's stem)
+            var pole = h.Upper.position - cam.up * 0.6f + cam.right * 0.3f;
+            var (wrist, fingers, palm) = BarGrip(h, at, along, HandleRadius, h.Knuckles * 0.62f, 20f, 55f, 0.012f, -side, 40f, cam, true, pole);
+            Reach(h, wrist, fingers, palm, pole);
             for (int i = 0; i < h.Fingers.Count; i++)
-                Curl(h.Fingers[i], palm, i == 0 ? 72f : 88f);   // tight round a 3 cm handle (68 left the fingers sticking out)
+                Curl(h.Fingers[i], palm, i == 0 ? 72f : 88f);
             // the thumb along the top of the handle, 7.5 cm ahead of the hand
             if (h.Thumb != null)
                 PointThumb(h.Thumb, at + along * 0.075f + top * (HandleRadius + 0.009f));
         }
 
-        /// <summary>The left hand pinching the crank's knob with a straight wrist (FirstPersonBody: the crank pinch).</summary>
+        /// <summary>
+        /// The left hand on the crank's knob with a straight wrist: the fingers run the way the forearm does (the elbow
+        /// found by the arm's own solve, a few rounds), the palm down onto the knob from above as in the user's reference,
+        /// the knob under the base of the fingers; half the turn in the forearm, the fingers closed round the knob.
+        /// </summary>
         private void PinchKnob(Hand h, Transform cam)
         {
             var knob = Rod.GripLeft.position;
-            float upperLength = Vector3.Distance(h.Upper.position, h.Lower.position);
-            var elbow = h.Upper.position - cam.up * upperLength * 0.9f;
-            var fingers = (knob - elbow).normalized;
-            // the palm towards the reel: from the knob to the nearest point of the rod's axis
-            var frame = Rod.GripRight.parent;
-            var onAxis = frame.position + Vector3.Project(knob - frame.position, frame.up);
-            var palm = Vector3.ProjectOnPlane(onAxis - knob, fingers);
-            palm = palm.sqrMagnitude > 1e-6f ? palm.normalized : Vector3.ProjectOnPlane(cam.right, fingers).normalized;
-            var wrist = knob - fingers * 0.072f - palm * 0.016f;
-            var pole = h.Upper.position - cam.up * 0.5f - cam.right * 0.35f;
-            Solve(h.Upper, h.Lower, h.Wrist, wrist, pole);
-            Turn(h, fingers, palm);
-            // the index and the thumb pinch the knob, the other fingers fold below it (grip 0.8)
+            var pole = h.Upper.position - cam.up * 0.55f - cam.right * 0.35f;
+            float l1 = Vector3.Distance(h.Upper.position, h.Lower.position), l2 = Vector3.Distance(h.Lower.position, h.Wrist.position);
+            var elbow = h.Upper.position - cam.up * l1 * 0.9f - cam.right * 0.08f;
+            Vector3 fingers = Vector3.forward, palm = Vector3.down, wrist = knob;
+            for (int round = 0; round < 4; round++)
+            {
+                fingers = (knob - elbow).normalized;
+                palm = Vector3.ProjectOnPlane(-cam.up, fingers).normalized;
+                // the knob under the middle of the closed fingers (with the knuckles' 11 cm it stayed ahead of them)
+                wrist = knob - fingers * (h.Knuckles * 0.72f) - palm * (0.011f + PalmDepth);
+                elbow = Elbow(h.Upper.position, l1, l2, wrist, pole).Elbow;
+            }
+            Reach(h, wrist, fingers, palm, pole);
             for (int i = 0; i < h.Fingers.Count; i++)
-                Curl(h.Fingers[i], palm, i == 0 ? 45f : 62f);
+                Curl(h.Fingers[i], palm, i == 0 ? 55f : 68f);
             if (h.Thumb != null)
-                PointThumb(h.Thumb, knob + cam.up * 0.012f);
+                PointThumb(h.Thumb, knob - fingers * 0.012f + palm * 0.01f);
+        }
+
+        /// <summary>The arm to the wrist, half the hand's turn about the forearm given to the forearm, then the hand turned.</summary>
+        private static void Reach(Hand h, Vector3 wrist, Vector3 fingers, Vector3 palm, Vector3 pole)
+        {
+            Solve(h.Upper, h.Lower, h.Wrist, wrist, pole);
+            var forearm = (h.Wrist.position - h.Lower.position).normalized;
+            var nowPalm = Vector3.ProjectOnPlane(h.Wrist.TransformDirection(h.PalmLocal), forearm);
+            var wantPalm = Vector3.ProjectOnPlane(palm, forearm);
+            if (nowPalm.sqrMagnitude > 1e-6f && wantPalm.sqrMagnitude > 1e-6f)
+            {
+                float turn = Vector3.SignedAngle(nowPalm, wantPalm, forearm);
+                h.Lower.rotation = Quaternion.AngleAxis(turn * 0.5f, forearm) * h.Lower.rotation;
+            }
+            Turn(h, fingers, palm);
+        }
+
+        /// <summary>Where a two-bone arm puts its elbow for a wrist point (the same solve as <see cref="Solve"/>).</summary>
+        private static (Vector3 Elbow, float OutOfReach) Elbow(Vector3 shoulder, float l1, float l2, Vector3 wrist, Vector3 pole)
+        {
+            var to = wrist - shoulder;
+            float d = to.magnitude, max = l1 + l2;
+            float outOfReach = Mathf.Max(0f, d - (max - 0.01f));
+            var dir = to / Mathf.Max(d, 1e-4f);
+            d = Mathf.Clamp(d, 0.05f, max - 0.002f);
+            float x = (l1 * l1 - l2 * l2 + d * d) / (2f * d);
+            float hgt = Mathf.Sqrt(Mathf.Max(l1 * l1 - x * x, 0f));
+            var bend = Vector3.ProjectOnPlane(pole - shoulder, dir).normalized;
+            return (shoulder + dir * x + bend * hgt, outOfReach);
+        }
+
+        /// <summary>The way a hand lay round its bar last frame (eased towards the best way each frame).</summary>
+        private sealed class GripState
+        {
+            public float Phi, Delta, Slide;
+            public bool Has;
+        }
+
+        /// <summary>
+        /// FirstPersonBody.BarGrip: the hand round a bar (world space), the way with the least bent wrist. palmToward and
+        /// cone (degrees) keep the palm on one side; the index finger (and the thumb) lie towards the bar's +axis.
+        /// </summary>
+        private static (Vector3 Wrist, Vector3 Fingers, Vector3 Palm) BarGrip(Hand h, Vector3 at, Vector3 axis, float radius, float alongFingers,
+            float deltaMin, float deltaMax, float slideRange, Vector3 palmToward, float cone, Transform cam, bool rightArm, Vector3 pole)
+        {
+            var a = axis.normalized;
+            var u = Vector3.ProjectOnPlane(cam.up, a);
+            if (u.sqrMagnitude < 1e-4f)
+                u = Vector3.ProjectOnPlane(cam.right, a);
+            u.Normalize();
+            var v = Vector3.Cross(a, u);
+            var shoulder = h.Upper.position;
+            float l1 = Vector3.Distance(shoulder, h.Lower.position), l2 = Vector3.Distance(h.Lower.position, h.Wrist.position);
+            float coneCos = Mathf.Cos(cone * Mathf.Deg2Rad);
+            float best = float.MaxValue, bPhi = 0f, bDelta = deltaMin * Mathf.Deg2Rad, bSlide = 0f;
+            for (int i = 0; i < 48; i++)
+            {
+                float phi = i / 48f * Mathf.PI * 2f;
+                var p = u * Mathf.Cos(phi) + v * Mathf.Sin(phi);
+                if (Vector3.Dot(p, palmToward) < coneCos)
+                    continue;
+                for (int j = 0; j < 4; j++)
+                {
+                    float delta = Mathf.Lerp(deltaMin, deltaMax, j / 3f) * Mathf.Deg2Rad;
+                    for (int k = -1; k <= 1; k++)
+                    {
+                        float slide = k * slideRange;
+                        var (wrist, f, _) = Pose(h, at, a, p, delta, slide, radius, alongFingers);
+                        var (elbow, outOfReach) = Elbow(shoulder, l1, l2, wrist, pole);
+                        var forearm = (wrist - elbow).normalized;
+                        float bend = Mathf.Acos(Mathf.Clamp(Vector3.Dot(forearm, f), -1f, 1f));
+                        // forearm twist: the palm towards the body's middle is neutral; a forearm turns ~85 degrees each way
+                        var neutral = Vector3.ProjectOnPlane(rightArm ? -cam.right : cam.right, forearm);
+                        var pp = Vector3.ProjectOnPlane(p, forearm);
+                        float twist = neutral.sqrMagnitude > 1e-6f && pp.sqrMagnitude > 1e-6f ? Vector3.Angle(pp, neutral) * Mathf.Deg2Rad : 0f;
+                        float score = outOfReach * 30f + Mathf.Max(0f, bend - 28f * Mathf.Deg2Rad) * 2.5f + bend * 0.3f
+                                      + Mathf.Max(0f, twist - 85f * Mathf.Deg2Rad) * 2f;
+                        if (h.Grip.Has)
+                            score += Mathf.Abs(Mathf.DeltaAngle(h.Grip.Phi * Mathf.Rad2Deg, phi * Mathf.Rad2Deg)) * Mathf.Deg2Rad * 0.35f
+                                     + Mathf.Abs(h.Grip.Delta - delta) * 0.8f + Mathf.Abs(h.Grip.Slide - slide) * 6f;
+                        if (score < best)
+                            (best, bPhi, bDelta, bSlide) = (score, phi, delta, slide);
+                    }
+                }
+            }
+            if (h.Grip.Has)
+            {
+                float ease = 1f - Mathf.Exp(-9f * Time.deltaTime);
+                h.Grip.Phi = Mathf.LerpAngle(h.Grip.Phi * Mathf.Rad2Deg, bPhi * Mathf.Rad2Deg, ease) * Mathf.Deg2Rad;
+                h.Grip.Delta = Mathf.Lerp(h.Grip.Delta, bDelta, ease);
+                h.Grip.Slide = Mathf.Lerp(h.Grip.Slide, bSlide, ease);
+            }
+            else
+                (h.Grip.Phi, h.Grip.Delta, h.Grip.Slide, h.Grip.Has) = (bPhi, bDelta, bSlide, true);
+            var palm = u * Mathf.Cos(h.Grip.Phi) + v * Mathf.Sin(h.Grip.Phi);
+            return Pose(h, at, a, palm, h.Grip.Delta, h.Grip.Slide, radius, alongFingers);
+        }
+
+        /// <summary>
+        /// One way round the bar: the palm facing it, the fingers square across it slanted by delta towards the bar's
+        /// +axis, wrapping so the index finger lies towards +axis; the wrist half the hand's thickness off the skin.
+        /// </summary>
+        private static (Vector3 Wrist, Vector3 Fingers, Vector3 Palm) Pose(Hand h, Vector3 at, Vector3 a, Vector3 p, float delta, float slide, float radius, float alongFingers)
+        {
+            var e2 = Vector3.Cross(p, a).normalized;
+            // the index side of a hand with fingers e2 and palm p is IndexSign x (fingers x palm): put it towards +a
+            if (Vector3.Dot(h.IndexSign * Vector3.Cross(e2, p), a) < 0f)
+                e2 = -e2;
+            var f = (a * Mathf.Sin(delta) + e2 * Mathf.Cos(delta)).normalized;
+            var wrist = at + a * slide - p * (radius + PalmDepth) - f * alongFingers;
+            return (wrist, f, p);
         }
 
         /// <summary>Turns the hand bone so its fingers and palm point the given ways.</summary>
