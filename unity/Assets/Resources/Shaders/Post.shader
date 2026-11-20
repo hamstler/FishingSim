@@ -167,7 +167,13 @@ Shader "Hidden/FS/Post"
         c = lerp(dot(c, 1) / 3.0, c, _Saturation);
         c = saturate(c);
         c = float3(tex2D(_Grade, float2(c.r, 0.5)).r, tex2D(_Grade, float2(c.g, 0.5)).g, tex2D(_Grade, float2(c.b, 0.5)).b);
-        return float4(GammaToLinearSpace(c), 1);
+        // debanding (Godot's use_debanding): a triangular dither of one 8-bit step before the output is quantised, so
+        // the sky's gentle gradients do not break into flat sheets with stepped edges
+        float2 px = i.uv * _ScreenParams.xy;
+        float n1 = frac(sin(dot(px, float2(12.9898, 78.233))) * 43758.5453);
+        float n2 = frac(sin(dot(px, float2(39.3468, 11.135))) * 24634.6345);
+        c += (n1 + n2 - 1.0) / 255.0;
+        return float4(GammaToLinearSpace(saturate(c)), 1);
     }
     ENDCG
     SubShader
