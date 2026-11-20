@@ -64,6 +64,61 @@ namespace FishingSim.Game
         }
 
         public static Texture2D NoiseField => _noise ??= Noise(512, 8, 17, "Noise");
+
+        /// <summary>
+        /// The sky's cloud noise like Godot's (SkyController: FastNoiseLite Perlin fBm, frequency 0.002 over 2048 px = about
+        /// 4 cycles per sheet unit, 6 octaves): tileable gradient noise, then moved onto the mean and spread measured from a
+        /// dump of Godot's texture (0.473, 0.154). The value noise thresholded into square, axis-bound patches that the
+        /// dome's projection sheared into zigzag cloud sheets.
+        /// </summary>
+        public static Texture2D CloudNoise => _cloudNoise ??= Perlin(2048, 8, 6, 71, 0.473f, 0.154f, "CloudNoise");
+        private static Texture2D? _cloudNoise;
+
+        private static float Grad(int x, int y, int period, int seed, float dx, float dy)
+        {
+            float a = Hash(((x % period) + period) % period, ((y % period) + period) % period, seed) * Mathf.PI * 2f;
+            return Mathf.Cos(a) * dx + Mathf.Sin(a) * dy;
+        }
+
+        private static float TilePerlin(float x, float y, int period, int seed)
+        {
+            int ix = Mathf.FloorToInt(x), iy = Mathf.FloorToInt(y);
+            float fx = x - ix, fy = y - iy;
+            float ux = fx * fx * fx * (fx * (fx * 6f - 15f) + 10f), uy = fy * fy * fy * (fy * (fy * 6f - 15f) + 10f);
+            float a = Grad(ix, iy, period, seed, fx, fy), b = Grad(ix + 1, iy, period, seed, fx - 1f, fy);
+            float c = Grad(ix, iy + 1, period, seed, fx, fy - 1f), d = Grad(ix + 1, iy + 1, period, seed, fx - 1f, fy - 1f);
+            return Mathf.Lerp(Mathf.Lerp(a, b, ux), Mathf.Lerp(c, d, ux), uy);
+        }
+
+        /// <summary>Tileable Perlin fBm (lacunarity 2, gain 0.5), scaled to the given mean and spread, 16-bit.</summary>
+        private static Texture2D Perlin(int size, int period, int octaves, int seed, float mean, float spread, string name)
+        {
+            var values = new float[size * size];
+            Parallel.For(0, size, y =>
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float v = 0f, amp = 1f;
+                    for (int o = 0; o < octaves; o++)
+                    {
+                        int p = period << o;
+                        v += TilePerlin(x / (float)size * p, y / (float)size * p, p, seed + o) * amp;
+                        amp *= 0.5f;
+                    }
+                    values[y * size + x] = v;
+                }
+            });
+            double sum = 0, sq = 0;
+            foreach (float v in values) { sum += v; sq += (double)v * v; }
+            float m = (float)(sum / values.Length), sd = Mathf.Sqrt(Mathf.Max((float)(sq / values.Length) - m * m, 1e-8f));
+            var px = new ushort[size * size];
+            for (int i = 0; i < px.Length; i++)
+                px[i] = Mathf.FloatToHalf(Mathf.Clamp01(mean + (values[i] - m) / sd * spread));
+            var tex = new Texture2D(size, size, TextureFormat.RHalf, true, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 4, name = name };
+            tex.SetPixelData(px, 0);
+            tex.Apply(true, true);
+            return tex;
+        }
         public static Texture2D Foam => _foam ??= Noise(512, 16, 53, "Foam");
 
         /// <summary>Caustics: the bright web of light focused by the waves (Voronoi cell borders, F2 - F1).</summary>

@@ -180,6 +180,14 @@ namespace FishingSim.Game
 
         private static Vector4 Tint(Color c, float t) => new(c.r + t, c.g + t, c.b + t, 1f);
 
+        /// <summary>A leaf colour given in sRGB (like TreeFactory's vertex colours, which foliage.gdshader turns linear):
+        /// passed on raw, the crowns came out about three times too light, pale mint instead of green.</summary>
+        private static Vector4 LeafTint(Color c, float t)
+        {
+            var l = new Color(Mathf.Max(c.r + t, 0f), Mathf.Max(c.g + t, 0f), Mathf.Max(c.b + t, 0f)).linear;
+            return new Vector4(l.r, l.g, l.b, 1f);
+        }
+
         private static Color CrownColor(string kind) => kind switch
         {
             "spruce" => new Color(0.17f, 0.3f, 0.2f),
@@ -233,7 +241,7 @@ namespace FishingSim.Game
                     var bark = Col.Lin(meshes.TrunkColor + new Color(tint, tint, tint) * 0.5f);
                     items.Add(new Item(k, Matrix4x4.TRS(pos + Vector3.up * meshes.TrunkLift * s, rot, scale), Tint(bark, 0f)));
                 }
-                items.Add(new Item(5 + k, Matrix4x4.TRS(pos + Vector3.up * meshes.CrownLift * s, rot, scale), Tint(CrownColor(kind), tint)));
+                items.Add(new Item(5 + k, Matrix4x4.TRS(pos + Vector3.up * meshes.CrownLift * s, rot, scale), LeafTint(CrownColor(kind), tint)));
                 if (understorey)
                     spots.Add((x, z, kind));
                 allTrees.Add((x, z));
@@ -345,7 +353,7 @@ namespace FishingSim.Game
                 float h = lake.HeightAt(x, z);
                 if (h < 1.0f || h > highest || !Clear(lake, x, z, 1.5f, 1.6f))
                     continue;
-                items.Add(new Item(10, Matrix4x4.TRS(new Vector3(x, h, z), Quaternion.Euler(0, yaw, 0), Vector3.one * s), Tint(CrownColor("bush"), R(rng, -0.05f, 0.05f))));
+                items.Add(new Item(10, Matrix4x4.TRS(new Vector3(x, h, z), Quaternion.Euler(0, yaw, 0), Vector3.one * s), LeafTint(CrownColor("bush"), R(rng, -0.05f, 0.05f))));
                 bushes++;
             }
             // hazel in the shade of the trees
@@ -360,7 +368,7 @@ namespace FishingSim.Game
                     continue;
                 float sc = R(rng, 0.8f, 1.5f);
                 items.Add(new Item(11, Matrix4x4.TRS(new Vector3(x, h + 0.7f * sc - 0.15f, z), Quaternion.Euler(0, (float)rng.NextDouble() * 360f, 0),
-                    new Vector3(sc, sc * R(rng, 0.9f, 1.3f), sc)), Tint(new Color(0.26f, 0.42f, 0.13f), R(rng, -0.05f, 0.05f))));
+                    new Vector3(sc, sc * R(rng, 0.9f, 1.3f), sc)), LeafTint(new Color(0.26f, 0.42f, 0.13f), R(rng, -0.05f, 0.05f))));
             }
 
             // ---- the small plants (Scenery.ScatterGroundCover's flowers and tufts, ferns round the trees, ScatterReeds,

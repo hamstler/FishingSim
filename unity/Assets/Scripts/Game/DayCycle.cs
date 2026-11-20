@@ -234,7 +234,7 @@ namespace FishingSim.Game
             _sky.SetFloat("_SunEnergy", _sun.intensity);
             _sky.SetFloat("_SunOn", el > -0.12f ? 1f : 0f);
             if (_sky.GetTexture("_CloudNoise") == null)
-                _sky.SetTexture("_CloudNoise", ProcTextures.NoiseField);
+                _sky.SetTexture("_CloudNoise", ProcTextures.CloudNoise);
 
             // ambient: a cool fixed colour mixed with the sky by day (AmbientLightSkyContribution)
             float golden = Mathf.Clamp01(1f - Mathf.Abs(el - 0.12f) / 0.16f) * (1f - _cloud * 0.8f);

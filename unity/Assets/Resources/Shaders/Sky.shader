@@ -46,16 +46,24 @@ Shader "FS/Sky"
             static const float3 night_color = float3(0.004, 0.006, 0.014);
 
             float hg(float c, float g) { return 0.0795774715459 * (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * c, 1.5); }
-            // Godot's noise had about half as many features per tile as ProcTextures.NoiseField
-            float N(float2 uv) { return tex2Dlod(_CloudNoise, float4(uv * 0.5, 0, 0)).r; }
-            float cloud_shape(float2 uv) { return N(uv) * 0.55 + N(uv * 2.03 + float2(0.31, 0.17)) * 0.28 + N(uv * 4.11 + float2(0.71, 0.53)) * 0.17; }
+            // ProcTextures.CloudNoise has 8 base cycles per tile, read at half scale: about Godot's 4 per sheet unit; it is
+            // Perlin fBm with Godot's mean and spread already (a clear sky about 14 % cloud).
+            // Read with mipmaps like Godot's texture(): the cloud sheet's screen derivatives (static, taken once before the
+            // branch) scaled by each octave's factor k. Reading the top level only (tex2Dlod 0) aliased towards the
+            // horizon and in the fine octaves into jagged, zigzag cloud edges.
+            static float2 _uvDx, _uvDy;
+            float N(float2 uv, float k)
+            {
+                return tex2Dgrad(_CloudNoise, uv * 0.5, _uvDx * (0.5 * k), _uvDy * (0.5 * k)).r;
+            }
+            float cloud_shape(float2 uv) { return N(uv, 1.0) * 0.55 + N(uv * 2.03 + float2(0.31, 0.17), 2.03) * 0.28 + N(uv * 4.11 + float2(0.71, 0.53), 4.11) * 0.17; }
             float clouds(float2 uv, bool detailed)
             {
                 float threshold = lerp(0.72, 0.18, _CloudCover);
                 float d = smoothstep(threshold, threshold + 0.24, cloud_shape(uv));
                 if (detailed)
                 {
-                    float billow = N(uv * 8.7 + float2(0.11, 0.83)) * 0.6 + N(uv * 17.3 + float2(0.47, 0.29)) * 0.4;
+                    float billow = N(uv * 8.7 + float2(0.11, 0.83), 8.7) * 0.6 + N(uv * 17.3 + float2(0.47, 0.29), 17.3) * 0.4;
                     d = saturate(d - (1.0 - d) * (billow - 0.25) * 1.1);
                 }
                 return d;
@@ -127,9 +135,12 @@ Shader "FS/Sky"
                 color = lerp(color, overcast, _CloudCover * _CloudCover * 0.85);
 
                 float density = 0;
+                float2 sheetUv = eye.xz / (max(eye.y, 0.0) + 0.08) * 0.08 + float2(_CloudDrift * 0.004, _CloudDrift * 0.0017);
+                _uvDx = ddx(sheetUv);
+                _uvDy = ddy(sheetUv);
                 if (eye.y > 0.0)
                 {
-                    float2 uv = eye.xz / (eye.y + 0.08) * 0.08 + float2(_CloudDrift * 0.004, _CloudDrift * 0.0017);
+                    float2 uv = sheetUv;
                     density = clouds(uv, true);
                     float depth = 0;
                     [unroll] for (int k = 1; k <= 3; k++)
