@@ -192,8 +192,19 @@ namespace FishingSim.Game
 
         private static float R(Random rng, float a, float b) => a + (float)rng.NextDouble() * (b - a);
 
-        private static bool Clear(Lake lake, float x, float z, float pad = 3f, float path = 1.8f) =>
-            !Lake.OnPier(x, z) && !lake.Built(x, z, pad) && lake.PathDistance(x, z) > path;
+        /// <summary>Ground kept free by the landmarks (x, z, radius), and trees they ask for (Building.TreeSpots).</summary>
+        public static List<(float X, float Z, float R)> Reserved { get; } = new();
+        public static List<Vector3> LandmarkTrees { get; } = new();
+
+        private static bool Clear(Lake lake, float x, float z, float pad = 3f, float path = 1.8f)
+        {
+            if (Lake.OnPier(x, z) || lake.Built(x, z, pad) || lake.PathDistance(x, z) <= path)
+                return false;
+            foreach (var (rx, rz, r) in Reserved)
+                if ((x - rx) * (x - rx) + (z - rz) * (z - rz) < r * r)
+                    return false;
+            return true;
+        }
 
         /// <summary>Scenery.ScatterTrees, ScatterGroundCover (bushes, hazel) and ScatterRocks.</summary>
         private static (List<Item>, List<(Vector3, float)>) Place(Lake lake)
@@ -270,6 +281,13 @@ namespace FishingSim.Game
                     continue;
                 Plant(Choose(weights, pick), x, z, h, s, yaw, tint, true);
                 placed++;
+            }
+
+            // trees the landmarks ask for (the dike's row): tall birches and oaks
+            foreach (var foot in LandmarkTrees)
+            {
+                float pick = (float)rng.NextDouble();
+                Plant(pick < 0.65f ? 2 : 1, foot.x, foot.z, foot.y + 0.1f, R(rng, 1.15f, 1.45f), (float)rng.NextDouble() * Mathf.PI * 2f, R(rng, -0.1f, 0.1f), false);
             }
 
             // the rim forest: dense at the edge, thinning up the slopes to the tree line

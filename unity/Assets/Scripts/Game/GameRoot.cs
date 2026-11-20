@@ -32,6 +32,7 @@ namespace FishingSim.Game
         private Player _player = null!;
         private Fishing _rod = null!;
         private Swimmers? _swimmers;
+        private Gulls? _gulls;
         private DayCycle _day = null!;
         private Village _village = null!;
         private Village.Door? _nearDoor;
@@ -223,6 +224,12 @@ namespace FishingSim.Game
                 _day.BuildEffects();
                 _swimmers ??= new GameObject("Swimmers").AddComponent<Swimmers>();
                 _swimmers.Watcher = _player.transform;
+                _swimmers.Day = _day;
+                if (_gulls == null)
+                {
+                    _gulls = new GameObject("Gulls").AddComponent<Gulls>();
+                    _gulls.Day = _day;
+                }
                 _swimmers.Clarity = _locations[index].WaterClarity;
                 _swimmers.Populate(_world.Lake, Tackle.AllSpecies);
                 GC.Collect();

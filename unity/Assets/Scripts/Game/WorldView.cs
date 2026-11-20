@@ -23,6 +23,7 @@ namespace FishingSim.Game
 
         private readonly List<GameObject> _parts = new();
         private Forest? _forest;
+        private Landmarks? _landmarks;
 
         /// <summary>Tree trunks and boulders the angler walks round.</summary>
         public List<(Vector3 At, float Radius)> Solids { get; } = new();
@@ -115,6 +116,32 @@ namespace FishingSim.Game
             }
             // the woods, bushes, boulders and the meadow (Scenery's placement, instanced)
             Solids.Clear();
+            _landmarks ??= new GameObject("Landmarks").AddComponent<Landmarks>();
+            _landmarks.transform.SetParent(transform, false);
+            _landmarks.Build(Lake);
+            Solids.AddRange(_landmarks.Solids);
+            Forest.Reserved.Clear();
+            foreach (var entry in location.Landmarks)
+            {
+                var parts = entry.Split(',');
+                if (parts.Length >= 3 && float.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float lx)
+                    && float.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float lz))
+                {
+                    string kind = parts[0].Trim();
+                    if (kind == "dike")
+                    {
+                        float length = parts.Length >= 5 && float.TryParse(parts[4], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float l) ? Mathf.Max(l, 20f) : 20f;
+                        float yaw = parts.Length >= 4 && float.TryParse(parts[3], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float y) ? y * Mathf.Deg2Rad : 0f;
+                        var along = new Vector2(Mathf.Cos(yaw), -Mathf.Sin(yaw));
+                        for (float t = -length / 2f; t <= length / 2f; t += 4f)
+                            Forest.Reserved.Add((lx + along.x * t, lz + along.y * t, 6f));
+                    }
+                    else if (kind is not ("platforms" or "rocks" or "stilthouse"))
+                        Forest.Reserved.Add((lx, lz, 8f));
+                }
+            }
+            Forest.LandmarkTrees.Clear();
+            Forest.LandmarkTrees.AddRange(_landmarks.TreeSpots);
             _forest ??= gameObject.AddComponent<Forest>();
             var forest = _forest.Build(Lake, Solids);
             while (forest.MoveNext())

@@ -20,6 +20,10 @@ namespace FishingSim.Game
         public const float VisibleRange = 28f, VisibleDepth = 1.4f, ViewScale = 1.4f, MinShownLength = 0.16f, MinSight = 0.08f;
 
         public Transform? Watcher { get; set; }
+        public DayCycle? Day { get; set; }
+
+        /// <summary>A fish rose at (x, z): species, x, z (FishingRod.NoteRise, the plop).</summary>
+        public event Action<string, float, float>? Risen;
         public float Clarity { get; set; } = 3f;
 
         private FishSwimModel? _model;
@@ -118,10 +122,113 @@ namespace FishingSim.Game
 
         private float LengthOf(FishAgent a) => _byName.TryGetValue(a.Species, out var sp) ? sp.LengthRef * Mathf.Pow(Mathf.Max(a.Weight, 0.005f), 0.33f) : 0.3f;
 
+        // ---------------------------------------------------------------- rise rings (World/RiseRings)
+        private const int RingPool = 10;
+        private const float RingLife = 2.2f, RingRange = 45f;
+        private readonly MeshRenderer[] _rings = new MeshRenderer[RingPool];
+        private readonly float[] _ringAge = new float[RingPool];
+        private MaterialPropertyBlock? _ringProps;
+        private Material? _ringMat;
+        private float _ringDue = 2f;
+        private readonly System.Random _ringRng = new(4242);
+
+        private void MakeRings()
+        {
+            _ringMat = new Material(Shader.Find("FS/RiseRing")) { name = "RiseRing" };
+            _ringProps = new MaterialPropertyBlock();
+            var mesh = new Mesh { name = "RiseRing" };
+            var v = new List<Vector3>();
+            var uv = new List<Vector2>();
+            var t = new List<int>();
+            const int n = 4;
+            for (int j = 0; j <= n; j++)
+                for (int i = 0; i <= n; i++)
+                {
+                    v.Add(new Vector3(i / (float)n - 0.5f, 0f, j / (float)n - 0.5f));
+                    uv.Add(new Vector2(i / (float)n, j / (float)n));
+                }
+            for (int j = 0; j < n; j++)
+                for (int i = 0; i < n; i++)
+                {
+                    int a = j * (n + 1) + i;
+                    t.AddRange(new[] { a, a + n + 1, a + 1, a + 1, a + n + 1, a + n + 2 });
+                }
+            mesh.SetVertices(v);
+            mesh.SetUVs(0, uv);
+            mesh.SetTriangles(t, 0);
+            mesh.bounds = new Bounds(Vector3.zero, new Vector3(1f, 2f, 1f));
+            for (int i = 0; i < RingPool; i++)
+            {
+                var go = new GameObject("RiseRing");
+                go.transform.SetParent(transform, false);
+                go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                var r = go.AddComponent<MeshRenderer>();
+                r.sharedMaterial = _ringMat;
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                r.receiveShadows = false;
+                r.enabled = false;
+                _rings[i] = r;
+                _ringAge[i] = 1f;
+            }
+        }
+
+        public void RingAt(float x, float z, float size, float age = 0f)
+        {
+            if (_rings[0] == null)
+                MakeRings();
+            int slot = 0;
+            for (int i = 1; i < RingPool; i++)
+                if (_ringAge[i] > _ringAge[slot])
+                    slot = i;
+            _rings[slot].transform.SetPositionAndRotation(new Vector3(x, 0.02f, z), Quaternion.identity);
+            _rings[slot].transform.localScale = new Vector3(size, 1f, size);
+            _ringAge[slot] = age;
+            _rings[slot].enabled = true;
+        }
+
+        private void UpdateRings(float dt, Vector3 eye)
+        {
+            if (_rings[0] == null)
+                MakeRings();
+            for (int i = 0; i < RingPool; i++)
+            {
+                if (_ringAge[i] >= 1f)
+                    continue;
+                _ringAge[i] += dt / RingLife;
+                if (_ringAge[i] >= 1f)
+                {
+                    _rings[i].enabled = false;
+                    continue;
+                }
+                _ringProps!.SetFloat("_Age", _ringAge[i]);
+                _rings[i].SetPropertyBlock(_ringProps);
+            }
+            _ringDue -= dt;
+            if (_ringDue > 0f || Day == null || _model == null || _model.Agents.Count == 0)
+                return;
+            float rate = Core.Methods.Rises.PerMinute(Day.Hour, Day.Weather, Day.Wind);
+            _ringDue = -MathF.Log(1f - (float)_ringRng.NextDouble() * 0.999f) * 60f / MathF.Max(rate, 0.05f);
+            _ringMat!.SetFloat("_Light", 0.25f + 0.75f * (1f - Day.Night));
+            var agents = _model.Agents;
+            for (int tries = 0; tries < 12; tries++)
+            {
+                var a = agents[_ringRng.Next(agents.Count)];
+                if (a.Hooked || a.Fear > 0f || !Core.Methods.Rises.Riser(Core.Methods.FeedingHabits.LayerOf(a.Species)))
+                    continue;
+                float dx = a.Position.X - eye.x, dz = a.Position.Y - eye.z;
+                if (dx * dx + dz * dz > RingRange * RingRange)
+                    continue;
+                RingAt(a.Position.X, a.Position.Y, 1.4f + 0.8f * MathF.Min(a.Weight, 2f));
+                Risen?.Invoke(a.Species, a.Position.X, a.Position.Y);
+                return;
+            }
+        }
+
         private void Update()
         {
             if (_model == null || Watcher == null || _lake == null)
                 return;
+            UpdateRings(Mathf.Min(Time.deltaTime, 0.1f), Watcher.position);
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             var w = Watcher.position;
             float speed = (w - _lastWatcher).magnitude / Mathf.Max(Time.deltaTime, 1e-4f);
