@@ -97,7 +97,29 @@ namespace FishingSim.Game
             _mat.SetFloat("_UseAO", ao != null ? 1f : 0f);
             _mat.SetTexture("_AO", ao != null ? ao : Texture2D.whiteTexture);
 
+            // sun shafts (Godot: volumetric fog lit by the sun, LightVolumetricFogEnergy x the golden hour)
+            RenderTexture? shafts = null;
+            float strength = Shader.GetGlobalFloat("_ShaftStrength");
+            var cam = GetComponent<Camera>();
+            var sunDir = (Vector3)Shader.GetGlobalVector("_SunDirection");
+            var sp = cam.WorldToViewportPoint(cam.transform.position + sunDir * 1000f);
+            bool facing = sp.z > 0f && sp.x > -0.3f && sp.x < 1.3f && sp.y > -0.3f && sp.y < 1.3f;
+            if (q >= 2 && strength > 0.01f && facing)
+            {
+                _mat.SetVector("_SunScreen", new Vector4(sp.x, sp.y, 0f, 0f));
+                var mask = RenderTexture.GetTemporary(src.width / 4, src.height / 4, 0, fmt);
+                shafts = RenderTexture.GetTemporary(src.width / 4, src.height / 4, 0, fmt);
+                Graphics.Blit(src, mask, _mat, 5);
+                Graphics.Blit(mask, shafts, _mat, 6);
+                RenderTexture.ReleaseTemporary(mask);
+            }
+            _mat.SetFloat("_ShaftStrength", shafts != null ? strength : 0f);
+            _mat.SetTexture("_Shafts", shafts != null ? shafts : Texture2D.blackTexture);
+            _mat.SetColor("_ShaftTint", Shader.GetGlobalColor("_SunTint"));
+
             Graphics.Blit(src, dst, _mat, 4);
+            if (shafts != null)
+                RenderTexture.ReleaseTemporary(shafts);
 
             for (int i = 0; i < levels; i++)
             {

@@ -197,6 +197,33 @@ namespace FishingSim.Game
             return t;
         }
 
+        private static readonly HashSet<Material> Matted = new();
+
+        /// <summary>
+        /// FishAsset.Foreign in the Godot game: the Meshy fish read matt (metallic about 0.1, roughness 0.5) instead of the
+        /// file's own metal/roughness, which made them look like wet plastic or chrome.
+        /// </summary>
+        private static void FishLook(GameObject model)
+        {
+            foreach (var r in model.GetComponentsInChildren<Renderer>(true))
+                foreach (var m in r.sharedMaterials)
+                {
+                    if (m == null || !Matted.Add(m))
+                        continue;
+                    foreach (var name in new[] { "metallicFactor", "_Metallic" })
+                        if (m.HasProperty(name))
+                            m.SetFloat(name, 0.1f);
+                    foreach (var name in new[] { "roughnessFactor", "_Roughness" })
+                        if (m.HasProperty(name))
+                            m.SetFloat(name, 0.5f);
+                    if (m.HasProperty("_Glossiness"))
+                        m.SetFloat("_Glossiness", 0.5f);
+                    foreach (var name in new[] { "metallicRoughnessTexture", "_MetallicGlossMap" })
+                        if (m.HasProperty(name))
+                            m.SetTexture(name, null);
+                }
+        }
+
         /// <summary>A transform anywhere under <paramref name="root"/> with this name.</summary>
         public static Transform? Find(Transform root, string name)
         {
@@ -223,6 +250,7 @@ namespace FishingSim.Game
             model.transform.SetParent(holder.transform, false);
             model.transform.localScale = Vector3.one / length;
             model.transform.localPosition = -b.center / length;
+            FishLook(model);
             return holder;
         }
     }

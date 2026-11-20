@@ -1,4 +1,6 @@
-// The Godot game's environment finish (GraphicsQuality.ApplyEnvironment): screen-space ambient occlusion from the
+// The Godot game's environment finish (GraphicsQuality.ApplyEnvironment): sun shafts (standing in for the volumetric
+// fog's light shafts: bright sky behind the trees smeared away from the sun, strongest at the golden hour),
+// screen-space ambient occlusion from the
 // depth buffer, glow over an HDR threshold of 1.15 blended as soft light, ACES tonemapping with white 6 (Godot's
 // formula), contrast 1.12, saturation 1.1 and the Nordic colour correction (per channel through a 1D gradient: teal
 // shadows, warm highlights), the time of day's exposure (SkyController: 1.9 at night .. 1.05 by day), in Godot's order (tonemap -> sRGB -> adjustments -> correction).
@@ -7,7 +9,9 @@ Shader "Hidden/FS/Post"
     Properties { _MainTex ("", 2D) = "black" {} }
     CGINCLUDE
     #include "UnityCG.cginc"
-    sampler2D _MainTex, _Bloom, _Grade, _AO;
+    sampler2D _MainTex, _Bloom, _Grade, _AO, _Shafts;
+    float4 _SunScreen, _ShaftTint;
+    float _ShaftStrength;
     float4 _MainTex_TexelSize;
     UNITY_DECLARE_DEPTH_TEXTURE(_CameraDepthTexture);
     float _SceneExposure, _Threshold, _GlowIntensity, _AOStrength, _AORadius, _Contrast, _Saturation, _White, _UseAO;
@@ -78,11 +82,40 @@ Shader "Hidden/FS/Post"
              : c + (2 * g - 1) * (sqrt(c) - c);
     }
 
+    // 5: what can shine through: bright sky (nothing in front of it) near the sun
+    float4 ShaftMask(v2f i) : SV_Target
+    {
+        float d = Linear01Depth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, i.uv));
+        float sky = step(0.999, d);
+        float3 c = tex2D(_MainTex, i.uv).rgb;
+        float2 toSun = (i.uv - _SunScreen.xy) * float2(_ScreenParams.x / _ScreenParams.y, 1);
+        float near = saturate(1.0 - length(toSun) * 1.4);
+        return float4(c * sky * near * near, 1);
+    }
+    // 6: smeared away from the sun (the light through the haze between the trees)
+    float4 ShaftBlur(v2f i) : SV_Target
+    {
+        float2 dir = (_SunScreen.xy - i.uv) / 24.0;
+        float2 uv = i.uv;
+        float3 sum = 0;
+        float w = 1.0;
+        [unroll] for (int k = 0; k < 24; k++)
+        {
+            sum += tex2D(_MainTex, uv).rgb * w;
+            uv += dir;
+            w *= 0.95;
+        }
+        return float4(sum / 12.0, 1);
+    }
+
     // 4: composite
     float4 Composite(v2f i) : SV_Target
     {
         float exposure = _SceneExposure > 0 ? _SceneExposure : 1.0;
-        float3 c = tex2D(_MainTex, i.uv).rgb * exposure;
+        float3 c = tex2D(_MainTex, i.uv).rgb;
+        if (_ShaftStrength > 0.001)
+            c += tex2D(_Shafts, i.uv).rgb * _ShaftTint.rgb * _ShaftStrength;
+        c *= exposure;
         if (_UseAO > 0.5)
         {
             float ao = tex2D(_AO, i.uv).r;
@@ -124,6 +157,15 @@ Shader "Hidden/FS/Post"
         Pass { CGPROGRAM
             #pragma vertex vert
             #pragma fragment Composite
+            ENDCG }
+        Pass { CGPROGRAM
+            #pragma vertex vert
+            #pragma fragment ShaftMask
+            ENDCG }
+        Pass { CGPROGRAM
+            #pragma vertex vert
+            #pragma fragment ShaftBlur
+            #pragma target 3.0
             ENDCG }
     }
 }

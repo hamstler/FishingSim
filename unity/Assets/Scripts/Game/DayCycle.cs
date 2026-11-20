@@ -226,6 +226,8 @@ namespace FishingSim.Game
             RenderSettings.ambientSkyColor = Color.Lerp(fixedAmb, skyTop, skyShare) * energy;
             RenderSettings.ambientEquatorColor = Color.Lerp(fixedAmb, skyHor, skyShare) * energy * 0.85f;
             RenderSettings.ambientGroundColor = Color.Lerp(fixedAmb * 0.5f, new Color(0.22f, 0.2f, 0.15f), skyShare) * energy * 0.6f;
+            // light shafts: weak by day, strong at the golden hour, more in the morning mist (ShaftStrength x golden)
+            Shader.SetGlobalFloat("_ShaftStrength", el > -0.02f ? (Mathf.Lerp(0.05f, 0.25f, Mathf.Clamp01(el * 3f)) + 0.6f * golden * (0.4f + 0.6f * MistAt(hour, Wind, _rain))) * (1f - _cloud * 0.8f) : 0f);
             Shader.SetGlobalFloat("_SceneExposure", Mathf.Lerp(1.9f, 1.05f, day) + 0.12f * golden);
 
             // fog: haze lit by the sky; denser with cloud, rain and the morning mist
