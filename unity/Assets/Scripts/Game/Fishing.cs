@@ -96,7 +96,50 @@ namespace FishingSim.Game
         private bool _baitOn = true;
         private Vector3 _lastEye;
         private bool _eyeSeen;
-        private float _jump, _weedTime, _tilt, _run;
+        private float _jump, _weedTime, _tilt, _run, _swimLoad;
+
+        /// <summary>Baited spots on the bottom (the feeder's groundbait, loose feed): bites come faster there.</summary>
+        public GroundbaitSpots Groundbait { get; } = new();
+        /// <summary>The fish taken from each place: a swim fished hard goes quiet for a few hours.</summary>
+        public SwimPressure Swim { get; } = new();
+        /// <summary>Where a shoaling fish was caught, its shoal is still about for a while.</summary>
+        public Shoals Shoal { get; } = new();
+        private Vector3 _hookedAt;
+        private readonly Queue<(float X, float Z, float At)> _rises = new();
+
+        /// <summary>A new map: the baited spots, fished swims, shoals, rises and frightened fish belong to the old one.</summary>
+        public void ClearPlace()
+        {
+            Groundbait.Clear();
+            Swim.Clear();
+            Shoal.Clear();
+            Disturbance.Clear();
+            _rises.Clear();
+        }
+
+        /// <summary>A fish rose at (x, z) (Swimmers.Risen): a bait cast to the ring soon after draws the risers.</summary>
+        public void NoteRise(string species, float x, float z)
+        {
+            _rises.Enqueue((x, z, Time.time));
+            while (_rises.Count > 16)
+                _rises.Dequeue();
+        }
+
+        /// <summary>Shoals.Boost of recent catches, times the draw of a fresh rise ring near the bait (Rises.Boost).</summary>
+        private float ShoalAt(string species, float x, float z)
+        {
+            float boost = Shoal.Any ? Shoal.Boost(species, x, z, Profile.Clock) : 1f;
+            float rise = 1f;
+            foreach (var (rx, rz, at) in _rises)
+                rise = Mathf.Max(rise, Rises.Boost(new Vector2(rx - x, rz - z).magnitude, Time.time - at));
+            return boost * (Rises.Riser(FeedingHabits.LayerOf(species)) ? rise : 1f);
+        }
+
+        /// <summary>The place has been fished hard (bites slow down).</summary>
+        public bool FishedOut => SwimPressure.FishedOut(_swimLoad);
+
+        /// <summary>The groundbait's draw at the bait now.</summary>
+        private float GroundbaitPace => Method == FishingMethod.Spinning ? 1f : GroundbaitSpots.PaceFor(Groundbait.HeatAt(_bobber.position.x, _bobber.position.z));
 
         /// <summary>How this species takes a bait under a float (FeedingHabits: dive, pluck, lift, run).</summary>
         private BiteStyle Style => Species != null ? FeedingHabits.StyleOf(Species.SpeciesName) : BiteStyle.Dive;
@@ -150,7 +193,7 @@ namespace FishingSim.Game
         /// <summary>What slows or quickens every bite clock: frightened fish, the pressure's trend, feeding spells, a
         /// wind blowing onto this shore.</summary>
         private float ConditionPace => Disturbance.Pace * Barometer.Pace * FeedingSpells.Pace(Profile.Clock, Profile.Location)
-            * WindShore.Pace(_windShore, Day.Wind);
+            * WindShore.Pace(_windShore, Day.Wind) * SwimPressure.Pace(_swimLoad);
 
         /// <summary>How well the bait still works (fresh .. washed out), and how its kind suits the water's temperature.</summary>
         private float BaitPace => Method == FishingMethod.Spinning ? 1f : _baitOn ? BaitWear.Appeal(_baitFresh) * _seasonPace : 0f;
@@ -161,6 +204,9 @@ namespace FishingSim.Game
         /// <summary>The water's clarity now (the map's).</summary>
         private float Clarity => World.Lake.Location.WaterClarity;
 
+        /// <summary>Particle baits that can be thrown in loose (FishingRod.LooseFeed).</summary>
+        private static bool LooseFeedable(string id) => id is "maggot" or "corn" or "kasza" or "konopie" or "groch" or "bread" or "ochotka";
+
         /// <summary>
         /// FishingRod.TickDisturbance: the frightened fish calm down; the angler's steps near the bait frighten them
         /// (more running, wading); once a second the wind's push onto this shore and the bait's season are read.
@@ -169,6 +215,25 @@ namespace FishingSim.Game
         {
             Disturbance.Decay(dt);
             Barometer.Step(Day.LastStepHours, Day.Weather);
+            Groundbait.Decay(Day.LastStepHours);
+            // loose feed (G): a handful of particle bait round the float
+            if (Input.GetKeyDown(KeyCode.G) && !Blocked && Method == FishingMethod.Float
+                && State is RodState.Waiting or RodState.Nibble or RodState.Bite && LooseFeedable(Profile.Bait))
+            {
+                if (Profile.BaitCount(Profile.Bait) >= 3)
+                {
+                    for (int i = 0; i < 3; i++)
+                        Profile.UseBait();
+                    var f = _bobber.position;
+                    float spread = Mathf.Min(1f + 0.06f * Distance, 3f);
+                    Groundbait.Feed(f.x + (_rng.NextFloat() - 0.5f) * spread, f.z + (_rng.NextFloat() - 0.5f) * spread, 0.7f);
+                    Disturbance.Add(0.04f * NoiseMasking);
+                    Cue?.Invoke(Core.Audio.OneShot.SmallSplash, 0.4f);
+                    Said?.Invoke("Garść zanęty przy spławiku.");
+                }
+                else
+                    Said?.Invoke("Za mało przynęty na zanętę (potrzeba 3).");
+            }
             var eye = Player.transform.position;
             float speed = _eyeSeen && dt > 0f ? new Vector2(eye.x - _lastEye.x, eye.z - _lastEye.z).magnitude / dt : 0f;
             _lastEye = eye;
@@ -195,6 +260,7 @@ namespace FishingSim.Game
                     var wind = new Vector3(0.8f, 0f, 0.6f) * (Day.Wind * 3f);
                     _windShore = WindShore.Exposure(World.Lake.DepthAt, bait.x, bait.z, wind.x, wind.z);
                     _seasonPace = Bait != null ? BaitSeason.Pace((int)Bait.Kind, BaitTemperature) : 1f;
+                    _swimLoad = Swim.Load(bait.x, bait.z, Profile.Clock);
                 }
             }
             else
@@ -745,7 +811,7 @@ namespace FishingSim.Game
                 cover,
                 edge,
                 Day.Night > 0.5f ? Day.MoonLight : null,
-                null,
+                Shoal.Any || _rises.Count > 0 ? sp => ShoalAt(sp, at.x, at.z) : null,
                 Day.Light);
         }
 
@@ -928,6 +994,12 @@ namespace FishingSim.Game
                 Lure = Method == FishingMethod.Spinning && Bait != null
                     ? new LureMotion(FishingSim.Core.Methods.Method.FamilyOf(Bait.AffinityAs), LureTuning.From(Bait))
                     : null;
+                // the feeder empties one bait as groundbait on the bottom where it lies (with at least two left)
+                if (Method == FishingMethod.Bottom && Profile.BaitCount(Profile.Bait) >= 2)
+                {
+                    Profile.UseBait();
+                    Groundbait.Feed(p.x, p.z);
+                }
                 NewBiteTimer();
                 Set(RodState.Waiting);
             }
@@ -1091,7 +1163,7 @@ namespace FishingSim.Game
                     // the lure's play drives the bite clock: its quality, a falling jig, the flash after a twitch, the colours
                     _biteTimer -= dt * Lure.BitePace * FishingSim.Core.Methods.Method.LureRodMatch(Rod.Kind) * 2f * ConditionPace * LureAppeal;
                 else if (Method != FishingMethod.Spinning)
-                    _biteTimer -= dt * ConditionPace * BaitPace;
+                    _biteTimer -= dt * ConditionPace * BaitPace * GroundbaitPace;
                 if (rmbDown && Method != FishingMethod.Spinning)
                     Said?.Invoke("Nic nie bierze.");
                 if (_biteTimer <= 0f)
@@ -1209,6 +1281,7 @@ namespace FishingSim.Game
             var to = Flat(_bobber.position - Player.transform.position);
             _origin = Player.transform.position;
             _hookHold = hold;
+            _hookedAt = _bobber.position;
             _tilt = 0f;
             _run = 0f;
             _bobber.rotation = Quaternion.identity;
@@ -1292,6 +1365,10 @@ namespace FishingSim.Game
                     Profile.LineWear[Profile.Line] = Mathf.Min(Profile.WearOf(Profile.Line) + LineWear.PerFish, LineWear.Max);
                     Profile.HookDull[Profile.Hook] = Mathf.Min(Profile.DullOf(Profile.Hook) + HookWear.PerFish(Weight), HookWear.Max);
                     Profile.LineTwist[Profile.Line] = Mathf.Max(0f, Profile.TwistOf(Profile.Line) - LineTwist.FightRelief(fight.Elapsed));
+                    // the swim is fished a little more; a shoaling fish's shoal stays about
+                    Swim.Add(_hookedAt.x, _hookedAt.z, Profile.Clock + 1f);
+                    if (Species != null && Shoals.IsShoaling(Species.SpeciesName))
+                        Shoal.Add(Species.SpeciesName, _hookedAt.x, _hookedAt.z, Profile.Clock);
                     Profile.UseBait();
                     Set(RodState.Landed);
                     _bobber.gameObject.SetActive(false);
@@ -1379,7 +1456,10 @@ namespace FishingSim.Game
             if (keep)
                 Profile.Keepnet.Add(new KeptFish { Species = Species.SpeciesName, Name = Species.DisplayNameOr(), Weight = Weight });
             else
+            {
                 Profile.Xp += Mathf.RoundToInt(Progression.FishXp(Species, Weight) * 0.2f);   // a small bonus for letting it go
+                Swim.Add(_hookedAt.x, _hookedAt.z, Profile.Clock, SwimPressure.Released - 1f);  // a released fish counts half
+            }
             Fight = null;
             Species = null;
             _fish.gameObject.SetActive(false);

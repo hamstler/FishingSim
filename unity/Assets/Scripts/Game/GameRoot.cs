@@ -235,7 +235,12 @@ namespace FishingSim.Game
                 _loadedLocation = index;
                 _day.Water = _world.WaterMaterial;
                 _day.BuildEffects();
-                _swimmers ??= new GameObject("Swimmers").AddComponent<Swimmers>();
+                _rod.ClearPlace();
+                if (_swimmers == null)
+                {
+                    _swimmers = new GameObject("Swimmers").AddComponent<Swimmers>();
+                    _swimmers.Risen += _rod.NoteRise;
+                }
                 _swimmers.Watcher = _player.transform;
                 _swimmers.Day = _day;
                 _mayflies ??= new GameObject("Mayflies").AddComponent<Mayflies>();
