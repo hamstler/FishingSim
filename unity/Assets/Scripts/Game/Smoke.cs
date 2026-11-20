@@ -124,6 +124,38 @@ namespace FishingSim.Game
                 Destroy(shot);
                 if (GameObject.Find("AnglerArms")?.GetComponent<AnglerArms>() is { } anglerArms)
                     Debug.Log($"SMOKE arms: {anglerArms.Report()}");
+                // close-ups of the grips from cameras beside the rod (FISHSIM_CLOSEUP in the Godot game): the right
+                // hand on the handle from its right, both hands from ahead, the crank hand from the left
+                var eye = Player.Camera.transform;
+                var right = Rod.GripRight.position;
+                var left = Rod.GripLeft.position;
+                var mid = (right + left) * 0.5f;
+                var closeViews = new (string Name, Vector3 At, Vector3 Look)[]
+                {
+                    ("grip_right", right + eye.right * 0.3f + eye.up * 0.06f + eye.forward * 0.04f, right),
+                    ("grip_front", mid + eye.forward * 0.5f + eye.up * 0.12f, mid),
+                    ("grip_left", left - eye.right * 0.3f + eye.up * 0.08f + eye.forward * 0.06f, left),
+                    ("grip_below", mid - eye.up * 0.35f + eye.forward * 0.12f, mid),
+                };
+                var close = new GameObject("CloseUp").AddComponent<Camera>();
+                close.depth = Player.Camera.depth + 1f;
+                close.cullingMask = Player.Camera.cullingMask;
+                close.nearClipPlane = 0.01f;
+                close.fieldOfView = 40f;
+                close.allowHDR = true;
+                close.depthTextureMode |= DepthTextureMode.Depth;
+                close.gameObject.AddComponent<PostFx>();
+                foreach (var (shotName, from, target) in closeViews)
+                {
+                    close.transform.SetPositionAndRotation(from, Quaternion.LookRotation(target - from, eye.up));
+                    for (int i = 0; i < 3; i++)
+                        yield return null;
+                    yield return new WaitForEndOfFrame();
+                    var c = ScreenCapture.CaptureScreenshotAsTexture();
+                    SaveFull(c, shotName);
+                    Destroy(c);
+                }
+                Destroy(close.gameObject);
                 Player.Look(180f, 0f);
             }
             // rain over the lake
