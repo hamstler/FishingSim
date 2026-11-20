@@ -17,6 +17,7 @@ namespace FishingSim.Game
         public const float PierDeck = 0.62f;
         public Lake Lake { get; private set; } = null!;
         public Material WaterMaterial { get; private set; } = null!;
+        public Material? TerrainMat { get; private set; }
         public float Progress { get; private set; }
         public bool Ready { get; private set; }
 
@@ -42,6 +43,8 @@ namespace FishingSim.Game
             var zs = GridLines(Lake.ZMin, Lake.ZMax);
             var heights = new float[xs.Count * zs.Count];
             var colours = new Color[xs.Count * zs.Count];
+            var weightsA = new Vector2[xs.Count * zs.Count];
+            var weightsB = new Vector2[xs.Count * zs.Count];
             var lake = Lake;
             var task = Task.Run(() =>
             {
@@ -52,6 +55,9 @@ namespace FishingSim.Game
                         float h = lake.HeightAt(xs[i], zs[j]);
                         heights[j * xs.Count + i] = h;
                         colours[j * xs.Count + i] = Lin(lake.ColorAt(xs[i], zs[j], h));
+                        var g = lake.GroundAt(xs[i], zs[j], h);
+                        weightsA[j * xs.Count + i] = new Vector2(g.Sand, g.Path);
+                        weightsB[j * xs.Count + i] = new Vector2(g.Forest, g.Bed);
                     }
                 });
             });
@@ -64,7 +70,9 @@ namespace FishingSim.Game
                 throw task.Exception;
             Progress = 0.35f;
             yield return null;
-            MakeTerrain(xs, zs, heights, colours);
+            int size = Settings.Quality <= 1 ? 1024 : 2048;
+            bool photos = GroundLayers.Build(size);
+            MakeTerrain(xs, zs, heights, colours, weightsA, weightsB, photos ? TerrainMaterial(location) : Materials.Ground());
             Progress = 0.45f;
             yield return null;
 
@@ -133,7 +141,33 @@ namespace FishingSim.Game
             return go;
         }
 
-        private void MakeTerrain(List<float> xs, List<float> zs, float[] heights, Color[] colours)
+        public static Color Gamma(Compat.Color c) => new(c.R, c.G, c.B, 1f);
+
+        /// <summary>FS/Terrain with the photographed layers, tinted to the map's colours (LakeBed.ApplyGroundTints).</summary>
+        private static Material TerrainMaterial(Data.LocationData loc)
+        {
+            var m = new Material(Shader.Find("FS/Terrain")) { name = "Terrain" };
+            m.SetTexture("_GroundAlb", GroundLayers.Albedo);
+            m.SetTexture("_GroundNrm", GroundLayers.Normal);
+            m.SetTexture("_Noise", ProcTextures.NoiseField);
+            m.SetTexture("_Caustics", ProcTextures.Caustics);
+            var tints = new Vector4[GroundLayers.Count];
+            tints[GroundLayers.Grass] = GroundLayers.Photo(GroundLayers.Calm(Gamma(loc.GrassColor)), GroundLayers.Grass, 0.45f);
+            tints[GroundLayers.Forest] = GroundLayers.Photo(Color.Lerp(Gamma(loc.DarkGrassColor), Gamma(loc.PathColor), 0.6f) * 0.75f, GroundLayers.Forest, 0.15f);
+            tints[GroundLayers.Sand] = GroundLayers.Photo(Gamma(loc.SandColor), GroundLayers.Sand, 0.3f);
+            tints[GroundLayers.Path] = GroundLayers.Photo(GroundLayers.Calm(Gamma(loc.PathColor)), GroundLayers.Path, 0.2f);
+            tints[GroundLayers.Bed] = GroundLayers.Photo(Gamma(loc.SandColor) * 0.7f, GroundLayers.Bed, 0.3f);
+            tints[GroundLayers.Rock] = Vector4.one;
+            tints[GroundLayers.Snow] = Vector4.one;
+            m.SetVectorArray("_LayerTint", tints);
+            m.SetFloatArray("_LayerRough", GroundLayers.Roughness);
+            m.SetVector("_DarkGrassTint", GroundLayers.Photo(GroundLayers.Calm(Gamma(loc.DarkGrassColor)), GroundLayers.Grass, 0.6f));
+            m.SetFloat("_SnowLine", loc.SnowLine);
+            m.SetFloat("_RockLine", loc.RockLine);
+            return m;
+        }
+
+        private void MakeTerrain(List<float> xs, List<float> zs, float[] heights, Color[] colours, Vector2[] uvA, Vector2[] uvB, Material material)
         {
             int nx = xs.Count, nz = zs.Count;
             var verts = new Vector3[nx * nz];
@@ -153,16 +187,27 @@ namespace FishingSim.Game
             var mesh = new Mesh { name = "Terrain", indexFormat = IndexFormat.UInt32 };
             mesh.vertices = verts;
             mesh.colors = colours;
+            mesh.uv = uvA;
+            mesh.uv2 = uvB;
             mesh.triangles = tris;
             mesh.RecalculateNormals();
+            var normals = mesh.normals;
+            var tangents = new Vector4[normals.Length];
+            for (int k = 0; k < normals.Length; k++)
+            {
+                var tan = Vector3.Cross(normals[k], Vector3.forward).normalized;
+                tangents[k] = new Vector4(tan.x, tan.y, tan.z, 1f);
+            }
+            mesh.tangents = tangents;
             mesh.RecalculateBounds();
-            var go = Part("Terrain", mesh, Materials.Ground(), true);
+            var go = Part("Terrain", mesh, material, true);
+            TerrainMat = material;
             go.GetComponent<MeshRenderer>().receiveShadows = true;
         }
 
         private void MakeWater(Data.LocationData loc)
         {
-            const float step = 2f;
+            const float step = 1f;
             float x0 = Lake.XMin - 40f, x1 = Lake.XMax + 40f, z0 = Lake.ZMin - 40f, z1 = Lake.ZMax + 40f;
             int nx = Mathf.CeilToInt((x1 - x0) / step) + 1, nz = Mathf.CeilToInt((z1 - z0) / step) + 1;
             var verts = new Vector3[nx * nz];
@@ -191,10 +236,28 @@ namespace FishingSim.Game
             mesh.RecalculateBounds();
             mesh.bounds = new Bounds(mesh.bounds.center, mesh.bounds.size + Vector3.up * 2f);
             WaterMaterial = Materials.Water();
-            WaterMaterial.SetColor("_Shallow", Lin(loc.WaterShallowColor));
-            WaterMaterial.SetColor("_Deep", Lin(loc.WaterDeepColor));
-            WaterMaterial.SetFloat("_Clarity", Mathf.Max(loc.WaterClarity * 0.8f, 0.6f));
-            WaterMaterial.SetFloat("_Amp", Waves.Amplitude);
+            var shallow = Gamma(loc.WaterShallowColor);
+            WaterMaterial.SetColor("_Shallow", shallow);
+            WaterMaterial.SetColor("_Deep", Gamma(loc.WaterDeepColor));
+            WaterMaterial.SetFloat("_Clarity", loc.WaterClarity);
+            float gg = Mathf.Max(shallow.g, 0.02f);
+            WaterMaterial.SetVector("_Extinction", new Vector4(Mathf.Clamp(gg / Mathf.Max(shallow.r, 0.02f), 1.2f, 3.2f), 1f, Mathf.Clamp(gg / Mathf.Max(shallow.b, 0.02f), 0.6f, 2.2f), 0f));
+            WaterMaterial.SetTexture("_Ripples", ProcTextures.Ripples);
+            WaterMaterial.SetTexture("_FoamNoise", ProcTextures.Foam);
+            WaterMaterial.SetFloat("_SsrSteps", Settings.Quality switch { 0 => 0f, 1 => 0f, 2 => 12f, 3 => 20f, _ => 32f });
+            // the lake's depth over the map (Water.BuildDepthMap: 1.5 m cells, depth / 16 m)
+            const float cell = 1.5f;
+            int dw = Mathf.CeilToInt((Lake.XMax - Lake.XMin) / cell), dh = Mathf.CeilToInt((Lake.ZMax - Lake.ZMin) / cell);
+            var depth = new byte[dw * dh];
+            for (int j = 0; j < dh; j++)
+                for (int i = 0; i < dw; i++)
+                    depth[j * dw + i] = (byte)Mathf.Clamp(Lake.DepthAt(Lake.XMin + (i + 0.5f) * cell, Lake.ZMin + (j + 0.5f) * cell) / 16f * 255f, 0f, 255f);
+            var dm = new Texture2D(dw, dh, TextureFormat.R8, false, true) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+            dm.SetPixelData(depth, 0);
+            dm.Apply(false, true);
+            WaterMaterial.SetTexture("_DepthMap", dm);
+            WaterMaterial.SetVector("_MapRect", new Vector4(Lake.XMin, Lake.ZMin, dw * cell, dh * cell));
+            WaterMaterial.SetFloat("_MaxDepth", 16f);
             Part("Water", mesh, WaterMaterial, false).GetComponent<MeshRenderer>().receiveShadows = false;
         }
 

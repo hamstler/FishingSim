@@ -40,6 +40,7 @@ jobs:
             assets/models
             assets/characters
             assets/unity_lite
+            assets/textures
       - uses: actions/cache@v4
         with:
           path: unity/Library
@@ -55,6 +56,11 @@ jobs:
           "$RUNNER_TEMP/cv/bin/python" -I tools/unity/convert_glb.py assets/unity_lite unity/Assets/StreamingAssets/Models --max 2048
           "$RUNNER_TEMP/cv/bin/python" -I tools/unity/convert_glb.py assets/characters unity/Assets/StreamingAssets/Models/characters --max 1024
           "$RUNNER_TEMP/cv/bin/python" -I tools/unity/convert_textures.py assets/characters/textures unity/Assets/StreamingAssets/Models/characters/textures --max 1024
+          for d in assets/textures/*/; do
+            id=$(basename "$d")
+            "$RUNNER_TEMP/cv/bin/python" -I tools/unity/convert_textures.py "$d" "unity/Assets/StreamingAssets/Textures/$id" --max 2048 > /dev/null
+            cp "$d"/*.json "unity/Assets/StreamingAssets/Textures/$id/" 2>/dev/null || true
+          done
           rm -rf assets
           du -sh unity/Assets/StreamingAssets/Models
           df -h /

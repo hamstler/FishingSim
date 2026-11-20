@@ -26,7 +26,7 @@ namespace FishingSim.Game
 
         private Light _sun = null!, _moon = null!;
         private Material _sky = null!;
-        private float _cloud = 0.35f, _rain;
+        private float _cloud = 0.35f, _rain, _wetness;
         private float _nextWeather = 3f;
         private readonly SystemRng _rng = new();
 
@@ -84,6 +84,10 @@ namespace FishingSim.Game
                 _nextWeather = Hour + 2f + _rng.NextFloat() * 4f;
             }
             _rain = Mathf.MoveTowards(_rain, Weather == Weather.Rain ? 1f : 0f, dt * 0.05f);
+            Waves.Push(dt);
+            // the ground soaks in about two minutes of rain and dries in about ten (LakeBed.Wetness)
+            _wetness = Mathf.MoveTowards(_wetness, Weather == Weather.Rain ? 1f : 0f, dt * (Weather == Weather.Rain ? 1f / 120f : 1f / 600f));
+            Shader.SetGlobalFloat("_Wetness", _wetness);
             float windTarget = (Weather switch { Weather.Clear => 0.2f, Weather.Cloudy => 0.45f, _ => 0.7f })
                                + 0.15f * Mathf.Sin(Time.time * 0.05f);
             Wind = Mathf.MoveTowards(Wind, Mathf.Clamp01(windTarget), dt * 0.01f);
@@ -131,12 +135,16 @@ namespace FishingSim.Game
             RenderSettings.fogColor = horizon;
             RenderSettings.fogDensity = Mathf.Lerp(0.0016f, 0.006f, _rain) + Mathf.Lerp(0.0015f, 0f, day) + golden * 0.0006f;
 
+            Shader.SetGlobalColor("_SkyTop", top);
+            Shader.SetGlobalColor("_SkyHorizon", horizon);
+            Shader.SetGlobalVector("_SunDirection", sunDir);
+            Shader.SetGlobalColor("_SunTint", sunColour * _sun.intensity);
+            Shader.SetGlobalFloat("_Daylight", day);
+            Waves.Wind = Mathf.Clamp01(Wind + _rain * 0.25f);
             if (Water != null)
             {
-                Water.SetColor("_SkyTop", top);
-                Water.SetColor("_SkyHorizon", horizon);
-                Waves.Amplitude = Mathf.Lerp(0.05f, 0.12f, Mathf.Max(cloud - 0.3f, 0f) + _rain * 0.5f);
-                Water.SetFloat("_Amp", Waves.Amplitude);
+                Water.SetFloat("_Wind", Waves.Wind);
+                Water.SetFloat("_Rain", _rain);
             }
         }
     }

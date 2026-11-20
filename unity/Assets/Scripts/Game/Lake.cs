@@ -103,6 +103,44 @@ public sealed class Lake
         return PathDistance(x, z) < 2.2f;
     }
 
+    /// <summary>Signed distance (m) to the nearest building pad's edge (negative on a pad).</summary>
+    public float PadDistance(float x, float z)
+    {
+        var p = new Vector2(x, z);
+        float best = float.MaxValue;
+        foreach (var (c, r, _) in _pads)
+            best = MathF.Min(best, p.DistanceTo(c) - r);
+        return best;
+    }
+
+    /// <summary>
+    /// How much of the photographed grounds lies at a point (LakeBed.GroundAt): x sand, y path, z forest floor,
+    /// w lake bed; the meadow is the rest, rock and snow come from slope and height in the terrain shader.
+    /// </summary>
+    public (float Sand, float Path, float Forest, float Bed) GroundAt(float x, float z, float h)
+    {
+        if (h < 0f)
+        {
+            float bed = Smooth(0.25f, 1.6f, -h);
+            return (1f - bed, 0f, 0f, bed);
+        }
+        float sand = 1f - Smooth(0.5f, 1.25f, h);
+        float path = h >= 0.4f ? (1f - Smooth(0.8f, 2.0f, PathDistance(x, z))) * 0.95f : 0f;
+        path = MathF.Max(path, (1f - Smooth(-2.5f, 0.8f, PadDistance(x, z))) * 0.5f * Smooth(0.6f, 1.2f, h));
+        float threshold = -0.08f + (1f - Location.TreeDensity) * 0.5f;
+        float forest = Smooth(threshold - 0.04f, threshold + 0.14f, ForestDensity(x, z)) * Smooth(1.2f, 2.6f, h) * 0.95f;
+        forest *= 1f - path;
+        sand *= 1f - path;
+        float sum = sand + path + forest;
+        if (sum > 1f)
+        {
+            sand /= sum;
+            path /= sum;
+            forest /= sum;
+        }
+        return (sand, path, forest, 0f);
+    }
+
     /// <summary>Distance (m) to the nearest path or street.</summary>
     public float PathDistance(float x, float z)
     {

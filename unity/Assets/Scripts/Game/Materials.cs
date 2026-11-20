@@ -95,24 +95,70 @@ namespace FishingSim.Game
         public static Material Unlit(Color c) => new(Find("FS/Unlit")) { name = "Unlit", color = c };
     }
 
-    /// <summary>The lake's waves in C#: the same four sines as Water.shader, for the float and the boat.</summary>
+    /// <summary>
+    /// The lake's Gerstner waves in C#, exactly as Waves.cginc moves the water (World/Water.HeightAt): the float, the
+    /// boat and the line ride them. Push() sets the shaders' globals once a frame.
+    /// </summary>
     public static class Waves
     {
-        public static float Amplitude = 0.06f;
-
-        public static float HeightAt(float x, float z, float t)
+        private static readonly Vector4[] Table =
         {
-            float a = Amplitude;
-            return a * 1.0f * Mathf.Sin(Dot(1f, 0.3f, x, z) * 0.7f + 1.2f * t)
-                 + a * 0.6f * Mathf.Sin(Dot(0.6f, 1f, x, z) * 1.1f + 1.5f * t)
-                 + a * 0.3f * Mathf.Sin(Dot(-0.4f, 1f, x, z) * 1.9f + 2.0f * t)
-                 + a * 0.15f * Mathf.Sin(Dot(1f, -0.7f, x, z) * 3.1f + 2.6f * t);
+            new(0f, 9f, 0.40f, 0f), new(0.49f, 6.2f, 0.26f, 1.7f), new(-0.58f, 4.4f, 0.18f, 4.1f), new(1.08f, 3.1f, 0.10f, 2.6f),
+            new(-0.26f, 1.9f, 0.05f, 5.3f), new(0.79f, 1.25f, 0.035f, 0.9f), new(-1.22f, 0.8f, 0.025f, 3.7f),
+        };
+
+        public const int VertexWaves = 4;
+        public static float Wind = 0.3f;
+        public static float Amplitude => Mathf.Lerp(0.015f, 0.1f, Wind);
+        public static Vector2 Direction = new(0.8f, 0.6f);
+        public static float Chop = 1.4f;
+        public static float Time;
+
+        private static readonly int TimeId = Shader.PropertyToID("_WaterTime"), AmpId = Shader.PropertyToID("_WaterAmp"),
+            DirId = Shader.PropertyToID("_WaterDir"), ChopId = Shader.PropertyToID("_WaterChop");
+
+        public static void Push(float dt)
+        {
+            Time += dt;
+            Shader.SetGlobalFloat(TimeId, Time);
+            Shader.SetGlobalFloat(AmpId, Amplitude);
+            Shader.SetGlobalVector(DirId, new Vector4(Direction.normalized.x, Direction.normalized.y, 0f, 0f));
+            Shader.SetGlobalFloat(ChopId, Chop);
         }
 
-        private static float Dot(float dx, float dz, float x, float z)
+        private static Vector2 Dir(int i)
         {
-            float l = Mathf.Sqrt(dx * dx + dz * dz);
-            return (dx * x + dz * z) / l;
+            var w = Direction.normalized;
+            float a = Table[i].x;
+            return new Vector2(w.x * Mathf.Cos(a) - w.y * Mathf.Sin(a), w.x * Mathf.Sin(a) + w.y * Mathf.Cos(a));
+        }
+
+        private static Vector3 Gerstner(Vector2 p)
+        {
+            var d = Vector3.zero;
+            float amp = Amplitude;
+            for (int i = 0; i < VertexWaves; i++)
+            {
+                float k = 2f * Mathf.PI / Table[i].y;
+                float omega = Mathf.Sqrt(9.81f * k);
+                var dir = Dir(i);
+                float f = k * Vector2.Dot(dir, p) - omega * Time + Table[i].w;
+                float a = amp * Table[i].z;
+                float q = Chop * a;
+                d.x += dir.x * q * Mathf.Cos(f);
+                d.z += dir.y * q * Mathf.Cos(f);
+                d.y += a * Mathf.Sin(f);
+            }
+            return d;
+        }
+
+        /// <summary>The water's height over the world point (x, z).</summary>
+        public static float HeightAt(float x, float z, float unusedTime = 0f)
+        {
+            var p = new Vector2(x, z);
+            var g = Gerstner(p);
+            var rest = p - new Vector2(g.x, g.z);
+            return Gerstner(rest).y;
         }
     }
 }
