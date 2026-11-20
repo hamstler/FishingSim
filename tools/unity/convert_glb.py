@@ -152,9 +152,11 @@ def main():
     ap.add_argument("dst")
     ap.add_argument("--max", type=int, default=2048)
     ap.add_argument("--only", default="")
+    ap.add_argument("--skip", default="", help="leave out paths matching this")
     ap.add_argument("--fish", action="store_true", help="also write <name>.json with the nose's direction")
     a = ap.parse_args()
     pattern = re.compile(a.only) if a.only else None
+    skip = re.compile(a.skip) if a.skip else None
     count = 0
     for root, _, files in os.walk(a.src):
         for name in sorted(files):
@@ -162,7 +164,7 @@ def main():
                 continue
             src = os.path.join(root, name)
             rel = os.path.relpath(src, a.src)
-            if pattern and not pattern.search(rel):
+            if pattern and not pattern.search(rel) or skip and skip.search(rel):
                 continue
             dst = os.path.join(a.dst, rel)
             if os.path.exists(dst) and os.path.getmtime(dst) >= os.path.getmtime(src):
