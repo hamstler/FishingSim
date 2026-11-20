@@ -41,6 +41,41 @@ public sealed class Profile
     public Dictionary<string, float> Records { get; set; } = new();
     public int Caught { get; set; }
 
+    /// <summary>Forest pickings (Core/Camp/Foraging ids -> pieces).</summary>
+    public Dictionary<string, int> Pantry { get; set; } = new();
+
+    /// <summary>The last meal's buff and until when it lasts (Clock hours).</summary>
+    public string MealId { get; set; } = "";
+    public float MealUntil { get; set; }
+
+    [JsonIgnore]
+    public Core.Camp.MealBuff? ActiveMeal =>
+        MealUntil > Clock ? Core.Camp.Cooking.All.FirstOrDefault(r => r.Id == MealId)?.Buff : null;
+
+    public bool HasAccessory(string id) => Owned.Contains(id);
+
+    /// <summary>Notices already handed in ("day:place:index").</summary>
+    public HashSet<string> Notices { get; set; } = new();
+
+    /// <summary>Cooks a dish from the keepnet (and the pantry); returns what happened.</summary>
+    public string Cook(Core.Camp.Recipe r)
+    {
+        var fish = Keepnet.Select((f, i) => new Core.Camp.Cooking.Ingredient(i, f.Weight,
+            Tackle.Species(f.Species) is { } sp ? Progression.FishValue(sp, f.Weight) : 0,
+            Tackle.Species(f.Species) is { } s2 && f.Weight < s2.LegalWeight)).ToList();
+        if (Core.Camp.Cooking.Missing(r, fish, HasAccessory("garnek"), Pantry) is { } why)
+            return why;
+        var take = Core.Camp.Cooking.Pick(r, fish)!.OrderByDescending(i => i).ToList();
+        foreach (int i in take)
+            Keepnet.RemoveAt(i);
+        if (r.Extras != null)
+            foreach (var (id, n) in r.Extras)
+                Pantry[id] = Pantry.GetValueOrDefault(id) - n;
+        MealId = r.Id;
+        MealUntil = Clock + r.Buff.Hours;
+        return $"{r.Name}: {r.Buff.Name} na {r.Buff.Hours:0} godz. (+{r.Buff.XpBonus * 100f:0}% doświadczenia, szybsze brania).";
+    }
+
     /// <summary>Game hours played in all (the market's and the smokehouse's clock).</summary>
     public float Clock { get; set; }
 
@@ -115,7 +150,7 @@ public sealed class Profile
     public void AddCatch(FishSpecies sp, float weight)
     {
         Caught++;
-        Xp += Progression.FishXp(sp, weight);
+        Xp += (int)(Progression.FishXp(sp, weight) * (1f + (ActiveMeal?.XpBonus ?? 0f)));
         if (!Records.TryGetValue(sp.SpeciesName, out float best) || weight > best)
             Records[sp.SpeciesName] = weight;
     }
@@ -207,6 +242,7 @@ public static class Tackle
     private static List<LineData>? _lines;
     private static List<HookData>? _hooks;
     private static List<BaitData>? _baits;
+    private static List<AccessoryData>? _accessories;
     private static List<FishSpecies>? _species;
 
     private static readonly string[] ShopReels = { "mlynek1000", "beben_sumowy", "fjordline_freespool6000" };
@@ -235,6 +271,8 @@ public static class Tackle
     public static IReadOnlyList<HookData> Hooks => _hooks ??= All<HookData>("hooks", _ => true)
         .OrderBy(h => h.Size).ToList();
     public static IReadOnlyList<BaitData> Baits => _baits ??= All<BaitData>("baits", _ => true)
+        .OrderBy(r => r.RequiredLevel).ThenBy(r => r.Price).ToList();
+    public static IReadOnlyList<AccessoryData> Accessories => _accessories ??= All<AccessoryData>("accessories", _ => true)
         .OrderBy(r => r.RequiredLevel).ThenBy(r => r.Price).ToList();
     public static IReadOnlyList<FishSpecies> AllSpecies => _species ??= SpeciesCatalog.Paths
         .Select(p => DataStore.Load<FishSpecies>(p)).Where(s => s != null).Select(s => s!).ToList();

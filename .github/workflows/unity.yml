@@ -41,11 +41,9 @@ jobs:
           restore-keys: Library-${{ matrix.target }}-
       - name: Convert the Meshy models for Unity
         run: |
-          pip install --quiet pillow numpy
-          python3 -I tools/unity/convert_glb.py assets/fish/meshy unity/Assets/Resources/Models/fish --fish --max 1024
-          python3 -I tools/unity/convert_glb.py assets/models/buildings unity/Assets/Resources/Models/buildings --max 2048
-          python3 -I tools/unity/convert_glb.py assets/models/rods unity/Assets/Resources/Models/rods --max 2048
-          python3 -I tools/unity/convert_glb.py assets/models/reels unity/Assets/Resources/Models/reels --max 2048
+          python3 -m venv "$RUNNER_TEMP/cv" && "$RUNNER_TEMP/cv/bin/pip" install --quiet pillow numpy
+          "$RUNNER_TEMP/cv/bin/python" -I tools/unity/convert_glb.py assets/fish/meshy unity/Assets/Resources/Models/fish --fish --max 1024
+          "$RUNNER_TEMP/cv/bin/python" -I tools/unity/convert_glb.py assets/models unity/Assets/Resources/Models --max 2048
           rm -rf assets
           du -sh unity/Assets/Resources/Models
           df -h /

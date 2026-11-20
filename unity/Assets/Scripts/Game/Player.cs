@@ -14,6 +14,9 @@ namespace FishingSim.Game
         public WorldView World { get; set; } = null!;
         public bool Frozen { get; set; }
 
+        /// <summary>The boat the angler sits in (the body follows its seat), or null on foot.</summary>
+        public Boat? Riding { get; set; }
+
         /// <summary>Buildings and other solids (centre, radius) the angler cannot walk into.</summary>
         public System.Collections.Generic.List<(Vector3 At, float Radius)> Solids { get; } = new();
 
@@ -31,7 +34,10 @@ namespace FishingSim.Game
         }
         public float Sensitivity { get; set; } = 2.2f;
 
-        private float _yaw, _pitch, _bob, _ground;
+        private float _yaw, _pitch, _bob, _ground, _stepAt;
+
+        /// <summary>A footstep (true = on wood).</summary>
+        public event System.Action<bool>? Step;
 
         private void Awake()
         {
@@ -78,6 +84,13 @@ namespace FishingSim.Game
                 _yaw += Input.GetAxisRaw("Mouse X") * Sensitivity;
                 _pitch = Mathf.Clamp(_pitch - Input.GetAxisRaw("Mouse Y") * Sensitivity, -80f, 80f);
             }
+            if (Riding != null)
+            {
+                transform.position = Riding.Seat;
+                _ground = transform.position.y;
+                Apply();
+                return;
+            }
             var move = Vector3.zero;
             if (!Frozen)
             {
@@ -99,6 +112,11 @@ namespace FishingSim.Game
                 else if (Free(p.x, p.z + flat.z))
                     p.z += flat.z;
                 _bob += flat.magnitude * 2.2f;
+                if (_bob - _stepAt > 1.6f)
+                {
+                    _stepAt = _bob;
+                    Step?.Invoke(Lake.OnPier(p.x, p.z));
+                }
             }
             float floor = FloorAt(p.x, p.z);
             _ground = Mathf.Lerp(_ground, floor, 1f - Mathf.Exp(-dt * 14f));

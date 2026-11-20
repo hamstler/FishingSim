@@ -23,7 +23,7 @@ namespace FishingSim.Game
         public static string Version => Application.version;
 
         private enum Screen { Menu, Loading, Play }
-        private enum Panel { None, Pause, Shop, Settings, Help, Keepnet, Records, Smokehouse }
+        private enum Panel { None, Pause, Shop, Settings, Help, Keepnet, Records, Smokehouse, Cooking, Notices }
 
         private Screen _screen = Screen.Menu;
         private Panel _panel = Panel.None;
@@ -34,6 +34,13 @@ namespace FishingSim.Game
         private DayCycle _day = null!;
         private Village _village = null!;
         private Village.Door? _nearDoor;
+        private Camp _camp = null!;
+        private Boat _boat = null!;
+        private Sound _sound = null!;
+        private string _hint = "";
+        private System.Action? _interact;
+        private Campfire? _fireAt;
+        private readonly HashSet<string> _handedIn = new();
         private readonly List<LocationData> _locations = new();
         private int _loadedLocation = -1;
         private string _message = "";
@@ -70,6 +77,8 @@ namespace FishingSim.Game
             _day.Hour = _profile.Hour;
             _world = new GameObject("World").AddComponent<WorldView>();
             _village = new GameObject("Village").AddComponent<Village>();
+            _camp = new GameObject("Camp").AddComponent<Camp>();
+            _boat = new GameObject("Boat").AddComponent<Boat>();
             var player = new GameObject("Angler");
             _player = player.AddComponent<Player>();
             _player.World = _world;
@@ -81,6 +90,16 @@ namespace FishingSim.Game
             _rod.Profile = _profile;
             _rod.Said += Say;
             _rod.Landed += () => SetCursor(false);
+            _boat.World = _world;
+            _boat.Day = _day;
+            _sound = _player.Camera.gameObject.AddComponent<Sound>();
+            _sound.Player = _player;
+            _sound.Rod = _rod;
+            _sound.Day = _day;
+            _sound.World = _world;
+            _rod.Cue += (kind, gain) => _sound.Play(kind, gain);
+            _rod.BiteBonus = () => _profile.ActiveMeal?.BiteBonus ?? 0f;
+            _player.Step += wood => _sound.Play(wood ? Core.Audio.OneShot.StepWood : Core.Audio.OneShot.StepGrass, 0.7f);
             Settings.Apply(_player.Camera);
             _player.Frozen = true;
             _rod.Blocked = true;
@@ -149,6 +168,14 @@ namespace FishingSim.Game
                 {
                     Debug.LogException(e);   // the map stays playable without its village
                 }
+                try
+                {
+                    _camp.Build(_world.Lake);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
                 _player.Solids.Clear();
                 _player.Solids.AddRange(_village.Solids);
                 _loadedLocation = index;
@@ -156,6 +183,8 @@ namespace FishingSim.Game
                 GC.Collect();
             }
             _profile.Location = index;
+            _player.Riding = null;
+            _boat.ResetToMooring();
             _player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
             _day.Apply();
             _screen = play ? Screen.Play : Screen.Menu;
@@ -220,19 +249,16 @@ namespace FishingSim.Game
                     ClosePanel();
             }
             _village.SetNight(_day.Night);
-            _nearDoor = null;
-            if (_panel == Panel.None && _rod.State == RodState.Idle)
-            {
-                float best = 3.5f;
-                foreach (var d in _village.Doors)
-                {
-                    float dist = Vector3.Distance(d.At, _player.transform.position);
-                    if (dist < best)
-                        (best, _nearDoor) = (dist, d);
-                }
-                if (_nearDoor is { } door && Input.GetKeyDown(KeyCode.E))
-                    UseDoor(door);
-            }
+            Campfire.ClockNow = _profile.Clock;
+            _camp.Regrow(_profile.Clock);
+            _boat.Tick(Time.deltaTime, _panel == Panel.None && _rod.State == RodState.Idle);
+            FindInteraction();
+            if (_panel == Panel.None && _interact != null && Input.GetKeyDown(KeyCode.E))
+                _interact();
+            if (_panel == Panel.None && Boat.Aboard && Input.GetKeyDown(KeyCode.X))
+                Say(_boat.ToggleAnchor());
+            if (_panel == Panel.None && _rod.State == RodState.Idle && Cursor.lockState == CursorLockMode.Locked)
+                UseTools();
             if (_panel == Panel.None && _rod.State != RodState.Landed)
             {
                 if (Input.GetKeyDown(KeyCode.T) && (_rod.State == RodState.Idle))
@@ -257,6 +283,126 @@ namespace FishingSim.Game
             }
             // the cursor shows only with a panel open or the fish landed; time runs on (the lake does not pause)
             _day.TimeScale = 1f;
+        }
+
+        /// <summary>What E does here: the nearest door, the boat, a campfire, the notice board or a forest patch.</summary>
+        private void FindInteraction()
+        {
+            _hint = "";
+            _interact = null;
+            _nearDoor = null;
+            if (_screen != Screen.Play || _rod.State != RodState.Idle)
+                return;
+            var p = _player.transform.position;
+            if (Boat.Aboard)
+            {
+                _hint = $"E – wysiądź · X – {(_boat.Anchored ? "podnieś kotwicę" : "rzuć kotwicę")} · W/S/A/D – wiosłuj";
+                _interact = () =>
+                {
+                    if (_boat.StepOut(out var at, out string why))
+                    {
+                        _player.Riding = null;
+                        _player.Place(at, _boat.Yaw);
+                    }
+                    else
+                        Say(why);
+                };
+                return;
+            }
+            float best = 3.5f;
+            foreach (var d in _village.Doors)
+            {
+                float dist = Vector3.Distance(d.At, p);
+                if (dist < best)
+                {
+                    best = dist;
+                    var door = d;
+                    _nearDoor = d;
+                    _hint = $"E – {d.Name}";
+                    _interact = () => UseDoor(door);
+                }
+            }
+            if (Vector3.Distance(_boat.transform.position, p) < Mathf.Min(best, 3.4f))
+            {
+                best = Vector3.Distance(_boat.transform.position, p);
+                _hint = "E – wsiądź do łódki";
+                _interact = () =>
+                {
+                    _boat.Board();
+                    _player.Riding = _boat;
+                    Say("W łódce: W/S wiosłuj, A/D skręcaj, X kotwica, E wysiądź.");
+                };
+            }
+            foreach (var fire in _camp.Fires)
+            {
+                float dist = Vector3.Distance(fire.transform.position, p);
+                if (dist < Mathf.Min(best, 2.6f))
+                {
+                    best = dist;
+                    var f = fire;
+                    _hint = f.Lit ? $"E – gotuj ({f.Name})" : $"E – rozpal ({f.Name})";
+                    _interact = () =>
+                    {
+                        if (!f.Lit)
+                        {
+                            f.BurnUntil = _profile.Clock + Campfire.BurnHours;
+                            _sound.Play(Core.Audio.OneShot.Ignite);
+                            Say("Ogień płonie. E – gotowanie.");
+                        }
+                        else
+                        {
+                            _fireAt = f;
+                            OpenPanel(Panel.Cooking);
+                        }
+                    };
+                }
+            }
+            if (Vector3.Distance(_camp.Board, p) < Mathf.Min(best, 2.6f))
+            {
+                best = Vector3.Distance(_camp.Board, p);
+                _hint = "E – tablica ogłoszeń";
+                _interact = () => OpenPanel(Panel.Notices);
+            }
+            if (_camp.NearPatch(p, _profile.Clock) is { } patch && Vector3.Distance(patch.At, p) < best)
+            {
+                _hint = $"E – zbierz ({Core.Camp.Foraging.NameOf(Core.Camp.Foraging.IdOf(patch.Kind))})";
+                _interact = () => Say(_camp.Pick(patch, _profile, _day.Weather == Weather.Rain));
+            }
+        }
+
+        /// <summary>G – kopanie łopatą, H – siatka na owady, L – podrywka (with the accessory bought).</summary>
+        private void UseTools()
+        {
+            var p = _player.transform.position;
+            var ahead = p + Vector3.ProjectOnPlane(_player.Forward, Vector3.up).normalized * 2.5f;
+            if (Input.GetKeyDown(KeyCode.G))
+            {
+                if (!_profile.HasAccessory("lopata")) Say("Potrzebna łopata (sklep, akcesoria).");
+                else if (Boat.Aboard) Say("Z łódki nie pokopiesz.");
+                else
+                {
+                    _sound.Play(Core.Audio.OneShot.Dig);
+                    Say(_camp.Dig(_world.Lake, p, _day.Hour, _day.Weather, _profile));
+                }
+            }
+            if (Input.GetKeyDown(KeyCode.H))
+            {
+                if (!_profile.HasAccessory("siatka_na_owady")) Say("Potrzebna siatka na owady (sklep, akcesoria).");
+                else
+                {
+                    _sound.Play(Core.Audio.OneShot.Swish);
+                    Say(_camp.Sweep(_world.Lake, p, _day.Hour, _day.Weather, _profile));
+                }
+            }
+            if (Input.GetKeyDown(KeyCode.L))
+            {
+                if (!_profile.HasAccessory("podrywka")) Say("Potrzebna podrywka (sklep, akcesoria).");
+                else
+                {
+                    _sound.Play(Core.Audio.OneShot.SmallSplash, 0.6f);
+                    Say(_camp.LiftNet(_world.Lake, ahead, _day.Hour, _day.Weather, _profile));
+                }
+            }
         }
 
         private void UseDoor(Village.Door door)
@@ -421,6 +567,8 @@ namespace FishingSim.Game
                         case Panel.Keepnet: DrawKeepnet(w, h); break;
                         case Panel.Records: DrawRecords(w, h); break;
                         case Panel.Smokehouse: DrawSmokehouse(w, h); break;
+                        case Panel.Cooking: DrawCooking(w, h); break;
+                        case Panel.Notices: DrawNotices(w, h); break;
                     }
                     break;
             }
@@ -578,7 +726,10 @@ namespace FishingSim.Game
                 "<b>PPM</b> – zacięcie, gdy spławik zanurkuje / szczytówka się ugnie\n" +
                 "W holu: <b>LPM</b> – zwijanie, <b>PPM</b> – podnoszenie wędki, <b>kółko</b> – hamulec\n" +
                 "Złowiona ryba: <b>E</b> – do siatki, <b>R</b> – wypuść\n" +
-                "<b>T</b> – sklep, <b>K</b> – siatka, <b>J</b> – rekordy, <b>Esc</b> – pauza\n\n" +
+                "<b>T</b> – sklep, <b>K</b> – siatka, <b>J</b> – rekordy, <b>Esc</b> – pauza\n" +
+                "<b>E</b> – sklepy, skup, wędzarnia, łódka, ognisko, tablica ogłoszeń, grzyby i jagody\n" +
+                "<b>G</b> – kopanie łopatą, <b>H</b> – siatka na owady, <b>L</b> – podrywka (akcesoria ze sklepu)\n" +
+                "Łódka: <b>W/S</b> wiosła, <b>A/D</b> skręt, <b>X</b> kotwica\n\n" +
                 "Za mocny hamulec zrywa żyłkę, za słaby pozwala rybie odejść z całą żyłką. Wybieraj haczyk do ryby: duże ryby rzadko biorą na małe haczyki, małe nie połkną dużych.",
                 _text);
             if (GUI.Button(new Rect(r.x, r.yMax - S(50), r.width, S(48)), "Zamknij", _accentButton))
@@ -597,6 +748,14 @@ namespace FishingSim.Game
             GUI.Label(new Rect(box.x + S(14), box.y + S(46), box.width, S(26)), place, _small);
             GUI.Label(new Rect(box.x + S(14), box.y + S(70), box.width, S(26)), $"Poz. {_profile.Level} · {_profile.Money} zł · siatka {_profile.Keepnet.Count}", _small);
 
+            if (Boat.Aboard && _profile.HasAccessory("echosonda"))
+            {
+                var er = new Rect(S(16), h * 0.4f, S(220), S(70));
+                GUI.Box(er, "", _panelStyle);
+                GUI.Label(new Rect(er.x + S(14), er.y + S(8), er.width, S(56)), $"Echosonda\n<b><size={(int)S(26)}>{_boat.DepthUnder:0.0} m</size></b>", _text);
+            }
+            if (_profile.ActiveMeal is { } meal)
+                GUI.Label(new Rect(w - S(300), S(128), S(284), S(26)), $"{meal.Name}: {(_profile.MealUntil - _profile.Clock):0.0} godz.", _small);
             // crosshair dot
             if (_panel == Panel.None && _rod.State != RodState.Landed)
                 GUI.Label(new Rect(w / 2f - S(4), h / 2f - S(12), S(12), S(24)), "·", _text);
@@ -629,10 +788,11 @@ namespace FishingSim.Game
                     GUI.Label(new Rect(bar.x, bar.y - S(4), bar.width, S(28)), $"Hamulec {_rod.DragSetting * 100f:0}% (kółko myszy) · F1 – sterowanie", _small);
                     break;
             }
-            if (_nearDoor is { } near && _panel == Panel.None)
+            if (_hint.Length > 0 && _panel == Panel.None && _rod.State == RodState.Idle)
             {
-                var hint = $"E – {near.Name}";
-                var hr = new Rect(w / 2f - S(200), h * 0.6f, S(400), S(40));
+                var hint = _hint;
+                float hw = Mathf.Min(_text!.CalcSize(new GUIContent(hint)).x + S(40), w * 0.9f);
+                var hr = new Rect(w / 2f - hw / 2f, h * 0.6f, hw, S(40));
                 GUI.Box(hr, "", _panelStyle);
                 GUI.Label(new Rect(hr.x + S(16), hr.y + S(6), hr.width - S(32), S(30)), hint, _text);
             }
@@ -723,6 +883,93 @@ namespace FishingSim.Game
                 ClosePanel();
         }
 
+        private void DrawCooking(float w, float h)
+        {
+            var r = Centre(w, h, S(760), S(640));
+            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), "Gotowanie", _title);
+            var pantry = string.Join(", ", _profile.Pantry.Where(p => p.Value > 0).Select(p => $"{Core.Camp.Foraging.NameOf(p.Key)} {p.Value}"));
+            GUI.Label(new Rect(r.x, r.y + S(48), r.width, S(26)), $"Siatka: {_profile.Keepnet.Count} ryb · spiżarnia: {(pantry.Length > 0 ? pantry : "pusta")}", _small);
+            float y = r.y + S(84);
+            var fish = _profile.Keepnet.Select((f, i) => new Core.Camp.Cooking.Ingredient(i, f.Weight,
+                Tackle.Species(f.Species) is { } sp ? Progression.FishValue(sp, f.Weight) : 0,
+                Tackle.Species(f.Species) is { } s2 && f.Weight < s2.LegalWeight)).ToList();
+            foreach (var recipe in Core.Camp.Cooking.All)
+            {
+                var missing = Core.Camp.Cooking.Missing(recipe, fish, _profile.HasAccessory("garnek"), _profile.Pantry);
+                GUI.Label(new Rect(r.x, y, r.width - S(170), S(28)), $"<b>{recipe.Name}</b> – {recipe.Buff.Name}, {recipe.Buff.Hours:0} godz.", _text);
+                GUI.Label(new Rect(r.x, y + S(28), r.width - S(170), S(44)), missing ?? recipe.Description, _small);
+                GUI.enabled = missing == null;
+                if (GUI.Button(new Rect(r.xMax - S(150), y + S(6), S(150), S(44)), "Gotuj", _accentButton))
+                {
+                    _sound.Play(Core.Audio.OneShot.Bubble);
+                    Say(_profile.Cook(recipe));
+                }
+                GUI.enabled = true;
+                y += S(86);
+            }
+            if (GUI.Button(new Rect(r.x, r.yMax - S(50), r.width, S(48)), "Zamknij", _button))
+                ClosePanel();
+        }
+
+        private void DrawNotices(float w, float h)
+        {
+            var r = Centre(w, h, S(820), S(660));
+            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), "Tablica ogłoszeń", _title);
+            var notes = Camp.Notices(_world.Lake, _profile, _profile.Location);
+            int day = (int)(_profile.Clock / 24f);
+            float y = r.y + S(60);
+            for (int i = 0; i < notes.Count; i++)
+            {
+                var n = notes[i];
+                string key = $"{day}:{_profile.Location}:{i}";
+                bool done = _handedIn.Contains(key) || _profile.Notices.Contains(key);
+                GUI.Label(new Rect(r.x, y, r.width - S(190), S(28)), $"<b>{n.From}</b>: {n.Wanted} – {n.Reward} zł, +{n.Xp} XP", _text);
+                GUI.Label(new Rect(r.x, y + S(28), r.width - S(190), S(48)), n.Text, _small);
+                GUI.enabled = !done;
+                if (GUI.Button(new Rect(r.xMax - S(170), y + S(8), S(170), S(44)), done ? "oddane" : "Oddaj", _button))
+                    Say(HandIn(n, key));
+                GUI.enabled = true;
+                y += S(88);
+            }
+            if (GUI.Button(new Rect(r.x, r.yMax - S(50), r.width, S(48)), "Zamknij", _button))
+                ClosePanel();
+        }
+
+        private string HandIn(Core.Camp.VillageRequest n, string key)
+        {
+            switch (n.Kind)
+            {
+                case Core.Camp.RequestKind.Fish:
+                {
+                    var fits = _profile.Keepnet.Where(f => Tackle.Species(f.Species) is { } sp
+                        && Core.Camp.NoticeBoard.FishFits(n, f.Species, f.Weight, f.Weight < sp.LegalWeight)).Take(n.Count).ToList();
+                    if (fits.Count < n.Count)
+                        return $"Potrzeba: {n.Wanted}. W siatce masz {fits.Count}.";
+                    foreach (var f in fits)
+                        _profile.Keepnet.Remove(f);
+                    break;
+                }
+                case Core.Camp.RequestKind.Bait:
+                    if (_profile.BaitCount(n.Item) < n.Count)
+                        return $"Potrzeba: {n.Wanted}.";
+                    _profile.Baits[n.Item] = _profile.BaitCount(n.Item) - n.Count;
+                    break;
+                case Core.Camp.RequestKind.Forage:
+                    if (_profile.Pantry.GetValueOrDefault(n.Item) < n.Count)
+                        return $"Potrzeba: {n.Wanted}.";
+                    _profile.Pantry[n.Item] -= n.Count;
+                    break;
+                default:
+                    return "Wędzone ryby sprzedaje się w wędzarni.";
+            }
+            _profile.Money += n.Reward;
+            _profile.Xp += n.Xp;
+            _profile.Notices.Add(key);
+            _handedIn.Add(key);
+            _sound.Play(Core.Audio.OneShot.Coins);
+            return $"{n.From} dziękuje: +{n.Reward} zł, +{n.Xp} XP.";
+        }
+
         private void DrawSmokehouse(float w, float h)
         {
             var r = Centre(w, h, S(620), S(420));
@@ -753,7 +1000,7 @@ namespace FishingSim.Game
         }
 
         // ------------------------------------------------------------------ shop
-        private static readonly string[] ShopTabs = { "Wędki", "Kołowrotki", "Żyłki", "Haczyki", "Przynęty" };
+        private static readonly string[] ShopTabs = { "Wędki", "Kołowrotki", "Żyłki", "Haczyki", "Przynęty", "Akcesoria" };
 
         private void DrawShop(float w, float h)
         {
@@ -777,7 +1024,8 @@ namespace FishingSim.Game
                 1 => Tackle.Reels,
                 2 => Tackle.Lines,
                 3 => Tackle.Hooks,
-                _ => Tackle.Baits,
+                4 => Tackle.Baits,
+                _ => Tackle.Accessories,
             };
             var list = items.ToList();
             var view = new Rect(r.x, r.y + S(110), r.width, r.height - S(176));
@@ -819,9 +1067,15 @@ namespace FishingSim.Game
                 {
                     _profile.Money -= item.Price;
                     _profile.Owned.Add(id);
+                    _sound.Play(Core.Audio.OneShot.Coins);
                     if (item is BaitData)
                         _profile.Baits[id] = 1;
                     Equip(item);
+                }
+                if (item is AccessoryData)
+                {
+                    GUI.enabled = true;
+                    continue;
                 }
                 GUI.enabled = owned && !equipped;
                 if (GUI.Button(use, equipped ? "w użyciu" : "użyj", equipped ? _accentButton : _button))
@@ -854,6 +1108,7 @@ namespace FishingSim.Game
             ReelData r => $"hamulec do {r.DragMax:0.0} kg · zwijanie {r.ReelSpeed:0.0} m/s · {r.LineCapacity:0} m żyłki",
             LineData l => $"{l.Diameter:0.00} mm · wytrzymałość {l.Strength:0.0} kg · widoczność {l.Visibility:0.00}",
             HookData k => $"{k.DisplayName} · wytrzymałość {k.Strength:0.0} kg · {k.WeightG:0.00} g",
+            AccessoryData a => a.Description.Length > 90 ? a.Description.Substring(0, 90) + "…" : a.Description,
             BaitData b => b.Reusable ? $"przynęta sztuczna · {b.SizeCm:0.#} cm · {b.WeightG:0.#} g" : $"{BaitKindName(b.Kind)} · paczka {b.PackSize} szt.",
             _ => "",
         };

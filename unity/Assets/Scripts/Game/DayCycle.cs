@@ -18,6 +18,9 @@ namespace FishingSim.Game
         /// <summary>0 by day .. 1 at night (lamps, windows).</summary>
         public float Night { get; private set; }
 
+        /// <summary>Wind strength 0..1 (calm sunny days to rainy gusts), drifting slowly.</summary>
+        public float Wind { get; private set; } = 0.25f;
+
         /// <summary>Game hours that passed in the last frame.</summary>
         public float LastStepHours { get; private set; }
 
@@ -81,6 +84,9 @@ namespace FishingSim.Game
                 _nextWeather = Hour + 2f + _rng.NextFloat() * 4f;
             }
             _rain = Mathf.MoveTowards(_rain, Weather == Weather.Rain ? 1f : 0f, dt * 0.05f);
+            float windTarget = (Weather switch { Weather.Clear => 0.2f, Weather.Cloudy => 0.45f, _ => 0.7f })
+                               + 0.15f * Mathf.Sin(Time.time * 0.05f);
+            Wind = Mathf.MoveTowards(Wind, Mathf.Clamp01(windTarget), dt * 0.01f);
             Apply();
         }
 

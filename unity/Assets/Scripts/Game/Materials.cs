@@ -89,6 +89,7 @@ namespace FishingSim.Game
             return m;
         }
 
+        public static Material Flame() => new(Find("FS/Flame")) { name = "Flame" };
         public static Material Water() => new(Find("FS/Water")) { name = "Water" };
         public static Material Sky() => new(Find("FS/Sky")) { name = "Sky" };
         public static Material Unlit(Color c) => new(Find("FS/Unlit")) { name = "Unlit", color = c };

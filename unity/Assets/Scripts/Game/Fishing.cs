@@ -39,6 +39,15 @@ namespace FishingSim.Game
         public event Action<string>? Said;
         public event Action? Landed;
 
+        /// <summary>Sounds of the rod (splash, strike, catch, line snap...).</summary>
+        public event Action<Core.Audio.OneShot, float>? Cue;
+
+        /// <summary>The reel turns (line out and the left button held).</summary>
+        public bool Reeling { get; private set; }
+
+        /// <summary>A well-fed angler waits less for a bite (the meal's buff).</summary>
+        public Func<float> BiteBonus { get; set; } = () => 0f;
+
         private readonly SystemRng _rng = new();
         private Transform _rodRoot = null!, _tip = null!;
         private readonly List<Transform> _segments = new();
@@ -408,6 +417,7 @@ namespace FishingSim.Game
                 }
                 DepthHere = -ground;
                 _lineSlack = 1f;
+                Cue?.Invoke(Method == FishingMethod.Bottom ? Core.Audio.OneShot.Splash : Core.Audio.OneShot.SmallSplash, 0.8f);
                 NewBiteTimer();
                 Set(RodState.Waiting);
             }
@@ -446,7 +456,8 @@ namespace FishingSim.Game
             var ctx = Context(DepthHere);
             float attraction = BiteModel.Attraction(SpeciesHere, ctx);
             float vis = LineItem?.Visibility ?? 1f;
-            _biteTimer = BiteModel.WaitSeconds(_rng, 4f, 12f, vis, attraction) * (Method == FishingMethod.Spinning ? 0.6f : 1f);
+            _biteTimer = BiteModel.WaitSeconds(_rng, 4f, 12f, vis, attraction) * (Method == FishingMethod.Spinning ? 0.6f : 1f)
+                         / (1f + BiteBonus());
         }
 
         private void TickWaiting(float dt, bool lmb, bool rmbDown)
@@ -569,6 +580,7 @@ namespace FishingSim.Game
             float length = Species!.LengthRef * Mathf.Pow(Mathf.Max(Weight, 0.005f), 0.33f);
             _fish.localScale = Vector3.one * Mathf.Clamp(length, 0.08f, 2.2f);
             _fish.gameObject.SetActive(true);
+            Cue?.Invoke(Core.Audio.OneShot.Strike, 1f);
             Set(RodState.Fight);
         }
 
@@ -588,6 +600,7 @@ namespace FishingSim.Game
             switch (outcome)
             {
                 case FightOutcome.Landed:
+                    Cue?.Invoke(Core.Audio.OneShot.Catch, 1f);
                     Profile.UseBait();
                     Set(RodState.Landed);
                     _bobber.gameObject.SetActive(false);
@@ -629,6 +642,7 @@ namespace FishingSim.Game
         /// <summary>The weakest link breaks: a rod snaps, a line parts (hook lost with it) or a hook opens.</summary>
         private void BreakTackle()
         {
+            Cue?.Invoke(Core.Audio.OneShot.LineSnap, 1f);
             float line = LineItem?.Strength ?? 0f, rod = Rod?.MaxLoad ?? 0f, hook = Hook?.Strength ?? 0f;
             if (rod <= line && rod <= hook)
             {
@@ -710,6 +724,7 @@ namespace FishingSim.Game
             float lift = State == RodState.Charging ? -25f * CastPower : State == RodState.Fight && Input.GetMouseButton(1) ? -18f : 0f;
             _rodRoot.localRotation = Quaternion.Slerp(_rodRoot.localRotation, Quaternion.Euler(-32f + lift, -6f, 0f), 1f - Mathf.Exp(-dt * 10f));
             bool reeling = (State == RodState.Fight || State == RodState.Waiting) && (Input.GetMouseButton(0) || SmokeReel) && !Blocked;
+            Reeling = reeling;
             if (reeling)
             {
                 _reelAngle += dt * 600f;
