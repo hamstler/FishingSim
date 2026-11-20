@@ -15,6 +15,12 @@ namespace FishingSim.Game
         public float TimeScale { get; set; } = 1f;
         public Material? Water { get; set; }
 
+        /// <summary>0 by day .. 1 at night (lamps, windows).</summary>
+        public float Night { get; private set; }
+
+        /// <summary>Game hours that passed in the last frame.</summary>
+        public float LastStepHours { get; private set; }
+
         private Light _sun = null!, _moon = null!;
         private Material _sky = null!;
         private float _cloud = 0.35f, _rain;
@@ -65,6 +71,7 @@ namespace FishingSim.Game
             float dt = Time.deltaTime;
             float before = Hour;
             Hour = DayClock.Advance(Hour, dt, TimeScale);
+            LastStepHours = Hour >= before ? Hour - before : Hour + 24f - before;
             if (Hour < before)
                 _nextWeather -= 24f;
             if (Hour >= _nextWeather)
@@ -85,6 +92,7 @@ namespace FishingSim.Game
             float elevation = sunDir.y;
             float day = Mathf.Clamp01(elevation * 4f + 0.25f);
             float golden = Mathf.Clamp01(1f - Mathf.Abs(elevation - 0.08f) * 6f);
+            Night = 1f - Mathf.Clamp01(elevation * 6f + 0.4f);
             float cloud = Mathf.Lerp(_cloud, 1f, _rain * 0.5f);
             _sun.transform.rotation = Quaternion.LookRotation(-sunDir);
             var sunColour = Color.Lerp(new Color(1f, 0.55f, 0.28f), new Color(1f, 0.96f, 0.9f), Mathf.Clamp01(elevation * 3.5f));

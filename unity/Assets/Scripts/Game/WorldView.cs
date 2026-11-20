@@ -261,7 +261,7 @@ namespace FishingSim.Game
                     float play = lake.PlayDistance(x, z);
                     bool forest = lake.IsForest(x, z, h) || (play > -25f && h > 1.5f && h < loc.RockLine + 8f);
                     float r = Hash(gx, gz, 3);
-                    if (Lake.OnPier(x, z) || Mathf.Abs(x) < 4f && z > -6f && z < 30f)
+                    if (Lake.OnPier(x, z) || lake.Built(x, z))
                         continue;
                     if (forest && r < (play > -25f ? 0.85f : 0.62f) * Mathf.Clamp(loc.TreeDensity, 0.3f, 1.4f))
                     {
@@ -296,7 +296,7 @@ namespace FishingSim.Game
                     int gx = Mathf.RoundToInt(x0 / gstep) + i, gz = Mathf.RoundToInt(z0 / gstep) + j;
                     float x = gx * gstep + (Hash(gx, gz, 11) - 0.5f) * gstep;
                     float z = gz * gstep + (Hash(gx, gz, 12) - 0.5f) * gstep;
-                    if (x < x0 || x >= x0 + 64f || z < z0 || z >= z0 + 64f || lake.PlayDistance(x, z) > 10f || Lake.OnPier(x, z))
+                    if (x < x0 || x >= x0 + 64f || z < z0 || z >= z0 + 64f || lake.PlayDistance(x, z) > 10f || Lake.OnPier(x, z) || lake.Built(x, z, 0.5f))
                         continue;
                     float h = lake.HeightAt(x, z);
                     float r = Hash(gx, gz, 13);

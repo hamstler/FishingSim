@@ -42,8 +42,19 @@ namespace FishingSim.Game
             }
             Debug.Log($"SMOKE map loaded in {Time.realtimeSinceStartup - started:0.0} s");
             EnterPlay();
-            foreach (float hour in new[] { 12f, 7f, 20.5f })
+            var views = new (float Hour, string Name, Vector3 At, float Yaw)[]
             {
+                (12f, "pier", new Vector3(0f, WorldView.PierDeck, 4.5f), 180f),
+                (12f, "village", new Vector3(0f, 0f, 9f), 0f),
+                (7f, "dawn", new Vector3(0f, WorldView.PierDeck, 4.5f), 180f),
+                (20.5f, "night", new Vector3(0f, 0f, 9f), 0f),
+            };
+            foreach (var (hour, name, at0, yaw) in views)
+            {
+                var at = at0;
+                if (at.y == 0f)
+                    at.y = Player.World.Lake.HeightAt(at.x, at.z);
+                Player.Place(at, yaw);
                 Day.Hour = hour;
                 Day.Apply();
                 for (int i = 0; i < 20; i++)
@@ -60,14 +71,19 @@ namespace FishingSim.Game
                         magenta++;
                 }
                 float share = magenta / (float)px.Length;
-                Debug.Log($"SMOKE frame {hour:0.0} h {shot.width}x{shot.height}: mean {r / px.Length},{g / px.Length},{b / px.Length}, magenta {share:P1}");
+                Debug.Log($"SMOKE frame {name} {hour:0.0} h {shot.width}x{shot.height}: mean {r / px.Length},{g / px.Length},{b / px.Length}, magenta {share:P1}");
                 if (share > 0.01f)
                     ok = false;
                 var small = Downscale(shot, 320, 180);
-                Debug.Log($"SMOKE JPEG {hour:0.0} {Convert.ToBase64String(small.EncodeToJPG(70))}");
+                Debug.Log($"SMOKE JPEG {name} {Convert.ToBase64String(small.EncodeToJPG(70))}");
                 Destroy(shot);
                 Destroy(small);
             }
+            Debug.Log($"SMOKE models: fish {ModelLibrary.Has("fish/okon")}, building {ModelLibrary.Has("buildings/dom_mur_pruski")}, rod {ModelLibrary.Has("rods/float_ostoja")}, reel {ModelLibrary.Has("reels/small_hokuto")}");
+            // the village's heavy models slow software rendering down: hide it for the fishing part
+            if (GameObject.Find("Village") is { } village)
+                village.SetActive(false);
+            Player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
             Day.Hour = 12f;
             int landed = 0;
             for (int n = 0; n < 2; n++)

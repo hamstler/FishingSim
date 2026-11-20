@@ -23,7 +23,7 @@ namespace FishingSim.Game
         public static string Version => Application.version;
 
         private enum Screen { Menu, Loading, Play }
-        private enum Panel { None, Pause, Shop, Settings, Help, Keepnet, Records }
+        private enum Panel { None, Pause, Shop, Settings, Help, Keepnet, Records, Smokehouse }
 
         private Screen _screen = Screen.Menu;
         private Panel _panel = Panel.None;
@@ -32,6 +32,8 @@ namespace FishingSim.Game
         private Player _player = null!;
         private Fishing _rod = null!;
         private DayCycle _day = null!;
+        private Village _village = null!;
+        private Village.Door? _nearDoor;
         private readonly List<LocationData> _locations = new();
         private int _loadedLocation = -1;
         private string _message = "";
@@ -67,6 +69,7 @@ namespace FishingSim.Game
             _day = new GameObject("Day").AddComponent<DayCycle>();
             _day.Hour = _profile.Hour;
             _world = new GameObject("World").AddComponent<WorldView>();
+            _village = new GameObject("Village").AddComponent<Village>();
             var player = new GameObject("Angler");
             _player = player.AddComponent<Player>();
             _player.World = _world;
@@ -138,6 +141,16 @@ namespace FishingSim.Game
                     }
                     yield return step;
                 }
+                try
+                {
+                    _village.Build(_world.Lake);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);   // the map stays playable without its village
+                }
+                _player.Solids.Clear();
+                _player.Solids.AddRange(_village.Solids);
                 _loadedLocation = index;
                 _day.Water = _world.WaterMaterial;
                 GC.Collect();
@@ -180,6 +193,7 @@ namespace FishingSim.Game
         private void Update()
         {
             _profile.Hour = _day.Hour;
+            _profile.Clock += _day.LastStepHours;
             if (_screen == Screen.Menu && _world.Ready)
             {
                 // the menu shows the lake from a slowly circling camera
@@ -205,6 +219,20 @@ namespace FishingSim.Game
                 else
                     ClosePanel();
             }
+            _village.SetNight(_day.Night);
+            _nearDoor = null;
+            if (_panel == Panel.None && _rod.State == RodState.Idle)
+            {
+                float best = 3.5f;
+                foreach (var d in _village.Doors)
+                {
+                    float dist = Vector3.Distance(d.At, _player.transform.position);
+                    if (dist < best)
+                        (best, _nearDoor) = (dist, d);
+                }
+                if (_nearDoor is { } door && Input.GetKeyDown(KeyCode.E))
+                    UseDoor(door);
+            }
             if (_panel == Panel.None && _rod.State != RodState.Landed)
             {
                 if (Input.GetKeyDown(KeyCode.T) && (_rod.State == RodState.Idle))
@@ -229,6 +257,31 @@ namespace FishingSim.Game
             }
             // the cursor shows only with a panel open or the fish landed; time runs on (the lake does not pause)
             _day.TimeScale = 1f;
+        }
+
+        private void UseDoor(Village.Door door)
+        {
+            switch (door.Kind)
+            {
+                case BuildingKind.Tackle:
+                case BuildingKind.General:
+                case BuildingKind.Bait:
+                    OpenPanel(Panel.Shop);
+                    break;
+                case BuildingKind.FishBuyer:
+                case BuildingKind.Market:
+                    OpenPanel(Panel.Keepnet);
+                    break;
+                case BuildingKind.Office:
+                    OpenPanel(Panel.Records);
+                    break;
+                case BuildingKind.Smokehouse:
+                    OpenPanel(Panel.Smokehouse);
+                    break;
+                default:
+                    Say(door.Name);
+                    break;
+            }
         }
 
         private void OpenPanel(Panel p)
@@ -367,6 +420,7 @@ namespace FishingSim.Game
                         case Panel.Help: DrawHelp(w, h); break;
                         case Panel.Keepnet: DrawKeepnet(w, h); break;
                         case Panel.Records: DrawRecords(w, h); break;
+                        case Panel.Smokehouse: DrawSmokehouse(w, h); break;
                     }
                     break;
             }
@@ -575,6 +629,13 @@ namespace FishingSim.Game
                     GUI.Label(new Rect(bar.x, bar.y - S(4), bar.width, S(28)), $"Hamulec {_rod.DragSetting * 100f:0}% (kółko myszy) · F1 – sterowanie", _small);
                     break;
             }
+            if (_nearDoor is { } near && _panel == Panel.None)
+            {
+                var hint = $"E – {near.Name}";
+                var hr = new Rect(w / 2f - S(200), h * 0.6f, S(400), S(40));
+                GUI.Box(hr, "", _panelStyle);
+                GUI.Label(new Rect(hr.x + S(16), hr.y + S(6), hr.width - S(32), S(30)), hint, _text);
+            }
             if (Time.unscaledTime < _messageUntil)
             {
                 var size = _text!.CalcSize(new GUIContent(_message));
@@ -590,7 +651,10 @@ namespace FishingSim.Game
             var sp = _rod.Species;
             if (sp == null)
                 return;
-            var r = Centre(w, h, S(620), S(400));
+            // the fish itself is shown above the panel (Fishing holds it up before the camera)
+            var box = new Rect((w - S(640)) / 2f, h - S(430), S(640), S(400));
+            GUI.Box(box, "", _panelStyle);
+            var r = new Rect(box.x + S(22), box.y + S(18), box.width - S(44), box.height - S(36));
             GUI.Label(new Rect(r.x, r.y, r.width, S(46)), sp.SpeciesName, _title);
             GUI.Label(new Rect(r.x, r.y + S(48), r.width, S(26)), sp.LatinName, _small);
             int value = Progression.FishValue(sp, _rod.Weight);
@@ -655,6 +719,35 @@ namespace FishingSim.Game
                 GUI.Label(new Rect(content.width * 0.6f, i * S(32), content.width * 0.4f, S(30)), rec, _small);
             }
             GUI.EndScrollView();
+            if (GUI.Button(new Rect(r.x, r.yMax - S(50), r.width, S(48)), "Zamknij", _button))
+                ClosePanel();
+        }
+
+        private void DrawSmokehouse(float w, float h)
+        {
+            var r = Centre(w, h, S(620), S(420));
+            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), "Wędzarnia", _title);
+            string state;
+            if (_profile.Smoking.Count == 0)
+                state = $"Wędzarz przyjmie wymiarowe ryby od 100 g z twojej siatki ({_profile.Keepnet.Count} ryb). " +
+                        $"Uwędzona ryba jest warta {Core.Camp.Smoking.ValueFactor:0.0}× więcej niż w skupie.";
+            else if (_profile.SmokingHoursLeft > 0f)
+                state = $"W dymie wisi {_profile.Smoking.Count} ryb. Gotowe za {_profile.SmokingHoursLeft * 60f:0} min gry.";
+            else
+                state = $"Uwędzone! {_profile.Smoking.Count} ryb, wędzarz zapłaci {_profile.SmokedValue()} zł.";
+            GUI.Label(new Rect(r.x, r.y + S(64), r.width, S(150)), state, _text);
+            if (_profile.Smoking.Count == 0)
+            {
+                if (GUI.Button(new Rect(r.x, r.yMax - S(104), r.width, S(48)), "Oddaj ryby do wędzenia", _accentButton))
+                    Say(_profile.StartSmoking());
+            }
+            else
+            {
+                GUI.enabled = _profile.SmokingHoursLeft <= 0f;
+                if (GUI.Button(new Rect(r.x, r.yMax - S(104), r.width, S(48)), $"Sprzedaj uwędzone ({_profile.SmokedValue()} zł)", _accentButton))
+                    Say($"Wędzarz zapłacił {_profile.SellSmoked()} zł.");
+                GUI.enabled = true;
+            }
             if (GUI.Button(new Rect(r.x, r.yMax - S(50), r.width, S(48)), "Zamknij", _button))
                 ClosePanel();
         }

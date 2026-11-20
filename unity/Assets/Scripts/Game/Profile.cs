@@ -41,6 +41,48 @@ public sealed class Profile
     public Dictionary<string, float> Records { get; set; } = new();
     public int Caught { get; set; }
 
+    /// <summary>Game hours played in all (the market's and the smokehouse's clock).</summary>
+    public float Clock { get; set; }
+
+    /// <summary>Fish hanging in the smokehouse and when they went in (-1 = none).</summary>
+    public List<KeptFish> Smoking { get; set; } = new();
+    public float SmokingSince { get; set; } = -1f;
+
+    /// <summary>Puts every keepnet fish the smokehouse takes into the smoke; returns the fee paid, or a refusal.</summary>
+    public string StartSmoking()
+    {
+        if (Smoking.Count > 0)
+            return "W wędzarni już wisi partia ryb.";
+        var take = Keepnet.Where(f => Tackle.Species(f.Species) is { } sp
+            && Core.Camp.Smoking.Refusal(f.Weight, f.Weight < sp.LegalWeight, false) == null).ToList();
+        if (take.Count == 0)
+            return "W siatce nie ma ryb do wędzenia (od 100 g, wymiarowe).";
+        int fee = Core.Camp.Smoking.Fee(take.Sum(f => f.Weight));
+        if (Money < fee)
+            return $"Opłata za drewno: {fee} zł. Za mało pieniędzy.";
+        Money -= fee;
+        foreach (var f in take)
+            Keepnet.Remove(f);
+        Smoking.AddRange(take);
+        SmokingSince = Clock;
+        return $"{take.Count} ryb w wędzarni (opłata {fee} zł). Gotowe za {Core.Camp.Smoking.Hours:0} godz. gry.";
+    }
+
+    public float SmokingHoursLeft => Smoking.Count == 0 ? 0f : Core.Camp.Smoking.HoursLeft(SmokingSince, Clock);
+
+    public int SmokedValue() => Smoking.Sum(f => Tackle.Species(f.Species) is { } sp
+        ? Core.Camp.Smoking.SmokedValue(Progression.FishValue(sp, f.Weight), 1f) : 0);
+
+    /// <summary>Sells a ready batch to the smokehouse keeper.</summary>
+    public int SellSmoked()
+    {
+        int total = SmokedValue();
+        Money += total;
+        Smoking.Clear();
+        SmokingSince = -1f;
+        return total;
+    }
+
     [JsonIgnore]
     public int Level
     {

@@ -37,10 +37,24 @@ jobs:
             unity
             .github
             tools/release
+            tools/unity
+            assets/fish/meshy
+            assets/models
       - uses: actions/cache@v4
         with:
           path: unity/Library
-          key: Library-${{ matrix.target }}-${{ hashFiles('unity/Packages/manifest.json') }}
+          key: Library-${{ matrix.target }}-${{ hashFiles('unity/Packages/manifest.json', 'tools/unity/convert_glb.py') }}-models1
+          restore-keys: Library-${{ matrix.target }}-
+      - name: Convert the Meshy models for Unity
+        run: |
+          pip install --quiet pillow numpy
+          python3 -I tools/unity/convert_glb.py assets/fish/meshy unity/Assets/Resources/Models/fish --fish --max 1024
+          python3 -I tools/unity/convert_glb.py assets/models/buildings unity/Assets/Resources/Models/buildings --max 2048
+          python3 -I tools/unity/convert_glb.py assets/models/rods unity/Assets/Resources/Models/rods --max 2048
+          python3 -I tools/unity/convert_glb.py assets/models/reels unity/Assets/Resources/Models/reels --max 2048
+          rm -rf assets
+          du -sh unity/Assets/Resources/Models
+          df -h /
       - uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}

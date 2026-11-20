@@ -29,6 +29,12 @@ public sealed class Lake
     private readonly List<(float X, float Z, float Rx, float Rz)> _lobes = new();
     private readonly List<(float X, float Z, float R)> _islands = new();
     private readonly List<(Vector2 P, float R)> _flat = new();
+    private readonly List<(Vector2 C, float R, float H)> _pads = new();
+    private readonly List<(Vector2 A, Vector2 B)> _paths = new();
+
+    /// <summary>The village's buildings and props (LocationData.Buildings).</summary>
+    public List<BuildingSpec> Specs { get; } = new();
+    public float PlazaHeight { get; private set; } = 1.25f;
 
     public LocationData Location { get; }
 
@@ -42,8 +48,78 @@ public sealed class Lake
             if (LocationData.Numbers(entry) is { Length: >= 3 } n)
                 _islands.Add((n[0], n[1], n[2]));
         _flat.Add((loc.PlazaCenter, 14f));
-        foreach (var spec in loc.BuildingSpecs())
+        Specs.AddRange(loc.BuildingSpecs());
+        foreach (var spec in Specs)
             _flat.Add((spec.Position, spec.PadRadius + 2f));
+        // Level pads under the square and every building (World/LakeBed.LayoutFor), and the paths: pier to square,
+        // streets, each door to the nearest street.
+        var plaza = loc.PlazaCenter;
+        PlazaHeight = MathF.Max(NaturalHeight(plaza.X, plaza.Y), 1.25f);
+        _pads.Add((plaza, 6f, PlazaHeight));
+        foreach (var spec in Specs)
+            if (spec.PadRadius > 0f)
+            {
+                var p = spec.Position;
+                float ground = VillageGround(p.X, p.Y, NaturalHeight(p.X, p.Y));
+                _pads.Add((p, spec.PadRadius, MathF.Max(ground, 1.25f)));
+            }
+        _paths.Add((new Vector2(0f, 6f), plaza));
+        var streets = new List<(Vector2, Vector2)>();
+        foreach (var entry in loc.Streets)
+            if (LocationData.Numbers(entry) is { Length: >= 4 } n)
+                streets.Add((new Vector2(n[0], n[1]), new Vector2(n[2], n[3])));
+        _paths.AddRange(streets);
+        foreach (var spec in Specs)
+        {
+            if (!spec.IsFunctional && !spec.IsDwelling)
+                continue;
+            var door = spec.DoorPoint(plaza);
+            var to = plaza;
+            float best = door.DistanceTo(plaza);
+            foreach (var (a, b) in streets)
+            {
+                var q = Closest(a, b, door);
+                if (door.DistanceTo(q) < best)
+                    (best, to) = (door.DistanceTo(q), q);
+            }
+            _paths.Add((to, door));
+        }
+    }
+
+    private static Vector2 Closest(Vector2 a, Vector2 b, Vector2 p)
+    {
+        var ab = b - a;
+        float t = Math.Clamp((p - a).Dot(ab) / MathF.Max(ab.Dot(ab), 1e-6f), 0f, 1f);
+        return a + ab * t;
+    }
+
+    /// <summary>True on or near a building's pad, the square or a path: no trees, bushes or stones there.</summary>
+    public bool Built(float x, float z, float margin = 3f)
+    {
+        var p = new Vector2(x, z);
+        foreach (var (c, r, _) in _pads)
+            if (p.DistanceTo(c) < r + margin)
+                return true;
+        return PathDistance(x, z) < 2.2f;
+    }
+
+    /// <summary>Distance (m) to the nearest path or street.</summary>
+    public float PathDistance(float x, float z)
+    {
+        float best = float.MaxValue;
+        foreach (var (a, b) in _paths)
+            best = MathF.Min(best, SegmentDistance(x, z, a.X, a.Y, b.X, b.Y));
+        return best;
+    }
+
+    /// <summary>The ground eases part way to the square's level near the village (LakeBed.VillageGround).</summary>
+    private float VillageGround(float x, float z, float h)
+    {
+        float d = new Vector2(x, z).DistanceTo(Location.PlazaCenter);
+        if (d > 70f)
+            return h;
+        float w = (1f - Smooth(18f, 55f, d)) * 0.55f * Smooth(5f, 14f, -InsideMetres(x, z));
+        return h + (PlazaHeight - h) * w;
     }
 
     public float ForestDensity(float x, float z) => _noise.Get(x * 1.2f + 99f, z * 1.2f + 99f);
@@ -192,8 +268,26 @@ public sealed class Lake
     private float VillageShare(float x, float z) =>
         1f - Smooth(30f, 70f, new Vector2(x, z).DistanceTo(Location.PlazaCenter));
 
-    /// <summary>The ground's height (negative = the lake bed under the water level 0).</summary>
+    /// <summary>The ground's height (negative = the lake bed under the water level 0), levelled under the village.</summary>
     public float HeightAt(float x, float z)
+    {
+        float h = NaturalHeight(x, z);
+        if (h < 0f || _pads.Count == 0)
+            return h;
+        h = VillageGround(x, z, h);
+        var p = new Vector2(x, z);
+        foreach (var (c, r, height) in _pads)
+        {
+            float d = p.DistanceTo(c);
+            float t = 1f - Smooth(r * 0.75f, r * 1.6f, d);
+            if (t > 0f)
+                h += (height - h) * t;
+        }
+        return h;
+    }
+
+    /// <summary>Terrain height without the levelled pads.</summary>
+    public float NaturalHeight(float x, float z)
     {
         var loc = Location;
         float inside = InsideMetres(x, z);
@@ -254,8 +348,8 @@ public sealed class Lake
             c = c.Lerp(new Color(0.45f, 0.43f, 0.40f), Math.Clamp((h - loc.RockLine) / 5f, 0f, 1f));
             c = c.Lerp(new Color(0.93f, 0.95f, 0.98f), Math.Clamp((h - loc.SnowLine) / 8f, 0f, 1f));
         }
-        // A trodden path from the pier to the square.
-        float path = 1f - Smooth(0.9f, 1.9f, SegmentDistance(x, z, 0f, 6f, loc.PlazaCenter.X, loc.PlazaCenter.Y));
+        // Trodden paths and streets.
+        float path = 1f - Smooth(0.9f, 1.9f, PathDistance(x, z));
         if (h >= 0.5f && path > 0f)
             c = c.Lerp(loc.PathColor, path * 0.92f);
         return new Color(c.R + n, c.G + n, c.B + n);

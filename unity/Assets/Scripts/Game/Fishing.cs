@@ -67,55 +67,163 @@ namespace FishingSim.Game
             BuildLine();
             var fish = new GameObject("HookedFish");
             _fish = fish.transform;
-            _fishMesh = fish.AddComponent<MeshFilter>();
-            fish.AddComponent<MeshRenderer>().sharedMaterial = Materials.Lit(0.55f, 0.08f);
+            var built = new GameObject("Built");
+            built.transform.SetParent(_fish, false);
+            _fishMesh = built.AddComponent<MeshFilter>();
+            built.AddComponent<MeshRenderer>().sharedMaterial = Materials.Lit(0.55f, 0.08f);
             fish.SetActive(false);
             ApplyTackle();
             ShowRod(Player.enabled);
         }
 
         // ------------------------------------------------------------------ visuals
+        // The rod is built in the Godot game's RodRig frame (the blank along +Y from the butt at -0.33, the reel seat
+        // at 0.1, the blank from 0.25 in ten sections, the reel hanging at -Z), so the user's Meshy rod and reel models
+        // (laid in that frame by tools/assets/meshy_rod_split.py) fit as they are. _frame turns it into the camera's
+        // rod root: +Y along the rod (+Z), the reel side down.
+        private const float ButtY = -0.33f, BlankStart = 0.25f, SegmentLength = 0.3f;
+        private Transform _frame = null!, _procHandle = null!, _rodModel = null!, _reelModel = null!;
+        private readonly List<GameObject> _procBlank = new();
+        private Transform? _rotor, _crank;
+        private string _shownRod = "", _shownReel = "";
+
         private void BuildRod()
         {
             var root = new GameObject("Rod").transform;
             root.SetParent(Player.Camera.transform, false);
-            root.localPosition = new Vector3(0.24f, -0.36f, 0.42f);
+            root.localPosition = new Vector3(0.26f, -0.38f, 0.5f);
             root.localRotation = Quaternion.Euler(-32f, -6f, 0f);
             _rodRoot = root;
+            _frame = new GameObject("RigFrame").transform;
+            _frame.SetParent(root, false);
+            _frame.localRotation = Quaternion.AngleAxis(180f, new Vector3(0f, 1f, 1f).normalized);
             var mat = Materials.Lit(0.6f, 0.05f);
-            // handle and reel
-            var handle = new MeshKit();
             var cork = Col.Lin(0.62f, 0.5f, 0.34f);
-            handle.Tube(new Vector3(0, 0, -0.42f), new Vector3(0, 0, 0.12f), 0.017f, 0.014f, 10, cork, cork, true);
             var dark = Col.Lin(0.12f, 0.12f, 0.13f);
             var metal = Col.Lin(0.55f, 0.56f, 0.58f);
-            handle.Tube(new Vector3(0, -0.02f, -0.12f), new Vector3(0, -0.07f, -0.12f), 0.006f, 0.006f, 6, dark, dark);
-            handle.Blob(new Vector3(0, -0.095f, -0.12f), new Vector3(0.028f, 0.03f, 0.034f), 1, 0f, dark, dark * 0.7f, true, 1);
-            handle.Tube(new Vector3(0, -0.095f, -0.09f), new Vector3(0, -0.095f, -0.05f), 0.024f, 0.024f, 12, metal, metal, true);
-            handle.Tube(new Vector3(-0.03f, -0.095f, -0.125f), new Vector3(-0.055f, -0.095f, -0.125f), 0.004f, 0.004f, 6, metal, metal, true);
-            Part(root, "Handle", handle.ToMesh("Handle"), mat);
+            // built handle and reel (used without the models)
+            var handle = new MeshKit();
+            handle.Tube(new Vector3(0, ButtY, 0), new Vector3(0, BlankStart, 0), 0.016f, 0.0135f, 10, cork, cork, true);
+            handle.Tube(new Vector3(0, 0.1f, -0.016f), new Vector3(0, 0.1f, -0.065f), 0.005f, 0.005f, 6, dark, dark);
+            handle.Blob(new Vector3(0, 0.096f, -0.088f), new Vector3(0.028f, 0.034f, 0.03f), 1, 0f, dark, dark * 0.7f, true, 1);
+            handle.Tube(new Vector3(0, 0.125f, -0.088f), new Vector3(0, 0.165f, -0.088f), 0.024f, 0.024f, 12, metal, metal, true);
+            handle.Tube(new Vector3(0.03f, 0.09f, -0.088f), new Vector3(0.055f, 0.09f, -0.088f), 0.004f, 0.004f, 6, metal, metal, true);
+            _procHandle = new GameObject("ProcHandle").transform;
+            _procHandle.SetParent(_frame, false);
+            Part(_procHandle, "Handle", handle.ToMesh("Handle"), mat);
+            _rodModel = new GameObject("RodModel").transform;
+            _rodModel.SetParent(_frame, false);
+            _reelModel = new GameObject("ReelModel").transform;
+            _reelModel.SetParent(_frame, false);
             // the blank in ten sections that bend
-            Transform parent = root;
-            float length = 3.0f, seg = length / 10f;
+            Transform parent = _frame;
             var blank = Col.Lin(0.18f, 0.1f, 0.08f);
             for (int i = 0; i < 10; i++)
             {
                 var s = new GameObject($"Seg{i}").transform;
                 s.SetParent(parent, false);
-                s.localPosition = i == 0 ? new Vector3(0, 0, 0.12f) : new Vector3(0, 0, seg);
+                s.localPosition = new Vector3(0, i == 0 ? BlankStart : SegmentLength, 0);
                 var k = new MeshKit();
-                float r0 = Mathf.Lerp(0.011f, 0.0022f, i / 10f), r1 = Mathf.Lerp(0.011f, 0.0022f, (i + 1) / 10f);
-                k.Tube(Vector3.zero, new Vector3(0, 0, seg), r0, r1, 6, blank, blank, i == 9);
-                // a guide ring under each section's end
-                k.Tube(new Vector3(0, -0.004f, seg - 0.01f), new Vector3(0, -0.02f, seg - 0.01f), 0.0015f, 0.0015f, 4, metal, metal);
-                Part(s, "Blank", k.ToMesh("Blank"), mat);
+                float r0 = Mathf.Lerp(0.0105f, 0.0022f, i / 10f), r1 = Mathf.Lerp(0.0105f, 0.0022f, (i + 1) / 10f);
+                k.Tube(Vector3.zero, new Vector3(0, SegmentLength, 0), r0, r1, 6, blank, blank, i == 9);
+                k.Tube(new Vector3(0, SegmentLength - 0.01f, -r1), new Vector3(0, SegmentLength - 0.01f, -r1 - 0.015f), 0.0015f, 0.0015f, 4, metal, metal);
+                var proc = new GameObject("Proc");
+                proc.transform.SetParent(s, false);
+                Part(proc.transform, "Blank", k.ToMesh("Blank"), mat);
+                _procBlank.Add(proc);
                 _segments.Add(s);
                 parent = s;
             }
             var tip = new GameObject("Tip").transform;
             tip.SetParent(parent, false);
-            tip.localPosition = new Vector3(0, 0, seg);
+            tip.localPosition = new Vector3(0, SegmentLength, 0);
             _tip = tip;
+        }
+
+        /// <summary>
+        /// Shows the rod's and reel's Meshy models (RodData.Model / ReelData.Model, default the series' look) on the
+        /// built frame: the handle and each blank section on its joint (scaled to the rod's length), the reel under the
+        /// seat with its rotor and crank turning while reeling. Without the models the built rod stays.
+        /// </summary>
+        private void ShowModels(RodData? rod, ReelData? reel)
+        {
+            string rodId = rod != null && rod.Model.Length > 0 ? rod.Model : "rods/float_ostoja";
+            string reelId = reel != null && reel.Model.Length > 0 ? reel.Model : "reels/small_hokuto";
+            float length = rod != null && rod.Length > 1f ? Mathf.Clamp(rod.Length, 1.6f, 4.6f) : 3.58f;
+            float section = (length - BlankStart + ButtY) / 10f;
+            for (int i = 0; i < _segments.Count; i++)
+                if (i > 0)
+                    _segments[i].localPosition = new Vector3(0f, section, 0f);
+            _tip.localPosition = new Vector3(0f, section, 0f);
+            float k = section / SegmentLength;
+            if (rodId != _shownRod)
+            {
+                _shownRod = rodId;
+                foreach (Transform c in _rodModel)
+                    Destroy(c.gameObject);
+                for (int i = 0; i < _segments.Count; i++)
+                    foreach (Transform c in _segments[i])
+                        if (c.name.StartsWith("Model"))
+                            Destroy(c.gameObject);
+                var model = ModelLibrary.Spawn(rodId, _rodModel);
+                bool ok = model != null;
+                if (model != null)
+                {
+                    for (int i = 0; i < _segments.Count; i++)
+                        if (ModelLibrary.Find(model.transform, $"Seg{i}") is { } seg)
+                        {
+                            seg.SetParent(_segments[i], false);
+                            seg.localPosition = Vector3.zero;
+                            seg.localRotation = Quaternion.identity;
+                            seg.name = "Model" + i;
+                        }
+                    foreach (var r in model.GetComponentsInChildren<Renderer>())
+                        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                }
+                _procHandle.gameObject.SetActive(!ok || !ModelLibrary.Has(reelId));
+                foreach (var p in _procBlank)
+                    p.SetActive(!ok);
+            }
+            for (int i = 0; i < _segments.Count; i++)
+                foreach (Transform c in _segments[i])
+                    if (c.name.StartsWith("Model"))
+                        c.localScale = new Vector3(1f, k, 1f);
+            if (reelId != _shownReel)
+            {
+                _shownReel = reelId;
+                foreach (Transform c in _reelModel)
+                    Destroy(c.gameObject);
+                _rotor = _crank = null;
+                var model = ModelLibrary.Spawn(reelId, _reelModel);
+                if (model != null)
+                {
+                    foreach (var r in model.GetComponentsInChildren<Renderer>())
+                        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    var frames = ModelLibrary.Json(reelId) is { } json ? JsonUtility.FromJson<ReelFrame>(json) : null;
+                    _rotor = Pivot(model.transform, "Rotor", frames?.rotor);
+                    _crank = Pivot(model.transform, "Crank", frames?.hub);
+                }
+                _procHandle.gameObject.SetActive(model == null || _rodModel.childCount == 0);
+            }
+        }
+
+        [Serializable]
+        private sealed class ReelFrame
+        {
+            public float[]? hub;
+            public float[]? rotor;
+        }
+
+        /// <summary>A pivot at a reel part's axis point (glTF coordinates, x mirrored into Unity) carrying the part.</summary>
+        private static Transform? Pivot(Transform model, string part, float[]? at)
+        {
+            if (ModelLibrary.Find(model, part) is not { } t)
+                return null;
+            var pivot = new GameObject(part + "Pivot").transform;
+            pivot.SetParent(t.parent, false);
+            pivot.localPosition = at is { Length: 3 } ? new Vector3(-at[0], at[1], at[2]) : t.localPosition;
+            t.SetParent(pivot, true);
+            return pivot;
         }
 
         private static void Part(Transform parent, string name, Mesh mesh, Material mat)
@@ -178,6 +286,8 @@ namespace FishingSim.Game
         public void ApplyTackle()
         {
             var rod = Rod;
+            if (_frame != null)
+                ShowModels(rod, Reel);
             var line = LineItem;
             var hook = Hook;
             EffectiveLimit = Mathf.Min(line?.Strength ?? 1f, Mathf.Min(rod?.MaxLoad ?? 1f, hook?.Strength ?? 1f));
@@ -455,7 +565,7 @@ namespace FishingSim.Game
             {
                 HookHold = hold,
             };
-            _fishMesh.sharedMesh = FishMesh.For(Species!);
+            ShowFishModel(Species!);
             float length = Species!.LengthRef * Mathf.Pow(Mathf.Max(Weight, 0.005f), 0.33f);
             _fish.localScale = Vector3.one * Mathf.Clamp(length, 0.08f, 2.2f);
             _fish.gameObject.SetActive(true);
@@ -498,6 +608,22 @@ namespace FishingSim.Game
                     LoseFish();
                     break;
             }
+        }
+
+        private GameObject? _fishModel;
+
+        /// <summary>The species' Meshy model when there is one (assets/fish/meshy), else the built fish.</summary>
+        private void ShowFishModel(FishSpecies sp)
+        {
+            if (_fishModel != null)
+                Destroy(_fishModel);
+            string id = System.IO.Path.GetFileNameWithoutExtension(sp.ResourcePath);
+            _fishModel = ModelLibrary.Fish(id);
+            if (_fishModel != null)
+                _fishModel.transform.SetParent(_fish, false);
+            else
+                _fishMesh.sharedMesh = FishMesh.For(sp);
+            _fishMesh.gameObject.SetActive(_fishModel == null);
         }
 
         /// <summary>The weakest link breaks: a rod snaps, a line parts (hook lost with it) or a hook opens.</summary>
@@ -578,14 +704,32 @@ namespace FishingSim.Game
             for (int i = 0; i < _segments.Count; i++)
             {
                 float w = Mathf.Pow((i + 1) / (float)_segments.Count, 1.6f);
-                _segments[i].localRotation = Quaternion.Euler(_bend * 16f * w, 0f, 0f);
+                _segments[i].localRotation = Quaternion.Euler(-_bend * 16f * w, 0f, 0f);
             }
             // the rod lifts while charging and in the fight when lifting
             float lift = State == RodState.Charging ? -25f * CastPower : State == RodState.Fight && Input.GetMouseButton(1) ? -18f : 0f;
             _rodRoot.localRotation = Quaternion.Slerp(_rodRoot.localRotation, Quaternion.Euler(-32f + lift, -6f, 0f), 1f - Mathf.Exp(-dt * 10f));
-            if (State == RodState.Fight && Input.GetMouseButton(0))
-                _reelAngle += dt * 720f;
+            bool reeling = (State == RodState.Fight || State == RodState.Waiting) && (Input.GetMouseButton(0) || SmokeReel) && !Blocked;
+            if (reeling)
+            {
+                _reelAngle += dt * 600f;
+                if (_rotor != null)
+                    _rotor.localRotation = Quaternion.Euler(0f, _reelAngle * 1.4f, 0f);
+                if (_crank != null)
+                    _crank.localRotation = Quaternion.Euler(_reelAngle, 0f, 0f);
+            }
 
+            if (State == RodState.Landed && Species != null)
+            {
+                // the catch held up before the camera, turning slowly (the catch panel sits below it)
+                var cam = Player.Camera.transform;
+                float length = Species.LengthRef * Mathf.Pow(Mathf.Max(Weight, 0.005f), 0.33f);
+                float shown = Mathf.Clamp(length, 0.12f, 0.5f);
+                _fish.gameObject.SetActive(true);
+                _fish.position = cam.position + cam.forward * 0.85f + cam.up * 0.13f;
+                _fish.rotation = Quaternion.LookRotation(cam.right, cam.up) * Quaternion.Euler(0f, Mathf.Sin(_stateTime * 0.6f) * 35f, 0f);
+                _fish.localScale = Vector3.one * shown;
+            }
             if (!_line.gameObject.activeSelf)
                 return;
             var a = _tip.position;

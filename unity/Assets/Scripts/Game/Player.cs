@@ -13,6 +13,22 @@ namespace FishingSim.Game
         public Camera Camera { get; private set; } = null!;
         public WorldView World { get; set; } = null!;
         public bool Frozen { get; set; }
+
+        /// <summary>Buildings and other solids (centre, radius) the angler cannot walk into.</summary>
+        public System.Collections.Generic.List<(Vector3 At, float Radius)> Solids { get; } = new();
+
+        private bool Free(float x, float z)
+        {
+            if (!World.Lake.IsWalkable(x, z))
+                return false;
+            foreach (var (at, r) in Solids)
+            {
+                float dx = x - at.x, dz = z - at.z;
+                if (dx * dx + dz * dz < r * r)
+                    return false;
+            }
+            return true;
+        }
         public float Sensitivity { get; set; } = 2.2f;
 
         private float _yaw, _pitch, _bob, _ground;
@@ -76,12 +92,11 @@ namespace FishingSim.Game
             // slide along the water's edge and the map's edge: keep whichever part of the step stays walkable
             if (move != Vector3.zero)
             {
-                var lake = World.Lake;
-                if (lake.IsWalkable(p.x + flat.x, p.z + flat.z))
+                if (Free(p.x + flat.x, p.z + flat.z))
                     p += flat;
-                else if (lake.IsWalkable(p.x + flat.x, p.z))
+                else if (Free(p.x + flat.x, p.z))
                     p.x += flat.x;
-                else if (lake.IsWalkable(p.x, p.z + flat.z))
+                else if (Free(p.x, p.z + flat.z))
                     p.z += flat.z;
                 _bob += flat.magnitude * 2.2f;
             }
