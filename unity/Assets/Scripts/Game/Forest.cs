@@ -26,9 +26,10 @@ namespace FishingSim.Game
             ("reed", 260f, false), ("cattail", 200f, false), ("rush", 140f, false), ("iris", 120f, false), ("irisflower", 120f, false),
             ("flower", 80f, false), ("tuft", 90f, false), ("fern", 90f, false),
             ("lilypad", 160f, true), ("pondweed", 120f, true), ("lilyflower", 160f, true), ("yellowlily", 160f, true),
+            ("stem", 300f, false),
         };
         private const int Reed = 15, Cattail = 16, Rush = 17, Iris = 18, IrisFlower = 19, Flower = 20, Tuft = 21, Fern = 22,
-            LilyPad = 23, Pondweed = 24, LilyFlower = 25, YellowLily = 26;
+            LilyPad = 23, Pondweed = 24, LilyFlower = 25, YellowLily = 26, Stem = 27;
 
         private sealed class Batch
         {
@@ -60,6 +61,9 @@ namespace FishingSim.Game
         /// <summary>The lily and pondweed patches (x, z, radius): cover for the fish.</summary>
         public static List<(float X, float Z, float Radius)> WeedBeds { get; } = new();
 
+        /// <summary>The sunken wood spots (x, z, radius): snags for lures and fish.</summary>
+        public static List<(float X, float Z, float Radius)> SunkenWood { get; } = new();
+
         public static float FoliageRange => Settings.Quality switch { 0 => 0.45f, 1 => 0.65f, 2 => 0.85f, _ => 1f };
         public static float GrassRadius => Settings.Quality switch { 0 => 0f, 1 => 18f, 2 => 28f, _ => 40f } * (Settings.View switch { 0 => 0.75f, 1 => 1f, _ => 1.2f });
         public static float ViewFactor => Settings.View switch { 0 => 0.6f, 1 => 0.85f, _ => 1.1f };
@@ -81,6 +85,7 @@ namespace FishingSim.Game
             foreach (var kind in Kinds)
                 Plants.Get(kind);   // meshes are made on the main thread; the worker only reads their lifts
             WeedBeds.Clear();
+            SunkenWood.Clear();
             foreach (var (kind, _, _) in SmallKinds)
                 Plants.SmallPlant(kind);
             var job = Task.Run(() => Place(lake));
@@ -214,6 +219,7 @@ namespace FishingSim.Game
             var items = new List<Item>(20000);
             var solids = new List<(Vector3, float)>();
             var spots = new List<(float X, float Z, string Kind)>();
+            var allTrees = new List<(float X, float Z)>();
 
             void Plant(int k, float x, float z, float h, float s, float yaw, float tint, bool understorey)
             {
@@ -230,6 +236,7 @@ namespace FishingSim.Game
                 items.Add(new Item(5 + k, Matrix4x4.TRS(pos + Vector3.up * meshes.CrownLift * s, rot, scale), Tint(CrownColor(kind), tint)));
                 if (understorey)
                     spots.Add((x, z, kind));
+                allTrees.Add((x, z));
                 if (lake.PlayDistance(x, z) < 2f)
                     solids.Add((new Vector3(x, h, z), TrunkRadius(kind) * s * 1.1f));
             }
@@ -512,6 +519,48 @@ namespace FishingSim.Game
                         else
                             items.Add(new Item(LilyFlower, Yaw(at, sc), rng.NextDouble() < 0.25f ? Lin(new Color(1f, 0.82f, 0.88f)) : Vector4.one));
                     }
+                }
+            }
+
+            // sunken wood: grey weathered branches poking out of the water off wooded banks (Scenery.ScatterSunkenWood)
+            int woods = 0;
+            for (int tries = 0; woods < 16 && tries < 4000; tries++)
+            {
+                var sh = Shore(0.45f);
+                float angle = (float)rng.NextDouble() * Mathf.PI * 2f;
+                float shrink = sh.Island ? R(rng, 1.05f, 1.5f) : R(rng, 0.8f, 0.97f);
+                float cx = sh.X + sh.Rx * shrink * MathF.Cos(angle), cz = sh.Z + sh.Rz * shrink * MathF.Sin(angle);
+                float depth = lake.DepthAt(cx, cz);
+                if (depth < 0.6f || depth > 3f || NearPier(cx, cz))
+                    continue;
+                bool crowded = false;
+                foreach (var (wx, wz, _) in SunkenWood)
+                    if ((wx - cx) * (wx - cx) + (wz - cz) * (wz - cz) < 196f)
+                        crowded = true;
+                if (crowded)
+                    continue;
+                float nearest = float.MaxValue;
+                foreach (var (tx, tz) in allTrees)
+                    nearest = MathF.Min(nearest, (tx - cx) * (tx - cx) + (tz - cz) * (tz - cz));
+                if (nearest > 30f * 30f && rng.NextDouble() > 0.15f)
+                    continue;
+                SunkenWood.Add((cx, cz, R(rng, 1.5f, 2.8f)));
+                woods++;
+                int branches = rng.Next(1, 4);
+                for (int b = 0; b < branches; b++)
+                {
+                    float lean = R(rng, 0.35f, 0.9f), yaw = (float)rng.NextDouble() * Mathf.PI * 2f;
+                    float len = (depth + R(rng, 0.6f, 1.6f)) / MathF.Cos(lean);
+                    var rot = Quaternion.Euler(0f, yaw * Mathf.Rad2Deg, 0f) * Quaternion.Euler(lean * Mathf.Rad2Deg, 0f, 0f);
+                    var foot = new Vector3(cx + R(rng, -1f, 1f), -depth, cz + R(rng, -1f, 1f));
+                    var up = rot * Vector3.up;
+                    float g = R(rng, 0.32f, 0.46f);
+                    var tint = Lin(new Color(g, g * 0.93f, g * 0.84f));
+                    items.Add(new Item(Stem, Matrix4x4.TRS(foot + up * len * 0.5f, rot, new Vector3(1f, len, 1f)), tint));
+                    float twig = len * R(rng, 0.3f, 0.45f);
+                    var trot = Quaternion.Euler(0f, (yaw + R(rng, -1.2f, 1.2f)) * Mathf.Rad2Deg, 0f) * Quaternion.Euler((lean + R(rng, 0.5f, 0.9f)) * Mathf.Rad2Deg, 0f, 0f);
+                    var fork = foot + up * len * R(rng, 0.65f, 0.85f);
+                    items.Add(new Item(Stem, Matrix4x4.TRS(fork + trot * Vector3.up * twig * 0.5f, trot, new Vector3(0.55f, twig, 0.55f)), tint));
                 }
             }
 

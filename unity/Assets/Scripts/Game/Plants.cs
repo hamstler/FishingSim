@@ -361,6 +361,10 @@ namespace FishingSim.Game
                         }
                     k.Tube(Vector3.zero, new Vector3(0f, 0.04f, 0f), 0.018f, 0.012f, 6, new Color(0.95f, 0.78f, 0.15f, 1f), new Color(0.98f, 0.85f, 0.2f, 1f), true);
                     break;
+                case "stem":
+                    // a tapered unit branch (CylinderMesh 0.03 / 0.11, height 1, centred), no sway
+                    k.Tube(new Vector3(0f, -0.5f, 0f), new Vector3(0f, 0.5f, 0f), 0.11f, 0.03f, 7, new Color(1f, 1f, 1f, 1f), new Color(1f, 1f, 1f, 1f), true);
+                    break;
                 case "yellowlily":
                     for (int i = 0; i < 5; i++)
                         Petal(k, i / 5f * Mathf.PI * 2f, 0.035f, 0.005f, 1.1f, new Color(0.98f, 0.82f, 0.12f, 1f));
