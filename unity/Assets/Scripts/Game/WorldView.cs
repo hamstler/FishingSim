@@ -298,32 +298,98 @@ namespace FishingSim.Game
             Part("Water", mesh, WaterMaterial, false).GetComponent<MeshRenderer>().receiveShadows = false;
         }
 
+        private Material? _bulbs;
+        private Light? _pierLamp;
+
+        /// <summary>
+        /// Scenery.BuildPier: old grey-brown boards weathered like the buildings (photographed weathered_brown_planks,
+        /// colour wander, rain streaks, moss in patches), darker posts and rails soaked from the waterline up, festoon
+        /// lights on masts behind the casting spot and a lantern post at the shore end. Painted boards without the set.
+        /// </summary>
         private void MakePier()
         {
-            var k = new MeshKit();
-            var wood = Col.Lin(0.36f, 0.28f, 0.2f);
-            var dark = Col.Lin(0.22f, 0.17f, 0.12f);
+            var wood = Photos.Weathered("weathered_brown_planks", new Color(0.92f, 0.9f, 0.86f), 0.85f, moss: 0.22f);
+            var darkWood = Photos.Weathered("weathered_brown_planks", new Color(0.5f, 0.45f, 0.4f), 0.92f, scale: 0.6f, moss: 0.12f);
+            var deck = new MeshKit();
+            var frame = new MeshKit();
+            var woodCol = wood != null ? Color.white : Col.Lin(0.36f, 0.28f, 0.2f);
+            var darkCol = darkWood != null ? Color.white : Col.Lin(0.22f, 0.17f, 0.12f);
             var rng = new System.Random(7);
             for (float z = -4.2f; z < 6.2f; z += 0.26f)
             {
-                var c = Color.Lerp(wood, dark, (float)rng.NextDouble() * 0.5f);
-                k.Box(new Vector3(0f, PierDeck - 0.03f, z + 0.12f), new Vector3(3.2f, 0.06f, 0.23f),
+                var c = wood != null ? woodCol : Color.Lerp(woodCol, darkCol, (float)rng.NextDouble() * 0.5f);
+                deck.Box(new Vector3(0f, PierDeck - 0.03f, z + 0.12f), new Vector3(3.2f, 0.06f, 0.23f),
                     Quaternion.Euler(0f, (float)(rng.NextDouble() - 0.5) * 1.2f, 0f), c);
             }
             foreach (float x in new[] { -1.5f, 1.5f })
             {
-                k.Box(new Vector3(x, PierDeck - 0.12f, 1f), new Vector3(0.12f, 0.12f, 10.4f), Quaternion.identity, dark);
+                frame.Box(new Vector3(x, PierDeck - 0.12f, 1f), new Vector3(0.12f, 0.12f, 10.4f), Quaternion.identity, darkCol);
                 for (float z = -4f; z <= 6.1f; z += 2.5f)
                 {
                     float bed = Lake.HeightAt(x, z);
-                    k.Tube(new Vector3(x, bed - 0.3f, z), new Vector3(x, PierDeck + 0.05f, z), 0.11f, 0.1f, 8, dark, wood, true);
+                    frame.Tube(new Vector3(x, bed - 0.3f, z), new Vector3(x, PierDeck + 0.05f, z), 0.11f, 0.1f, 10, darkCol, darkCol, true);
                 }
-                // hand rail on the far half
-                for (float z = -4f; z <= 1.1f; z += 2.5f)
-                    k.Tube(new Vector3(x, PierDeck, z), new Vector3(x, PierDeck + 0.95f, z), 0.05f, 0.045f, 6, dark, wood, true);
-                k.Box(new Vector3(x, PierDeck + 0.95f, -1.5f), new Vector3(0.08f, 0.06f, 5.2f), Quaternion.identity, wood);
+                // railing on the far half (open at the casting end and at the shore)
+                for (float z = -1f; z <= 4.1f; z += 2.5f)
+                    frame.Box(new Vector3(x, PierDeck + 0.45f, z), new Vector3(0.07f, 0.9f, 0.07f), Quaternion.identity, darkCol);
+                frame.Box(new Vector3(x, PierDeck + 0.9f, 1.5f), new Vector3(0.06f, 0.06f, 5.2f), Quaternion.identity, darkCol);
+                frame.Box(new Vector3(x, PierDeck + 0.6f, 1.5f), new Vector3(0.05f, 0.05f, 5.2f), Quaternion.identity, darkCol);
             }
-            Part("Pier", k.ToMesh("Pier"), _lit, true);
+            // cross beams under the deck
+            foreach (float z in new[] { -3.5f, -1f, 1.5f, 4f })
+                frame.Box(new Vector3(0f, PierDeck - 0.27f, z), new Vector3(3f, 0.1f, 0.12f), Quaternion.identity, darkCol);
+
+            // festoon lights: masts behind the casting spot and a post at the shore, ropes sagging between them
+            float top = PierDeck;
+            foreach (var (x, z, h) in new[] { (-1.42f, -0.4f, 4.4f), (1.42f, -0.4f, 4.4f), (-1.42f, 5.6f, 3.0f) })
+                frame.Box(new Vector3(x, top + h / 2f, z), new Vector3(0.1f, h, 0.1f), Quaternion.identity, darkCol);
+            frame.Box(new Vector3(1.42f, top + 0.95f, 5.6f), new Vector3(0.09f, 1.9f, 0.09f), Quaternion.identity, darkCol);
+            var tops = new[] { new Vector3(-1.42f, top + 4.4f, -0.4f), new Vector3(1.42f, top + 4.4f, -0.4f), new Vector3(1.42f, top + 2.0f, 5.6f), new Vector3(-1.42f, top + 3.0f, 5.6f) };
+            var rope = new MeshKit();
+            var bulbs = new MeshKit();
+            var ropeCol = Col.Lin(0.25f, 0.18f, 0.12f);
+            foreach (var (a, b) in new[] { (tops[0], tops[1]), (tops[1], tops[2]), (tops[0], tops[3]) })
+            {
+                Vector3 P(float t) => Vector3.Lerp(a, b, t) + Vector3.down * (0.45f * 4f * t * (1f - t));
+                const int segments = 12;
+                for (int i = 0; i < segments; i++)
+                    rope.Tube(P(i / (float)segments), P((i + 1) / (float)segments), 0.012f, 0.012f, 4, ropeCol, ropeCol);
+                int count = (int)(Vector3.Distance(a, b) / 0.5f);
+                for (int i = 1; i < count; i++)
+                    bulbs.Box(P(i / (float)count) + Vector3.down * 0.07f, new Vector3(0.09f, 0.11f, 0.09f), Quaternion.identity, Color.white);
+            }
+            bulbs.Box(new Vector3(1.42f, top + 2.1f, 5.6f), new Vector3(0.22f, 0.26f, 0.22f), Quaternion.identity, Color.white);
+
+            var deckPart = Part("Pier", deck.ToMesh("PierDeck"), wood ?? _lit, true);
+            var framePart = Part("PierFrame", frame.ToMesh("PierFrame"), darkWood ?? _lit, true);
+            // soaked and dirty from the waterline up (the weathering's damp foot, measured from the water)
+            var block = new MaterialPropertyBlock();
+            block.SetFloat("_BaseY", 0f);
+            framePart.GetComponent<MeshRenderer>().SetPropertyBlock(block);
+            deckPart.GetComponent<MeshRenderer>().SetPropertyBlock(block);
+            Part("PierRope", rope.ToMesh("PierRope"), _lit, false);
+            _bulbs ??= Materials.Unlit(new Color(1f, 0.86f, 0.5f));
+            Part("PierBulbs", bulbs.ToMesh("PierBulbs"), _bulbs, false);
+            var lamp = new GameObject("PierLamp");
+            lamp.transform.SetParent(transform, false);
+            lamp.transform.position = new Vector3(1.42f, top + 1.95f, 5.6f);
+            _pierLamp = lamp.AddComponent<Light>();
+            _pierLamp.type = LightType.Point;
+            _pierLamp.color = new Color(1f, 0.75f, 0.45f);
+            _pierLamp.range = 12f;
+            _parts.Add(lamp);
+        }
+
+        /// <summary>The pier's bulbs dim by day and glow at night, its lantern lights the boards.</summary>
+        public void SetNight(float night)
+        {
+            if (_bulbs != null)
+                _bulbs.color = Color.Lerp(new Color(0.55f, 0.48f, 0.32f), new Color(2.4f, 1.75f, 0.8f), night);
+            if (_pierLamp != null)
+            {
+                _pierLamp.intensity = 1.2f * night;
+                _pierLamp.enabled = night > 0.02f;
+            }
         }
 
         // ------------------------------------------------------------------ plants

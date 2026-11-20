@@ -55,7 +55,7 @@ namespace FishingSim.Game
                     _ => ground,
                 };
                 float yaw = n.Length >= 3 ? n[2] : MathF.Atan2(-x, loc.OutlineCz - z) * Mathf.Rad2Deg;
-                var k = new MeshKit();
+                var k = new Kit();
                 var w = new MeshKit();
                 var spots = new List<Vector3>();
                 switch (kind)
@@ -72,7 +72,26 @@ namespace FishingSim.Game
                 var root = new GameObject("Landmark " + kind);
                 root.transform.SetParent(transform, false);
                 root.transform.SetPositionAndRotation(new Vector3(x, y, z), Quaternion.Euler(0f, yaw, 0f));
-                Part(root, k, _lit, true);
+                var block = new MaterialPropertyBlock();
+                block.SetFloat("_BaseY", y);
+                foreach (var (surf, mesh) in k.Parts)
+                {
+                    var mat = surf.Photo != null
+                        ? Photos.Weathered(surf.Photo, surf.Tint, surf.Rough, true, surf.Scale, 1f, surf.Moss, false, surf.Normal) ?? _lit
+                        : _lit;
+                    var r = Part(root, mesh, mat, true);
+                    if (surf.Photo != null && mat != _lit)
+                        r.SetPropertyBlock(block);
+                    else if (surf.Photo != null)
+                    {
+                        // without the set: the flat colour
+                        var flat = new MeshKit();
+                        for (int i = 0; i < mesh.V.Count; i++)
+                            flat.Add(mesh.V[i], mesh.N[i], surf.Colour);
+                        flat.T.AddRange(mesh.T);
+                        r.GetComponent<MeshFilter>().sharedMesh = flat.ToMesh(root.name);
+                    }
+                }
                 if (w.Count > 0)
                     Part(root, w, _water, false);
                 _made.Add(root);
@@ -83,7 +102,7 @@ namespace FishingSim.Game
             }
         }
 
-        private static void Part(GameObject root, MeshKit k, Material m, bool shadows)
+        private static MeshRenderer Part(GameObject root, MeshKit k, Material m, bool shadows)
         {
             var go = new GameObject("Mesh");
             go.transform.SetParent(root.transform, false);
@@ -92,24 +111,58 @@ namespace FishingSim.Game
             var r = go.AddComponent<MeshRenderer>();
             r.sharedMaterial = m;
             r.shadowCastingMode = shadows ? UnityEngine.Rendering.ShadowCastingMode.On : UnityEngine.Rendering.ShadowCastingMode.Off;
+            return r;
         }
 
-        private static Color C(float r, float g, float b) => Col.Lin(r, g, b);
+        /// <summary>A surface: a photographed weathered set (BuildingFactory's Stone, Plaster, Wood, Timber, Roof) or a flat colour.</summary>
+        private readonly record struct Surf(string? Photo, Color Tint, float Rough, float Moss, float Normal, float Scale)
+        {
+            public Color Colour => Col.Lin(Tint);
+        }
 
-        private static void Box(MeshKit k, Vector3 size, Vector3 at, Color c, Vector3 rot = default) => k.Box(at, size, Quaternion.Euler(rot), c);
+        /// <summary>One mesh per surface.</summary>
+        private sealed class Kit
+        {
+            public readonly Dictionary<Surf, MeshKit> Parts = new();
+            public MeshKit this[Surf s] => Parts.TryGetValue(s, out var k) ? k : Parts[s] = new MeshKit();
+        }
+
+        private static Surf C(float r, float g, float b) => new(null, new Color(r, g, b), 0.85f, 0f, 1f, 1f);
+
+        /// <summary>BuildingFactory.Nudge: a pale hint of the tint over the photo's own colour.</summary>
+        private static Color Nudge(Color tint)
+        {
+            float m = Mathf.Max(tint.r, Mathf.Max(tint.g, tint.b));
+            if (m <= 0f)
+                return Color.white;
+            var hue = new Color(tint.r / m, tint.g / m, tint.b / m);
+            return Color.Lerp(Color.white, hue, 0.25f) * (0.82f + 0.18f * Mathf.Min(m * 1.4f, 1f));
+        }
+
+        private static Surf Stone(float r, float g, float b) => new("stone_wall", Nudge(new Color(r, g, b)), 0.95f, 0.6f, 1.5f, 1f);
+        private static Surf Plaster(float r, float g, float b) => new("medieval_wall_01", Color.Lerp(Color.white, new Color(r, g, b), 0.18f), 0.92f, 0.1f, 1.1f, 1f);
+        private static Surf Wood(float r, float g, float b) => new("weathered_brown_planks", Nudge(new Color(r, g, b)), 0.85f, 0.3f, 1.1f, 1f);
+        private static Surf Timber() => new("weathered_brown_planks", new Color(0.72f, 0.66f, 0.6f), 0.85f, 0.25f, 1.4f, 1f);
+        private static Surf Thatch(float r, float g, float b) => new("reed_roof_04", Color.Lerp(Color.white, new Color(r, g, b), 0.08f) * 0.92f, 1f, 0.35f, 2f, 1f);
+        private static Surf Grass() => new("leafy_grass", new Color(0.95f, 1f, 0.9f), 0.95f, 0f, 1.1f, 1f);
+        private static Surf Trail() => new("rocky_trail", Color.white, 0.95f, 0f, 1.1f, 1f);
+
+        private static void Box(Kit k, Vector3 size, Vector3 at, Surf s, Vector3 rot = default) => k[s].Box(at, size, Quaternion.Euler(rot), s.Photo != null ? Color.white : s.Colour);
+        private static void Box(MeshKit k, Vector3 size, Vector3 at, Surf s, Vector3 rot = default) => k.Box(at, size, Quaternion.Euler(rot), s.Colour);
 
         /// <summary>Godot's CylinderMesh (top radius, bottom radius, height) centred at <paramref name="at"/>.</summary>
-        private static void Cyl(MeshKit k, float top, float bottom, float height, Vector3 at, Color c, int sides, Vector3 rot = default)
+        private static void Cyl(Kit kit, float top, float bottom, float height, Vector3 at, Surf s, int sides, Vector3 rot = default)
         {
             var q = Quaternion.Euler(rot);
             var a = at + q * Vector3.down * height * 0.5f;
             var b = at + q * Vector3.up * height * 0.5f;
-            k.Tube(a, b, Mathf.Max(bottom, 0.001f), Mathf.Max(top, 0.001f), sides, c, c, true);
+            var c = s.Photo != null ? Color.white : s.Colour;
+            kit[s].Tube(a, b, Mathf.Max(bottom, 0.001f), Mathf.Max(top, 0.001f), sides, c, c, true);
         }
 
-        private static void Tower(MeshKit k)
+        private static void Tower(Kit k)
         {
-            var stone = C(0.78f, 0.74f, 0.66f);
+            var stone = Stone(0.78f, 0.74f, 0.66f);
             var dark = C(0.08f, 0.07f, 0.06f);
             var ivy = C(0.2f, 0.36f, 0.14f);
             Cyl(k, 2.5f, 2.9f, 7.5f, new Vector3(0, 3.5f, 0), stone, 14);
@@ -136,14 +189,16 @@ namespace FishingSim.Game
         }
 
         /// <summary>A gable roof (Godot's AddRoof): two sloping slabs over w x d at eaves height h, ridge rise r.</summary>
-        private static void Roof(MeshKit k, Vector3 at, float w, float d, float h, float rise, float overhang, Color c)
+        private static void Roof(Kit kit, Vector3 at, float w, float d, float h, float rise, float overhang, Surf surf)
         {
             float half = d / 2f + overhang;
             float slope = Mathf.Atan2(rise, d / 2f) * Mathf.Rad2Deg;
             float len = Mathf.Sqrt(half * half + rise * rise * (half / (d / 2f)) * (half / (d / 2f)));
             foreach (float s in new[] { -1f, 1f })
-                Box(k, new Vector3(w + overhang * 2f, 0.14f, len), at + new Vector3(0, h + rise / 2f, s * half / 2f), c, new Vector3(s * slope, 0, 0));
-            // the gable ends
+                Box(kit, new Vector3(w + overhang * 2f, 0.14f, len), at + new Vector3(0, h + rise / 2f, s * half / 2f), surf, new Vector3(s * slope, 0, 0));
+            // the gable ends (in the wall's surface colour)
+            var k = kit[surf];
+            var c = surf.Photo != null ? Color.white : surf.Colour;
             foreach (float e in new[] { -1f, 1f })
             {
                 var p0 = at + new Vector3(e * w / 2f, h, -d / 2f);
@@ -155,12 +210,12 @@ namespace FishingSim.Game
             }
         }
 
-        private static void Chapel(MeshKit k)
+        private static void Chapel(Kit k)
         {
             const float w = 6.5f, d = 4.4f, h = 3.6f;
-            var wall = C(0.95f, 0.92f, 0.85f);
-            var stone = C(0.62f, 0.6f, 0.56f);
-            var roof = C(0.3f, 0.22f, 0.18f);
+            var wall = Plaster(0.95f, 0.92f, 0.85f);
+            var stone = Stone(0.62f, 0.6f, 0.56f);
+            var roof = Thatch(0.3f, 0.22f, 0.18f);
             var iron = C(0.15f, 0.13f, 0.12f);
             Box(k, new Vector3(w + 0.3f, 0.5f, d + 0.3f), Vector3.zero, stone);
             Box(k, new Vector3(w, h, d), new Vector3(0, h / 2f, 0), wall);
@@ -171,24 +226,24 @@ namespace FishingSim.Game
             Box(k, new Vector3(0.1f, 0.1f, 0.6f), new Vector3(w / 2f + 0.6f, 9.5f, 0), iron);
             Box(k, new Vector3(0.5f, 0.9f, 1.95f), new Vector3(w / 2f + 0.6f, 5.3f, 0), C(0.08f, 0.07f, 0.06f));
             Cyl(k, 0.2f, 0.32f, 0.45f, new Vector3(w / 2f + 0.6f, 5.2f, 0), C(0.55f, 0.42f, 0.18f), 8);
-            Box(k, new Vector3(0.1f, 2.0f, 1.0f), new Vector3(w / 2f + 1.56f, 1.0f, 0), C(0.45f, 0.3f, 0.2f));
+            Box(k, new Vector3(0.1f, 2.0f, 1.0f), new Vector3(w / 2f + 1.56f, 1.0f, 0), Wood(0.45f, 0.3f, 0.2f));
             var glass = C(0.25f, 0.3f, 0.32f);
             foreach (float sx in new[] { -1.6f, 1.0f })
                 foreach (float sz in new[] { -1f, 1f })
                     Box(k, new Vector3(0.7f, 1.3f, 0.1f), new Vector3(sx, 2.1f, sz * (d / 2f + 0.02f)), glass);
         }
 
-        private static void StiltHouse(MeshKit k, float depth)
+        private static void StiltHouse(Kit k, float depth)
         {
-            var timber = C(0.4f, 0.3f, 0.2f);
-            var planks = C(0.62f, 0.48f, 0.34f);
+            var timber = Timber();
+            var planks = Wood(0.62f, 0.48f, 0.34f);
             float postLen = depth + 2.2f;
             foreach (float sx in new[] { -2.2f, 0f, 2.2f })
                 foreach (float sz in new[] { -1.9f, 1.9f })
                     Cyl(k, 0.13f, 0.16f, postLen, new Vector3(sx, 1.6f - postLen / 2f, sz), timber, 6);
             Box(k, new Vector3(5.6f, 0.2f, 4.6f), new Vector3(0, 1.6f, 0), planks);
             Box(k, new Vector3(3.6f, 2.3f, 3.0f), new Vector3(-0.6f, 2.85f, -0.3f), planks);
-            Roof(k, new Vector3(-0.6f, 0, -0.3f), 3.6f, 3.0f, 4.0f, 1.9f, 0.4f, C(0.5f, 0.4f, 0.2f));
+            Roof(k, new Vector3(-0.6f, 0, -0.3f), 3.6f, 3.0f, 4.0f, 1.9f, 0.4f, Thatch(0.5f, 0.4f, 0.2f));
             Box(k, new Vector3(0.9f, 1.8f, 0.08f), new Vector3(-0.2f, 2.6f, 1.23f), C(0.12f, 0.09f, 0.07f));
             Box(k, new Vector3(0.7f, 0.6f, 0.08f), new Vector3(-1.6f, 3.1f, 1.23f), C(0.25f, 0.3f, 0.32f));
             Box(k, new Vector3(5.6f, 0.08f, 0.08f), new Vector3(0, 2.5f, 2.25f), timber);
@@ -203,12 +258,12 @@ namespace FishingSim.Game
             Box(k, new Vector3(3.2f, 0.35f, 0.9f), new Vector3(2.8f, 0.1f, 3.4f), C(0.35f, 0.3f, 0.22f), new Vector3(0, 15f, 0));
         }
 
-        private static void Dike(MeshKit k, float length, List<Vector3> trees)
+        private static void Dike(Kit k, float length, List<Vector3> trees)
         {
-            var earth = C(0.36f, 0.5f, 0.2f);
-            var path = C(0.55f, 0.45f, 0.3f);
-            var concrete = C(0.7f, 0.68f, 0.62f);
-            var wood = C(0.48f, 0.34f, 0.24f);
+            var earth = Grass();
+            var path = Trail();
+            var concrete = Stone(0.7f, 0.68f, 0.62f);
+            var wood = Wood(0.48f, 0.34f, 0.24f);
             Box(k, new Vector3(length, 1.4f, 3.2f), new Vector3(0, 0.3f, 0), earth);
             foreach (float sz in new[] { -1f, 1f })
                 Box(k, new Vector3(length, 0.5f, 2.6f), new Vector3(0, 0.25f, sz * 2.4f), earth, new Vector3(sz * 18f, 0, 0));
@@ -232,9 +287,9 @@ namespace FishingSim.Game
             }
         }
 
-        private static void Platform(MeshKit k, float depth)
+        private static void Platform(Kit k, float depth)
         {
-            var wood = C(0.66f, 0.5f, 0.34f);
+            var wood = Wood(0.66f, 0.5f, 0.34f);
             Box(k, new Vector3(2.2f, 0.12f, 2.0f), new Vector3(0, 0.45f, 1.0f), wood);
             foreach (float sx in new[] { -0.95f, 0.95f })
                 foreach (float sz in new[] { 0.15f, 1.85f })
@@ -242,10 +297,10 @@ namespace FishingSim.Game
             Box(k, new Vector3(0.5f, 0.06f, 0.3f), new Vector3(0.7f, 0.85f, 1.7f), wood);
         }
 
-        private static void Waterfall(MeshKit k, MeshKit water)
+        private static void Waterfall(Kit k, MeshKit water)
         {
-            var rock = C(0.74f, 0.72f, 0.7f);
-            var darkRock = C(0.58f, 0.57f, 0.6f);
+            var rock = Stone(0.74f, 0.72f, 0.7f);
+            var darkRock = Stone(0.58f, 0.57f, 0.6f);
             var moss = C(0.3f, 0.45f, 0.18f);
             var rng = new System.Random(5);
             float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
@@ -271,15 +326,15 @@ namespace FishingSim.Game
             for (int i = 0; i < 6; i++)
             {
                 float a = i * 1.1f;
-                water.Blob(new Vector3(MathF.Sin(a) * 1.6f, 0.05f, 1.2f + MathF.Cos(a) * 0.8f), new Vector3(0.9f, 0.3f, 0.9f), 40 + i, 0.3f, foam, foam, true, 1);
+                water.Blob(new Vector3(MathF.Sin(a) * 1.6f, 0.05f, 1.2f + MathF.Cos(a) * 0.8f), new Vector3(0.9f, 0.3f, 0.9f), 40 + i, 0.3f, foam.Colour, foam.Colour, true, 1);
             }
             foreach (var (pos, s) in new[] { (new Vector3(-3.2f, 0.2f, 2.2f), 1.2f), (new Vector3(3.5f, 0.1f, 1.6f), 1.5f), (new Vector3(-1.4f, 0f, 3.6f), 0.8f) })
                 Box(k, new Vector3(s * 1.6f, s, s * 1.3f), pos, darkRock, new Vector3(10f, pos.x * 20f, 6f));
         }
 
-        private static void Rocks(MeshKit k)
+        private static void Rocks(Kit k)
         {
-            var rock = C(0.52f, 0.52f, 0.55f);
+            var rock = Stone(0.52f, 0.52f, 0.55f);
             (Vector3 Size, Vector3 Pos, Vector3 Rot)[] stones =
             {
                 (new(4.5f, 3.2f, 3.8f), new(0, 0.6f, 0), new(8f, 20f, -6f)),

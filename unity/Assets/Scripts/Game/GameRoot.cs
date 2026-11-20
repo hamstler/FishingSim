@@ -305,6 +305,7 @@ namespace FishingSim.Game
                     ClosePanel();
             }
             _village.SetNight(_day.Night);
+            _world.SetNight(_day.Night);
             Campfire.ClockNow = _profile.Clock;
             _camp.Regrow(_profile.Clock);
             _people.Tick(Time.deltaTime, _day.Hour);
