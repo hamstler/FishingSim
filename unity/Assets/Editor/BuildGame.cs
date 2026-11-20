@@ -98,6 +98,33 @@ namespace FishingSim.EditorTools
                 preloaded.GetArrayElementAtIndex(preloaded.arraySize - 1).objectReferenceValue = svc;
                 Debug.Log("Preloaded shader variants: " + AssetDatabase.GUIDToAssetPath(guid));
             }
+            // The game makes its materials at run time and draws plants instanced, with fog set by the time of day:
+            // nothing in the scene uses those variants, so the build would strip them (no trees, no grass, no fog).
+            void SetInt(string name, int value)
+            {
+                var p = so.FindProperty(name);
+                if (p != null && p.propertyType == SerializedPropertyType.Boolean)
+                    p.boolValue = value != 0;
+                else if (p != null)
+                    p.intValue = value;
+                else
+                    Debug.LogWarning("GraphicsSettings property missing: " + name);
+            }
+            void SetBool(string name, bool value)
+            {
+                var p = so.FindProperty(name);
+                if (p != null && p.propertyType == SerializedPropertyType.Boolean)
+                    p.boolValue = value;
+                else if (p != null)
+                    p.intValue = value ? 1 : 0;
+                else
+                    Debug.LogWarning("GraphicsSettings property missing: " + name);
+            }
+            SetInt("m_InstancingStripping", 2);   // keep all
+            SetBool("m_FogStripping", true);       // custom
+            SetBool("m_FogKeepLinear", true);
+            SetBool("m_FogKeepExp", true);
+            SetBool("m_FogKeepExp2", true);
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
