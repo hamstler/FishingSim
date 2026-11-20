@@ -51,6 +51,7 @@ namespace FishingSim.Game
             Camera.depthTextureMode = DepthTextureMode.Depth;
             Camera.clearFlags = CameraClearFlags.Skybox;
             cam.AddComponent<AudioListener>();
+            cam.AddComponent<PostFx>();
             cam.tag = "MainCamera";
         }
 
