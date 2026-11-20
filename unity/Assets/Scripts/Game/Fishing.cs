@@ -216,8 +216,8 @@ namespace FishingSim.Game
             Disturbance.Decay(dt);
             Barometer.Step(Day.LastStepHours, Day.Weather);
             Groundbait.Decay(Day.LastStepHours);
-            // loose feed (G): a handful of particle bait round the float
-            if (Input.GetKeyDown(KeyCode.G) && !Blocked && Method == FishingMethod.Float
+            // loose feed (V; G digs): a handful of particle bait round the float
+            if (Input.GetKeyDown(KeyCode.V) && !Blocked && Method == FishingMethod.Float
                 && State is RodState.Waiting or RodState.Nibble or RodState.Bite && LooseFeedable(Profile.Bait))
             {
                 if (Profile.BaitCount(Profile.Bait) >= 3)
