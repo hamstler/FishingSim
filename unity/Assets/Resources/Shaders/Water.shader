@@ -105,7 +105,9 @@ Shader "FS/Water"
 
             float3 sky_colour(float3 r)
             {
-                float3 sky = lerp(_SkyHorizon.rgb, _SkyTop.rgb, pow(saturate(r.y), 0.55));
+                // Godot reflects its sky's radiance cubemap, which is darker and bluer than the haze at the horizon
+                // (the Jezioro reference: navy water under a pale sky): the reflected horizon leans to the zenith.
+                float3 sky = lerp(_SkyHorizon.rgb, _SkyTop.rgb, 0.45 + 0.55 * pow(saturate(r.y), 0.55)) * 0.6;
                 return sky;
             }
 

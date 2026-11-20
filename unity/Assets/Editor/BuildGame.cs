@@ -29,6 +29,11 @@ namespace FishingSim.EditorTools
             Directory.CreateDirectory("Assets/Scenes");
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             new GameObject("Boot");
+            // The game sets exponential fog by the time of day: with it on in the scene the build keeps that fog
+            // variant (automatic fog stripping) and nothing more.
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.Exponential;
+            RenderSettings.fogDensity = 0.002f;
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
 
@@ -53,7 +58,35 @@ namespace FishingSim.EditorTools
             if (icon != null)
                 PlayerSettings.SetIcons(UnityEditor.Build.NamedBuildTarget.Unknown, new[] { icon }, IconKind.Any);
             IncludeGltfShaders();
+            InstancedMaterials();
             AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>
+        /// Plants, stones and grass are drawn instanced with materials made at run time; a material with instancing on
+        /// per shader in Resources makes the build keep those shaders' instancing variants (only theirs).
+        /// </summary>
+        private static void InstancedMaterials()
+        {
+            Directory.CreateDirectory("Assets/Resources/Instanced");
+            foreach (var name in new[] { "FS/Foliage", "FS/Bark", "FS/Rock", "FS/GrassCard", "FS/Plant" })
+            {
+                var shader = Shader.Find(name);
+                if (shader == null)
+                {
+                    Debug.LogWarning("Shader missing: " + name);
+                    continue;
+                }
+                string path = "Assets/Resources/Instanced/" + name.Replace("FS/", "") + ".mat";
+                var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+                if (mat == null)
+                {
+                    mat = new Material(shader) { enableInstancing = true };
+                    AssetDatabase.CreateAsset(mat, path);
+                }
+                mat.enableInstancing = true;
+                EditorUtility.SetDirty(mat);
+            }
         }
 
         /// <summary>
@@ -98,33 +131,6 @@ namespace FishingSim.EditorTools
                 preloaded.GetArrayElementAtIndex(preloaded.arraySize - 1).objectReferenceValue = svc;
                 Debug.Log("Preloaded shader variants: " + AssetDatabase.GUIDToAssetPath(guid));
             }
-            // The game makes its materials at run time and draws plants instanced, with fog set by the time of day:
-            // nothing in the scene uses those variants, so the build would strip them (no trees, no grass, no fog).
-            void SetInt(string name, int value)
-            {
-                var p = so.FindProperty(name);
-                if (p != null && p.propertyType == SerializedPropertyType.Boolean)
-                    p.boolValue = value != 0;
-                else if (p != null)
-                    p.intValue = value;
-                else
-                    Debug.LogWarning("GraphicsSettings property missing: " + name);
-            }
-            void SetBool(string name, bool value)
-            {
-                var p = so.FindProperty(name);
-                if (p != null && p.propertyType == SerializedPropertyType.Boolean)
-                    p.boolValue = value;
-                else if (p != null)
-                    p.intValue = value ? 1 : 0;
-                else
-                    Debug.LogWarning("GraphicsSettings property missing: " + name);
-            }
-            SetInt("m_InstancingStripping", 2);   // keep all
-            SetBool("m_FogStripping", true);       // custom
-            SetBool("m_FogKeepLinear", true);
-            SetBool("m_FogKeepExp", true);
-            SetBool("m_FogKeepExp2", true);
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
