@@ -80,7 +80,7 @@ namespace FishingSim.Game
                 Destroy(shot);
                 Destroy(small);
             }
-            Debug.Log($"SMOKE people: {UnityEngine.Object.FindObjectsByType<Person>(FindObjectsSortMode.None).Length}, clips {Resources.LoadAll<AnimationClip>("Models/characters/anims_male").Length}, legacy {Resources.LoadAll<AnimationClip>("Models/characters/anims_male").FirstOrDefault()?.legacy}");
+            Debug.Log($"SMOKE people: {UnityEngine.Object.FindObjectsByType<Person>(FindObjectsSortMode.None).Length}, anims loaded {ModelLibrary.Has("characters/anims_male")}, arms {GameObject.Find("AnglerArms") != null}");
             Debug.Log($"SMOKE models: fish {ModelLibrary.Has("fish/okon")}, building {ModelLibrary.Has("buildings/dom_mur_pruski")}, rod {ModelLibrary.Has("rods/float_ostoja")}, reel {ModelLibrary.Has("reels/small_hokuto")}");
             // the village's heavy models slow software rendering down: hide it for the fishing part
             if (GameObject.Find("Village") is { } village)

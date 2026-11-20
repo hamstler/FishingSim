@@ -7,5 +7,5 @@
 /[Uu]ser[Ss]ettings/
 *.csproj
 *.sln
-Assets/Resources/Models/
-Assets/Resources/Models.meta
+Assets/StreamingAssets/Models/
+Assets/StreamingAssets/Models.meta

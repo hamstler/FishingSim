@@ -52,7 +52,53 @@ namespace FishingSim.EditorTools
             var icon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Icon/icon.png");
             if (icon != null)
                 PlayerSettings.SetIcons(UnityEditor.Build.NamedBuildTarget.Unknown, new[] { icon }, IconKind.Any);
+            IncludeGltfShaders();
             AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>
+        /// The models are read at run time (glTFast from StreamingAssets), so nothing in the scenes references glTFast's
+        /// shaders: they and its shader variant collections are added to the graphics settings, or the build strips them.
+        /// </summary>
+        private static void IncludeGltfShaders()
+        {
+            var gs = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.GraphicsSettings>("ProjectSettings/GraphicsSettings.asset");
+            if (gs == null)
+            {
+                Debug.LogWarning("GraphicsSettings not found");
+                return;
+            }
+            var so = new SerializedObject(gs);
+            var always = so.FindProperty("m_AlwaysIncludedShaders");
+            foreach (var name in new[] { "glTF/PbrMetallicRoughness", "glTF/PbrSpecularGlossiness", "glTF/Unlit" })
+            {
+                var shader = Shader.Find(name);
+                if (shader == null)
+                {
+                    Debug.LogWarning("glTFast shader missing: " + name);
+                    continue;
+                }
+                bool has = false;
+                for (int i = 0; i < always.arraySize; i++)
+                    has |= always.GetArrayElementAtIndex(i).objectReferenceValue == shader;
+                if (!has)
+                {
+                    always.arraySize++;
+                    always.GetArrayElementAtIndex(always.arraySize - 1).objectReferenceValue = shader;
+                    Debug.Log("Always included: " + name);
+                }
+            }
+            var preloaded = so.FindProperty("m_PreloadedShaders");
+            foreach (var guid in AssetDatabase.FindAssets("t:ShaderVariantCollection", new[] { "Packages/com.unity.cloud.gltfast" }))
+            {
+                var svc = AssetDatabase.LoadAssetAtPath<ShaderVariantCollection>(AssetDatabase.GUIDToAssetPath(guid));
+                if (svc == null)
+                    continue;
+                preloaded.arraySize++;
+                preloaded.GetArrayElementAtIndex(preloaded.arraySize - 1).objectReferenceValue = svc;
+                Debug.Log("Preloaded shader variants: " + AssetDatabase.GUIDToAssetPath(guid));
+            }
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         public static void Build()

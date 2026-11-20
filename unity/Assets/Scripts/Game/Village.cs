@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using FishingSim.Data;
 using UnityEngine;
 using Mathf = UnityEngine.Mathf;
@@ -69,6 +70,10 @@ namespace FishingSim.Game
         public List<(Vector3 At, float Radius)> Solids { get; } = new();
 
         private Material _lit = null!;
+
+        /// <summary>The Meshy buildings this map's village needs (loaded before it is built).</summary>
+        public static IEnumerable<string> ModelIds(Lake lake) =>
+            lake.Specs.Where(s => Meshy.ContainsKey(s.Kind)).Select(s => Meshy[s.Kind].Id).Distinct();
 
         public void Build(Lake lake)
         {

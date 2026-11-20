@@ -106,6 +106,7 @@ namespace FishingSim.Game
             Settings.Apply(_player.Camera);
             _player.Frozen = true;
             _rod.Blocked = true;
+            StartCoroutine(PreloadModels());
             if (_locations.Count > 0)
                 StartCoroutine(LoadMap(Mathf.Clamp(_profile.Location, 0, _locations.Count - 1), false));
             if (Smoke.Enabled)
@@ -119,9 +120,24 @@ namespace FishingSim.Game
             }
         }
 
+        /// <summary>Rods, reels, the people and the camp props first, then every fish (in the background).</summary>
+        private IEnumerator PreloadModels()
+        {
+            var first = new List<string>();
+            first.AddRange(ModelLibrary.IdsIn("rods"));
+            first.AddRange(ModelLibrary.IdsIn("reels"));
+            first.Add("stone_fire_pit");
+            first.Add("characters/player_angler");
+            yield return ModelLibrary.Preload(first);
+            _rod.ApplyTackle();
+            yield return ModelLibrary.Preload(ModelLibrary.IdsIn("characters"));
+            yield return ModelLibrary.Preload(ModelLibrary.IdsIn("fish"));
+        }
+
         private IEnumerator MakeArms()
         {
             yield return null;   // the rod is built in its Start
+            yield return ModelLibrary.Preload(new[] { "characters/player_angler" });
             try
             {
                 AnglerArms.Create(_player.Camera, _rod);
@@ -176,6 +192,11 @@ namespace FishingSim.Game
                     }
                     yield return step;
                 }
+                // the village's buildings and its people
+                var needed = Village.ModelIds(_world.Lake).ToList();
+                needed.AddRange(ModelLibrary.IdsIn("characters"));
+                needed.Add("stone_fire_pit");
+                yield return ModelLibrary.Preload(needed);
                 try
                 {
                     _village.Build(_world.Lake);

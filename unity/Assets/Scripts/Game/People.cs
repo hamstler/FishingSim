@@ -56,9 +56,14 @@ namespace FishingSim.Game
             if (!Clips.TryGetValue(file, out var clips))
             {
                 clips = new Dictionary<string, AnimationClip>();
-                foreach (var c in Resources.LoadAll<AnimationClip>("Models/characters/" + file))
-                    clips[c.name] = c;
-                Clips[file] = clips;
+                // the clips glTFast made (legacy) on the loaded animations file
+                if (ModelLibrary.Template("characters/" + file) is { } t)
+                    foreach (var anim in t.GetComponentsInChildren<Animation>(true))
+                        foreach (AnimationState state in anim)
+                            if (state.clip != null)
+                                clips[state.clip.name] = state.clip;
+                if (clips.Count > 0)
+                    Clips[file] = clips;
             }
             return clips.TryGetValue(name, out var clip) ? clip : clips.Values.FirstOrDefault(c => c.name.Contains(name));
         }
@@ -68,7 +73,13 @@ namespace FishingSim.Game
             var probe = ClipFor(Sex, "Idle_Loop");
             if (probe != null && probe.legacy)
             {
-                _legacy = model.AddComponent<Animation>();
+                // on the same node as in the animations file (the clips' paths start there)
+                var host = model.transform;
+                if (ModelLibrary.Template(Sex == "F" ? "characters/anims_female" : "characters/anims_male") is { } t
+                    && t.GetComponentInChildren<Animation>(true) is { } src && src.transform != t.transform
+                    && ModelLibrary.Find(model.transform, src.name) is { } same)
+                    host = same;
+                _legacy = host.GetComponent<Animation>() ?? host.gameObject.AddComponent<Animation>();
                 _legacy.cullingType = AnimationCullingType.BasedOnRenderers;
             }
             else
@@ -129,7 +140,7 @@ namespace FishingSim.Game
             public bool alpha;
         }
 
-        private static Texture2D? Picture(string name) => string.IsNullOrEmpty(name) ? null : Resources.Load<Texture2D>("Models/characters/textures/" + name);
+        private static Texture2D? Picture(string name) => string.IsNullOrEmpty(name) ? null : ModelLibrary.Picture("characters/textures/" + name);
 
         public static void DressModel(GameObject go, string model, string? json) => Dress(go, model, json);
 
