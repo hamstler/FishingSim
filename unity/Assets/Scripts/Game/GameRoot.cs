@@ -33,6 +33,7 @@ namespace FishingSim.Game
         private Fishing _rod = null!;
         private Swimmers? _swimmers;
         private Gulls? _gulls;
+        private Anglers? _anglers;
         private Mayflies? _mayflies;
         private DayCycle _day = null!;
         private Village _village = null!;
@@ -199,6 +200,7 @@ namespace FishingSim.Game
                 var needed = Village.ModelIds(_world.Lake).ToList();
                 needed.AddRange(ModelLibrary.IdsIn("characters"));
                 needed.Add("stone_fire_pit");
+                needed.AddRange(Anglers.ModelIds);
                 yield return ModelLibrary.Preload(needed);
                 try
                 {
@@ -220,6 +222,16 @@ namespace FishingSim.Game
                 _player.Solids.Clear();
                 _player.Solids.AddRange(_village.Solids);
                 _player.Solids.AddRange(_world.Solids);
+                try
+                {
+                    _anglers ??= new GameObject("Anglers").AddComponent<Anglers>();
+                    _anglers.Build(_world.Lake);
+                    _player.Solids.AddRange(_anglers.Solids);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
                 _loadedLocation = index;
                 _day.Water = _world.WaterMaterial;
                 _day.BuildEffects();
