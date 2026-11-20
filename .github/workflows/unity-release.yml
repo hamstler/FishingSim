@@ -30,6 +30,10 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/share/swift
           sudo docker image prune --all --force || true
+          # importing the million-triangle Meshy buildings needs more than the runner's 8 GB of memory
+          sudo swapoff -a || true
+          sudo fallocate -l 20G /swapfile2 && sudo chmod 600 /swapfile2 && sudo mkswap /swapfile2 && sudo swapon /swapfile2
+          free -h
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
