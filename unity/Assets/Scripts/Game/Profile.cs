@@ -41,6 +41,35 @@ public sealed class Profile
     public Dictionary<string, float> Records { get; set; } = new();
     public int Caught { get; set; }
 
+    /// <summary>Line wear per line id (0 .. 0.6: the share of its strength lost; Core/Methods/LineWear).</summary>
+    public Dictionary<string, float> LineWear { get; set; } = new();
+
+    /// <summary>Hook dullness per hook id (0 .. 0.6; Core/Methods/HookWear).</summary>
+    public Dictionary<string, float> HookDull { get; set; } = new();
+
+    /// <summary>Twist per line id (turns put in by spinning lures; Core/Methods/LineTwist).</summary>
+    public Dictionary<string, float> LineTwist { get; set; } = new();
+
+    /// <summary>Fish kept today per species (Core/Methods/BagLimits), and which day that is.</summary>
+    public Dictionary<string, int> KeptToday { get; set; } = new();
+    public int KeptDay { get; set; } = -1;
+
+    public float WearOf(string line) => LineWear.TryGetValue(line, out var w) ? w : 0f;
+    public float DullOf(string hook) => HookDull.TryGetValue(hook, out var d) ? d : 0f;
+    public float TwistOf(string line) => LineTwist.TryGetValue(line, out var t) ? t : 0f;
+
+    /// <summary>How many of a species were kept today (the day from the profile's clock).</summary>
+    public int KeptOf(string species)
+    {
+        int day = (int)(Clock / 24f);
+        if (day != KeptDay)
+        {
+            KeptToday.Clear();
+            KeptDay = day;
+        }
+        return KeptToday.TryGetValue(species, out var n) ? n : 0;
+    }
+
     /// <summary>Forest pickings (Core/Camp/Foraging ids -> pieces).</summary>
     public Dictionary<string, int> Pantry { get; set; } = new();
 
@@ -169,6 +198,9 @@ public sealed class Profile
     public void Destroy(string id)
     {
         Owned.Remove(id);
+        LineWear.Remove(id);
+        HookDull.Remove(id);
+        LineTwist.Remove(id);
         if (Rod == id) Rod = Owned.FirstOrDefault(o => Tackle.Rod(o) != null) ?? "";
         if (Line == id) Line = Owned.FirstOrDefault(o => Tackle.Line(o) != null) ?? "";
         if (Hook == id) Hook = Owned.FirstOrDefault(o => Tackle.Hook(o) != null) ?? "";

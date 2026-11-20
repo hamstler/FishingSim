@@ -87,6 +87,109 @@ namespace FishingSim.Game
         /// <summary>A float of a few grams with its split shot; a filled feeder.</summary>
         private const float FloatRigGrams = 4.5f, FeederGrams = 40f;
 
+        // ---- the conditions behind every bite (Core/Methods, as FishingRod uses them)
+        /// <summary>Frightened fish: splashes and the angler's steps; every bite clock slows with it.</summary>
+        public Disturbance Disturbance { get; } = new();
+        /// <summary>The air pressure and its trend (falling pressure: feeding fish).</summary>
+        public Barometer Barometer { get; } = new();
+        private float _baitFresh = 1f, _seasonPace = 1f, _windShore, _shoreCheck;
+        private bool _baitOn = true;
+        private Vector3 _lastEye;
+        private bool _eyeSeen;
+        private float _jump, _weedTime;
+
+        /// <summary>The hooked fish is in a weed bed or among branches: lift the rod (RMB) to drag it out.</summary>
+        public bool FishInWeeds => State == RodState.Fight && _weedTime > 0.2f;
+
+        /// <summary>The float's depth setting (m): where the bait hangs under a float.</summary>
+        public float FloatDepth { get; set; } = 1.2f;
+
+        /// <summary>The water's temperature now at the surface (degrees Celsius).</summary>
+        public float WaterTemp => WaterTemperature.At(World.Lake.Location.WaterTemperature, Day.Hour, Day.Weather);
+
+        /// <summary>Where in the water column the bait is (1 bottom .. 0 surface); null = not judged.</summary>
+        private float? BaitLayerAt(float depth) => Method switch
+        {
+            FishingMethod.Bottom => 1f,
+            FishingMethod.Float => depth > 0.05f ? Mathf.Clamp01(FloatDepth / depth) : 1f,
+            _ => depth > 0.05f ? Mathf.Clamp01(Mathf.Min(1.2f, depth) / depth) : 1f,
+        };
+
+        /// <summary>The temperature at the bait (the surface's, cooling below the mixed top layer).</summary>
+        public float BaitTemperature => WaterTemperature.AtDepth(WaterTemp, DepthHere * (BaitLayerAt(DepthHere) ?? 1f));
+
+        /// <summary>Plants or sunken wood at a point (1 inside .. 0 four metres out) and how steeply the bottom drops there.</summary>
+        public (float Cover, float Edge) StructureAt(float x, float z)
+        {
+            const float d = 1.5f;
+            var lake = World.Lake;
+            float gx = (lake.DepthAt(x + d, z) - lake.DepthAt(x - d, z)) / (2f * d);
+            float gz = (lake.DepthAt(x, z + d) - lake.DepthAt(x, z - d)) / (2f * d);
+            float cover = 0f;
+            foreach (var (bx, bz, r) in Forest.WeedBeds)
+                cover = Mathf.Max(cover, Structure.CoverAt(new[] { new WeedBed(bx, bz, r) }, x, z));
+            foreach (var (wx, wz, r) in Forest.SunkenWood)
+                cover = Mathf.Max(cover, Structure.WoodAt(new[] { new SunkenWood(wx, wz, r) }, x, z));
+            return (cover, Structure.EdgeFrom(Mathf.Sqrt(gx * gx + gz * gz)));
+        }
+
+        /// <summary>What slows or quickens every bite clock: frightened fish, the pressure's trend, feeding spells, a
+        /// wind blowing onto this shore.</summary>
+        private float ConditionPace => Disturbance.Pace * Barometer.Pace * FeedingSpells.Pace(Profile.Clock, Profile.Location)
+            * WindShore.Pace(_windShore, Day.Wind);
+
+        /// <summary>How well the bait still works (fresh .. washed out), and how its kind suits the water's temperature.</summary>
+        private float BaitPace => Method == FishingMethod.Spinning ? 1f : _baitOn ? BaitWear.Appeal(_baitFresh) * _seasonPace : 0f;
+
+        /// <summary>Rain and wind hide the angler's noise.</summary>
+        private float NoiseMasking => Disturbance.Masking(Day.Weather, Day.Wind);
+
+        /// <summary>The water's clarity now (the map's).</summary>
+        private float Clarity => World.Lake.Location.WaterClarity;
+
+        /// <summary>
+        /// FishingRod.TickDisturbance: the frightened fish calm down; the angler's steps near the bait frighten them
+        /// (more running, wading); once a second the wind's push onto this shore and the bait's season are read.
+        /// </summary>
+        private void TickConditions(float dt)
+        {
+            Disturbance.Decay(dt);
+            Barometer.Step(Day.LastStepHours, Day.Weather);
+            var eye = Player.transform.position;
+            float speed = _eyeSeen && dt > 0f ? new Vector2(eye.x - _lastEye.x, eye.z - _lastEye.z).magnitude / dt : 0f;
+            _lastEye = eye;
+            _eyeSeen = true;
+            if (State is RodState.Waiting or RodState.Nibble or RodState.Bite && speed < 12f)
+            {
+                var bait = _bobber.position;
+                float dist = new Vector2(eye.x - bait.x, eye.z - bait.z).magnitude;
+                Disturbance.Add(Disturbance.Steps(speed, dist, World.Lake.DepthAt(eye.x, eye.z) > 0.05f, dt) * NoiseMasking);
+                // the bait washes out in the water (a dissolving one falls off the hook when spent)
+                if (Method != FishingMethod.Spinning && _baitOn)
+                {
+                    _baitFresh = BaitWear.Step(_baitFresh, Profile.Bait, dt);
+                    if (_baitFresh <= 0f && BaitWear.Dissolves(Profile.Bait))
+                    {
+                        _baitOn = false;
+                        Said?.Invoke("Przynęta rozmokła i spadła z haczyka.");
+                    }
+                }
+                _shoreCheck -= dt;
+                if (_shoreCheck <= 0f)
+                {
+                    _shoreCheck = 1f;
+                    var wind = new Vector3(0.8f, 0f, 0.6f) * (Day.Wind * 3f);
+                    _windShore = WindShore.Exposure(World.Lake.DepthAt, bait.x, bait.z, wind.x, wind.z);
+                    _seasonPace = Bait != null ? BaitSeason.Pace((int)Bait.Kind, BaitTemperature) : 1f;
+                }
+            }
+            else
+            {
+                _windShore = 0f;
+                _shoreCheck = 0f;
+            }
+        }
+
         private RodData? Rod => Tackle.Rod(Profile.Rod);
         private ReelData? Reel => Tackle.Reel(Profile.Reel);
         private LineData? LineItem => Tackle.Line(Profile.Line);
@@ -579,7 +682,9 @@ namespace FishingSim.Game
                 ShowModels(rod, Reel);
             var line = LineItem;
             var hook = Hook;
-            EffectiveLimit = Mathf.Min(line?.Strength ?? 1f, Mathf.Min(rod?.MaxLoad ?? 1f, hook?.Strength ?? 1f));
+            // a worn line holds less (LineWear.Strength)
+            float lineHold = line != null ? LineWear.Strength(line.Strength, Profile.WearOf(Profile.Line)) : 1f;
+            EffectiveLimit = Mathf.Min(lineHold, Mathf.Min(rod?.MaxLoad ?? 1f, hook?.Strength ?? 1f));
             if (line != null)
             {
                 var c = line.LineColor;
@@ -607,20 +712,28 @@ namespace FishingSim.Game
             BaitData? bait() => Bait;
         }
 
-        private BiteContext Context(float depth) => new(
-            Profile.Bait,
-            Hook?.Size ?? 5f,
-            depth,
-            World.Lake.Location,
-            Day.Period,
-            Day.Weather,
-            Method == FishingMethod.Bottom ? 1f : null,
-            null,
-            null,
-            0f,
-            null,
-            null,
-            Day.Light);
+        /// <summary>FishingRod.MakeBiteContext: the bait, hook and depth, the place's plants and drop-offs, where the bait
+        /// hangs in the water column and the temperature there, the moonlight at night, the light.</summary>
+        private BiteContext Context(float depth)
+        {
+            var at = _bobber != null ? _bobber.position : Player.transform.position;
+            var (cover, edge) = StructureAt(at.x, at.z);
+            float? layer = BaitLayerAt(depth);
+            return new BiteContext(
+                Profile.Bait,
+                Hook?.Size ?? 5f,
+                depth,
+                World.Lake.Location,
+                Day.Period,
+                Day.Weather,
+                layer,
+                WaterTemperature.AtDepth(WaterTemp, depth * (layer ?? 1f)),
+                cover,
+                edge,
+                Day.Night > 0.5f ? Day.MoonLight : null,
+                null,
+                Day.Light);
+        }
 
         private IReadOnlyList<FishSpecies> SpeciesHere => Tackle.AllSpecies;
 
@@ -633,7 +746,18 @@ namespace FishingSim.Game
             bool lmbDown = canAct && Input.GetMouseButtonDown(0), lmb = canAct && Input.GetMouseButton(0) || SmokeReel, lmbUp = canAct && Input.GetMouseButtonUp(0);
             bool rmbDown = canAct && Input.GetMouseButtonDown(1), rmb = canAct && Input.GetMouseButton(1);
             if (canAct)
-                DragSetting = Mathf.Clamp01(DragSetting + Input.mouseScrollDelta.y * 0.05f);
+            {
+                // wheel: the drag; with Ctrl the float's depth (FloatDepth 0.2-6 m, only between casts)
+                if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
+                {
+                    if (State == RodState.Idle)
+                        FloatDepth = Mathf.Clamp(FloatDepth + Input.mouseScrollDelta.y * 0.1f, 0.2f, 6f);
+                }
+                else
+                    DragSetting = Mathf.Clamp01(DragSetting + Input.mouseScrollDelta.y * 0.05f);
+            }
+            Day.MoonPhase = Moon.Phase(Profile.Clock);
+            TickConditions(dt);
 
             switch (State)
             {
@@ -735,9 +859,19 @@ namespace FishingSim.Game
             float weight = Method == FishingMethod.Bottom ? 40f : Method == FishingMethod.Spinning ? Mathf.Max(Bait?.WeightG ?? 8f, 3f) : 4.5f;
             float reach = (14f + 30f * Mathf.Clamp01(weight / 25f)) * rod.CastMult;
             var dir = Flat(Player.Forward).normalized;
-            float scatter = (float)(_rng.NextFloat() - 0.5f) * (1.5f + 4.5f * power) * Mathf.Deg2Rad;
-            dir = Quaternion.Euler(0f, scatter * Mathf.Rad2Deg, 0f) * dir;
-            float distance = Mathf.Lerp(5f, reach, power);
+            var (degrees, speedFactor) = Casting.Scatter(power, _rng);     // a soft bell round the aim, wider at full power
+            dir = Quaternion.Euler(0f, degrees, 0f) * dir;
+            float distance = Mathf.Lerp(5f, reach, power) * speedFactor;
+            _baitFresh = 1f;          // a fresh bait on every cast
+            _baitOn = true;
+            // a twisted line can throw a bird's nest: the cast dies short, half the twist comes out, the line wears
+            if (LineItem != null && _rng.NextFloat() < LineTwist.TangleChance(Profile.TwistOf(Profile.Line), (int)LineItem.Kind))
+            {
+                distance *= 0.3f;
+                Profile.LineTwist[Profile.Line] = LineTwist.AfterTangle(Profile.TwistOf(Profile.Line));
+                Profile.LineWear[Profile.Line] = Mathf.Min(Profile.WearOf(Profile.Line) + 0.03f, LineWear.Max);
+                Said?.Invoke("Splątanie żyłki (\"broda\")! Zestaw padł blisko.");
+            }
             _origin = Player.transform.position;
             _bobber.position = _tip.position;
             float flight = 0.6f + distance / 28f;
@@ -774,6 +908,8 @@ namespace FishingSim.Game
                 // a little slack on landing (more for a float than for a lure); the bail snaps shut
                 _lineLength = TipDistance() * (Method == FishingMethod.Spinning ? 1.02f : 1.07f);
                 Cue?.Invoke(Method == FishingMethod.Bottom ? Core.Audio.OneShot.Splash : Core.Audio.OneShot.SmallSplash, 0.8f);
+                // the splash frightens the fish round it (less in rain and wind)
+                Disturbance.Add(Disturbance.Splash(Method, TackleWeightKg * 1000f, DepthHere) * NoiseMasking);
                 NewBiteTimer();
                 Set(RodState.Waiting);
             }
@@ -813,7 +949,8 @@ namespace FishingSim.Game
         {
             var ctx = Context(DepthHere);
             float attraction = BiteModel.Attraction(SpeciesHere, ctx);
-            float vis = LineItem?.Visibility ?? 1f;
+            // LineShyness: in clear water and good light the fish see the line better
+            float vis = LineShyness.Effective(LineItem?.Visibility ?? 1f, Clarity, Day.Light);
             _biteTimer = BiteModel.WaitSeconds(_rng, 4f, 12f, vis, attraction) * (Method == FishingMethod.Spinning ? 0.6f : 1f)
                          / (1f + BiteBonus());
         }
@@ -835,6 +972,13 @@ namespace FishingSim.Game
                 // the slack lying on the water is taken up first; only then does the end tackle come in
                 float pull = TakeUpSlack(speed * dt);
                 p += toAngler.normalized * pull;
+                // a spinning lure twists the line as it is drawn (a swivel takes most of it out)
+                if (Method == FishingMethod.Spinning && Bait != null && pull > 0f)
+                {
+                    var family = FishingSim.Core.Methods.Method.FamilyOf(Bait.AffinityAs);
+                    float twist = LineTwist.PerMetre(family, Profile.HasAccessory("kretlik")) * pull;
+                    Profile.LineTwist[Profile.Line] = Mathf.Min(Profile.TwistOf(Profile.Line) + twist, LineTwist.Max);
+                }
                 DepthHere = -World.Lake.HeightAt(p.x, p.z);
                 _lineSlack = Mathf.MoveTowards(_lineSlack, 0f, dt * 2f);
             }
@@ -853,7 +997,7 @@ namespace FishingSim.Game
             if (State == RodState.Waiting)
             {
                 if (Method != FishingMethod.Spinning || lmb)
-                    _biteTimer -= dt;
+                    _biteTimer -= dt * ConditionPace * BaitPace * (Method == FishingMethod.Spinning ? 2f : 1f);
                 if (rmbDown)
                     Said?.Invoke("Nic nie bierze.");
                 if (_biteTimer <= 0f)
@@ -890,11 +1034,15 @@ namespace FishingSim.Game
             }
             // Bite: the float goes under (the tip pulls round) for the hook window
             _dip = Mathf.MoveTowards(_dip, 1f, dt * 5f);
-            float window = FishingSim.Core.Methods.Method.HookWindow(Method) + 0.4f;
+            // the hook window: longer in warm water, shorter in cold (WaterTemperature.WindowFactor at the bait)
+            float window = FishingSim.Core.Methods.Method.HookWindow(Method) * WaterTemperature.WindowFactor(BaitTemperature) + 0.4f;
             if (rmbDown)
             {
                 float lateness = Mathf.Clamp01(_stateTime / window);
-                float chance = 0.9f * (1f - 0.4f * lateness) * Mathf.Lerp(1f, 0.75f, Mathf.Clamp01((Distance - 15f) / 50f) * (LineItem?.Stretch ?? 0.5f));
+                // Strike.Efficiency: a long stretchy line and slack lose the strike's force; a loose drag too
+                float efficiency = Strike.Efficiency(Distance, LineItem?.Stretch ?? 0.5f, Slack)
+                    * Strike.DragFactor(DragSetting * (Reel?.DragMax ?? 3f));
+                float chance = 0.95f * (1f - 0.4f * lateness) * efficiency * HookWear.SetFactor(Profile.DullOf(Profile.Hook));
                 if (_rng.NextFloat() < chance)
                     StartFight(1f - 0.4f * lateness);
                 else
@@ -936,6 +1084,9 @@ namespace FishingSim.Game
             var to = Flat(_bobber.position - Player.transform.position);
             _origin = Player.transform.position;
             _hookHold = hold;
+            _jump = 0f;
+            _weedTime = 0f;
+            Disturbance.Add(0.3f);       // a fish thrashing on the hook frightens the others
             Fight = new FightModel(FishProfile.From(Species!, Weight), gear, _rng, Mathf.Max(to.magnitude, 2.5f), Mathf.Atan2(to.x, to.z), DragSetting)
             {
                 HookHold = hold,
@@ -953,11 +1104,54 @@ namespace FishingSim.Game
         {
             var fight = Fight!;
             var outcome = fight.Step(dt, DragSetting, reeling, lifting);
+            // the load wears the line (more near its breaking point)
+            if (LineItem != null)
+                Profile.LineWear[Profile.Line] = Mathf.Min(Profile.WearOf(Profile.Line) + LineWear.FromLoad(fight.Tension, LineItem.Strength, dt), LineWear.Max);
+            if (outcome == FightOutcome.Ongoing)
+            {
+                // a leap: the fish clears the water and shakes its head; a rod held high (or a weakly set hook) loses it
+                if (_jump <= 0f && fight.Distance < 30f && _rng.NextFloat() < dt * (0.02f + 0.08f * (Species?.Aggression ?? 0.5f)) * (fight.Bursting ? 3f : 1f))
+                    _jump = 1f;
+                if (_jump > 0f)
+                {
+                    float before = _jump;
+                    _jump = Mathf.Max(0f, _jump - dt * 1.6f);
+                    if (before > 0.5f && _jump <= 0.5f)
+                    {
+                        Cue?.Invoke(Core.Audio.OneShot.SmallSplash, 1f);
+                        float load = fight.Tension / Mathf.Max(fight.PeakPull, 0.1f);
+                        if (_rng.NextFloat() < Jumps.ThrowChance(lifting, fight.HookHold, load))
+                        {
+                            Said?.Invoke("Ryba wyskoczyła z wody i wypięła się.");
+                            LoseFish();
+                            return;
+                        }
+                    }
+                }
+                // in a weed bed or among sunken branches the line tangles unless the rod is lifted to drag it out
+                var at = _origin + new Vector3(fight.Position.X, 0f, fight.Position.Y);
+                var (cover, _) = StructureAt(at.x, at.z);
+                if (cover > 0.6f && !lifting)
+                {
+                    _weedTime += dt;
+                    if (_weedTime > Structure.TangleSeconds)
+                    {
+                        Said?.Invoke("Ryba wplątała żyłkę w zielsko i się zerwała.");
+                        Profile.Destroy(Profile.Hook);
+                        LoseFish();
+                        return;
+                    }
+                }
+                else
+                    _weedTime = Mathf.Max(0f, _weedTime - dt * 2f);
+            }
             var pos = _origin + new Vector3(fight.Position.X, 0f, fight.Position.Y);
             float surface = Waves.HeightAt(pos.x, pos.z, Time.time);
             float depthAt = -World.Lake.HeightAt(pos.x, pos.z);
             float swim = Mathf.Lerp(-0.6f, -0.12f, Mathf.Clamp01(1f - fight.Distance / 25f));
             swim = Mathf.Max(swim, -Mathf.Max(depthAt - 0.15f, 0.05f));
+            if (_jump > 0f)
+                swim = Mathf.Max(swim, 0.9f * Mathf.Sin(Mathf.Clamp01(1f - _jump) * Mathf.PI) - 0.1f);     // the leap's arc
             _fish.position = new Vector3(pos.x, surface + swim, pos.z);
             _fish.rotation = Quaternion.Euler(0f, fight.Heading * Mathf.Rad2Deg, Mathf.Sin(Time.time * 9f) * 8f);
             _bobber.position = Vector3.Lerp(_bobber.position, new Vector3(pos.x, surface, pos.z) + (_origin - pos).normalized * 0.4f, 1f - Mathf.Exp(-dt * 10f));
@@ -966,6 +1160,10 @@ namespace FishingSim.Game
             {
                 case FightOutcome.Landed:
                     Cue?.Invoke(Core.Audio.OneShot.Catch, 1f);
+                    // every fish wears the line a little and blunts the hook; the fight takes some twist out
+                    Profile.LineWear[Profile.Line] = Mathf.Min(Profile.WearOf(Profile.Line) + LineWear.PerFish, LineWear.Max);
+                    Profile.HookDull[Profile.Hook] = Mathf.Min(Profile.DullOf(Profile.Hook) + HookWear.PerFish(Weight), HookWear.Max);
+                    Profile.LineTwist[Profile.Line] = Mathf.Max(0f, Profile.TwistOf(Profile.Line) - LineTwist.FightRelief(fight.Elapsed));
                     Profile.UseBait();
                     Set(RodState.Landed);
                     _bobber.gameObject.SetActive(false);
@@ -1042,7 +1240,14 @@ namespace FishingSim.Game
         {
             if (State != RodState.Landed || Species == null)
                 return;
+            if (keep && !BagLimits.MayKeep(Species.SpeciesName, Profile.KeptOf(Species.SpeciesName)))
+            {
+                Said?.Invoke($"Limit dzienny: {Species.SpeciesName} — tylko {BagLimits.LimitOf(Species.SpeciesName)} szt. dziennie. Ryba wraca do wody.");
+                keep = false;
+            }
             Profile.AddCatch(Species, Weight);
+            if (keep)
+                Profile.KeptToday[Species.SpeciesName] = Profile.KeptOf(Species.SpeciesName) + 1;
             if (keep)
                 Profile.Keepnet.Add(new KeptFish { Species = Species.SpeciesName, Name = Species.DisplayNameOr(), Weight = Weight });
             else

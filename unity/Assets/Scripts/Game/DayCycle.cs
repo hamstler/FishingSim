@@ -22,6 +22,13 @@ namespace FishingSim.Game
         /// <summary>Wind strength 0..1 (calm sunny days to rainy gusts), drifting slowly.</summary>
         public float Wind { get; private set; } = 0.25f;
 
+        /// <summary>The moon's phase (0 new .. 0.5 full .. 1), set from the profile's clock.</summary>
+        public float MoonPhase { get; set; } = 0.35f;
+
+        /// <summary>Moonlight on the water: the moon's illumination at night through the clouds (WorldState.MoonLight).</summary>
+        public float MoonLight => FishingSim.Core.Methods.Moon.Illumination(MoonPhase) * Night
+            * (Weather == Weather.Rain ? 0.15f : Weather == Weather.Cloudy ? 0.45f : 1f);
+
         /// <summary>Game hours that passed in the last frame.</summary>
         public float LastStepHours { get; private set; }
 
@@ -199,7 +206,7 @@ namespace FishingSim.Game
             _sun.shadows = _cloud < 0.75f && day > 0.02f ? LightShadows.Soft : LightShadows.None;
             _moon.transform.rotation = Quaternion.LookRotation(LightTravel(elDeg, 150f));
             _moon.color = new Color(0.58f, 0.68f, 1f);
-            _moon.intensity = 0.25f * Mathf.Clamp01(-el * 2.5f) * (1f - _cloud * 0.6f);
+            _moon.intensity = 0.25f * (0.2f + 0.8f * FishingSim.Core.Methods.Moon.Illumination(MoonPhase)) * Mathf.Clamp01(-el * 2.5f) * (1f - _cloud * 0.6f);
             _moon.enabled = _moon.intensity > 0.001f;
 
             _sky.SetFloat("_CloudCover", cover);
