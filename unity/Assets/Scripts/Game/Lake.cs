@@ -239,7 +239,7 @@ public sealed class Lake
         }
     }
 
-    private int Seed
+    public int Seed
     {
         get
         {

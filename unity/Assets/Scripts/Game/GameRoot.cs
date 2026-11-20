@@ -216,6 +216,7 @@ namespace FishingSim.Game
                 }
                 _player.Solids.Clear();
                 _player.Solids.AddRange(_village.Solids);
+                _player.Solids.AddRange(_world.Solids);
                 _loadedLocation = index;
                 _day.Water = _world.WaterMaterial;
                 GC.Collect();

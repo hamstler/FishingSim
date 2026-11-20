@@ -91,6 +91,9 @@ namespace FishingSim.Game
             float windTarget = (Weather switch { Weather.Clear => 0.2f, Weather.Cloudy => 0.45f, _ => 0.7f })
                                + 0.15f * Mathf.Sin(Time.time * 0.05f);
             Wind = Mathf.MoveTowards(Wind, Mathf.Clamp01(windTarget), dt * 0.01f);
+            // foliage sway (Godot's foliage_wind / foliage_time globals)
+            Shader.SetGlobalFloat("_FoliageWind", Mathf.Clamp01(Wind + _rain * 0.25f));
+            Shader.SetGlobalFloat("_FoliageTime", Time.time);
             Apply();
         }
 

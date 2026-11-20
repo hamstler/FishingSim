@@ -22,6 +22,10 @@ namespace FishingSim.Game
         public bool Ready { get; private set; }
 
         private readonly List<GameObject> _parts = new();
+        private Forest? _forest;
+
+        /// <summary>Tree trunks and boulders the angler walks round.</summary>
+        public List<(Vector3 At, float Radius)> Solids { get; } = new();
         private Material _lit = null!, _foliage = null!, _foliageTwoSided = null!;
 
         public static Color Lin(Compat.Color c) => Col.Lin(c.R, c.G, c.B);
@@ -109,6 +113,12 @@ namespace FishingSim.Game
                 if (k % 8 == 0)
                     yield return null;
             }
+            // the woods, bushes, boulders and the meadow (Scenery's placement, instanced)
+            Solids.Clear();
+            _forest ??= gameObject.AddComponent<Forest>();
+            var forest = _forest.Build(Lake, Solids);
+            while (forest.MoveNext())
+                yield return forest.Current;
             Progress = 1f;
             Ready = true;
         }
@@ -310,47 +320,6 @@ namespace FishingSim.Game
             var grass = new MeshKit();
             float x0 = cell.x * 64f, z0 = cell.y * 64f;
             var loc = lake.Location;
-            // trees on a jittered grid: dense in the forest belt, sparse on meadows
-            const float step = 4.2f;
-            for (int j = 0; j < 16; j++)
-                for (int i = 0; i < 16; i++)
-                {
-                    int gx = Mathf.RoundToInt(x0 / step) + i, gz = Mathf.RoundToInt(z0 / step) + j;
-                    float x = gx * step + (Hash(gx, gz, 1) - 0.5f) * step * 0.9f;
-                    float z = gz * step + (Hash(gx, gz, 2) - 0.5f) * step * 0.9f;
-                    if (x < x0 || x >= x0 + 64f || z < z0 || z >= z0 + 64f || Mathf.Abs(x) > Lake.Outer - 4f || Mathf.Abs(z) > Lake.Outer - 4f)
-                        continue;
-                    float h = lake.HeightAt(x, z);
-                    float play = lake.PlayDistance(x, z);
-                    bool forest = lake.IsForest(x, z, h) || (play > -25f && h > 1.5f && h < loc.RockLine + 8f);
-                    float r = Hash(gx, gz, 3);
-                    if (Lake.OnPier(x, z) || lake.Built(x, z))
-                        continue;
-                    if (forest && r < (play > -25f ? 0.85f : 0.62f) * Mathf.Clamp(loc.TreeDensity, 0.3f, 1.4f))
-                    {
-                        if (play > 60f && r > 0.5f)
-                            continue;   // thinner up the mountains
-                        float size = 0.75f + Hash(gx, gz, 4) * 0.7f;
-                        bool pine = Hash(gx, gz, 5) < 0.55f + Mathf.Clamp01((h - 6f) / 20f) * 0.4f;
-                        if (pine)
-                            Pine(solid, leaves, new Vector3(x, h, z), size, gx * 31 + gz);
-                        else
-                            Broadleaf(solid, leaves, new Vector3(x, h, z), size, gx * 31 + gz, Hash(gx, gz, 6) < 0.3f);
-                    }
-                    else if (h > 1.2f && h < loc.RockLine && r > 0.985f && play < -10f)
-                        Broadleaf(solid, leaves, new Vector3(x, h, z), 0.9f + Hash(gx, gz, 4) * 0.5f, gx * 31 + gz, false);
-                    else if (h > 0.8f && r < 0.06f && play < 0f)
-                        Bush(leaves, new Vector3(x, h, z), 0.6f + Hash(gx, gz, 7), gx * 13 + gz);
-                    // stones on the beach, rocky slopes
-                    if (Hash(gx, gz, 8) < (h > loc.RockLine ? 0.25f : h > -0.4f && h < 1f ? 0.08f : 0.012f))
-                    {
-                        var p = new Vector3(x + 1.3f, 0f, z - 0.9f);
-                        p.y = lake.HeightAt(p.x, p.z);
-                        float s = 0.25f + Hash(gx, gz, 9) * (h > loc.RockLine ? 2.2f : 0.7f);
-                        var stone = Col.Lin(Color.Lerp(new Color(0.42f, 0.41f, 0.38f), new Color(0.3f, 0.31f, 0.29f), Hash(gx, gz, 10)));
-                        solid.Blob(p + Vector3.up * s * 0.25f, new Vector3(s, s * 0.6f, s * 0.85f), gx * 7 + gz, 0.5f, stone, stone * 0.6f, false, 1);
-                    }
-                }
             // reeds along the shallow shore and grass tufts on the meadows near the lake
             const float gstep = 1.6f;
             for (int j = 0; j < 40; j++)
@@ -365,82 +334,8 @@ namespace FishingSim.Game
                     float r = Hash(gx, gz, 13);
                     if (h < -0.05f && h > -0.9f && r < 0.5f && Mathf.Abs(x) > 3f)
                         Reeds(grass, new Vector3(x, h, z), gx * 17 + gz);
-                    else if (h > 0.9f && h < loc.RockLine && r < 0.55f && !lake.IsForest(x, z, h))
-                        Tuft(grass, new Vector3(x, h, z), gx * 19 + gz, WorldView.Lin(loc.GrassColor));
                 }
             return (solid, leaves, grass);
-        }
-
-        private static readonly Color Bark = Col.Lin(0.27f, 0.2f, 0.15f);
-        private static readonly Color BirchBark = Col.Lin(0.78f, 0.76f, 0.7f);
-
-        private static void Pine(MeshKit solid, MeshKit leaves, Vector3 at, float size, int seed)
-        {
-            var rng = new System.Random(seed);
-            float height = 11f * size;
-            solid.Tube(at - Vector3.up * 0.3f, at + Vector3.up * height * 0.92f, 0.22f * size, 0.04f, 6, Bark, Bark, false);
-            var needle = Col.Lin(Color.Lerp(new Color(0.08f, 0.16f, 0.09f), new Color(0.12f, 0.22f, 0.1f), (float)rng.NextDouble()));
-            var dark = needle * 0.55f;
-            int tiers = 6;
-            for (int t = 0; t < tiers; t++)
-            {
-                float f = t / (float)(tiers - 1);
-                float y = height * Mathf.Lerp(0.22f, 0.86f, f);
-                float radius = Mathf.Lerp(2.3f, 0.6f, f) * size * (0.85f + (float)rng.NextDouble() * 0.3f);
-                float rise = Mathf.Lerp(2.1f, 1.4f, f) * size;
-                // a drooping skirt of branches: a ring of jittered points under an apex
-                int n = 9;
-                var c = at + Vector3.up * y;
-                int apex = leaves.Add(c + Vector3.up * rise, Vector3.up, new Color(needle.r, needle.g, needle.b, 0.75f));
-                int first = leaves.Count;
-                for (int k = 0; k < n; k++)
-                {
-                    float a = k / (float)n * Mathf.PI * 2f + (float)rng.NextDouble() * 0.3f;
-                    float rr = radius * (0.8f + (float)rng.NextDouble() * 0.35f);
-                    var p = c + new Vector3(Mathf.Cos(a) * rr, -0.35f * size - (float)rng.NextDouble() * 0.3f, Mathf.Sin(a) * rr);
-                    var nrm = new Vector3(Mathf.Cos(a), 0.6f, Mathf.Sin(a)).normalized;
-                    leaves.Add(p, nrm, new Color(dark.r, dark.g, dark.b, 0.55f));
-                }
-                for (int k = 0; k < n; k++)
-                    leaves.Tri(apex, first + (k + 1) % n, first + k);
-                // underside so it is not see-through from below
-                int under = leaves.Add(c - Vector3.up * 0.2f, Vector3.down, new Color(dark.r * 0.6f, dark.g * 0.6f, dark.b * 0.6f, 0.8f));
-                for (int k = 0; k < n; k++)
-                    leaves.Tri(under, first + k, first + (k + 1) % n);
-            }
-            leaves.Add(at, Vector3.up, needle); // keeps the bounds' floor
-        }
-
-        private static void Broadleaf(MeshKit solid, MeshKit leaves, Vector3 at, float size, int seed, bool birch)
-        {
-            var rng = new System.Random(seed);
-            float height = (birch ? 9f : 7.5f) * size;
-            var bark = birch ? BirchBark : Bark;
-            solid.Tube(at - Vector3.up * 0.3f, at + Vector3.up * height * 0.75f, (birch ? 0.14f : 0.26f) * size, 0.08f * size, 7, bark, bark, false);
-            var leaf = Col.Lin(birch
-                ? Color.Lerp(new Color(0.3f, 0.42f, 0.14f), new Color(0.38f, 0.48f, 0.16f), (float)rng.NextDouble())
-                : Color.Lerp(new Color(0.17f, 0.3f, 0.1f), new Color(0.26f, 0.36f, 0.12f), (float)rng.NextDouble()));
-            leaf.a = 0.6f;
-            var dark = leaf * 0.45f;
-            dark.a = 0.8f;
-            int blobs = 3 + rng.Next(3);
-            for (int b = 0; b < blobs; b++)
-            {
-                var off = new Vector3((float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() * 0.6f, (float)rng.NextDouble() - 0.5f) * 2.6f * size;
-                float r = (1.4f + (float)rng.NextDouble() * 0.9f) * size * (birch ? 0.8f : 1f);
-                // branch to the blob
-                solid.Tube(at + Vector3.up * height * 0.5f, at + Vector3.up * height * 0.72f + off * 0.7f, 0.07f * size, 0.04f * size, 5, bark, bark);
-                leaves.Blob(at + Vector3.up * height * 0.78f + off, new Vector3(r, r * 0.8f, r), seed * 7 + b, 0.55f, leaf, dark, true, 2);
-            }
-        }
-
-        private static void Bush(MeshKit leaves, Vector3 at, float size, int seed)
-        {
-            var leaf = Col.Lin(0.16f, 0.27f, 0.1f);
-            leaf.a = 0.7f;
-            var dark = leaf * 0.5f;
-            dark.a = 1f;
-            leaves.Blob(at + Vector3.up * 0.45f * size, new Vector3(1.1f, 0.75f, 1f) * size, seed, 0.6f, leaf, dark, true, 1);
         }
 
         private static void Reeds(MeshKit k, Vector3 at, int seed)
@@ -457,20 +352,6 @@ namespace FishingSim.Game
             }
         }
 
-        private static void Tuft(MeshKit k, Vector3 at, int seed, Color grass)
-        {
-            var rng = new System.Random(seed);
-            for (int s = 0; s < 5; s++)
-            {
-                var p = at + new Vector3((float)rng.NextDouble() - 0.5f, -0.02f, (float)rng.NextDouble() - 0.5f) * 0.5f;
-                float h = 0.25f + (float)rng.NextDouble() * 0.35f;
-                var lean = new Vector3((float)rng.NextDouble() - 0.5f, 0f, (float)rng.NextDouble() - 0.5f) * 0.25f;
-                var c = Color.Lerp(grass * 0.6f, grass * 1.15f, (float)rng.NextDouble());
-                Blade(k, p, p + Vector3.up * h + lean, 0.035f, c * 0.55f, c);
-            }
-        }
-
-        /// <summary>A thin tapering blade (two-sided material), its tip swaying in the wind.</summary>
         private static void Blade(MeshKit k, Vector3 root, Vector3 tip, float width, Color baseColour, Color tipColour)
         {
             var dir = tip - root;
