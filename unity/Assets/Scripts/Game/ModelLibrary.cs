@@ -167,10 +167,12 @@ namespace FishingSim.Game
 
         private static readonly Dictionary<string, Texture2D?> Pictures = new();
 
-        /// <summary>A loose picture from StreamingAssets/Models (png or jpg), or null.</summary>
-        public static Texture2D? Picture(string pathWithoutExtension)
+        /// <summary>A loose picture from StreamingAssets/Models (png or jpg), or null; <paramref name="linear"/> for data
+        /// pictures (normal maps, ambient occlusion), which must not be colour-corrected as sRGB.</summary>
+        public static Texture2D? Picture(string pathWithoutExtension, bool linear = false, System.Action<Color32[]>? grade = null)
         {
-            if (Pictures.TryGetValue(pathWithoutExtension, out var t))
+            string key = (linear ? pathWithoutExtension + "#linear" : pathWithoutExtension) + (grade != null ? "#graded" : "");
+            if (Pictures.TryGetValue(key, out var t))
                 return t;
             t = null;
             foreach (var ext in new[] { ".png", ".jpg" })
@@ -178,13 +180,20 @@ namespace FishingSim.Game
                 string path = Path.Combine(Root, pathWithoutExtension + ext);
                 if (!File.Exists(path))
                     continue;
-                t = new Texture2D(2, 2, TextureFormat.RGBA32, true) { name = pathWithoutExtension, anisoLevel = 4 };
+                t = new Texture2D(2, 2, TextureFormat.RGBA32, true, linear) { name = pathWithoutExtension, anisoLevel = 8 };
                 t.LoadImage(File.ReadAllBytes(path), false);
+                if (grade != null)
+                {
+                    var px = t.GetPixels32();
+                    grade(px);
+                    t.SetPixels32(px);
+                    t.Apply(true);
+                }
                 t.Compress(true);
                 t.Apply(true, true);
                 break;
             }
-            Pictures[pathWithoutExtension] = t;
+            Pictures[key] = t;
             return t;
         }
 

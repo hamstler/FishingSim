@@ -45,7 +45,6 @@ jobs:
             assets/fish/meshy
             assets/models
             assets/characters
-            assets/unity_lite
             assets/textures
       - uses: actions/cache@v4
         with:
@@ -55,16 +54,14 @@ jobs:
       - name: Convert the Meshy models for Unity
         run: |
           python3 -m venv "$RUNNER_TEMP/cv" && "$RUNNER_TEMP/cv/bin/pip" install --quiet pillow numpy
-          "$RUNNER_TEMP/cv/bin/python" -I tools/unity/convert_glb.py assets/fish/meshy unity/Assets/StreamingAssets/Models/fish --fish --max 1024
-          # the full-look buildings and reels (up to 1 M triangles) do not import in the runner's memory: Unity takes
-          # their earlier collapsed versions (assets/unity_lite: buildings 20-60 k, reels ~200 k triangles)
-          "$RUNNER_TEMP/cv/bin/python" -I tools/unity/convert_glb.py assets/models unity/Assets/StreamingAssets/Models --max 2048 --skip "^(buildings|reels)/"
-          "$RUNNER_TEMP/cv/bin/python" -I tools/unity/convert_glb.py assets/unity_lite unity/Assets/StreamingAssets/Models --max 2048
-          "$RUNNER_TEMP/cv/bin/python" -I tools/unity/convert_glb.py assets/characters unity/Assets/StreamingAssets/Models/characters --max 1024
-          "$RUNNER_TEMP/cv/bin/python" -I tools/unity/convert_textures.py assets/characters/textures unity/Assets/StreamingAssets/Models/characters/textures --max 1024
+          "$RUNNER_TEMP/cv/bin/python" -I tools/unity/convert_glb.py assets/fish/meshy unity/Assets/StreamingAssets/Models/fish --fish --max 2048
+          # the full-look models, as in the Godot game (read at run time by glTFast, never imported by the editor)
+          "$RUNNER_TEMP/cv/bin/python" -I tools/unity/convert_glb.py assets/models unity/Assets/StreamingAssets/Models --max 4096
+          "$RUNNER_TEMP/cv/bin/python" -I tools/unity/convert_glb.py assets/characters unity/Assets/StreamingAssets/Models/characters --max 2048
+          "$RUNNER_TEMP/cv/bin/python" -I tools/unity/convert_textures.py assets/characters/textures unity/Assets/StreamingAssets/Models/characters/textures --max 2048
           for d in assets/textures/*/; do
             id=$(basename "$d")
-            "$RUNNER_TEMP/cv/bin/python" -I tools/unity/convert_textures.py "$d" "unity/Assets/StreamingAssets/Textures/$id" --max 2048 > /dev/null
+            "$RUNNER_TEMP/cv/bin/python" -I tools/unity/convert_textures.py "$d" "unity/Assets/StreamingAssets/Textures/$id" --max 4096 > /dev/null
             cp "$d"/*.json "unity/Assets/StreamingAssets/Textures/$id/" 2>/dev/null || true
           done
           rm -rf assets

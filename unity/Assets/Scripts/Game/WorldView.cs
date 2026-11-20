@@ -75,7 +75,7 @@ namespace FishingSim.Game
                 throw task.Exception;
             Progress = 0.35f;
             yield return null;
-            int size = Settings.Quality <= 1 ? 1024 : 2048;
+            int size = Settings.Quality <= 1 ? 1024 : Settings.Quality == 2 ? 2048 : 4096;   // the Textures setting: Low 1K, Medium 2K, High+ 4K (as in Godot)
             bool photos = GroundLayers.Build(size);
             MakeTerrain(xs, zs, heights, colours, weightsA, weightsB, photos ? TerrainMaterial(location) : Materials.Ground());
             Progress = 0.45f;

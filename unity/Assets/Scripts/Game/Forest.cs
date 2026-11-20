@@ -632,7 +632,7 @@ namespace FishingSim.Game
                     continue;
                 t = new Texture2D(2, 2, TextureFormat.RGBA32, true) { name = key, anisoLevel = 8, wrapMode = TextureWrapMode.Repeat };
                 t.LoadImage(File.ReadAllBytes(path), false);
-                int limit = Settings.Quality <= 1 ? 1024 : 2048;
+                int limit = Settings.Quality <= 1 ? 1024 : Settings.Quality == 2 ? 2048 : 4096;   // the Textures setting: Low 1K, Medium 2K, High+ 4K (as in Godot)
                 if (t.width > limit)
                 {
                     var rt = RenderTexture.GetTemporary(limit, limit * t.height / t.width, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);

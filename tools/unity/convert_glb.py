@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Converts the game's .glb models for Unity: pictures stored as WebP (EXT_texture_webp, which Unity's glTF importer
-cannot read) are re-encoded as JPEG (or PNG when they have transparency), at most --max px on a side; everything else is
+cannot read) are re-encoded as JPEG (PNG for normal maps and pictures with transparency), at most --max px on a side; everything else is
 copied unchanged.
 
     python3 -I tools/unity/convert_glb.py SRC_DIR DST_DIR [--max 2048] [--only REGEX]
@@ -57,11 +57,21 @@ def convert(src, dst, max_side):
     views = js.get("bufferViews", [])
     images = js.get("images", [])
     # every buffer view's bytes, so the binary can be rebuilt with new pictures
+    # pictures used as normal maps stay lossless (JPEG blocks show as dents in the lighting)
+    normal_images = set()
+    textures = js.get("textures", [])
+    for mat in js.get("materials", []):
+        info = mat.get("normalTexture")
+        if info is not None and info.get("index", -1) < len(textures):
+            tex = textures[info["index"]]
+            src_img = tex.get("extensions", {}).get("EXT_texture_webp", {}).get("source", tex.get("source"))
+            if src_img is not None:
+                normal_images.add(src_img)
     pieces = []
     for v in views:
         start = v.get("byteOffset", 0)
         pieces.append(binary[start: start + v["byteLength"]])
-    for img in images:
+    for index, img in enumerate(images):
         if "bufferView" not in img:
             continue
         raw = pieces[img["bufferView"]]
@@ -78,11 +88,14 @@ def convert(src, dst, max_side):
             pic = pic.resize((max(1, round(pic.width * k)), max(1, round(pic.height * k))), Image.LANCZOS)
         alpha = pic.mode in ("RGBA", "LA") and pic.getchannel("A").getextrema()[0] < 250
         out = io.BytesIO()
-        if alpha:
+        if index in normal_images:
+            pic.convert("RGB").save(out, "PNG", compress_level=6)
+            img["mimeType"] = "image/png"
+        elif alpha:
             pic.convert("RGBA").save(out, "PNG", optimize=True)
             img["mimeType"] = "image/png"
         else:
-            pic.convert("RGB").save(out, "JPEG", quality=90)
+            pic.convert("RGB").save(out, "JPEG", quality=95, subsampling=0)
             img["mimeType"] = "image/jpeg"
         pieces[img["bufferView"]] = out.getvalue()
     for tex in js.get("textures", []):

@@ -45,6 +45,7 @@ namespace FishingSim.Game
             var look = json != null ? JsonUtility.FromJson<Look>(json) : new Look();
             p.Sex = look.sex;
             Dress(go, model, json);
+            Tint(go, model, Mathf.RoundToInt(at.x * 7.3f) * 7919 + Mathf.RoundToInt(at.z * 3.1f));
             p.Setup(go);
             p.Play(anim);
             return p;
@@ -140,7 +141,70 @@ namespace FishingSim.Game
             public bool alpha;
         }
 
-        private static Texture2D? Picture(string name) => string.IsNullOrEmpty(name) ? null : ModelLibrary.Picture("characters/textures/" + name);
+        private static Texture2D? Picture(string name, bool linear = false) => string.IsNullOrEmpty(name) ? null
+            : ModelLibrary.Picture("characters/textures/" + name, linear, !linear && IsCloth(name) ? ClothGrade : null);
+
+        /// <summary>Clothes, hats and shoes of the MakeHuman models, toned down as they are read (CharacterAsset).</summary>
+        private static bool IsCloth(string name) =>
+            name.StartsWith("mh_") && (name.EndsWith("_outfit_a") || name.EndsWith("_hat_a") || name.EndsWith("_shoes_a"));
+
+        private const float ClothSaturation = 0.6f, ClothKnee = 0.35f, ClothWhite = 0.62f;
+
+        /// <summary>Worn, dyed cloth instead of fresh catalogue colours: saturation down, highlights rolled off.</summary>
+        private static void ClothGrade(Color32[] px)
+        {
+            for (int i = 0; i < px.Length; i++)
+            {
+                float r = px[i].r / 255f, g = px[i].g / 255f, b = px[i].b / 255f;
+                float y = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+                float yk = y <= ClothKnee ? y : ClothKnee + (ClothWhite - ClothKnee) * (1f - Mathf.Exp(-(y - ClothKnee) / (ClothWhite - ClothKnee)));
+                float k = y > 1e-4f ? yk / y : 1f;
+                px[i].r = (byte)Mathf.Clamp((y + (r - y) * ClothSaturation) * k * 255f + 0.5f, 0f, 255f);
+                px[i].g = (byte)Mathf.Clamp((y + (g - y) * ClothSaturation) * k * 255f + 0.5f, 0f, 255f);
+                px[i].b = (byte)Mathf.Clamp((y + (b - y) * ClothSaturation) * k * 255f + 0.5f, 0f, 255f);
+            }
+        }
+
+        // People.HairColours / SkinTints of the Godot game: the MakeHuman hair pictures are neutral grey, tinted per person
+        private static readonly Color[] HairColours =
+        {
+            new(0.3f, 0.2f, 0.13f), new(0.48f, 0.33f, 0.19f), new(0.86f, 0.72f, 0.48f), new(0.74f, 0.6f, 0.38f),
+            new(0.16f, 0.13f, 0.11f), new(0.58f, 0.3f, 0.15f), new(0.62f, 0.5f, 0.32f),
+        };
+        private static readonly Color[] SkinTints =
+        {
+            new(1f, 1f, 1f), new(1.04f, 1.0f, 0.97f), new(0.96f, 0.9f, 0.85f), new(0.9f, 0.82f, 0.74f), new(1.02f, 0.96f, 0.93f),
+        };
+
+        /// <summary>This person's hair colour and skin tint on the shared materials (per-renderer property blocks).</summary>
+        private static void Tint(GameObject go, string model, int seed)
+        {
+            var rng = new System.Random(seed);
+            var hair = model == "mh_male_old" ? new Color(0.78f, 0.77f, 0.74f) : HairColours[rng.Next(HairColours.Length)];
+            var skin = SkinTints[rng.Next(SkinTints.Length)];
+            var block = new MaterialPropertyBlock();
+            foreach (var r in go.GetComponentsInChildren<Renderer>())
+            {
+                var mats = r.sharedMaterials;
+                for (int i = 0; i < mats.Length; i++)
+                {
+                    if (mats[i] == null)
+                        continue;
+                    string slot = mats[i].name.Substring(mats[i].name.LastIndexOf('/') + 1);
+                    Color? c = slot switch
+                    {
+                        "hair1" or "hair2" or "brows" => hair,
+                        "skin" => skin,
+                        _ => null,
+                    };
+                    if (c == null)
+                        continue;
+                    block.Clear();
+                    block.SetColor("_Color", c.Value);
+                    r.SetPropertyBlock(block, i);
+                }
+            }
+        }
 
         public static void DressModel(GameObject go, string model, string? json) => Dress(go, model, json);
 
@@ -170,15 +234,17 @@ namespace FishingSim.Game
                         m = new Material(shader) { name = key };
                         if (Picture(slot.albedo.FirstOrDefault() ?? "") is { } a)
                             m.SetTexture("_MainTex", a);
-                        if (Picture(slot.normal) is { } n)
+                        if (Picture(slot.normal, true) is { } n)
                         {
                             m.SetTexture("_BumpMap", n);
                             m.SetFloat("_BumpScale", slotName == "skin" ? 0.6f : 1f);
                         }
-                        if (Picture(slot.ao) is { } o)
+                        if (Picture(slot.ao, true) is { } o)
                         {
+                            // baked contact shade: the sky's light fully, the sun's by AOLightAffect (0.45, skin 0.7)
                             m.SetTexture("_AOMap", o);
-                            m.SetFloat("_AOStrength", slotName == "skin" ? 0.7f : 0.45f);
+                            m.SetFloat("_AOStrength", 1f);
+                            m.SetFloat("_AOLight", slotName == "skin" ? 0.7f : 0.45f);
                         }
                         m.SetFloat("_Glossiness", Mathf.Clamp01(1f - slot.roughness_value));
                         if (slot.alpha)
@@ -186,8 +252,29 @@ namespace FishingSim.Game
                             m.SetFloat("_Cutoff", 0.4f);
                             m.SetFloat("_Cull", 0f);
                         }
-                        if (slotName == "outfit" || slotName == "hat")
-                            m.SetFloat("_Cull", 0f);
+                        // CharacterAsset.MaterialFor's look per slot
+                        switch (slotName)
+                        {
+                            case "skin":
+                                m.SetFloat("_Rim", 0.18f); m.SetFloat("_RimTint", 0.25f); m.SetFloat("_Spec", 0.42f);
+                                if (slot.roughness_value >= 0.69f && slot.roughness_value <= 0.71f)
+                                    m.SetFloat("_Glossiness", 0.45f);
+                                break;
+                            case "hair1" or "hair2":
+                                m.SetFloat("_Cull", 0f); m.SetFloat("_Rim", 0.25f); m.SetFloat("_RimTint", 0.8f);
+                                break;
+                            case "outfit":
+                                m.SetFloat("_Cull", 0f); m.SetFloat("_Rim", 0.12f); m.SetFloat("_RimTint", 0.55f); m.SetFloat("_Spec", 0.2f);
+                                break;
+                            case "eye":
+                                m.SetColor("_Color", new Color(0.72f, 0.72f, 0.72f)); m.SetFloat("_Spec", 0.8f); m.SetFloat("_Clearcoat", 1f);
+                                break;
+                            case "shoes" or "hat":
+                                m.SetFloat("_Rim", 0.2f); m.SetFloat("_RimTint", 0.6f);
+                                if (slotName == "hat")
+                                    m.SetFloat("_Cull", 0f);
+                                break;
+                        }
                         Mats[key] = m;
                     }
                     mats[i] = m;
