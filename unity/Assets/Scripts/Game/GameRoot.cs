@@ -33,6 +33,7 @@ namespace FishingSim.Game
         private Fishing _rod = null!;
         private Swimmers? _swimmers;
         private Gulls? _gulls;
+        private Mayflies? _mayflies;
         private DayCycle _day = null!;
         private Village _village = null!;
         private Village.Door? _nearDoor;
@@ -225,6 +226,9 @@ namespace FishingSim.Game
                 _swimmers ??= new GameObject("Swimmers").AddComponent<Swimmers>();
                 _swimmers.Watcher = _player.transform;
                 _swimmers.Day = _day;
+                _mayflies ??= new GameObject("Mayflies").AddComponent<Mayflies>();
+                _mayflies.Day = _day;
+                _mayflies.Build(_world.Lake);
                 if (_gulls == null)
                 {
                     _gulls = new GameObject("Gulls").AddComponent<Gulls>();
