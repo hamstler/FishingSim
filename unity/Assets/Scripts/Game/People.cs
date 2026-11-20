@@ -131,6 +131,8 @@ namespace FishingSim.Game
 
         private static Texture2D? Picture(string name) => string.IsNullOrEmpty(name) ? null : Resources.Load<Texture2D>("Models/characters/textures/" + name);
 
+        public static void DressModel(GameObject go, string model, string? json) => Dress(go, model, json);
+
         /// <summary>Gives each surface its material from the model's json (slots: skin, eye, hair1, outfit, shoes, hat...).</summary>
         private static void Dress(GameObject go, string model, string? json)
         {

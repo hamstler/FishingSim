@@ -101,6 +101,7 @@ namespace FishingSim.Game
             _sound.World = _world;
             _rod.Cue += (kind, gain) => _sound.Play(kind, gain);
             _rod.BiteBonus = () => _profile.ActiveMeal?.BiteBonus ?? 0f;
+            StartCoroutine(MakeArms());
             _player.Step += wood => _sound.Play(wood ? Core.Audio.OneShot.StepWood : Core.Audio.OneShot.StepGrass, 0.7f);
             Settings.Apply(_player.Camera);
             _player.Frozen = true;
@@ -115,6 +116,19 @@ namespace FishingSim.Game
                 smoke.Rod = _rod;
                 smoke.Player = _player;
                 smoke.Day = _day;
+            }
+        }
+
+        private IEnumerator MakeArms()
+        {
+            yield return null;   // the rod is built in its Start
+            try
+            {
+                AnglerArms.Create(_player.Camera, _rod);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
             }
         }
 

@@ -94,6 +94,11 @@ namespace FishingSim.Game
         private Transform _frame = null!, _procHandle = null!, _rodModel = null!, _reelModel = null!;
         private readonly List<GameObject> _procBlank = new();
         private Transform? _rotor, _crank;
+
+        /// <summary>Where the angler's hands go (AnglerArms): the handle above the seat, the crank's knob.</summary>
+        public Transform GripRight { get; private set; } = null!;
+        public Transform GripLeft { get; private set; } = null!;
+        public bool RodVisible => _rodRoot != null && _rodRoot.gameObject.activeInHierarchy;
         private string _shownRod = "", _shownReel = "";
 
         private void BuildRod()
@@ -147,6 +152,12 @@ namespace FishingSim.Game
             tip.SetParent(parent, false);
             tip.localPosition = new Vector3(0, SegmentLength, 0);
             _tip = tip;
+            GripRight = new GameObject("GripRight").transform;
+            GripRight.SetParent(_frame, false);
+            GripRight.localPosition = new Vector3(0f, 0.03f, 0.03f);
+            GripLeft = new GameObject("GripLeft").transform;
+            GripLeft.SetParent(_frame, false);
+            GripLeft.localPosition = new Vector3(0f, -0.2f, 0.02f);
         }
 
         /// <summary>
@@ -200,6 +211,8 @@ namespace FishingSim.Game
             if (reelId != _shownReel)
             {
                 _shownReel = reelId;
+                GripLeft.SetParent(_frame, false);
+                GripLeft.localPosition = new Vector3(0f, -0.2f, 0.02f);
                 foreach (Transform c in _reelModel)
                     Destroy(c.gameObject);
                 _rotor = _crank = null;
@@ -211,6 +224,12 @@ namespace FishingSim.Game
                     var frames = ModelLibrary.Json(reelId) is { } json ? JsonUtility.FromJson<ReelFrame>(json) : null;
                     _rotor = Pivot(model.transform, "Rotor", frames?.rotor);
                     _crank = Pivot(model.transform, "Crank", frames?.hub);
+                    if (_crank != null && frames != null)
+                    {
+                        // the knob: out from the hub along the crank's axis, the arm's length down
+                        GripLeft.SetParent(_crank, false);
+                        GripLeft.localPosition = new Vector3(-frames.knob_out, -frames.arm, 0f);
+                    }
                 }
                 _procHandle.gameObject.SetActive(model == null || _rodModel.childCount == 0);
             }
@@ -221,6 +240,8 @@ namespace FishingSim.Game
         {
             public float[]? hub;
             public float[]? rotor;
+            public float arm = 0.036f;
+            public float knob_out = -0.049f;
         }
 
         /// <summary>A pivot at a reel part's axis point (glTF coordinates, x mirrored into Unity) carrying the part.</summary>
