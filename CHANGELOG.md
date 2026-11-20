@@ -1,5 +1,13 @@
 # Zmiany
 
+## 0.9.3 (Unity 6)
+- Modele z Meshy: 66 gatunków ryb (hol, panel złowionej ryby), budynki wsi, wędki i kołowrotki (obracający się rotor i korbka).
+- Wioska z mapy (wyrównany teren pod budynkami, ulice, latarnie nocą); E: sklep, skup, targ, gildia, wędzarnia.
+- Mieszkańcy z animacjami (sprzedawcy, ludzie przy pracy, przy ognisku, spacerowicze w dzień).
+- Dźwięk (syntezowany: wiatr, woda, ptaki, świerszcze, deszcz, żaby, wieś, kołowrotek, hamulec, chlupot, kroki).
+- Łódka (wiosłowanie, fale, kotwica, znoszenie wiatrem, echosonda), ogniska i gotowanie z premiami, łopata, siatka na owady, podrywka, grzyby i jagody, tablica ogłoszeń, akcesoria w sklepie.
+- Ręce wędkarza trzymające wędkę i korbkę.
+
 ## 0.9.2 (Unity 6)
 - Pierwsza wersja na silniku Unity 6 (DirectX 11 na Windows, bez Vulkana, z którym wiązały się awarie przy starcie).
 - Grywalne: 4 łowiska (teren i jezioro z tych samych wzorów co w wersji Godot), woda, niebo, pora dnia i pogoda, las, pomost; zarzucanie, branie, zacięcie, hol (te same modele brań i holu), siatka, skup, sklep (wędki, kołowrotki, żyłki, haczyki, przynęty), rekordy, ustawienia grafiki, zapis gry.
