@@ -17,6 +17,8 @@ Shader "FS/Weathered"
         _DampHeight ("Damp band (m)", Float) = 0.7
         _BaseY ("Ground height", Float) = -10000
         _Cull ("Cull", Float) = 2
+        _VertexColour ("Colour from the mesh (photo for detail)", Float) = 0
+        _Mean ("Photo mean (linear)", Color) = (0.5,0.5,0.5,1)
     }
     SubShader
     {
@@ -27,9 +29,10 @@ Shader "FS/Weathered"
         #pragma target 3.5
         sampler2D _MainTex, _NormalTex;
         float4 _Tint;
-        float _Rough, _NormalStrength, _UVScale, _Triplanar, _Weathering, _Moss, _DampHeight, _BaseY;
+        float _Rough, _NormalStrength, _UVScale, _Triplanar, _Weathering, _Moss, _DampHeight, _BaseY, _VertexColour;
+        float4 _Mean;
 
-        struct Input { float3 lpos; float3 lnrm; float3 wpos; float3 wN; float3 wT; float2 uv; float face : VFACE; };
+        struct Input { float4 color : COLOR; float3 lpos; float3 lnrm; float3 wpos; float3 wN; float3 wT; float2 uv; float face : VFACE; };
 
         void vert(inout appdata_full v, out Input o)
         {
@@ -89,6 +92,8 @@ Shader "FS/Weathered"
                 float3 B = cross(wgeo, T);
                 wn = normalize(T * t.x + B * t.y + wgeo * t.z);
             }
+            if (_VertexColour > 0.5)
+                col = IN.color.rgb * saturate(col / max(_Mean.rgb, 0.02) * 0.85 + 0.15);   // the mesh's colour, the photo's grain
             col *= _Tint.rgb;
             float rough = _Rough;
 

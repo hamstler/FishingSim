@@ -255,7 +255,16 @@ namespace FishingSim.Game
             var go = new GameObject("Shape");
             go.transform.SetParent(holder, false);
             go.AddComponent<MeshFilter>().sharedMesh = k.ToMesh(spec.Kind.ToString());
-            go.AddComponent<MeshRenderer>().sharedMaterial = _lit;
+            // the props' wood in the photographed weathered planks (their colours from the mesh, the grain from the photo)
+            var mr = go.AddComponent<MeshRenderer>();
+            var weathered = Photos.Weathered("weathered_brown_planks", Color.white, 0.88f, moss: 0.25f, twoSided: true, vertexColour: true);
+            mr.sharedMaterial = weathered ?? _lit;
+            if (weathered != null)
+            {
+                var block = new MaterialPropertyBlock();
+                block.SetFloat("_BaseY", holder.position.y);
+                mr.SetPropertyBlock(block);
+            }
             if (spec.PadRadius > 2f)
                 Solids.Add((holder.position, spec.PadRadius * 0.4f));
         }

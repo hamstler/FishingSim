@@ -53,6 +53,24 @@ namespace FishingSim.Game
             return Pictures[key] = t;
         }
 
+        /// <summary>A picture's average colour (linear), from a 16 px copy.</summary>
+        public static Color Mean(Texture t)
+        {
+            var rt = RenderTexture.GetTemporary(16, 16, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            Graphics.Blit(t, rt);
+            var prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            var small = new Texture2D(16, 16, TextureFormat.RGBA32, false);
+            small.ReadPixels(new Rect(0, 0, 16, 16), 0, 0);
+            RenderTexture.active = prev;
+            RenderTexture.ReleaseTemporary(rt);
+            var sum = Color.black;
+            foreach (var p in small.GetPixels())
+                sum += p.linear;
+            Object.Destroy(small);
+            return sum / 256f;
+        }
+
         /// <summary>The set's real size in metres (info.json "metres"), 2 m without it.</summary>
         public static float Metres(string id)
         {
@@ -76,9 +94,9 @@ namespace FishingSim.Game
         /// wander, rain streaks, damp foot from the object's ground, moss on faces turned up); null without the set.
         /// </summary>
         public static Material? Weathered(string id, Color tint, float roughness = 0.85f, bool triplanar = true, float scale = 1f,
-            float weathering = 1f, float moss = 0.4f, bool twoSided = false, float normal = 1.1f)
+            float weathering = 1f, float moss = 0.4f, bool twoSided = false, float normal = 1.1f, bool vertexColour = false)
         {
-            string key = $"{id}|{tint}|{roughness}|{triplanar}|{scale}|{weathering}|{moss}|{twoSided}|{normal}|{Limit}";
+            string key = $"{id}|{tint}|{roughness}|{triplanar}|{scale}|{weathering}|{moss}|{twoSided}|{normal}|{vertexColour}|{Limit}";
             if (Mats.TryGetValue(key, out var m))
                 return m;
             var albedo = Picture(id, "diff", false);
@@ -98,6 +116,11 @@ namespace FishingSim.Game
                 m.SetFloat("_Weathering", weathering);
                 m.SetFloat("_Moss", moss);
                 m.SetFloat("_Cull", twoSided ? 0f : 2f);
+                if (vertexColour)
+                {
+                    m.SetFloat("_VertexColour", 1f);
+                    m.SetColor("_Mean", Mean(albedo));
+                }
             }
             return Mats[key] = m;
         }

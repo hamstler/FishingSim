@@ -32,8 +32,14 @@ namespace FishingSim.Game
             var k = new MeshKit();
             BuildHull(k);
             _hull.gameObject.AddComponent<MeshFilter>().sharedMesh = k.ToMesh("Rowboat");
-            var mat = Materials.Lit(0.25f, 0.35f);
-            mat.SetFloat("_Cull", 0f);
+            // Everyday.Rowboat: painted white_planks_clean sides, tarred bottom, bare wood inside (colours from the mesh,
+            // grain from the photographed planks); the vertex-coloured fallback without the set
+            var mat = Photos.Weathered("white_planks_clean", Color.white, 0.75f, weathering: 0.8f, moss: 0.05f, twoSided: true, vertexColour: true);
+            if (mat == null)
+            {
+                mat = Materials.Lit(0.25f, 0.35f);
+                mat.SetFloat("_Cull", 0f);
+            }
             _hull.gameObject.AddComponent<MeshRenderer>().sharedMaterial = mat;
             _oarL = Oar(-1f, mat);
             _oarR = Oar(1f, mat);
