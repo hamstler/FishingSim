@@ -14,7 +14,7 @@ Shader "FS/Rock"
     {
         Tags { "RenderType"="Opaque" }
         CGPROGRAM
-        #pragma surface surf Standard vertex:vert addshadow fullforwardshadows
+        #pragma surface surf Standard vertex:vert addshadow fullforwardshadows nolightmap nodynlightmap nodirlightmap nometa exclude_path:deferred exclude_path:prepass
         #pragma multi_compile_instancing
         #pragma target 3.5
         #pragma require 2darray

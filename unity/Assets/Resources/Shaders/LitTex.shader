@@ -27,7 +27,7 @@ Shader "FS/LitTex"
         Tags { "RenderType"="TransparentCutout" "Queue"="AlphaTest" }
         Cull [_Cull]
         CGPROGRAM
-        #pragma surface surf Char fullforwardshadows addshadow
+        #pragma surface surf Char fullforwardshadows addshadow nolightmap nodynlightmap nodirlightmap nometa exclude_path:deferred exclude_path:prepass
         #pragma target 3.5
         #include "UnityPBSLighting.cginc"
         sampler2D _MainTex, _BumpMap, _AOMap;

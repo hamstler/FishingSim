@@ -19,7 +19,7 @@ Shader "FS/Lit"
         LOD 200
         Cull [_Cull]
         CGPROGRAM
-        #pragma surface surf Standard fullforwardshadows vertex:vert addshadow
+        #pragma surface surf Standard fullforwardshadows vertex:vert addshadow nolightmap nodynlightmap nodirlightmap nometa exclude_path:deferred exclude_path:prepass
         #pragma target 3.0
         sampler2D _Grain;
         fixed4 _Color;

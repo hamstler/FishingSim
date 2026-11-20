@@ -13,7 +13,7 @@ Shader "FS/Foliage"
         Tags { "RenderType"="TransparentCutout" "Queue"="AlphaTest" }
         Cull Off
         CGPROGRAM
-        #pragma surface surf Foliage vertex:vert addshadow fullforwardshadows
+        #pragma surface surf Foliage vertex:vert addshadow fullforwardshadows nolightmap nodynlightmap nodirlightmap nometa exclude_path:deferred exclude_path:prepass
         #pragma multi_compile_instancing
         #pragma target 3.5
         #include "UnityPBSLighting.cginc"

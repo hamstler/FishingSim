@@ -21,7 +21,7 @@ Shader "FS/Terrain"
         Tags { "RenderType"="Opaque" }
         Cull Off
         CGPROGRAM
-        #pragma surface surf Standard fullforwardshadows vertex:vert addshadow
+        #pragma surface surf Standard fullforwardshadows vertex:vert addshadow nolightmap nodynlightmap nodirlightmap nometa exclude_path:deferred exclude_path:prepass
         #pragma target 3.5
         #pragma require 2darray
         #include "Waves.cginc"
