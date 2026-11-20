@@ -57,8 +57,14 @@ Shader "FS/Terrain"
             return float2(c * p.x - s * p.y, s * p.x + c * p.y);
         }
 
+        // the surface shader's analysis pass declares the arrays as plain samplers (no methods): sample them simply there
+#if defined(SHADER_TARGET_SURFACE_ANALYSIS)
+        float4 SampleA(float2 uv, float L, float2 dx, float2 dy) { return UNITY_SAMPLE_TEX2DARRAY(_GroundAlb, float3(uv, L)); }
+        float4 SampleN(float2 uv, float L, float2 dx, float2 dy) { return UNITY_SAMPLE_TEX2DARRAY(_GroundNrm, float3(uv, L)); }
+#else
         float4 SampleA(float2 uv, float L, float2 dx, float2 dy) { return _GroundAlb.SampleGrad(sampler_GroundAlb, float3(uv, L), dx, dy); }
         float4 SampleN(float2 uv, float L, float2 dx, float2 dy) { return _GroundNrm.SampleGrad(sampler_GroundNrm, float3(uv, L), dx, dy); }
+#endif
 
         void surf(Input IN, inout SurfaceOutputStandard o)
         {
@@ -99,10 +105,10 @@ Shader "FS/Terrain"
             float4 alb[7];
             float s[7];
             float top = -1.0;
+            // every element set before any is read (dx11 refused the partly initialised array)
+            [unroll] for (int z = 0; z < 7; z++) { alb[z] = 0; s[z] = -1.0; }
             [unroll] for (int i = 0; i < 7; i++)
             {
-                alb[i] = 0;
-                s[i] = -1.0;
                 if (w[i] < 0.002) continue;
                 float L = i;
                 if (i == 5)

@@ -40,6 +40,16 @@ namespace FishingSim.Game
             }
         }
 
+        /// <summary>A watchdog: an exception inside the coroutine stops it silently, and the game must still quit.</summary>
+        private void Update()
+        {
+            if (Time.realtimeSinceStartup > 900f)
+            {
+                Debug.Log("SMOKE FAIL: still running after 900 s (the test coroutine stopped?)");
+                Application.Quit(1);
+            }
+        }
+
         private IEnumerator Start()
         {
             float started = Time.realtimeSinceStartup;
@@ -116,7 +126,8 @@ namespace FishingSim.Game
                 Destroy(shot);
                 Destroy(small);
             }
-            Day.SetWeather(Core.Weather.Clear);
+            // clear at once: easing out of the rain took seconds, so the menu views still had rain and overcast
+            Day.SetWeatherNow(Core.Weather.Clear);
             // the Godot menu pictures' views (screenshot mode 0, FISHSIM_SCENIC=1, FISHSIM_CAM_LIFT=7, yaw 30, pitch -6,
             // High quality): the same place and hour, to compare side by side with assets/menu/<map>_10/_17.webp
             int quality = Settings.Quality;
@@ -130,6 +141,9 @@ namespace FishingSim.Game
             if (GameObject.Find("AnglerArms") is { } arms)
                 foreach (var r in arms.GetComponentsInChildren<Renderer>())
                     if (r.enabled) { r.enabled = false; hidden.Add(r); }
+            // nor the fishing line (it hangs in the world, not under the camera)
+            foreach (var r in UnityEngine.Object.FindObjectsByType<LineRenderer>(FindObjectsSortMode.None))
+                if (r.enabled) { r.enabled = false; hidden.Add(r); }
             foreach (var (hour, name) in new[] { (10f, "menu10"), (17f, "menu17") })
             {
                 Player.Place(new Vector3(0f, WorldView.PierDeck + 7f, -3.5f), 210f);
@@ -143,6 +157,24 @@ namespace FishingSim.Game
                 SaveFull(shot, name);
                 Debug.Log($"SMOKE JPEG {name} {Convert.ToBase64String(shot.EncodeToJPG(85))}");
                 Destroy(shot);
+            }
+            // FISHSIM_SMOKE_WATER=1: the water shader's debug views of the 10 h menu view (1 thickness/10 m,
+            // 2 refracted picture, 3 Fresnel, 4 scene depth/50 m), saved as water1..water4
+            if (Environment.GetEnvironmentVariable("FISHSIM_SMOKE_WATER") == "1")
+            {
+                Day.Hour = 10f;
+                Day.Apply();
+                for (int mode = 1; mode <= 4; mode++)
+                {
+                    Shader.SetGlobalFloat("_WaterDebug", mode);
+                    for (int i = 0; i < 5; i++)
+                        yield return null;
+                    yield return new WaitForEndOfFrame();
+                    var shot = ScreenCapture.CaptureScreenshotAsTexture();
+                    SaveFull(shot, "water" + mode);
+                    Destroy(shot);
+                }
+                Shader.SetGlobalFloat("_WaterDebug", 0f);
             }
             GameRoot.HideHud = false;
             foreach (var r in hidden)
@@ -161,6 +193,11 @@ namespace FishingSim.Game
             int landed = 0;
             for (int n = 0; n < 2; n++)
             {
+                if (!Rod.SmokeTackleReady)
+                {
+                    Debug.Log($"SMOKE cast {n}: tackle lost in the previous fight, no more casts");
+                    break;
+                }
                 var target = Player.transform.position + Player.transform.forward * (12f + n * 4f);
                 Rod.SmokeCast(target);
                 Rod.SmokeBiteNow();

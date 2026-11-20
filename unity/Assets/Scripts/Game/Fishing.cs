@@ -480,6 +480,10 @@ namespace FishingSim.Game
                 _procHandle.gameObject.SetActive(!ok);
                 foreach (var p in _procBlank)
                     p.SetActive(!ok);
+                // remembered only once shown: a model still loading (the first ApplyTackle runs before the preload ends)
+                // is tried again on the next call, else the built rod stayed for good
+                if (!ok)
+                    _shownRod = "";
             }
             for (int i = 0; i < _segments.Count; i++)
                 foreach (Transform c in _segments[i])
@@ -549,6 +553,7 @@ namespace FishingSim.Game
                         Destroy(model);
                     GripLeft.SetParent(_builtCrank, false);
                     GripLeft.localPosition = new Vector3(0.05f, -0.04f, 0f);
+                    _shownReel = "";   // tried again once the model has loaded
                 }
                 _spoolFill = -1f;
                 SetCrank(_crankAngle);
@@ -1047,9 +1052,13 @@ namespace FishingSim.Game
         /// <summary>Strikes at the bite (always hooks).</summary>
         public void SmokeStrike()
         {
-            if (State == RodState.Bite && Species != null)
+            // a line or rod lost in an earlier fight leaves nothing to strike with
+            if (State == RodState.Bite && Species != null && Reel != null && LineItem != null && Rod != null)
                 StartFight(1f);
         }
+
+        /// <summary>Whether the rod, reel and line are all there (the smoke test stops fishing when one was lost).</summary>
+        public bool SmokeTackleReady => Reel != null && LineItem != null && Rod != null;
 
         private void NewBiteTimer()
         {

@@ -10,10 +10,11 @@ namespace FishingSim.Game
     public sealed class PostFx : MonoBehaviour
     {
         [SerializeField] public float Threshold = 1.15f, GlowIntensity = 0.7f, Contrast = 1.12f, Saturation = 1.1f, White = 6f;
-        [SerializeField] public float AORadius = 1.8f, AOStrength = 2.4f;
+        [SerializeField] public float AORadius = 1.2f, AOStrength = 1.6f;
 
         private Material? _mat;
         private Texture2D? _grade;
+        private bool _logged;
         private const int Levels = 6;
         private readonly RenderTexture?[] _chain = new RenderTexture?[Levels];
 
@@ -59,6 +60,11 @@ namespace FishingSim.Game
                 _mat = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
                 _grade = Grade();
             }
+            if (!_logged)
+            {
+                _logged = true;
+                Debug.Log($"POSTFX source {src.format} {src.width}x{src.height}, camera HDR {GetComponent<Camera>().allowHDR}, msaa {src.antiAliasing}");
+            }
             int q = Settings.Quality;
             _mat.SetFloat("_Threshold", Threshold);
             _mat.SetFloat("_GlowIntensity", q >= 2 ? GlowIntensity : 0f);
@@ -89,10 +95,15 @@ namespace FishingSim.Game
             RenderTexture? ao = null;
             if (q >= 2)
             {
-                ao = RenderTexture.GetTemporary(src.width / 2, src.height / 2, 0, RenderTextureFormat.R8);
+                // linear: an sRGB R8 target does not exist (Unity fell back to RGBA8 sRGB and logged it every frame)
+                ao = RenderTexture.GetTemporary(src.width / 2, src.height / 2, 0, RenderTextureFormat.R8, RenderTextureReadWrite.Linear);
                 _mat.SetFloat("_AORadius", AORadius);
                 _mat.SetFloat("_AOStrength", AOStrength);
                 Graphics.Blit(src, ao, _mat, 3);
+                var blurred = RenderTexture.GetTemporary(ao.width, ao.height, 0, RenderTextureFormat.R8, RenderTextureReadWrite.Linear);
+                Graphics.Blit(ao, blurred, _mat, 7);
+                RenderTexture.ReleaseTemporary(ao);
+                ao = blurred;
             }
             _mat.SetFloat("_UseAO", ao != null ? 1f : 0f);
             _mat.SetTexture("_AO", ao != null ? ao : Texture2D.whiteTexture);

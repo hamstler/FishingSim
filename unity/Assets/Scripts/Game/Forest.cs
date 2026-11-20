@@ -633,7 +633,7 @@ namespace FishingSim.Game
             {
                 _rock.SetTexture("_GroundAlb", GroundLayers.Albedo);
                 _rock.SetTexture("_GroundNrm", GroundLayers.Normal);
-                _rock.SetColor("_RockMean", GroundLayers.Means[5]);
+                _rock.SetVector("_RockMean", GroundLayers.Means[5]);   // already linear (SetColor would linearise it again)
             }
             return _rock;
         }
@@ -655,7 +655,7 @@ namespace FishingSim.Game
             if (diff != null)
             {
                 m.SetTexture("_MainTex", diff);
-                m.SetColor("_Mean", Mean(diff));
+                m.SetVector("_Mean", Mean(diff));   // already linear: SetColor would linearise it again (orange, clipped trunks)
                 m.mainTextureScale = kind == "birch" ? Vector2.one : new Vector2(1f, 1f);
             }
             if (nor != null)
@@ -777,7 +777,7 @@ namespace FishingSim.Game
                 return null;
             _grassMat = new Material(FindShader("FS/GrassCard")) { name = "GrassCards", enableInstancing = true, mainTexture = cards };
             _grassMat.SetTexture("_Noise", ProcTextures.NoiseField);
-            _grassMat.SetColor("_CardMean", Mean(cards));
+            _grassMat.SetVector("_CardMean", Mean(cards));   // already linear: through SetColor the meadow came out glaring yellow
             string info = Path.Combine(GroundLayers.Dir("grass_medium_01"), "info.json");
             if (File.Exists(info))
             {

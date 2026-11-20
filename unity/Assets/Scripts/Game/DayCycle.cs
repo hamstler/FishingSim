@@ -79,6 +79,20 @@ namespace FishingSim.Game
                 _cloud = w switch { Weather.Clear => 0.05f, Weather.Cloudy => 0.65f, _ => 1f };
         }
 
+        /// <summary>The weather at once, without easing (clouds, rain, wetness and wind at their targets): screenshots.</summary>
+        public void SetWeatherNow(Weather w)
+        {
+            Weather = w;
+            _cloud = w switch { Weather.Clear => 0.05f, Weather.Cloudy => 0.65f, _ => 1f };
+            _rain = w == Weather.Rain ? 1f : 0f;
+            _wetness = _rain;
+            Wind = w switch { Weather.Clear => 0.2f, Weather.Cloudy => 0.45f, _ => 0.7f };
+            Shader.SetGlobalFloat("_Wetness", _wetness);
+            if (_rainRenderer != null)
+                _rainRenderer.enabled = _rain > 0.02f;
+            _applied = (float.NaN, 0f, 0f);
+        }
+
         private void Update()
         {
             float dt = Time.deltaTime;

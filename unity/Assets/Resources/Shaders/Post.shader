@@ -40,28 +40,64 @@ Shader "Hidden/FS/Post"
     // 2: up (added onto the level below by blending)
     float4 Up(v2f i) : SV_Target { return float4(Box(i.uv, 0.5), 1); }
 
-    // 3: ambient occlusion from depth (a disc of samples scaled by distance, range checked)
+    // view-space point of a screen position (the camera's own projection; off-centre terms ignored)
+    float3 ViewPos(float2 uv)
+    {
+        float d = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv));
+        float2 ndc = uv * 2 - 1;
+        return float3(ndc.x / unity_CameraProjection._m00, ndc.y / unity_CameraProjection._m11, 1) * d;
+    }
+
+    // 3: ambient occlusion from depth, oriented by the surface (Alchemy-style: a sample occludes only when it rises
+    // above the point's tangent plane, so flat ground and water seen at a grazing angle stay unshaded)
     float4 Occlusion(v2f i) : SV_Target
     {
-        float raw = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, i.uv);
-        float d = LinearEyeDepth(raw);
-        if (d > 300) return 1;
-        float radius = _AORadius / d * unity_CameraProjection._m11 * 0.5;
+        float3 p = ViewPos(i.uv);
+        float d = p.z;
+        if (d > 250) return 1;
+        // normal from the nearer neighbour on each axis (no halo along depth edges)
+        float2 tx = float2(_MainTex_TexelSize.x * 2, 0), ty = float2(0, _MainTex_TexelSize.y * 2);
+        float3 px1 = ViewPos(i.uv + tx) - p, px0 = p - ViewPos(i.uv - tx);
+        float3 py1 = ViewPos(i.uv + ty) - p, py0 = p - ViewPos(i.uv - ty);
+        float3 dx = abs(px1.z) < abs(px0.z) ? px1 : px0;
+        float3 dy = abs(py1.z) < abs(py0.z) ? py1 : py0;
+        float3 n = normalize(cross(dy, dx));
+        if (dot(n, p) > 0) n = -n;
+        float radius = _AORadius * unity_CameraProjection._m11 * 0.5 / d;
         float ao = 0;
-        float spin = frac(sin(dot(i.uv * _ScreenParams.xy, float2(12.9898, 78.233))) * 43758.5453) * 6.2831;
+        // a 4x4 interleaved rotation pattern (the blur pass averages it away; per-pixel random spin left grain)
+        float2 cell = fmod(floor(i.uv * _ScreenParams.xy * 0.5), 4.0);
+        float spin = (cell.x * 4 + cell.y) * (6.2831 / 16.0);
         [unroll] for (int k = 0; k < 12; k++)
         {
             float a = spin + k * 2.3999;
             float r = (k + 0.5) / 12.0;
             float2 off = float2(cos(a), sin(a)) * radius * r;
             off.x *= _ScreenParams.y / _ScreenParams.x;
-            float s = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, i.uv + off));
-            float diff = d - s;
-            float range = saturate(_AORadius / max(abs(diff), 1e-3));
-            ao += step(0.04 * d * 0.02 + 0.02, diff) * range * (1 - r * 0.5);
+            float3 v = ViewPos(i.uv + off) - p;
+            float len2 = dot(v, v);
+            float falloff = saturate(1 - len2 / (_AORadius * _AORadius * 4));
+            ao += max(dot(n, v) - 0.02 * d - 0.03, 0) / (len2 + 0.05) * falloff;
         }
         ao = saturate(1 - ao / 12.0 * _AOStrength);
-        return pow(ao, 1.4);
+        return ao;
+    }
+
+    // 7: blur the occlusion (a 4x4 box matching the rotation pattern, depth-aware)
+    float4 BlurAO(v2f i) : SV_Target
+    {
+        float d0 = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, i.uv));
+        float sum = 0, wsum = 0;
+        [unroll] for (int y = -2; y < 2; y++)
+            [unroll] for (int x = -2; x < 2; x++)
+            {
+                float2 uv = i.uv + (float2(x, y) + 0.5) * _MainTex_TexelSize.xy;
+                float d = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv));
+                float w = saturate(1 - abs(d - d0) / (0.05 * d0 + 0.1));
+                sum += tex2D(_MainTex, uv).r * w;
+                wsum += w;
+            }
+        return sum / max(wsum, 1e-3);
     }
 
     float3 Aces(float3 c, float white)
@@ -75,10 +111,11 @@ Shader "Hidden/FS/Post"
         return t / w;
     }
 
+    // the W3C soft light (Godot's glow blend): D(c) = ((16c - 12)c + 4)c below a quarter, sqrt(c) above
     float SoftLight(float c, float g)
     {
         return g <= 0.5 ? c - (1 - 2 * g) * c * (1 - c)
-             : c <= 0.25 ? c + (2 * g - 1) * (4 * c * (16 * c + 4) * (c - 1))
+             : c <= 0.25 ? c + (2 * g - 1) * (((16 * c - 12) * c + 4) * c - c)
              : c + (2 * g - 1) * (sqrt(c) - c);
     }
 
@@ -165,6 +202,11 @@ Shader "Hidden/FS/Post"
         Pass { CGPROGRAM
             #pragma vertex vert
             #pragma fragment ShaftBlur
+            #pragma target 3.0
+            ENDCG }
+        Pass { CGPROGRAM
+            #pragma vertex vert
+            #pragma fragment BlurAO
             #pragma target 3.0
             ENDCG }
     }

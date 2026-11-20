@@ -52,10 +52,12 @@ namespace FishingSim.Game
             });
             float lo = 1f, hi = 0f;
             foreach (float v in values) { lo = Mathf.Min(lo, v); hi = Mathf.Max(hi, v); }
-            var px = new byte[size * size];
+            // 16-bit: the shaders magnify this field a lot and threshold it with narrow smoothsteps; 8 bits showed as
+            // flat terraces with hard contours (clouds, hills, water)
+            var px = new ushort[size * size];
             for (int i = 0; i < px.Length; i++)
-                px[i] = (byte)Mathf.Clamp((values[i] - lo) / Mathf.Max(hi - lo, 1e-4f) * 255f, 0f, 255f);
-            var tex = new Texture2D(size, size, TextureFormat.R8, true, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 4, name = name };
+                px[i] = Mathf.FloatToHalf(Mathf.Clamp01((values[i] - lo) / Mathf.Max(hi - lo, 1e-4f)));
+            var tex = new Texture2D(size, size, TextureFormat.RHalf, true, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 4, name = name };
             tex.SetPixelData(px, 0);
             tex.Apply(true, true);
             return tex;

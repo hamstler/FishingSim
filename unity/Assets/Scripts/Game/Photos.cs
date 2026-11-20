@@ -119,7 +119,7 @@ namespace FishingSim.Game
                 if (vertexColour)
                 {
                     m.SetFloat("_VertexColour", 1f);
-                    m.SetColor("_Mean", Mean(albedo));
+                    m.SetVector("_Mean", Mean(albedo));   // already linear (SetColor would linearise it again)
                 }
             }
             return Mats[key] = m;
