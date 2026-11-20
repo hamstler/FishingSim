@@ -806,7 +806,7 @@ namespace FishingSim.Game
                 "<b>PPM</b> – zacięcie, gdy spławik zanurkuje / szczytówka się ugnie\n" +
                 "W holu: <b>LPM</b> – zwijanie, <b>PPM</b> – podnoszenie wędki, <b>kółko</b> – hamulec\n" +
                 "Spinning: <b>PPM</b> – podszarpnięcie przynęty, <b>Shift+LPM</b> – szybciej; zaczep: <b>PPM</b> szarpnij, <b>LPM</b> ciągnij\n" +
-                "<b>Ctrl+kółko</b> – grunt spławika (przed rzutem), <b>V</b> – garść zanęty przy spławiku\n" +
+                "<b>Ctrl+kółko</b> – grunt spławika (przed rzutem), <b>V</b> – garść zanęty przy spławiku, <b>B</b> – ostrzenie haczyka (osełka)\n" +
                 "Złowiona ryba: <b>E</b> – do siatki, <b>R</b> – wypuść\n" +
                 "<b>T</b> – sklep, <b>K</b> – siatka, <b>J</b> – rekordy, <b>Esc</b> – pauza\n" +
                 "<b>E</b> – sklepy, skup, wędzarnia, łódka, ognisko, tablica ogłoszeń, grzyby i jagody\n" +

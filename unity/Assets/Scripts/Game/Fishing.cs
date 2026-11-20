@@ -838,6 +838,19 @@ namespace FishingSim.Game
             }
             Day.MoonPhase = Moon.Phase(Profile.Clock);
             TickConditions(dt);
+            // B: sharpen the hook on the hone (FishingRod.SharpenHook; needs the hone, between casts)
+            if (canAct && State == RodState.Idle && Input.GetKeyDown(KeyCode.B))
+            {
+                if (!Profile.HasAccessory("oselka"))
+                    Said?.Invoke("Potrzebna osełka (sklep, akcesoria).");
+                else if (Profile.DullOf(Profile.Hook) <= 0.001f)
+                    Said?.Invoke("Haczyk jest ostry.");
+                else
+                {
+                    Profile.HookDull[Profile.Hook] = 0f;
+                    Said?.Invoke("Haczyk naostrzony.");
+                }
+            }
 
             switch (State)
             {
@@ -1329,6 +1342,12 @@ namespace FishingSim.Game
                         }
                     }
                 }
+                // a small fish on the line can be grabbed by a pike, perch or zander (PreyAttack)
+                if (Species != null && PreyAttack.IsPrey(Species.SpeciesName, Weight) && _rng.NextFloat() < PreyAttack.ChancePerSecond(PredatorPresence()) * dt)
+                {
+                    PredatorTakes();
+                    return;
+                }
                 // in a weed bed or among sunken branches the line tangles unless the rod is lifted to drag it out
                 var at = _origin + new Vector3(fight.Position.X, 0f, fight.Position.Y);
                 var (cover, _) = StructureAt(at.x, at.z);
@@ -1405,6 +1424,69 @@ namespace FishingSim.Game
             else
                 _fishMesh.sharedMesh = FishMesh.For(sp);
             _fishMesh.gameObject.SetActive(_fishModel == null);
+        }
+
+        /// <summary>How many predators the lake holds (tendency x abundance of PreyAttack.Predators).</summary>
+        private float PredatorPresence()
+        {
+            float sum = 0f;
+            foreach (var (name, tendency) in PreyAttack.Predators)
+                sum += tendency * World.Lake.Location.AbundanceOf(name);
+            return sum;
+        }
+
+        /// <summary>
+        /// FishingRod.PredatorTakes: a predator grabs the little fish on the line; the fight goes on with it (a big one, as
+        /// on a live bait), hooked less firmly.
+        /// </summary>
+        public void PredatorTakes()
+        {
+            if (Fight == null || Species == null)
+                return;
+            var choices = new List<(FishSpecies Sp, float W)>();
+            float total = 0f;
+            foreach (var sp in SpeciesHere)
+                if (PreyAttack.Predators.TryGetValue(sp.SpeciesName, out float tendency) && sp.SpeciesName != Species.SpeciesName)
+                {
+                    float w = tendency * World.Lake.Location.AbundanceOf(sp.SpeciesName);
+                    if (w > 0f)
+                    {
+                        choices.Add((sp, w));
+                        total += w;
+                    }
+                }
+            if (choices.Count == 0)
+                return;
+            float roll = _rng.NextFloat() * total;
+            var predator = choices[^1].Sp;
+            foreach (var (sp, w) in choices)
+            {
+                roll -= w;
+                if (roll <= 0f)
+                {
+                    predator = sp;
+                    break;
+                }
+            }
+            string prey = Species.SpeciesName;
+            var old = Fight;
+            Species = predator;
+            Weight = BiteModel.RollWeight(predator, (Hook?.Size ?? 5f) + BaitSize.HookShift("livebait"), _rng);
+            var reel = Reel!;
+            var rod = Rod!;
+            var line = LineItem!;
+            float shock = Mathf.Min(rod.ShockAbsorb + 0.12f * line.Stretch, 0.5f);
+            var gear = new FightGear(reel.DragMax, EffectiveLimit, shock, reel.ReelSpeed, reel.LineCapacity);
+            Fight = new FightModel(FishProfile.From(predator, Weight), gear, _rng, Mathf.Max(old.Distance, 2.5f), old.FishAngle, DragSetting)
+            {
+                HookHold = PreyAttack.Hold,
+            };
+            ShowFishModel(predator);
+            float length = predator.LengthRef * Mathf.Pow(Mathf.Max(Weight, 0.005f), 0.33f);
+            _fish.localScale = Vector3.one * Mathf.Clamp(length, 0.08f, 2.2f);
+            Twitch(1.2f);
+            Cue?.Invoke(Core.Audio.OneShot.Strike, 1f);
+            Said?.Invoke($"{predator.SpeciesName} chwycił holowaną rybę ({prey})!");
         }
 
         /// <summary>The weakest link breaks: a rod snaps, a line parts (hook lost with it) or a hook opens.</summary>
