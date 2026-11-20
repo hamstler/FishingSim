@@ -110,6 +110,22 @@ namespace FishingSim.Game
                 Destroy(shot);
                 Destroy(small);
             }
+            // the hands on the rod and the reel's crank, looking a little down (FirstPersonBody's grips)
+            {
+                Player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
+                Player.Look(180f, 22f);
+                Day.Hour = 12f;
+                Day.Apply();
+                for (int i = 0; i < 20; i++)
+                    yield return null;
+                yield return new WaitForEndOfFrame();
+                var shot = ScreenCapture.CaptureScreenshotAsTexture();
+                SaveFull(shot, "hands");
+                Destroy(shot);
+                if (GameObject.Find("AnglerArms")?.GetComponent<AnglerArms>() is { } anglerArms)
+                    Debug.Log($"SMOKE arms: {anglerArms.Report()}");
+                Player.Look(180f, 0f);
+            }
             // rain over the lake
             Player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
             Day.SetWeather(Core.Weather.Rain);
