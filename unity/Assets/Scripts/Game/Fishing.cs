@@ -96,7 +96,21 @@ namespace FishingSim.Game
         private bool _baitOn = true;
         private Vector3 _lastEye;
         private bool _eyeSeen;
-        private float _jump, _weedTime;
+        private float _jump, _weedTime, _tilt, _run;
+
+        /// <summary>How this species takes a bait under a float (FeedingHabits: dive, pluck, lift, run).</summary>
+        private BiteStyle Style => Species != null ? FeedingHabits.StyleOf(Species.SpeciesName) : BiteStyle.Dive;
+
+        /// <summary>The lure in the water (spinning): its depth by the retrieve, falls, twitches and snags (LureMotion).</summary>
+        public LureMotion? Lure { get; private set; }
+
+        /// <summary>The lure is stuck on the bottom: RMB jerks it, a held LMB pulls (the line may give).</summary>
+        public bool Snagged => Lure?.Snagged == true;
+
+        /// <summary>How the lure's colours suit the light and the water now (1 = neutral).</summary>
+        public float LureAppeal => Method == FishingMethod.Spinning && Bait != null
+            ? FishingSim.Core.Methods.Method.ColourAppeal(Bait.LureColor, Bait.AccentColor, Bait.Metallic, Day.Light, Clarity)
+            : 1f;
 
         /// <summary>The hooked fish is in a weed bed or among branches: lift the rod (RMB) to drag it out.</summary>
         public bool FishInWeeds => State == RodState.Fight && _weedTime > 0.2f;
@@ -839,7 +853,8 @@ namespace FishingSim.Game
             float taut = Mathf.Clamp01(1f - Slack / 0.25f);
             float pull = Method switch
             {
-                FishingMethod.Spinning => Reeling ? TackleWeightKg * 0.6f + 0.05f * Mathf.Pow(Mathf.Min((Reel?.ReelSpeed ?? 3f) * 0.35f, 2f), 2f) : 0f,
+                FishingMethod.Spinning => (Snagged ? (Reeling ? 0.6f : 0.25f) * EffectiveLimit : 0f)
+                    + (Reeling ? TackleWeightKg * 0.6f + 0.05f * Mathf.Pow(Mathf.Min(Lure?.Speed ?? 0f, 2f), 2f) : 0f),
                 FishingMethod.Bottom => TackleWeightKg * 0.6f + _bitePull * 0.9f,
                 _ => Reeling ? 0.03f : 0f,
             };
@@ -910,6 +925,9 @@ namespace FishingSim.Game
                 Cue?.Invoke(Method == FishingMethod.Bottom ? Core.Audio.OneShot.Splash : Core.Audio.OneShot.SmallSplash, 0.8f);
                 // the splash frightens the fish round it (less in rain and wind)
                 Disturbance.Add(Disturbance.Splash(Method, TackleWeightKg * 1000f, DepthHere) * NoiseMasking);
+                Lure = Method == FishingMethod.Spinning && Bait != null
+                    ? new LureMotion(FishingSim.Core.Methods.Method.FamilyOf(Bait.AffinityAs), LureTuning.From(Bait))
+                    : null;
                 NewBiteTimer();
                 Set(RodState.Waiting);
             }
@@ -931,6 +949,9 @@ namespace FishingSim.Game
             _lineSlack = 1f;
             _lineLength = TipDistance() * 1.05f;
             _ropeLive = false;
+            Lure = Method == FishingMethod.Spinning && Bait != null
+                ? new LureMotion(FishingSim.Core.Methods.Method.FamilyOf(Bait.AffinityAs), LureTuning.From(Bait))
+                : null;
             NewBiteTimer();
             Set(RodState.Waiting);
         }
@@ -955,11 +976,73 @@ namespace FishingSim.Game
                          / (1f + BiteBonus());
         }
 
+        /// <summary>
+        /// The spinning retrieve (FishingRod.TickSpinning): the lure runs at the depth its speed gives (Shift: faster), sinks
+        /// when the reel stands, hops on a twitch (RMB), snags among sunken wood; a snag is jerked (RMB: often free, now and
+        /// then the line gives) or pulled (LMB held: frees it or, after a few seconds, breaks the line). Returns true when the
+        /// end tackle left the water (handled).
+        /// </summary>
+        private bool TickLure(float dt, bool lmb, bool rmbDown, ref Vector3 p)
+        {
+            var lure = Lure!;
+            float wood = 0f;
+            foreach (var (wx, wz, r) in Forest.SunkenWood)
+                wood = Mathf.Max(wood, Structure.WoodAt(new[] { new SunkenWood(wx, wz, r) }, p.x, p.z));
+            lure.SnagFactor = Structure.SnagFactor(wood);
+            if (lure.Snagged)
+            {
+                SnagResult result = SnagResult.Stuck;
+                if (rmbDown)
+                {
+                    result = lure.Jerk(_rng);
+                    Profile.LineWear[Profile.Line] = Mathf.Min(Profile.WearOf(Profile.Line) + LineWear.PerSnagJerk, LineWear.Max);
+                    Twitch(0.5f);
+                }
+                else if (lmb)
+                {
+                    result = lure.Pull(_rng, dt);
+                    Profile.LineWear[Profile.Line] = Mathf.Min(Profile.WearOf(Profile.Line) + LineWear.PerSnagPullSecond * dt, LineWear.Max);
+                }
+                if (result == SnagResult.Freed)
+                    Said?.Invoke("Przynęta odczepiona.");
+                else if (result == SnagResult.Broke)
+                {
+                    Said?.Invoke("Zaczep! Żyłka pękła — przynęta i haczyk zostały na dnie.");
+                    Cue?.Invoke(Core.Audio.OneShot.LineSnap, 1f);
+                    Profile.Destroy(Profile.Hook);
+                    Profile.UseBait();
+                    Reset();
+                    return true;
+                }
+                return false;
+            }
+            if (rmbDown)
+            {
+                // a twitch: the lure darts towards the angler (the slack goes first) and flashes
+                float dart = TakeUpSlack(lure.Twitch());
+                var toAngler = Flat(Player.transform.position - p);
+                if (toAngler.sqrMagnitude > 1e-4f)
+                    p += toAngler.normalized * dart;
+                Twitch(0.3f);
+            }
+            float retrieve = lmb ? (Reel?.ReelSpeed ?? 3f) * (Input.GetKey(KeyCode.LeftShift) ? 0.6f : 0.3f) : 0f;
+            bool wasSnagged = lure.Snagged;
+            lure.Step(dt, retrieve, Mathf.Max(DepthHere, 0.05f), _rng);
+            if (!wasSnagged && lure.Snagged)
+            {
+                Said?.Invoke("Zaczep! RMB: szarpnij, LMB: ciągnij.");
+                Profile.HookDull[Profile.Hook] = Mathf.Min(Profile.DullOf(Profile.Hook) + HookWear.PerSnag, HookWear.Max);
+            }
+            return false;
+        }
+
         private void TickWaiting(float dt, bool lmb, bool rmbDown)
         {
             var p = _bobber.position;
+            if (Lure != null && State == RodState.Waiting && TickLure(dt, lmb, rmbDown, ref p))
+                return;
             // retrieve: the float/feeder comes in, the lure works
-            if (lmb && State == RodState.Waiting)
+            if (lmb && State == RodState.Waiting && !Snagged)
             {
                 float speed = (Reel?.ReelSpeed ?? 3f) * (Method == FishingMethod.Spinning ? 0.35f : 0.22f);
                 var toAngler = Flat(Player.transform.position - p);
@@ -986,19 +1069,30 @@ namespace FishingSim.Game
             float y = Method switch
             {
                 FishingMethod.Float => surface - 0.01f - _dip * 0.09f,
-                FishingMethod.Spinning => Mathf.Max(surface - 0.5f, -DepthHere + 0.1f),
+                FishingMethod.Spinning => Lure != null ? Mathf.Max(surface - Lure.Depth, -DepthHere + 0.03f) : Mathf.Max(surface - 0.5f, -DepthHere + 0.1f),
                 _ => -DepthHere + 0.05f,
             };
+            // a running bite slides the float away across the water before it goes under
+            if (State == RodState.Bite && Method == FishingMethod.Float && Style == BiteStyle.Run && _run > 0f)
+            {
+                var away = Flat(p - Player.transform.position).normalized;
+                p += away * dt * 0.45f * _run;
+            }
             _bobber.position = new Vector3(p.x, y, p.z);
+            // a lifting bite lays the float flat on the water
+            _bobber.rotation = Quaternion.Euler(_tilt * 85f, 0f, 0f);
             // the line never stretches: when the end tackle drifts off, the line follows
             _lineLength = Mathf.Max(_lineLength, TipDistance());
 
             // the bite clock runs while the bait waits (a lure only while it is drawn)
             if (State == RodState.Waiting)
             {
-                if (Method != FishingMethod.Spinning || lmb)
-                    _biteTimer -= dt * ConditionPace * BaitPace * (Method == FishingMethod.Spinning ? 2f : 1f);
-                if (rmbDown)
+                if (Method == FishingMethod.Spinning && Lure != null && Rod != null)
+                    // the lure's play drives the bite clock: its quality, a falling jig, the flash after a twitch, the colours
+                    _biteTimer -= dt * Lure.BitePace * FishingSim.Core.Methods.Method.LureRodMatch(Rod.Kind) * 2f * ConditionPace * LureAppeal;
+                else if (Method != FishingMethod.Spinning)
+                    _biteTimer -= dt * ConditionPace * BaitPace;
+                if (rmbDown && Method != FishingMethod.Spinning)
                     Said?.Invoke("Nic nie bierze.");
                 if (_biteTimer <= 0f)
                 {
@@ -1017,8 +1111,9 @@ namespace FishingSim.Game
             }
             if (State == RodState.Nibble)
             {
-                // little plucks at the float / the quiver tip
-                _dip = Mathf.Max(0f, Mathf.Sin(_stateTime * 9f) * 0.35f * (_rng.NextFloat() < 0.5f ? 1f : 0.4f));
+                // little plucks at the float / the quiver tip (small fish pluck quicker and harder)
+                float pluck = Style == BiteStyle.Pluck ? 0.5f : 0.35f;
+                _dip = Mathf.Max(0f, Mathf.Sin(_stateTime * (Style == BiteStyle.Pluck ? 14f : 9f)) * pluck * (_rng.NextFloat() < 0.5f ? 1f : 0.4f));
                 if (Method != FishingMethod.Float && _rng.NextFloat() < dt * 3f)
                     Twitch(Method == FishingMethod.Spinning ? 0.25f : 0.45f);      // the quiver tip plucks (the float shows bites on its own)
                 if (rmbDown)
@@ -1032,10 +1127,38 @@ namespace FishingSim.Game
                     Set(RodState.Bite);
                 return;
             }
-            // Bite: the float goes under (the tip pulls round) for the hook window
-            _dip = Mathf.MoveTowards(_dip, 1f, dt * 5f);
+            // Bite (FishingRod.FloatBite): by the species' style the float goes under, is pulled under in a short tug, rises
+            // and lies flat (a bait lifted off the bottom), or slides away and then goes under; the tip pulls round
+            if (Method == FishingMethod.Float)
+                switch (Style)
+                {
+                    case BiteStyle.Lift:
+                        _dip = Mathf.MoveTowards(_dip, -0.6f, dt * 2f);
+                        _tilt = Mathf.MoveTowards(_tilt, 1f, dt * 1.6f);
+                        break;
+                    case BiteStyle.Run:
+                        _run = Mathf.MoveTowards(_run, 1f, dt * 2f);
+                        _dip = _stateTime > 0.7f ? Mathf.MoveTowards(_dip, 1f, dt * 4f) : 0.15f;
+                        break;
+                    case BiteStyle.Pluck:
+                        _dip = Mathf.MoveTowards(_dip, 1f, dt * 9f);
+                        break;
+                    default:
+                        _dip = Mathf.MoveTowards(_dip, 1f, dt * 5f);
+                        break;
+                }
+            else
+                _dip = Mathf.MoveTowards(_dip, 1f, dt * 5f);
             // the hook window: longer in warm water, shorter in cold (WaterTemperature.WindowFactor at the bait)
             float window = FishingSim.Core.Methods.Method.HookWindow(Method) * WaterTemperature.WindowFactor(BaitTemperature) + 0.4f;
+            // a float is ready to strike only once it is under (or lying flat on a lift): sooner the fish only feels it
+            bool ready = Method != FishingMethod.Float || _dip >= 0.9f || (Style == BiteStyle.Lift && _tilt >= 0.85f);
+            if (rmbDown && !ready)
+            {
+                Said?.Invoke("Za wcześnie! Ryba uciekła.");
+                Missed(keepBait: 0.6f);
+                return;
+            }
             if (rmbDown)
             {
                 float lateness = Mathf.Clamp01(_stateTime / window);
@@ -1061,6 +1184,8 @@ namespace FishingSim.Game
 
         private void Missed(float keepBait)
         {
+            _tilt = 0f;
+            _run = 0f;
             if (_rng.NextFloat() > keepBait)
                 Profile.UseBait();
             Species = null;
@@ -1084,6 +1209,9 @@ namespace FishingSim.Game
             var to = Flat(_bobber.position - Player.transform.position);
             _origin = Player.transform.position;
             _hookHold = hold;
+            _tilt = 0f;
+            _run = 0f;
+            _bobber.rotation = Quaternion.identity;
             _jump = 0f;
             _weedTime = 0f;
             Disturbance.Add(0.3f);       // a fish thrashing on the hook frightens the others
@@ -1268,6 +1396,9 @@ namespace FishingSim.Game
             _dip = 0f;
             _lineSlack = 1f;
             CastPower = 0f;
+            Lure = null;
+            _tilt = 0f;
+            _run = 0f;
             if (State != RodState.Landed || Species == null)
                 Set(RodState.Idle);
             else
