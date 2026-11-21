@@ -141,10 +141,12 @@ namespace FishingSim.Game
         private IEnumerator MakeArms()
         {
             yield return null;   // the rod is built in its Start
-            yield return ModelLibrary.Preload(new[] { "characters/player_angler" });
+            yield return ModelLibrary.Preload(new[] { GripArms.ModelId, "characters/player_angler" });
             try
             {
-                AnglerArms.Create(_player.Camera, _rod);
+                // the arms posed by the user in Blender when they are there, else the solved MakeHuman arms
+                if (GripArms.Create(_player.Camera, _rod) == null)
+                    AnglerArms.Create(_player.Camera, _rod);
             }
             catch (Exception e)
             {

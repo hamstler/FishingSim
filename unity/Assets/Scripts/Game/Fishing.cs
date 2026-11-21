@@ -308,7 +308,33 @@ namespace FishingSim.Game
         public Transform GripRight { get; private set; } = null!;
         public Transform GripLeft { get; private set; } = null!;
         public bool RodVisible => _rodRoot != null && _rodRoot.gameObject.activeInHierarchy;
+
+        /// <summary>The rod's own frame (RodRig's: the rod's and reel's models hang here) and the reel's crank pivot.</summary>
+        public Transform? Frame => _frame;
+        public Transform? CrankPivot => _crank;
+
+        private bool _framed;
+        private Quaternion _frameTurn = Quaternion.identity;
+
+        /// <summary>The rod held where posed arms put it (GripArms: the camera at the posed figure's eyes) instead of
+        /// RigBasePosition/RigRest.</summary>
+        public void SetFraming(Vector3 position, Quaternion turn)
+        {
+            _framed = true;
+            _frameTurn = turn;
+            if (_rodRoot != null)
+            {
+                _rodRoot.localPosition = position;
+                _rodRoot.localRotation = turn;
+            }
+        }
+
+        private Quaternion RestTurn(float lift) => _framed ? Quaternion.Euler(lift, 0f, 0f) * _frameTurn : RigRest(lift);
         private string _shownRod = "", _shownReel = "";
+
+        /// <summary>The rod's and the reel's model ids now shown ("" while the built ones show).</summary>
+        public string ShownRodId => _shownRod;
+        public string ShownReelId => _shownReel;
 
         /// <summary>
         /// The framing of the user's reference (a Russian Fishing 4 clip): the rod comes in from the lower right, the
@@ -1614,7 +1640,7 @@ namespace FishingSim.Game
 
             // the rod lifts while charging and in the fight when lifting
             float lift = State == RodState.Charging ? -25f * CastPower : State == RodState.Fight && Input.GetMouseButton(1) ? -18f : 0f;
-            _rodRoot.localRotation = Quaternion.Slerp(_rodRoot.localRotation, RigRest(lift), 1f - Mathf.Exp(-dt * 10f));
+            _rodRoot.localRotation = Quaternion.Slerp(_rodRoot.localRotation, RestTurn(lift), 1f - Mathf.Exp(-dt * 10f));
 
             // the crank turns with the line wound in: the rotor lays 2 pi r of line a turn, 5.2 turns to one of the crank
             bool reeling = (State == RodState.Fight || State == RodState.Waiting) && (Input.GetMouseButton(0) || SmokeReel) && !Blocked;

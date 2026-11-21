@@ -279,9 +279,17 @@ namespace FishingSim.Game
             var shot = ScreenCapture.CaptureScreenshotAsTexture();
             SaveFull(shot, "hands");
             Destroy(shot);
+            if (GameObject.Find("AnglerArms")?.GetComponent<GripArms>() is { } gripArms)
+                Debug.Log($"SMOKE arms: {gripArms.Report()}");
             if (GameObject.Find("AnglerArms")?.GetComponent<AnglerArms>() is { } anglerArms)
             {
                 Debug.Log($"SMOKE arms: {anglerArms.Report()}");
+                // the grips' scene for Blender (tools/assets/grip_view.py)
+                if (Environment.GetEnvironmentVariable("FISHSIM_SMOKE_DIR") is { Length: > 0 } dumpDir)
+                {
+                    System.IO.File.WriteAllText(System.IO.Path.Combine(dumpDir, "grip_pose.json"), anglerArms.DumpPose());
+                    Debug.Log($"SMOKE grip pose written to {System.IO.Path.Combine(dumpDir, "grip_pose.json")}");
+                }
             }
             // close-ups of the grips from cameras beside the rod (FISHSIM_CLOSEUP in the Godot game): the right
             // hand on the handle from its right, both hands from ahead, the crank hand from the left

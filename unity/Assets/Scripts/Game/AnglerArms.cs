@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace FishingSim.Game
@@ -26,8 +27,12 @@ namespace FishingSim.Game
         /// <summary>Half the hand's thickness: the wrist bone runs through the middle of the hand (FirstPersonBody.PalmDepth).</summary>
         public const float PalmDepth = 0.012f;
 
-        /// <summary>The cork handle's radius at the grip (the built handle's 13.5-16 mm).</summary>
-        public const float HandleRadius = 0.015f;
+        /// <summary>The handle's radius at the grip (14.3 mm on the Meshy rod, measured by grip_view.py).</summary>
+        public const float HandleRadius = 0.0143f;
+
+        /// <summary>How far ahead of Fishing.GripRight the right hand holds the handle (grip_view.py: the reel's stem
+        /// between the middle and ring fingers).</summary>
+        public const float SeatSlide = 0.097f;
 
         private Transform? _model;
         private Hand? _right, _left;
@@ -159,16 +164,24 @@ namespace FishingSim.Game
             var frame = Rod.GripRight.parent;
             var along = frame.up;                       // the blank's axis, butt to tip
             var top = frame.forward;                    // away from the reel
-            var at = frame.TransformPoint(new Vector3(0f, Rod.GripRight.localPosition.y, 0f));
+            // the reel seat: measured on the meshes (tools/assets/grip_view.py), the hand slides 97 mm ahead of the old
+            // grip point to put the reel's stem between the middle and ring fingers (index and middle in front of it, as
+            // anglers hold it)
+            var at = frame.TransformPoint(new Vector3(0f, Rod.GripRight.localPosition.y + SeatSlide, 0f));
             var side = Vector3.Dot(frame.right, cam.right) >= 0f ? frame.right : -frame.right;
             var pole = h.Upper.position - cam.up * 0.6f + cam.right * 0.3f;
-            var (wrist, fingers, palm) = BarGrip(h, at, along, HandleRadius, h.Knuckles * 0.62f, 20f, 55f, 0.012f, -side, 40f, cam, true, pole);
+            // the user's description: the four fingers round the handle from below, the thumb on top. So the hand lies
+            // under the handle and to its right, the palm facing up and left onto it (palm within 35 degrees of that),
+            // the handle across the palm slanting 5-30 degrees (Godot's 20-55 let the search lay the fingers along the
+            // handle, straight up the rod: seen in Blender, nothing wrapped round)
+            var palmUp = (top - side).normalized;
+            var (wrist, fingers, palm) = BarGrip(h, at, along, HandleRadius, h.Knuckles * 0.62f, 5f, 30f, 0.012f, palmUp, 35f, cam, true, pole);
             Reach(h, wrist, fingers, palm, pole);
             for (int i = 0; i < h.Fingers.Count; i++)
                 Curl(h.Fingers[i], palm, i == 0 ? 72f : 88f);
-            // the thumb along the top of the handle, 7.5 cm ahead of the hand
+            // the thumb on top of the handle, just ahead of the hand
             if (h.Thumb != null)
-                PointThumb(h.Thumb, at + along * 0.075f + top * (HandleRadius + 0.009f));
+                PointThumb(h.Thumb, at + along * 0.03f + top * (HandleRadius + 0.008f));
         }
 
         /// <summary>
@@ -360,6 +373,68 @@ namespace FishingSim.Game
             upper.rotation = Quaternion.FromToRotation(lower.position - a, elbow - a) * upper.rotation;
             var reach = a + dir * d;
             lower.rotation = Quaternion.FromToRotation(hand.position - lower.position, reach - lower.position) * lower.rotation;
+        }
+
+        /// <summary>
+        /// The scene of the grips for tools/assets/grip_view.py (Blender): every bone of the angler at rest and as posed
+        /// now, and the rod's and the reel's parts (glTF node names: the rod's Model{i} are its Seg{i}), all as 4x4
+        /// matrices (row-major) in the angler model's own space, with the glb ids to load.
+        /// </summary>
+        public string DumpPose()
+        {
+            if (_model == null || Rod?.GripRight == null)
+                return "{}";
+            var root = _model;
+            var inv = root.worldToLocalMatrix;
+            var bones = root.GetComponentsInChildren<Transform>(true);
+            var sb = new System.Text.StringBuilder();
+            static string M(Matrix4x4 m) => string.Join(",", new[]
+            {
+                m.m00, m.m01, m.m02, m.m03, m.m10, m.m11, m.m12, m.m13, m.m20, m.m21, m.m22, m.m23, m.m30, m.m31, m.m32, m.m33,
+            }.Select(v => v.ToString("R", System.Globalization.CultureInfo.InvariantCulture)));
+            // at rest: the arm bones back to their rest turns (the rest of the skeleton is never moved)
+            foreach (var (bone, rest) in _rest)
+                bone.localRotation = rest;
+            var restM = new Dictionary<Transform, Matrix4x4>();
+            foreach (var b in bones)
+                restM[b] = inv * b.localToWorldMatrix;
+            LateUpdate();
+            sb.Append("{\"angler\":\"characters/player_angler\",\"bones\":{");
+            bool first = true;
+            foreach (var b in bones)
+            {
+                if (b == root)
+                    continue;
+                sb.Append(first ? "" : ",").Append('"').Append(b.name).Append("\":{\"rest\":[").Append(M(restM[b]))
+                  .Append("],\"now\":[").Append(M(inv * b.localToWorldMatrix)).Append("]}");
+                first = false;
+            }
+            sb.Append("},\"parts\":[");
+            first = true;
+            var rodRoot = Rod.GripRight.parent.parent;
+            foreach (var t in rodRoot.GetComponentsInChildren<Transform>(false))
+            {
+                string node = t.name.StartsWith("Model") && int.TryParse(t.name.Substring(5), out int i) ? "Seg" + i : t.name;
+                if (node is not ("Handle" or "Body" or "Rotor" or "Crank" or "Bail") && !node.StartsWith("Seg"))
+                    continue;
+                string glb = IsUnder(t, "ReelModel") ? "reel" : "rod";
+                sb.Append(first ? "" : ",").Append("{\"glb\":\"").Append(glb).Append("\",\"node\":\"").Append(node)
+                  .Append("\",\"m\":[").Append(M(inv * t.localToWorldMatrix)).Append("]}");
+                first = false;
+            }
+            var frame = Rod.GripRight.parent;
+            sb.Append("],\"rod\":\"").Append(Rod.ShownRodId).Append("\",\"reel\":\"").Append(Rod.ShownReelId)
+              .Append("\",\"grip\":[").Append(M(inv * Matrix4x4.Translate(frame.TransformPoint(new Vector3(0f, Rod.GripRight.localPosition.y + SeatSlide, 0f)))))
+              .Append("],\"knob\":[").Append(M(inv * Matrix4x4.Translate(Rod.GripLeft.position))).Append("]}");
+            return sb.ToString();
+        }
+
+        private static bool IsUnder(Transform t, string name)
+        {
+            for (var p = t; p != null; p = p.parent)
+                if (p.name == name)
+                    return true;
+            return false;
         }
 
         /// <summary>For the smoke test: how far each wrist ended from its target (mm), to check the arms reach.</summary>
