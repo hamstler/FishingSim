@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="LocationData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/LocationData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Zbiornik Kamienna Zapora"
+Description = "Największy i najgłębszy akwen. Przy dnie żeruje sandacz, a nad stokiem krąży boleń."
+RequiredLevel = 27
+OutlineRx = 114.0
+OutlineRz = 75.0
+OutlineCz = -75.0
+Slope = 0.2
+MaxDepth = 17
+HolePos = Vector2(26, -56)
+HoleDepth = 4.0
+HoleRadius = 17.0
+BarPos = Vector2(-40, -42)
+BarHeight = 1.5
+BarRadius = 14.0
+Abundance = {"Sandacz":1.65,"Sum":1,"Boleń":1.25,"Leszcz":1,"Ukleja":1.4,"Jesiotr ostronosy":0.3}
+Lobes = PackedStringArray("83,-110,35,24")
+Islands = PackedStringArray("-43,-104,11")
+WaterShallowColor = Color(0.06, 0.15, 0.11, 1.0)
+WaterDeepColor = Color(0.02, 0.055, 0.035, 1.0)
+WaterClarity = 3.9
+WaterTemperature = 17.0
+TreeMix = {"oak": 1.0, "birch": 0.35}
+TreeDensity = 0.85
+ReedDensity = 0.65
+RimHeight = 55.0
+SnowLine = 999.0
+PlazaCenter = Vector2(0, 18)
+VillageStyle = "fishing"
+Buildings = PackedStringArray("general,-12,17", "office,13,18", "busstop,5,10", "bench,-4,9")

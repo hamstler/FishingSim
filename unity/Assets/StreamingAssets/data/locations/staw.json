@@ -42,7 +42,7 @@
   "Orfa": 0.5,
   "Pstrąg tęczowy": 0.3
  },
- "RequiredLevel": 3,
+ "RequiredLevel": 2,
  "Description": "Mały, płytki staw pełen karpi. Spokojne łowisko dla cierpliwych.",
  "GrassColor": {
   "R": 0.4,
@@ -148,7 +148,7 @@
  ],
  "Squareness": 3.0,
  "Lobes": [
-  "-90,-45,17,26"
+  "-53,-45,14,18"
  ],
  "Landmarks": [
   "dike,0,-95,0,64",

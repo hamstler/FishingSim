@@ -23,6 +23,12 @@ public sealed class Lake
         "res://data/locations/staw.tres",
         "res://data/locations/zatoka.tres",
         "res://data/locations/gory.tres",
+        "res://data/locations/starorzecze.tres",
+        "res://data/locations/jezioro_brzosz.tres",
+        "res://data/locations/wyrobisko.tres",
+        "res://data/locations/pojezierze.tres",
+        "res://data/locations/rozlewisko.tres",
+        "res://data/locations/zapora.tres",
     };
 
     private readonly Noise _noise = new(1234, 0.01f);

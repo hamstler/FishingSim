@@ -159,6 +159,12 @@ namespace FishingSim.Game
 
         private static Mesh LeafCards(int seed, int leaf, float cardSize, float density, params Puff[] puffs)
         {
+            // Smaller clusters on the close mesh keep individual leaf silhouettes visible at the shore.
+            if (_cardDensity == 1f && leaf != LeafPainter.LeafHazel)
+            {
+                cardSize *= 0.76f;
+                density *= 1.6f;
+            }
             var rng = new Random(seed);
             var cb = new CardBuilder();
             var centre = Vector3.zero;

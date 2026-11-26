@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="LocationData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/LocationData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Jezioro Sosnowe"
+Description = "Chłodny akwen pośród sosen. Głębokie rynny są domem sielawy i siei."
+RequiredLevel = 16
+OutlineRx = 96.0
+OutlineRz = 64.0
+OutlineCz = -64.0
+Slope = 0.2
+MaxDepth = 13
+HolePos = Vector2(22, -48)
+HoleDepth = 4.0
+HoleRadius = 14.0
+BarPos = Vector2(-34, -36)
+BarHeight = 1.5
+BarRadius = 12.0
+Abundance = {"Sielawa":1.5,"Sieja":1.25,"Troć jeziorowa":0.65,"Palia":0.4,"Miętus":0.6,"Okoń":0.85}
+Lobes = PackedStringArray("69,-100,33,18")
+Islands = PackedStringArray("27,-92,8")
+WaterShallowColor = Color(0.06, 0.15, 0.11, 1.0)
+WaterDeepColor = Color(0.02, 0.055, 0.035, 1.0)
+WaterClarity = 3.9
+WaterTemperature = 13.0
+TreeMix = {"pine": 1.0, "birch": 0.35}
+TreeDensity = 1.4
+ReedDensity = 0.65
+RimHeight = 55.0
+SnowLine = 999.0
+PlazaCenter = Vector2(0, 18)
+VillageStyle = "mountain"
+Buildings = PackedStringArray("general,-12,17", "office,13,18", "busstop,5,10", "bench,-4,9")

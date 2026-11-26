@@ -38,13 +38,15 @@ else:
     head = [v for v in verts if v.z > top - 0.3]
     centre = sum(head, Vector()) / len(head)
     eye = Vector((centre.x, min(v.y for v in head) + 0.05, centre.z - 0.02))
-skin_mod = next(m for m in figure.modifiers if m.type == "ARMATURE")
-
 # bake the pose: the mesh into the posed shape, the bones' rest to the pose, no constraints left
 bpy.ops.object.select_all(action="DESELECT")
 bpy.context.view_layer.objects.active = figure
 figure.select_set(True)
-bpy.ops.object.modifier_apply(modifier=skin_mod.name)
+depsgraph = bpy.context.evaluated_depsgraph_get()
+posed_mesh = bpy.data.meshes.new_from_object(figure.evaluated_get(depsgraph), preserve_all_data_layers=True,
+                                           depsgraph=depsgraph)
+figure.modifiers.clear()
+figure.data = posed_mesh
 bpy.ops.object.select_all(action="DESELECT")
 bpy.context.view_layer.objects.active = arm
 arm.select_set(True)

@@ -1330,13 +1330,16 @@ namespace FishingSim.Game
             var r = Centre(w, h, Mathf.Min(S(980), w * 0.94f), Mathf.Min(S(150) + _locations.Count * S(132) + S(80), h * 0.94f));
             GUI.Label(new Rect(r.x, r.y, r.width, S(40)), "ŁOWISKA", _title);
             GUI.Label(new Rect(r.x, r.y + S(38), r.width, S(24)), "Podróż zajmuje chwilę: zestaw zostaje zwinięty, siatka jedzie z tobą.", _small);
-            float y = r.y + S(78);
+            var view = new Rect(r.x, r.y + S(78), r.width, Mathf.Max(1f, r.height - S(136)));
+            float rowWidth = view.width - S(24);
+            _scroll = GUI.BeginScrollView(view, _scroll, new Rect(0, 0, rowWidth, _locations.Count * S(132)));
+            float y = 0f;
             for (int i = 0; i < _locations.Count; i++)
             {
                 var loc = _locations[i];
                 bool here = i == _loadedLocation;
                 bool locked = loc.RequiredLevel > _profile.Level;
-                var row = new Rect(r.x, y, r.width, S(120));
+                var row = new Rect(0, y, rowWidth, S(120));
                 GUI.enabled = !locked;
                 if (GUI.Button(row, GUIContent.none, here ? _cardHot : _card) && !locked)
                 {
@@ -1363,6 +1366,7 @@ namespace FishingSim.Game
                 GUI.Label(new Rect(row.xMax - S(160), row.y + S(48), S(140), S(24)), state, new GUIStyle(_label!) { alignment = TextAnchor.MiddleRight, normal = { textColor = locked ? Faint : Ink } });
                 y += S(132);
             }
+            GUI.EndScrollView();
             if (GUI.Button(new Rect(r.x, r.yMax - S(48), S(220), S(46)), "Zamknij", _button))
                 ClosePanel();
         }

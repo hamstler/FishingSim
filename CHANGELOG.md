@@ -1,5 +1,10 @@
 # Zmiany
 
+## 0.11.2 (Unity 6)
+- Wędkarz w widoku pierwszoosobowym. Żyłka przechodzi przez obracający się kabłąk, a grubość nawoju odpowiada ilości pozostałej żyłki.
+- Dziesięć łowisk o rosnącej wielkości, z osobnymi progami poziomu i obsadami ryb. Panel podróży można przewijać.
+- Drobniejsze skupiska liści na modelach dębów, brzóz i wierzb oglądanych z bliska.
+
 ## 0.11.1 (Unity 6)
 - Mniejszy teren do chodzenia: najwyżej 10 m od wody, poza tym ścieżki, plac, okolice budynków i charakterystyczne miejsca.
 - Poprawione artefakty otoczenia (z przeglądem Codexa): dalekie pnie nie świecą już na pomarańczowo, słupki latarni i drogowskazów są przeszkodami, ławki nie są czarne, łąka bez jaskrawej żółtej zieleni, okrągłe żarówki nad pomostem, łódka bez migoczących pasów.

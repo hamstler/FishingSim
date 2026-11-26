@@ -784,25 +784,48 @@ namespace FishingSim.Game
             _builtBail.localRotation = Quaternion.Euler(_bailOpen * 2.7f * Mathf.Rad2Deg, 0f, 0f);
         }
 
-        /// <summary>RodRig.SetSpoolFill: the wound line shrinks towards the spool's core as it goes out.</summary>
+        private static float WoundRadius(float fill) =>
+            Mathf.Sqrt(Mathf.Lerp(SpoolCore * SpoolCore, 1f, fill));
+
+        /// <summary>At constant spool width, the amount of wound line is proportional to its annular area.</summary>
         private void SetSpoolFill(float fill)
         {
             fill = Mathf.Clamp01(fill);
             if (Mathf.Abs(fill - _spoolFill) < 0.002f)
                 return;
             _spoolFill = fill;
-            float k = Mathf.Lerp(SpoolCore, 1f, fill);
+            float k = WoundRadius(fill);
             _builtSpoolLine.localScale = new Vector3(k, 1f, k);
             if (_spoolLine != null)
                 _spoolLine.localScale = new Vector3(k, 1f, k);
         }
 
-        /// <summary>RodRig.LinePath: from the spool's lip through every guide's ring to the tip-top (world space).</summary>
+        /// <summary>With the bail closed, the line runs from the winding surface via the rotating roller to the guides.</summary>
         private int LinePath(Vector3[] into)
         {
             int n = 0;
             var exit = _modelledReel && _lineExit != null ? _lineExit : _builtLineExit;
-            into[n++] = exit.position;
+            bool modelled = _modelledReel && _lineExit != null;
+            var rotor = modelled ? _rotor : _builtRotor;
+            if (_bailOpen < 0.05f && rotor != null)
+            {
+                Vector3 axis = rotor.position;
+                Vector3 forward = rotor.up;
+                float lipRadius = Vector3.ProjectOnPlane(exit.position - axis, forward).magnitude;
+                float lipHeight = Vector3.Dot(exit.position - axis, forward);
+                Vector3 roller = modelled && _bail != null
+                    ? _bail.position
+                    : axis + rotor.right * (0.03f * rotor.lossyScale.x) + forward * lipHeight;
+                Vector3 radial = Vector3.ProjectOnPlane(roller - axis, forward).normalized;
+                if (radial == Vector3.zero)
+                    radial = rotor.right;
+                float traverse = 0.5f - 0.5f * Mathf.Cos(_crankAngle);
+                into[n++] = axis + forward * (lipHeight - Mathf.Lerp(0.024f, 0.010f, traverse) * rotor.lossyScale.y)
+                    + radial * (lipRadius * WoundRadius(_spoolFill));
+                into[n++] = roller;
+            }
+            else
+                into[n++] = exit.position;
             foreach (var g in _guides)
                 into[n++] = g.position;
             into[n++] = _tip.position;
@@ -1838,7 +1861,7 @@ namespace FishingSim.Game
             // the spool empties as the line goes out and fills as it is wound back
             float capacity = Mathf.Max(Reel?.LineCapacity ?? 100f, 10f);
             bool outside = State is not (RodState.Idle or RodState.Charging or RodState.Landed);
-            SetSpoolFill(1f - (outside ? Mathf.Min(_lineLength, capacity) : 0f) / capacity);
+            SetSpoolFill(1f - (outside ? Mathf.Min(Fight?.LineOut ?? _lineLength, capacity) : 0f) / capacity);
 
             // the line inside the rod: from the spool's lip through the guides to the tip-top, bending with the blank
             if (_inRodLine != null && _inRodLine.gameObject.activeSelf)

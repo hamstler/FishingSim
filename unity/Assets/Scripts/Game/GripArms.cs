@@ -27,8 +27,7 @@ namespace FishingSim.Game
         /// <summary>How far right of the screen's middle the rod stands, as a share of the screen's width (the user: 15 %).</summary>
         public const float ShiftRight = 0.15f;
 
-        /// <summary>The angler's arms are shown (the user: hidden for now, only the rod in its place).</summary>
-        public static bool ShowAngler = false;
+        public static bool ShowAngler = true;
 
         private sealed class Arm
         {

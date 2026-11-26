@@ -1,9 +1,9 @@
 {
  "$type": "LocationData",
  "DisplayName": "Jezioro Zielone",
- "OutlineCz": -75.0,
- "OutlineRx": 120.0,
- "OutlineRz": 77.0,
+ "OutlineCz": -34.0,
+ "OutlineRx": 46.0,
+ "OutlineRz": 36.0,
  "Slope": 0.15,
  "MaxDepth": 8.0,
  "HolePos": {
@@ -180,12 +180,11 @@
   "villager,40,50"
  ],
  "Lobes": [
-  "-108,-108,34,24",
-  "92,-136,46,14"
+  "-39,-46,12,11",
+  "35,-52,13,8"
  ],
  "Islands": [
-  "-35,-82,12",
-  "-50,-66,4"
+  "-18,-42,5"
  ],
  "Landmarks": [
   "tower,-35,-82",
