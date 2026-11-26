@@ -1,5 +1,10 @@
 # Zmiany
 
+## 0.11.1 (Unity 6)
+- Mniejszy teren do chodzenia: najwyżej 10 m od wody, poza tym ścieżki, plac, okolice budynków i charakterystyczne miejsca.
+- Poprawione artefakty otoczenia (z przeglądem Codexa): dalekie pnie nie świecą już na pomarańczowo, słupki latarni i drogowskazów są przeszkodami, ławki nie są czarne, łąka bez jaskrawej żółtej zieleni, okrągłe żarówki nad pomostem, łódka bez migoczących pasów.
+- Woda (poprawki Codexa): bez srebrnych kresek w oddali i w deszczu, bez ciemnej plamy i jasnych łuków przy krawędziach ekranu, równe odbicie nieba.
+
 ## 0.11.0 (Unity 6)
 - Start jak w nowoczesnej grze wędkarskiej: najpierw logowanie na konto (statyczny obraz łowiska), potem statyczny ekran wczytywania łowiska z nazwą, opisem, wskazówką i postępem, potem gra. Menu z kartami łowisk zastąpione panelem „Łowiska” w grze (M lub pauza).
 - Szybsze wczytywanie: tekstury gruntu, zdjęcia materiałów, liście i tekstury postaci kompresowane na wątkach roboczych i zapisywane w pamięci podręcznej (texcache), więc kolejne starty tylko je odczytują; gra wczytuje tylko modele potrzebne na łowisku (wędka i kołowrotek w ręku, wioska, ryby tego jeziora) zamiast wszystkich 66 ryb i całego katalogu sprzętu.
