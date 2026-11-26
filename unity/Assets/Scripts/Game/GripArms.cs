@@ -36,6 +36,7 @@ namespace FishingSim.Game
             public Vector3 Offset;           // the wrist from its anchor on the rod, in the rod's frame
             public Quaternion Turn;          // the hand's turn in the rod's frame
             public Vector3 PoleSide;         // where the elbow points, in the body's space (from the shoulder)
+            public Vector3 UpperRestPosition, LowerRestPosition, PalmAxis;
             public bool OnKnob;
         }
 
@@ -99,6 +100,8 @@ namespace FishingSim.Game
             foreach (var b in new[] { upper, lower, hand })
                 _rest.Add((b, b.localRotation));
             var arm = new Arm { Upper = upper, Lower = lower, Hand = hand, OnKnob = side == "l" };
+            arm.UpperRestPosition = upper.localPosition;
+            arm.LowerRestPosition = lower.localPosition;
             arm.Turn = Quaternion.Inverse(_frame.rotation) * hand.rotation;
             if (arm.OnKnob)
             {
@@ -107,6 +110,9 @@ namespace FishingSim.Game
                 var crankRef = ModelLibrary.Find(_model, "CrankRef");
                 var knobThen = knobRef != null ? knobRef.position : crankRef != null ? crankRef.TransformPoint(Rod.GripLeft.localPosition) : hand.position;
                 arm.Offset = Quaternion.Inverse(_frame.rotation) * (hand.position - knobThen);
+                var knuckle = ModelLibrary.Find(_model, "middle_01_l");
+                var palm = knuckle != null ? knuckle.position - hand.position : hand.position - lower.position;
+                arm.PalmAxis = hand.InverseTransformDirection(palm.normalized);
             }
             else
                 arm.Offset = _frame.InverseTransformPoint(hand.position);
@@ -173,15 +179,31 @@ namespace FishingSim.Game
 
         private void Reach(Arm arm, Vector3 wrist)
         {
-            var pole = arm.Upper.position + transform.TransformDirection(arm.PoleSide);
-            Solve(arm.Upper, arm.Lower, arm.Hand, wrist, pole);
             var desired = _frame.rotation * arm.Turn;
+            if (arm.OnKnob)
+                SeatCrankArm(arm, wrist, desired * arm.PalmAxis);
+            else
+                Solve(arm.Upper, arm.Lower, arm.Hand, wrist, arm.Upper.position + transform.TransformDirection(arm.PoleSide));
             var axis = (arm.Hand.position - arm.Lower.position).normalized;
             var difference = desired * Quaternion.Inverse(arm.Hand.rotation);
             float along = Vector3.Dot(new Vector3(difference.x, difference.y, difference.z), axis);
             float roll = Mathf.DeltaAngle(0f, 2f * Mathf.Atan2(along, difference.w) * Mathf.Rad2Deg);
             arm.Lower.rotation = Quaternion.AngleAxis(Mathf.Clamp(roll * .5f, -55f, 55f), axis) * arm.Lower.rotation;
             arm.Hand.rotation = desired;
+        }
+
+        private void SeatCrankArm(Arm arm, Vector3 wrist, Vector3 palmDirection)
+        {
+            // Fit the visible wrist first. The upper sleeve can change length behind the camera.
+            arm.Upper.localPosition = arm.UpperRestPosition;
+            arm.Lower.localPosition = arm.LowerRestPosition;
+            arm.Upper.position -= transform.forward * .065f;
+            float length = Vector3.Distance(arm.Lower.position, arm.Hand.position);
+            var forearm = (palmDirection + transform.forward * .45f + transform.up * .28f).normalized;
+            var elbow = wrist - forearm * length;
+            arm.Upper.rotation = Quaternion.FromToRotation(arm.Lower.position - arm.Upper.position, elbow - arm.Upper.position) * arm.Upper.rotation;
+            arm.Lower.position = elbow;
+            arm.Lower.rotation = Quaternion.FromToRotation(arm.Hand.position - elbow, wrist - elbow) * arm.Lower.rotation;
         }
 
         /// <summary>Two-bone IK (as AnglerArms.Solve): the elbow in the pole's plane, the wrist at the target.</summary>
@@ -210,7 +232,8 @@ namespace FishingSim.Game
             if (_right == null && _left == null)
                 return "posed arms (no bones)";
             return $"posed arms; right wrist {Off(_right, _right != null ? _frame.TransformPoint(_right.Offset) : default)} off the handle, "
-                + $"left {Off(_left, _left != null ? Rod.GripLeft.position + _frame.rotation * _left.Offset : default)} off the knob";
+                + $"left {Off(_left, _left != null ? Rod.GripLeft.position + _frame.rotation * _left.Offset : default)} off the knob"
+                + (_left == null ? "" : $"; left palm angle {Vector3.Angle(_left.Hand.position - _left.Lower.position, _left.Hand.rotation * _left.PalmAxis):F1} deg");
         }
     }
 }

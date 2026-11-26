@@ -496,8 +496,18 @@ namespace FishingSim.Game
                 SaveFull(c, "reel_" + n);
                 Destroy(c);
             }
-            Rod.SmokeReel = false;
             Destroy(cam.gameObject);
+            for (int n = 0; n < 6; n++)
+            {
+                yield return new WaitForSecondsRealtime(1f / (6f * Rod.CrankTurns));
+                yield return new WaitForEndOfFrame();
+                var frame = ScreenCapture.CaptureScreenshotAsTexture();
+                SaveFull(frame, "reel_eyes_" + n);
+                Destroy(frame);
+                if (FindFirstObjectByType<GripArms>() is { } grip)
+                    Debug.Log($"SMOKE reel eyes {n}: {grip.Report()}");
+            }
+            Rod.SmokeReel = false;
             Debug.Log($"SMOKE reeling: state {Rod.State} after the cast ({waited:0.0} s)");
             // a fight: a pike on, reeled for a moment, the gauges photographed
             Rod.SmokeHook("Szczupak", 2.5f);
