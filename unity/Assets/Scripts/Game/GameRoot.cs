@@ -180,7 +180,7 @@ namespace FishingSim.Game
                     else
                     {
                         OpenInventory();
-                        SelectInventoryTab(tab);
+                        SelectInventoryTab(tab == 0 ? -1 : tab);
                     }
                 };
                 smoke.LoadMap = index => StartCoroutine(LoadMap(index, true));
@@ -984,8 +984,9 @@ namespace FishingSim.Game
             _fadeRight = Fade(0.88f, false);
             _panelStyle = new GUIStyle
             {
-                normal = { background = Flat(new Color(0.055f, 0.062f, 0.07f, 0.94f), hair), textColor = Ink },
-                border = B(2),
+                normal = { background = InventorySkin(new Color(.035f, .065f, .073f, .98f),
+                    new Color(.09f, .155f, .16f, .99f), new Color(.22f, .35f, .35f)), textColor = Ink },
+                border = B(15),
                 padding = new RectOffset(F(22), F(22), F(18), F(18)),
                 font = _font,
                 fontSize = F(19),
@@ -1137,6 +1138,12 @@ namespace FishingSim.Game
                     DrawHud(w, h);
                     if (_rod.State == RodState.Landed)
                         DrawCatch(w, h);
+                    bool workshop = _panel is Panel.Shop or Panel.Travel or Panel.Records or Panel.Settings;
+                    if (workshop)
+                    {
+                        GUI.BeginGroup(new Rect(0, S(64), w, h - S(64)));
+                        h -= S(64);
+                    }
                     switch (_panel)
                     {
                         case Panel.Pause: DrawPause(w, h); break;
@@ -1150,6 +1157,11 @@ namespace FishingSim.Game
                         case Panel.Cooking: DrawCooking(w, h); break;
                         case Panel.Notices: DrawNotices(w, h); break;
                         case Panel.Travel: DrawTravel(w, h); break;
+                    }
+                    if (workshop)
+                    {
+                        GUI.EndGroup();
+                        DrawWorkshopNav(w);
                     }
                     break;
             }
@@ -1954,13 +1966,13 @@ namespace FishingSim.Game
             _rigDraft[3] = _rod.HookItem;
             _rigDraft[4] = _rod.BaitItem;
             OpenPanel(Panel.Inventory);
-            SelectInventoryTab(0);
+            SelectInventoryTab(-1);
         }
 
         private void SelectInventoryTab(int tab)
         {
             _inventoryTab = tab;
-            _inventoryInspect = tab < _rigDraft.Length ? _rigDraft[tab] : null;
+            _inventoryInspect = tab < 0 ? _rigDraft[0] : tab < _rigDraft.Length ? _rigDraft[tab] : null;
             _scroll = Vector2.zero;
         }
 
@@ -1968,100 +1980,143 @@ namespace FishingSim.Game
             ? _profile.BaitCount(item.ItemId) > 0
             : _profile.Owned.Contains(item.ItemId);
 
+        private Texture2D? _gearAtlas;
+        private Dictionary<string, Rect>? _gearRegions;
+        private string _inventoryQuery = "";
+        private bool _inventorySortByName;
+
+        private void InventoryIcon(Rect rect, TackleItem? item, int category)
+        {
+            if (_gearRegions == null)
+            {
+                _gearRegions = new Dictionary<string, Rect>(StringComparer.Ordinal);
+                string path = Path.Combine(Application.streamingAssetsPath, "Inventory");
+                if (File.Exists(Path.Combine(path, "gear.png")) && File.Exists(Path.Combine(path, "gear.txt")))
+                {
+                    _gearAtlas = new Texture2D(2, 2, TextureFormat.RGBA32, false)
+                        { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.HideAndDontSave };
+                    if (_gearAtlas.LoadImage(File.ReadAllBytes(Path.Combine(path, "gear.png")), true))
+                    {
+                        string[] keys = File.ReadAllLines(Path.Combine(path, "gear.txt"));
+                        float cellWidth = 96f / _gearAtlas.width, cellHeight = 96f / _gearAtlas.height;
+                        for (int i = 0; i < keys.Length; i++)
+                            _gearRegions[keys[i]] = new Rect(i % 16 * cellWidth, 1f - (i / 16 + 1) * cellHeight, cellWidth, cellHeight);
+                    }
+                }
+            }
+            if (item != null && _gearAtlas != null && _gearRegions.TryGetValue(item.ItemId, out var uv))
+                GUI.DrawTextureWithTexCoords(rect, _gearAtlas, uv);
+            else
+                DrawGearGlyph(rect, category, item != null ? Muted : Faint);
+        }
+
+        private static int EquipmentCategory(TackleItem item) => item switch
+        {
+            RodData => 0, ReelData => 1, LineData => 2, HookData => 3, BaitData => 4, _ => 5,
+        };
+
+        private void DrawWorkshopNav(float w)
+        {
+            InventoryArt();
+            float height = S(64), buttonWidth = w * .122f;
+            GUI.Box(new Rect(0, 0, w, height), GUIContent.none, _inventorySurface);
+            string[] labels = { "Graj", "Ekwipunek", "Sklep", "Łowiska", "Dziennik" };
+            Panel[] destinations = { Panel.None, Panel.Inventory, Panel.Shop, Panel.Travel, Panel.Records };
+            _inventoryAction!.font = _fontBold;
+            _inventoryAction.fontSize = _button!.fontSize;
+            for (int i = 0; i < destinations.Length; i++)
+            {
+                var destination = destinations[i];
+                bool selected = _panel == destination;
+                if (GUI.Button(new Rect(S(10) + i * buttonWidth, S(7), buttonWidth - S(5), height - S(14)),
+                    labels[i], selected ? _inventoryAction : _button) && !selected)
+                {
+                    if (destination == Panel.Shop && _rod.State != RodState.Idle)
+                    {
+                        Say("Najpierw wyjmij zestaw z wody.");
+                        continue;
+                    }
+                    if (_panel == Panel.Inventory || destination == Panel.None)
+                        ClosePanel();
+                    if (destination == Panel.Inventory)
+                        OpenInventory();
+                    else if (destination != Panel.None)
+                        OpenPanel(destination);
+                }
+            }
+            int level = _profile.Level;
+            float start = w * .64f;
+            int from = Progression.XpForLevel(level), to = Progression.XpForLevel(level + 1);
+            GUI.Label(new Rect(start, S(7), w * .16f, S(22)), $"Poziom {level}  ·  {_profile.Xp} XP", _text);
+            var track = new Rect(start, S(37), w * .12f, S(6));
+            GUI.Box(track, GUIContent.none, _bar);
+            track.width *= Mathf.InverseLerp(from, to, _profile.Xp);
+            GUI.Box(track, GUIContent.none, _barFill);
+            GUI.Label(new Rect(w * .8f, S(17), w * .12f, S(30)), $"{_profile.Money:N0} zł", _text);
+            if (GUI.Button(new Rect(w - S(116), S(8), S(105), height - S(16)), "Ustawienia", _button))
+            {
+                if (_panel == Panel.Inventory)
+                    ClosePanel();
+                OpenPanel(Panel.Settings);
+            }
+        }
+
         private void DrawInventory(float w, float h)
         {
             InventoryArt();
             GUI.DrawTexture(new Rect(0, 0, w, h), _dim!);
-            float width = Mathf.Min(S(1280), w * 0.96f), height = Mathf.Min(S(780), h * 0.94f);
-            var panel = new Rect((w - width) * .5f, (h - height) * .5f, width, height);
-            GUI.Box(panel, GUIContent.none, _inventorySurface);
-            var r = new Rect(panel.x + S(29), panel.y + S(22), panel.width - S(58), panel.height - S(44));
-            GUI.Label(new Rect(r.x, r.y, r.width, S(42)), "Ekwipunek", _title);
-            float slotsWidth = r.width * 0.30f;
-            float heroWidth = r.width * 0.29f;
-            float listX = r.x + slotsWidth + S(18);
-            float listWidth = r.xMax - heroWidth - S(18) - listX;
-            GUI.Label(new Rect(r.x, r.y + S(50), slotsWidth, S(26)), "Zestaw do zmontowania", _text);
+            float gap = S(9), y = S(106), bottom = h - S(48), height = bottom - y;
+            float inner = w - gap * 5f;
+            var rail = new Rect(gap, y, inner * .121f, height);
+            var rig = new Rect(rail.xMax + gap, y, inner * .245f, height);
+            var grid = new Rect(rig.xMax + gap, y, inner * .467f, height);
+            var detail = new Rect(grid.xMax + gap, y, inner * .167f, height);
+            GUI.Box(rail, GUIContent.none, _inventorySurface);
+            GUI.Box(rig, GUIContent.none, _inventorySurface);
+            GUI.Box(grid, GUIContent.none, _inventorySurface);
+            GUI.Box(detail, GUIContent.none, _inventorySurface);
+            float pad = S(13);
+            GUI.Label(new Rect(rail.x + pad, y + pad, rail.width - 2f * pad, S(35)), "Wyposażenie", _title);
+            for (int i = -1; i < ShopTabs.Length; i++)
+            {
+                var row = new Rect(rail.x + pad, y + S(62 + (i + 1) * 52), rail.width - pad * 2f, S(45));
+                bool active = i == _inventoryTab;
+                if (GUI.Button(row, GUIContent.none, active ? _inventorySelected : _inventoryCard))
+                    SelectInventoryTab(i);
+                DrawGearGlyph(new Rect(row.x + S(7), row.y + S(8), S(28), S(28)), i < 0 ? 5 : i, active ? Accent : Muted);
+                GUI.Label(new Rect(row.x + S(42), row.y + S(10), row.width - S(46), S(29)), i < 0 ? "Wszystko" : ShopTabs[i], _text);
+            }
+
+            GUI.Label(new Rect(rig.x + pad, y + pad, rig.width - pad * 2f, S(36)), "Twój zestaw", _title);
+            var stage = new Rect(rig.x + pad, y + S(58), rig.width - pad * 2f, height * .24f);
+            if (Picture(_loadedLocation) is { } scenery)
+            {
+                GUI.DrawTexture(stage, scenery, ScaleMode.ScaleAndCrop);
+                GUI.DrawTexture(stage, _fadeUp!);
+            }
+            else
+                GUI.Box(stage, GUIContent.none, _inventoryHero);
+            var mainIcon = new Rect(stage.center.x - stage.height * .52f, stage.y, stage.height * 1.04f, stage.height);
+            InventoryIcon(mainIcon, _rigDraft[0], 0);
+            InventoryIcon(new Rect(mainIcon.center.x, mainIcon.center.y, stage.height * .46f, stage.height * .46f), _rigDraft[1], 1);
+            float slotHeight = Mathf.Min(S(77), (bottom - stage.yMax - S(77)) / RigSlots.Length);
             for (int i = 0; i < RigSlots.Length; i++)
             {
-                var row = new Rect(r.x, r.y + S(82 + i * 67), slotsWidth, S(61));
+                var row = new Rect(rig.x + pad, stage.yMax + S(11) + i * slotHeight, rig.width - pad * 2f, slotHeight - S(5));
                 if (GUI.Button(row, GUIContent.none, _inventoryTab == i ? _inventorySelected : _inventoryCard))
                     SelectInventoryTab(i);
-                DrawGearGlyph(new Rect(row.x + S(8), row.y + S(8), S(44), S(44)), i, Accent);
-                GUI.Label(new Rect(row.x + S(57), row.y + S(4), row.width - S(64), S(20)), RigSlots[i], _small);
-                GUI.Label(new Rect(row.x + S(57), row.y + S(20), row.width - S(64), S(39)), _rigDraft[i]?.DisplayName ?? "Wybierz element", _text);
+                InventoryIcon(new Rect(row.x + S(4), row.y + S(3), row.height - S(6), row.height - S(6)), _rigDraft[i], i);
+                float tx = row.x + row.height + S(4);
+                GUI.Label(new Rect(tx, row.y + S(3), row.xMax - tx - S(6), S(20)), RigSlots[i], _small);
+                GUI.Label(new Rect(tx, row.y + S(21), row.xMax - tx - S(6), row.height - S(20)),
+                    _rigDraft[i]?.DisplayName ?? "Wybierz element", _text);
             }
-            if (GUI.Button(new Rect(r.x, r.y + S(422), slotsWidth, S(36)), "Akcesoria", _inventoryTab == 5 ? _tabOn : _tab))
-                SelectInventoryTab(5);
-
-            GUI.Label(new Rect(listX, r.y + S(50), listWidth, S(26)), ShopTabs[_inventoryTab], _text);
-            IEnumerable<TackleItem> items = _inventoryTab switch
-            {
-                0 => Tackle.Rods,
-                1 => Tackle.Reels,
-                2 => Tackle.Lines,
-                3 => Tackle.Hooks,
-                4 => Tackle.Baits,
-                _ => Tackle.Accessories,
-            };
-            var owned = items.Where(HasInventoryItem).OrderBy(it => it.DisplayName).ToList();
-            if (owned.Count == 0)
-                GUI.Label(new Rect(listX, r.y + S(84), listWidth, S(30)), "Nie masz przedmiotów w tej kategorii.", _small);
-            var view = new Rect(listX, r.y + S(82), listWidth, Mathf.Max(1f, r.height - S(152)));
-            float itemHeight = S(76);
-            var content = new Rect(0, 0, view.width - S(22), owned.Count * itemHeight);
-            _scroll = GUI.BeginScrollView(view, _scroll, content);
-            for (int i = 0; i < owned.Count; i++)
-            {
-                var item = owned[i];
-                var row = new Rect(0, i * itemHeight, content.width, itemHeight - S(4));
-                bool selected = _inventoryInspect?.ItemId == item.ItemId;
-                if (GUI.Button(row, GUIContent.none, selected ? _inventorySelected : _inventoryCard))
-                {
-                    _inventoryInspect = item;
-                    if (_inventoryTab < _rigDraft.Length)
-                        _rigDraft[_inventoryTab] = item;
-                }
-                DrawGearGlyph(new Rect(row.x + S(7), row.y + S(14), S(42), S(42)), _inventoryTab, selected ? Accent : Muted);
-                string count = item is BaitData { Reusable: false } ? $" ×{_profile.BaitCount(item.ItemId)}" : "";
-                GUI.Label(new Rect(row.x + S(53), row.y + S(10), row.width - S(65), row.height - S(18)), item.DisplayName + count, _text);
-            }
-            GUI.EndScrollView();
-            var hero = new Rect(r.xMax - heroWidth, r.y + S(82), heroWidth, Mathf.Min(S(418), view.height));
-            GUI.Box(hero, GUIContent.none, _inventoryHero);
-            var previewArea = new Rect(hero.x + S(10), hero.y + S(10), hero.width - S(20), hero.height * .51f);
-            bool hasPreview = false;
-            if (_inventoryInspect is RodData or ReelData)
-            {
-                _tacklePreview ??= new TacklePreview();
-                hasPreview = _tacklePreview.Draw(previewArea, _inventoryInspect);
-            }
-            var hintArea = new Rect(hero.x + S(17), previewArea.yMax + S(5), hero.width - S(34), S(24));
-            if (hasPreview)
-                GUI.Label(hintArea, "Przeciągnij, aby obrócić · kółko przybliża", _small);
-            else
-            {
-                float icon = Mathf.Min(previewArea.width * .72f, previewArea.height);
-                DrawGearGlyph(new Rect(previewArea.center.x - icon * .5f, previewArea.center.y - icon * .5f, icon, icon), _inventoryTab, Accent);
-                if (_inventoryInspect is RodData or ReelData && _tacklePreview!.Loading)
-                    GUI.Label(hintArea, "Wczytywanie modelu…", _small);
-            }
-            if (_inventoryInspect is { } detail)
-            {
-                var name = new Rect(hero.x + S(17), hintArea.yMax + S(4), hero.width - S(34), S(94));
-                GUI.Label(name, detail.DisplayName, _title);
-                GUI.Label(new Rect(name.x, name.yMax + S(4), name.width, S(76)), Stats(detail), _small);
-            }
-
-            bool ready = _rigDraft.All(item => item != null && HasInventoryItem(item));
             bool idle = _rod.State == RodState.Idle && !_rod.Swinging;
-            string hint = !idle ? "Wyjmij zestaw z wody, aby zmienić części." :
-                !ready ? "Wybierz wszystkie części i dostępną przynętę." : "";
-            GUI.Label(new Rect(r.x, r.yMax - S(60), r.width, S(22)), hint, _small);
+            bool ready = _rigDraft.All(item => item != null && HasInventoryItem(item));
             GUI.enabled = ready && idle;
             _inventoryAction!.font = _fontBold;
             _inventoryAction.fontSize = _button!.fontSize;
-            if (GUI.Button(new Rect(r.x, r.yMax - S(38), S(240), S(38)), "Zmontuj i załóż", _inventoryAction))
+            if (GUI.Button(new Rect(rig.x + pad, bottom - S(50), rig.width - pad * 2f, S(38)), "Zmontuj i załóż", _inventoryAction))
             {
                 foreach (var item in _rigDraft)
                     SetEquippedItem(item!);
@@ -2070,8 +2125,98 @@ namespace FishingSim.Game
                 Say("Zestaw zmontowany.");
             }
             GUI.enabled = true;
-            if (GUI.Button(new Rect(r.xMax - S(160), r.yMax - S(38), S(160), S(38)), "Zamknij", _button))
-                ClosePanel();
+
+            float tabWidth = (grid.width - pad * 2f) / (ShopTabs.Length + 1);
+            for (int i = -1; i < ShopTabs.Length; i++)
+            {
+                var tab = new Rect(grid.x + pad + (i + 1) * tabWidth, y + S(9), tabWidth - S(3), S(66));
+                bool selected = _inventoryTab == i;
+                if (GUI.Button(tab, GUIContent.none, selected ? _inventorySelected : _inventoryCard))
+                    SelectInventoryTab(i);
+                DrawGearGlyph(new Rect(tab.center.x - S(13), tab.y + S(3), S(26), S(26)), i < 0 ? 5 : i, selected ? Accent : Muted);
+                GUI.Label(new Rect(tab.x + S(4), tab.y + S(31), tab.width - S(8), S(29)), i < 0 ? "Wszystko" : ShopTabs[i], _small);
+            }
+            var search = new Rect(grid.x + pad, y + S(86), grid.width - pad * 2f - S(139), S(38));
+            GUI.SetNextControlName("InventorySearch");
+            string query = GUI.TextField(search, _inventoryQuery, 60, _field);
+            if (query != _inventoryQuery)
+            {
+                _inventoryQuery = query;
+                _scroll = Vector2.zero;
+            }
+            if (query.Length == 0 && GUI.GetNameOfFocusedControl() != "InventorySearch")
+                GUI.Label(new Rect(search.x + S(10), search.y + S(8), search.width - S(20), S(27)), "Szukaj w ekwipunku…", _small);
+            if (GUI.Button(new Rect(search.xMax + S(7), search.y, S(132), search.height),
+                _inventorySortByName ? "Sortuj: nazwa" : "Sortuj: typ", _button))
+            {
+                _inventorySortByName = !_inventorySortByName;
+                _scroll = Vector2.zero;
+            }
+            IEnumerable<TackleItem> items = Tackle.Rods.Cast<TackleItem>().Concat(Tackle.Reels).Concat(Tackle.Lines)
+                .Concat(Tackle.Hooks).Concat(Tackle.Baits).Concat(Tackle.Accessories).Where(HasInventoryItem);
+            string term = _inventoryQuery.Trim();
+            items = items.Where(item => (_inventoryTab < 0 || EquipmentCategory(item) == _inventoryTab) &&
+                (term.Length == 0 || item.DisplayName.IndexOf(term, StringComparison.CurrentCultureIgnoreCase) >= 0));
+            var owned = (_inventorySortByName ? items.OrderBy(item => item.DisplayName) :
+                items.OrderBy(EquipmentCategory).ThenBy(item => item.DisplayName)).ToList();
+            var view = new Rect(grid.x + pad, y + S(143), grid.width - pad * 2f, height - S(155));
+            const int columns = 7;
+            float cell = (view.width - S(18)) / columns;
+            _scroll = GUI.BeginScrollView(view, _scroll, new Rect(0, 0, cell * columns, Mathf.CeilToInt(owned.Count / (float)columns) * cell));
+            for (int i = 0; i < owned.Count; i++)
+            {
+                var tile = new Rect(i % columns * cell, i / columns * cell, cell - S(6), cell - S(6));
+                if (tile.yMax < _scroll.y || tile.y > _scroll.y + view.height)
+                    continue;
+                var item = owned[i];
+                bool active = _inventoryInspect?.ItemId == item.ItemId;
+                if (GUI.Button(tile, new GUIContent("", item.DisplayName), active ? _inventorySelected : _inventoryCard))
+                    _inventoryInspect = item;
+                InventoryIcon(new Rect(tile.x + S(5), tile.y + S(5), tile.width - S(10), tile.height - S(10)), item, EquipmentCategory(item));
+                if (item is BaitData { Reusable: false })
+                    GUI.Label(new Rect(tile.xMax - S(34), tile.yMax - S(21), S(32), S(19)), $"{_profile.BaitCount(item.ItemId)}", _small);
+            }
+            GUI.EndScrollView();
+            if (owned.Count == 0)
+                GUI.Label(new Rect(view.x, view.y, view.width, S(30)), "Brak pasujących przedmiotów.", _small);
+
+            if (_inventoryInspect is { } selectedItem)
+            {
+                int category = EquipmentCategory(selectedItem);
+                var preview = new Rect(detail.x + pad, y + pad, detail.width - 2f * pad, height * .29f);
+                bool hasPreview = false;
+                if (selectedItem is RodData or ReelData)
+                {
+                    _tacklePreview ??= new TacklePreview();
+                    hasPreview = _tacklePreview.Draw(preview, selectedItem);
+                }
+                if (!hasPreview)
+                {
+                    float size = Mathf.Min(preview.width, preview.height);
+                    InventoryIcon(new Rect(preview.center.x - size * .5f, preview.center.y - size * .5f, size, size), selectedItem, category);
+                }
+                else
+                    GUI.Label(new Rect(preview.x, preview.yMax, preview.width, S(40)), "Przeciągnij, aby obrócić", _small);
+                var name = new Rect(preview.x, preview.yMax + S(40), preview.width, S(106));
+                GUI.Label(name, selectedItem.DisplayName, _title);
+                GUI.Label(new Rect(name.x, name.yMax + S(3), name.width, S(100)), Stats(selectedItem), _text);
+                if (category < _rigDraft.Length)
+                {
+                    bool inDraft = _rigDraft[category]?.ItemId == selectedItem.ItemId;
+                    GUI.enabled = !inDraft;
+                    if (GUI.Button(new Rect(detail.x + pad, bottom - S(50), detail.width - pad * 2f, S(38)),
+                        inDraft ? "W zestawie" : "Dodaj do zestawu", _inventoryAction))
+                        _rigDraft[category] = selectedItem;
+                    GUI.enabled = true;
+                }
+            }
+            else
+                GUI.Label(new Rect(detail.x + pad, y + pad, detail.width - 2f * pad, S(62)), "Wybierz przedmiot", _text);
+
+            string hint = !idle ? "Wyjmij zestaw z wody, aby zmienić części." :
+                !ready ? "Wybierz wszystkie części i dostępną przynętę." : GUI.tooltip;
+            GUI.Label(new Rect(rail.x + pad, bottom + S(9), w - pad * 2f, S(26)), hint, _text);
+            DrawWorkshopNav(w);
         }
 
         private void DrawShop(float w, float h)
