@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Kaminari Tsunami Jerk 2,2 m · jerkowy (długa)"
+Kind = 1
+CastMult = 1.08
+MaxLoad = 24.4
+ShockAbsorb = 0.0641
+Action = 0.15
+Price = 1025
+RequiredLevel = 7
+Description = "Krótki, twardy kij do ciężkich jerków i wielkich szczupaków. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy."
+BlankColor = Color(0.06, 0.1, 0.3, 1)
+WhipColor = Color(0.85, 0.85, 0.88, 1)
+FoamGrip = true
+Length = 2.2
+Model = "rods/spin_kaminari"
+ModelTint = Color(0.35, 0.45, 0.85, 1)

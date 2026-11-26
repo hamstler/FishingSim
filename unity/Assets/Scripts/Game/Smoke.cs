@@ -71,12 +71,40 @@ namespace FishingSim.Game
                 yield return null;
             }
             Debug.Log($"SMOKE map loaded in {Time.realtimeSinceStartup - started:0.0} s");
+            // the interface: the main menu over the lake, then the login card
+            Settings.Quality = 3;
+            Settings.Apply(Player.Camera);
+            for (int i = 0; i < 30; i++)
+                yield return null;
+            yield return new WaitForEndOfFrame();
+            var gm = ScreenCapture.CaptureScreenshotAsTexture();
+            SaveFull(gm, "gui_menu");
+            Destroy(gm);
+            GameRoot.ShowLoginForShot = true;
+            for (int i = 0; i < 3; i++)
+                yield return null;
+            yield return new WaitForEndOfFrame();
+            var gl = ScreenCapture.CaptureScreenshotAsTexture();
+            SaveFull(gl, "gui_login");
+            Destroy(gl);
+            GameRoot.ShowLoginForShot = false;
             EnterPlay();
             if (HandsOnly)
             {
                 Settings.Quality = 3;
                 Settings.Apply(Player.Camera);
                 Day.SetWeatherNow(Core.Weather.Clear);
+                for (int tab = 0; tab < 2; tab++)
+                {
+                    GameRoot.ShopShotTab = tab;
+                    for (int i = 0; i < 3; i++)
+                        yield return null;
+                    yield return new WaitForEndOfFrame();
+                    var sh = ScreenCapture.CaptureScreenshotAsTexture();
+                    SaveFull(sh, tab == 0 ? "gui_shop_rods" : "gui_shop_reels");
+                    Destroy(sh);
+                }
+                GameRoot.ShopShotTab = -1;
                 yield return HandShots(true);
                 Debug.Log("SMOKE OK (hands only)");
                 Application.Quit(0);
@@ -155,6 +183,8 @@ namespace FishingSim.Game
             // nor the fishing line (it hangs in the world, not under the camera)
             foreach (var r in UnityEngine.Object.FindObjectsByType<LineRenderer>(FindObjectsSortMode.None))
                 if (r.enabled) { r.enabled = false; hidden.Add(r); }
+            foreach (var l in UnityEngine.Object.FindObjectsByType<LineRibbon>(FindObjectsSortMode.None))
+                if (l.GetComponent<Renderer>() is { enabled: true } r) { r.enabled = false; hidden.Add(r); }
             foreach (var (hour, name) in new[] { (10f, "menu10"), (17f, "menu17") })
             {
                 Player.Place(new Vector3(0f, WorldView.PierDeck + 7f, -3.5f), 210f);
@@ -327,6 +357,36 @@ namespace FishingSim.Game
         
             if (!reeling)
                 yield break;
+            // the cast: held (the rod rises to 60 degrees), let go (it swings back and the float flies): cast_0..5
+            Player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
+            Player.Look(180f, 8f);
+            Rod.SmokeCharge = true;
+            string[] castShots = { "cast_0_rest", "cast_1_up", "cast_2_swing", "cast_3_swing", "cast_4_fly", "cast_5_land" };
+            for (int i = 0; i < 2; i++)
+                yield return null;
+            yield return new WaitForEndOfFrame();
+            var cs = ScreenCapture.CaptureScreenshotAsTexture();
+            SaveFull(cs, castShots[0]);
+            Destroy(cs);
+            float held = 0f;
+            while (held < 0.9f) { held += Time.deltaTime; yield return null; }
+            yield return new WaitForEndOfFrame();
+            cs = ScreenCapture.CaptureScreenshotAsTexture();
+            SaveFull(cs, castShots[1]);
+            Destroy(cs);
+            Rod.SmokeCharge = false;
+            for (int k = 2; k < castShots.Length; k++)
+            {
+                float wait = k <= 3 ? 0.05f : k == 4 ? 0.35f : 2.5f;
+                float t0 = 0f;
+                while (t0 < wait) { t0 += Time.deltaTime; yield return null; }
+                yield return new WaitForEndOfFrame();
+                cs = ScreenCapture.CaptureScreenshotAsTexture();
+                SaveFull(cs, castShots[k]);
+                Destroy(cs);
+            }
+            Debug.Log($"SMOKE cast: state {Rod.State}, line {Rod.LineOut:0.0} m");
+            Rod.Reset();
             // the crank turning: cast, then reel and watch the left hand from beside the reel (reel_0..5)
             Player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
             Rod.SmokeCast(Player.transform.position + Player.transform.forward * 14f);
@@ -336,6 +396,15 @@ namespace FishingSim.Game
                 waited += Time.unscaledDeltaTime;
                 yield return null;
             }
+            // the line from the angler's eyes: from the tip down to the float on the water (line_view), and from beside
+            // the rod along the line (line_side)
+            Player.Look(180f, 8f);
+            for (int i = 0; i < 30; i++)
+                yield return null;
+            yield return new WaitForEndOfFrame();
+            var lv = ScreenCapture.CaptureScreenshotAsTexture();
+            SaveFull(lv, "line_view");
+            Destroy(lv);
             Rod.SmokeReel = true;
             var cam = new GameObject("ReelCloseUp").AddComponent<Camera>();
             cam.depth = Player.Camera.depth + 1f;

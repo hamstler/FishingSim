@@ -23,4 +23,10 @@ public partial class ReelData : TackleItem
 
     /// <summary>Trim (rotor ring, spool lip, drag knob) colour.</summary>
     [Export] public Color TrimColor { get; set; } = new(0.62f, 0.52f, 0.3f);
+
+    /// <summary>The model's finish: its pictures multiplied by this colour (white = as modelled).</summary>
+    [Export] public Color ModelTint { get; set; } = new(1f, 1f, 1f);
+
+    /// <summary>The model's size against the modelled one (a 1000 reel is smaller than a 3000 on the same body).</summary>
+    [Export] public float ModelScale { get; set; } = 1f;
 }

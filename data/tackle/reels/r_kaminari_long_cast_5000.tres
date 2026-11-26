@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ReelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/ReelData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Kaminari Long Cast 5000 · dalekorzutowy z wolnym biegiem"
+DragMax = 8.7
+ReelSpeed = 3.60
+LineCapacity = 200.0
+Price = 440
+RequiredLevel = 4
+Description = "Kaminari Long Cast w rozmiarze 5000: 200 m żyłki 0,25 mm, hamulec do 8.7 kg."
+BodyColor = Color(0.25, 0.25, 0.25, 1)
+TrimColor = Color(0.75, 0.62, 0.3, 1)
+Model = "reels/baitrunner_kaminari"
+ModelTint = Color(1, 1, 1, 1)
+ModelScale = 0.855

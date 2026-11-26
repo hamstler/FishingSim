@@ -22,7 +22,7 @@ namespace FishingSim.Game
     {
         public static string Version => Application.version;
 
-        private enum Screen { Menu, Loading, Play }
+        private enum Screen { Login, Menu, Loading, Play }
         private enum Panel { None, Pause, Shop, Settings, Help, Keepnet, Records, Smokehouse, Cooking, Notices }
 
         private Screen _screen = Screen.Menu;
@@ -51,11 +51,17 @@ namespace FishingSim.Game
         private string _message = "";
         private float _messageUntil;
         private string _error = "";
-        private int _shopTab;
+        private int _shopTab, _shopFilter;
+        private string _shopSearch = "";
         private Vector2 _scroll;
         private float _menuOrbit;
         private Panel _settingsBack = Panel.None;
         private float _autosave;
+
+        // the account logged in (null: the login screen; a test run plays as a guest without saving)
+        private string? _user;
+        private bool _registering;
+        private string _loginName = "", _loginPass = "", _loginRepeat = "", _loginError = "";
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Boot()
@@ -68,10 +74,22 @@ namespace FishingSim.Game
         {
             DataStore.Root = Path.Combine(Application.streamingAssetsPath, "data");
             bool noSave = Environment.GetEnvironmentVariable("FISHSIM_NO_SAVE") == "1";
-            Profile.SavePath = noSave ? null : Path.Combine(Application.persistentDataPath, "profile.json");
+            Profile.SavePath = null;            // a profile is saved once an account logs in (Accounts.ProfilePath)
             Application.logMessageReceived += OnLog;
             Settings.Load();
             _profile = Profile.Load();
+            // the login screen first; the smoke test and runs without saving play as a guest
+            if (noSave || Smoke.Enabled)
+            {
+                _user = "gość";
+                _screen = Screen.Menu;
+            }
+            else
+            {
+                _screen = Screen.Login;
+                _loginName = Accounts.LastUser;
+                _registering = Accounts.Count == 0;
+            }
             foreach (var path in Lake.LocationPaths)
                 if (DataStore.Load<LocationData>(path) is { } loc)
                     _locations.Add(loc);
@@ -268,7 +286,7 @@ namespace FishingSim.Game
             _boat.ResetToMooring();
             _player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
             _day.Apply();
-            _screen = play ? Screen.Play : Screen.Menu;
+            _screen = play ? Screen.Play : _user == null ? Screen.Login : Screen.Menu;
             if (play)
                 EnterPlay();
             else
@@ -304,7 +322,7 @@ namespace FishingSim.Game
         {
             _profile.Hour = _day.Hour;
             _profile.Clock += _day.LastStepHours;
-            if (_screen == Screen.Menu && _world.Ready)
+            if (_screen is Screen.Menu or Screen.Login && _world.Ready)
             {
                 // the menu shows the lake from a slowly circling camera
                 _menuOrbit += Time.deltaTime * 0.02f;
@@ -574,48 +592,114 @@ namespace FishingSim.Game
             return t;
         }
 
+        /// <summary>
+        /// A rounded box for 9-slice styles (GUIStyle.border = the radius): fill, a hairline border and optionally an
+        /// accent line along the top (the Godot UI's graphite-glass panels with an amber edge), antialiased corners.
+        /// </summary>
+        private static Texture2D Round(Color fill, Color edge, int radius, Color? top = null, int size = 48)
+        {
+            var t = new Texture2D(size, size, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, wrapMode = TextureWrapMode.Clamp };
+            var px = new Color[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float cx = Mathf.Clamp(x + 0.5f, radius, size - radius), cy = Mathf.Clamp(y + 0.5f, radius, size - radius);
+                    float d = Mathf.Sqrt((x + 0.5f - cx) * (x + 0.5f - cx) + (y + 0.5f - cy) * (y + 0.5f - cy));
+                    float inside = Mathf.Clamp01(radius - d + 0.5f);
+                    float rim = Mathf.Clamp01(1f - Mathf.Abs(radius - 1f - d));
+                    var c = Color.Lerp(fill, edge, edge.a > 0f ? rim : 0f);
+                    if (top is { } accent && y >= size - 3 && x > radius * 0.6f && x < size - radius * 0.6f)
+                        c = accent;
+                    c.a = (edge.a > 0f && rim > 0f ? Mathf.Max(fill.a, edge.a * rim) : fill.a) * inside;
+                    if (top is { } a2 && y >= size - 3 && x > radius * 0.6f && x < size - radius * 0.6f)
+                        c.a = a2.a * inside;
+                    px[y * size + x] = c;
+                }
+            t.SetPixels(px);
+            t.Apply();
+            return t;
+        }
+
+        private GUIStyle? _field, _card, _cardHot, _tab, _tabOn, _label, _logo, _danger;
+
         private void Styles()
         {
             _scale = Mathf.Clamp(UnityEngine.Screen.height / 1080f, 0.7f, 2f);
             if (_panelStyle != null && Mathf.Approximately(_panelStyle.fontSize, Mathf.RoundToInt(20 * _scale)))
                 return;
             int F(int size) => Mathf.RoundToInt(size * _scale);
-            var text = new Color(0.9f, 0.92f, 0.94f);
-            var amber = new Color(0.95f, 0.72f, 0.3f);
-            _dim = Tex(new Color(0f, 0f, 0f, 0.45f));
-            _panelStyle = new GUIStyle(GUI.skin.box)
+            RectOffset B(int r) => new(r, r, r, r);
+            // a modern fishing game's look: deep graphite-teal glass, light text, amber for what matters
+            var text = new Color(0.9f, 0.93f, 0.95f);
+            var muted = new Color(0.66f, 0.72f, 0.76f);
+            var amber = new Color(0.96f, 0.7f, 0.26f);
+            var glass = new Color(0.05f, 0.08f, 0.1f, 0.84f);
+            var hair = new Color(1f, 1f, 1f, 0.1f);
+            _dim = Tex(new Color(0.01f, 0.02f, 0.03f, 0.55f));
+            _panelStyle = new GUIStyle
             {
-                normal = { background = Tex(new Color(0.07f, 0.1f, 0.11f, 0.86f)), textColor = text },
-                padding = new RectOffset(F(18), F(18), F(14), F(14)),
+                normal = { background = Round(glass, hair, 12, new Color(amber.r, amber.g, amber.b, 0.9f)), textColor = text },
+                border = B(14),
+                padding = new RectOffset(F(22), F(22), F(18), F(18)),
                 fontSize = F(20),
                 alignment = TextAnchor.UpperLeft,
             };
-            _title = new GUIStyle(GUI.skin.label) { fontSize = F(34), fontStyle = FontStyle.Bold, normal = { textColor = amber }, wordWrap = true };
+            _logo = new GUIStyle(GUI.skin.label) { fontSize = F(52), fontStyle = FontStyle.Bold, normal = { textColor = Color.white }, richText = true };
+            _title = new GUIStyle(GUI.skin.label) { fontSize = F(32), fontStyle = FontStyle.Bold, normal = { textColor = amber }, wordWrap = true, richText = true };
             _text = new GUIStyle(GUI.skin.label) { fontSize = F(19), normal = { textColor = text }, wordWrap = true, richText = true };
-            _small = new GUIStyle(_text) { fontSize = F(15), normal = { textColor = new Color(0.72f, 0.76f, 0.78f) } };
-            _button = new GUIStyle(GUI.skin.button)
+            _small = new GUIStyle(_text) { fontSize = F(15), normal = { textColor = muted } };
+            _label = new GUIStyle(_small) { fontSize = F(14), fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.55f, 0.75f, 0.78f) } };
+            _button = new GUIStyle
             {
-                fontSize = F(19),
-                normal = { background = Tex(new Color(0.16f, 0.21f, 0.23f, 0.95f)), textColor = text },
-                hover = { background = Tex(new Color(0.22f, 0.29f, 0.31f, 1f)), textColor = Color.white },
-                active = { background = Tex(new Color(0.1f, 0.14f, 0.15f, 1f)), textColor = amber },
-                padding = new RectOffset(F(12), F(12), F(8), F(8)),
+                fontSize = F(18),
+                alignment = TextAnchor.MiddleCenter,
+                normal = { background = Round(new Color(0.12f, 0.17f, 0.19f, 0.95f), hair, 8), textColor = text },
+                hover = { background = Round(new Color(0.17f, 0.24f, 0.27f, 1f), new Color(1f, 1f, 1f, 0.2f), 8), textColor = Color.white },
+                active = { background = Round(new Color(0.08f, 0.12f, 0.13f, 1f), hair, 8), textColor = amber },
+                border = B(9),
+                padding = new RectOffset(F(14), F(14), F(8), F(8)),
             };
             _accentButton = new GUIStyle(_button)
             {
-                normal = { background = Tex(new Color(0.78f, 0.52f, 0.16f, 1f)), textColor = new Color(0.08f, 0.06f, 0.03f) },
-                hover = { background = Tex(new Color(0.9f, 0.62f, 0.2f, 1f)), textColor = Color.black },
+                normal = { background = Round(new Color(0.92f, 0.62f, 0.2f, 1f), new Color(1f, 0.85f, 0.5f, 0.6f), 8), textColor = new Color(0.1f, 0.07f, 0.02f) },
+                hover = { background = Round(new Color(1f, 0.72f, 0.28f, 1f), new Color(1f, 0.9f, 0.6f, 0.8f), 8), textColor = Color.black },
+                active = { background = Round(new Color(0.8f, 0.52f, 0.14f, 1f), hair, 8), textColor = Color.black },
                 fontStyle = FontStyle.Bold,
             };
-            _chip = new GUIStyle(_button) { fontSize = F(16), padding = new RectOffset(F(10), F(10), F(5), F(5)) };
-            _bar = new GUIStyle { normal = { background = Tex(new Color(1f, 1f, 1f, 0.18f)) } };
-            _barFill = new GUIStyle { normal = { background = Tex(Color.white) } };
+            _danger = new GUIStyle(_button) { normal = { background = Round(new Color(0.3f, 0.1f, 0.09f, 0.95f), hair, 8), textColor = new Color(1f, 0.85f, 0.82f) } };
+            _chip = new GUIStyle(_button) { fontSize = F(15), padding = new RectOffset(F(12), F(12), F(5), F(5)), border = B(14),
+                normal = { background = Round(new Color(0.12f, 0.17f, 0.19f, 0.9f), hair, 14), textColor = muted },
+                hover = { background = Round(new Color(0.18f, 0.25f, 0.28f, 1f), hair, 14), textColor = Color.white } };
+            _tab = new GUIStyle(_chip);
+            _tabOn = new GUIStyle(_chip) { fontStyle = FontStyle.Bold, normal = { background = Round(new Color(0.96f, 0.7f, 0.26f, 0.95f), hair, 14), textColor = Color.black } };
+            _card = new GUIStyle(_button) { alignment = TextAnchor.MiddleLeft, padding = new RectOffset(F(18), F(18), F(10), F(10)), richText = true, wordWrap = true,
+                normal = { background = Round(new Color(0.1f, 0.15f, 0.17f, 0.9f), hair, 10), textColor = text },
+                hover = { background = Round(new Color(0.15f, 0.22f, 0.25f, 0.95f), new Color(0.96f, 0.7f, 0.26f, 0.5f), 10), textColor = Color.white }, border = B(11) };
+            _cardHot = new GUIStyle(_card) { normal = { background = Round(new Color(0.16f, 0.2f, 0.18f, 0.95f), new Color(0.96f, 0.7f, 0.26f, 0.9f), 10), textColor = Color.white } };
+            _field = new GUIStyle(GUI.skin.textField)
+            {
+                fontSize = F(19),
+                normal = { background = Round(new Color(0.02f, 0.04f, 0.05f, 0.9f), new Color(1f, 1f, 1f, 0.16f), 7), textColor = text },
+                focused = { background = Round(new Color(0.03f, 0.06f, 0.07f, 0.95f), new Color(0.96f, 0.7f, 0.26f, 0.9f), 7), textColor = Color.white },
+                hover = { background = Round(new Color(0.03f, 0.05f, 0.06f, 0.92f), new Color(1f, 1f, 1f, 0.26f), 7), textColor = text },
+                border = B(8),
+                padding = new RectOffset(F(12), F(12), F(9), F(9)),
+                alignment = TextAnchor.MiddleLeft,
+            };
+            _bar = new GUIStyle { normal = { background = Round(new Color(1f, 1f, 1f, 0.14f), new Color(0, 0, 0, 0), 3, null, 12) }, border = B(4) };
+            _barFill = new GUIStyle { normal = { background = Round(Color.white, new Color(0, 0, 0, 0), 3, null, 12) }, border = B(4) };
         }
 
         private float S(float v) => v * _scale;
 
         /// <summary>Screenshots of the scenery only (the smoke test's menu-picture views).</summary>
         public static bool HideHud { get; set; }
+
+        /// <summary>The smoke test's picture of the login screen: drawn over whatever screen this frame.</summary>
+        public static bool ShowLoginForShot { get; set; }
+
+        /// <summary>The smoke test's picture of a shop tab (-1 = none).</summary>
+        public static int ShopShotTab { get; set; } = -1;
 
         private void OnGUI()
         {
@@ -631,10 +715,24 @@ namespace FishingSim.Game
                     Application.Quit();
                 return;
             }
+            if (ShowLoginForShot)
+            {
+                DrawLogin(w, h);
+                return;
+            }
+            if (ShopShotTab >= 0)
+            {
+                _shopTab = ShopShotTab;
+                DrawShop(w, h);
+                return;
+            }
             switch (_screen)
             {
                 case Screen.Loading:
                     DrawLoading(w, h);
+                    break;
+                case Screen.Login:
+                    DrawLogin(w, h);
                     break;
                 case Screen.Menu:
                     if (_panel == Panel.Settings)
@@ -680,44 +778,143 @@ namespace FishingSim.Game
             GUI.color = old;
         }
 
+
+        /// <summary>The login screen: the lake behind, a card with logging in or creating an account (Accounts).</summary>
+        private void DrawLogin(float w, float h)
+        {
+            GUI.DrawTexture(new Rect(0, 0, w, h), _dim!);
+            float cw = S(560), ch = S(_registering ? 560 : 470);
+            var card = new Rect((w - cw) / 2f, (h - ch) / 2f + S(30), cw, ch);
+            GUI.Label(new Rect(card.x, card.y - S(120), cw, S(70)), "FISHING <color=#F5B342>SIM</color>", _logo);
+            GUI.Label(new Rect(card.x + S(4), card.y - S(56), cw, S(30)), "Symulator wędkarstwa · jeziora, rzeki i stawy", _small);
+            GUI.Box(card, "", _panelStyle);
+            var r = new Rect(card.x + S(28), card.y + S(26), cw - S(56), ch - S(52));
+            float tw = (r.width - S(10)) / 2f;
+            if (GUI.Button(new Rect(r.x, r.y, tw, S(40)), "Zaloguj się", _registering ? _tab : _tabOn))
+            {
+                _registering = false;
+                _loginError = "";
+            }
+            if (GUI.Button(new Rect(r.x + tw + S(10), r.y, tw, S(40)), "Utwórz konto", _registering ? _tabOn : _tab))
+            {
+                _registering = true;
+                _loginError = "";
+            }
+            float y = r.y + S(70);
+            GUI.Label(new Rect(r.x, y, r.width, S(22)), "NAZWA KONTA", _label);
+            GUI.SetNextControlName("login_name");
+            _loginName = GUI.TextField(new Rect(r.x, y + S(24), r.width, S(48)), _loginName, 20, _field);
+            y += S(88);
+            GUI.Label(new Rect(r.x, y, r.width, S(22)), "HASŁO", _label);
+            _loginPass = GUI.PasswordField(new Rect(r.x, y + S(24), r.width, S(48)), _loginPass, '•', 64, _field);
+            y += S(88);
+            if (_registering)
+            {
+                GUI.Label(new Rect(r.x, y, r.width, S(22)), "POWTÓRZ HASŁO", _label);
+                _loginRepeat = GUI.PasswordField(new Rect(r.x, y + S(24), r.width, S(48)), _loginRepeat, '•', 64, _field);
+                y += S(88);
+            }
+            if (_loginError.Length > 0)
+                GUI.Label(new Rect(r.x, y, r.width, S(28)), $"<color=#FF8A7A>{_loginError}</color>", _text);
+            y += S(38);
+            bool enter = Event.current.type == EventType.KeyDown && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter);
+            if (GUI.Button(new Rect(r.x, y, r.width, S(54)), _registering ? "Utwórz konto i graj" : "Zaloguj się", _accentButton) || enter)
+            {
+                _loginError = (_registering ? Accounts.Register(_loginName, _loginPass, _loginRepeat) : Accounts.Login(_loginName, _loginPass)) ?? "";
+                if (_loginError.Length == 0)
+                    LogIn(_loginName.Trim());
+            }
+            y += S(66);
+            GUI.Label(new Rect(r.x, y, r.width, S(40)), _registering
+                ? "Konto i postępy zapisują się na tym komputerze. Hasło nie jest nigdzie zapisane wprost."
+                : "Nie masz konta? Wybierz „Utwórz konto”.", _small);
+            if (GUI.Button(new Rect(w - S(150), h - S(70), S(120), S(44)), "Wyjdź", _button))
+                Application.Quit();
+        }
+
+        /// <summary>The account's own profile in place of the one shown behind the login screen.</summary>
+        private void LogIn(string user)
+        {
+            bool fresh = !File.Exists(Accounts.ProfilePath(user));
+            // the progress from before accounts (profile.json) goes to the first account made
+            string legacy = Path.Combine(Application.persistentDataPath, "profile.json");
+            if (fresh && Accounts.Count == 1 && File.Exists(legacy))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(Accounts.ProfilePath(user))!);
+                File.Copy(legacy, Accounts.ProfilePath(user));
+            }
+            Profile.SavePath = Accounts.ProfilePath(user);
+            _profile = Profile.Load();
+            _rod.Profile = _profile;
+            _rod.ApplyTackle();
+            _day.Hour = _profile.Hour;
+            _user = user;
+            _loginPass = _loginRepeat = "";
+            _screen = Screen.Menu;
+            Say($"Witaj, {user}!");
+        }
+
         private void DrawMenu(float w, float h)
         {
-            float pw = S(520), x = S(70), y = h * 0.16f;
-            GUI.Box(new Rect(x - S(20), y - S(20), pw + S(40), h * 0.72f), "", _panelStyle);
-            GUI.Label(new Rect(x, y, pw, S(50)), "Fishing Sim", _title);
-            GUI.Label(new Rect(x, y + S(50), pw, S(26)), $"wersja {Version} · Unity", _small);
-            y += S(100);
-            GUI.Label(new Rect(x, y, pw, S(30)), $"Poziom {_profile.Level} · {_profile.Money} zł · złowione: {_profile.Caught}", _text);
-            y += S(44);
-            GUI.Label(new Rect(x, y, pw, S(28)), "Łowiska:", _small);
-            y += S(30);
+            // a column of cards over the lake: the game's name, the angler, the fisheries, settings
+            float pw = S(560), x = S(64), y = h * 0.09f;
+            var shade = new Rect(0, 0, pw + S(140), h);
+            GUI.DrawTexture(shade, _dim!);
+            GUI.Label(new Rect(x, y, pw, S(70)), "FISHING <color=#F5B342>SIM</color>", _logo);
+            GUI.Label(new Rect(x + S(4), y + S(66), pw, S(26)), $"wersja {Version}", _small);
+            y += S(112);
+            // the angler's card: name, level with its progress, money and catches
+            var me = new Rect(x, y, pw, S(124));
+            GUI.Box(me, "", _panelStyle);
+            GUI.Label(new Rect(me.x + S(22), me.y + S(16), pw * 0.6f, S(34)), $"<b>{_user}</b>", _text);
+            if (_user != "gość" && GUI.Button(new Rect(me.xMax - S(140), me.y + S(14), S(118), S(36)), "Wyloguj", _chip))
+            {
+                _profile.Save();
+                _user = null;
+                Profile.SavePath = null;
+                _loginName = Accounts.LastUser;
+                _registering = false;
+                _screen = Screen.Login;
+            }
+            int lvl = _profile.Level;
+            float from = Core.Progression.XpForLevel(lvl), to = Core.Progression.XpForLevel(lvl + 1);
+            GUI.Label(new Rect(me.x + S(22), me.y + S(54), pw * 0.5f, S(26)), $"Poziom {lvl}", _small);
+            Bar(new Rect(me.x + S(130), me.y + S(64), me.width - S(152), S(8)), (_profile.Xp - from) / Mathf.Max(to - from, 1f), new Color(0.96f, 0.7f, 0.26f));
+            GUI.Label(new Rect(me.x + S(22), me.y + S(84), me.width - S(44), S(28)),
+                $"<color=#F5B342>{_profile.Money} zł</color>   ·   złowione ryby: {_profile.Caught}   ·   rekordy: {_profile.Records.Count}", _small);
+            y += S(146);
+            GUI.Label(new Rect(x, y, pw, S(24)), "ŁOWISKA", _label);
+            y += S(28);
             for (int i = 0; i < _locations.Count; i++)
             {
                 var loc = _locations[i];
                 bool locked = loc.RequiredLevel > _profile.Level;
-                string label = locked ? $"{loc.DisplayName}  (od poziomu {loc.RequiredLevel})" : loc.DisplayName;
+                string desc = loc.Description.Length > 90 ? loc.Description.Substring(0, 88).TrimEnd() + "…" : loc.Description;
+                string label = locked
+                    ? $"<b>{loc.DisplayName}</b>   <color=#9AA6AC>· od poziomu {loc.RequiredLevel}</color>\n<size={Mathf.RoundToInt(14 * _scale)}><color=#7F8C92>{desc}</color></size>"
+                    : $"<b>{loc.DisplayName}</b>\n<size={Mathf.RoundToInt(14 * _scale)}><color=#A9B6BC>{desc}</color></size>";
                 GUI.enabled = !locked;
-                if (GUI.Button(new Rect(x, y, pw, S(46)), label, i == _profile.Location ? _accentButton : _button))
+                if (GUI.Button(new Rect(x, y, pw, S(74)), label, i == _profile.Location ? _cardHot : _card))
                 {
                     int index = i;
                     StartCoroutine(LoadMap(index, true));
                 }
                 GUI.enabled = true;
-                y += S(54);
+                y += S(82);
             }
-            y += S(16);
-            if (GUI.Button(new Rect(x, y, pw * 0.48f, S(44)), "Ustawienia", _button))
+            y += S(10);
+            if (GUI.Button(new Rect(x, y, pw * 0.48f, S(48)), "Ustawienia", _button))
             {
                 _settingsBack = Panel.None;
                 _panel = Panel.Settings;
             }
-            if (GUI.Button(new Rect(x + pw * 0.52f, y, pw * 0.48f, S(44)), "Wyjdź", _button))
+            if (GUI.Button(new Rect(x + pw * 0.52f, y, pw * 0.48f, S(48)), "Wyjdź z gry", _button))
             {
                 _profile.Save();
                 Application.Quit();
             }
-            y += S(60);
-            GUI.Label(new Rect(x, y, pw, S(60)), "Wybierz łowisko, żeby zacząć. F1 w grze pokazuje sterowanie.", _small);
+            y += S(62);
+            GUI.Label(new Rect(x, y, pw, S(48)), "Wybierz łowisko, żeby zacząć. W grze F1 pokazuje sterowanie, T otwiera sklep.", _small);
         }
 
         private Rect Centre(float w, float h, float pw, float ph)
@@ -1101,9 +1298,10 @@ namespace FishingSim.Game
             for (int i = 0; i < ShopTabs.Length; i++)
             {
                 float bw = S(150);
-                if (GUI.Button(new Rect(x, r.y + S(56), bw, S(40)), ShopTabs[i], i == _shopTab ? _accentButton : _chip))
+                if (GUI.Button(new Rect(x, r.y + S(56), bw, S(40)), ShopTabs[i], i == _shopTab ? _tabOn : _tab))
                 {
                     _shopTab = i;
+                    _shopFilter = 0;
                     _scroll = Vector2.zero;
                 }
                 x += bw + S(8);
@@ -1117,8 +1315,42 @@ namespace FishingSim.Game
                 4 => Tackle.Baits,
                 _ => Tackle.Accessories,
             };
-            var list = items.ToList();
-            var view = new Rect(r.x, r.y + S(110), r.width, r.height - S(176));
+            // the catalogue is long (81 rods, 87 reels): a search, a filter by kind or size and the order by level and price
+            var filters = _shopTab switch
+            {
+                0 => new[] { "Wszystkie", "Spławikowe", "Spinningowe", "Gruntowe", "Karpiowe" },
+                1 => new[] { "Wszystkie", "Do 2500", "3000–5000", "Od 6000" },
+                _ => new[] { "Wszystkie" },
+            };
+            float fx = r.x;
+            for (int i = 0; i < filters.Length; i++)
+            {
+                float bw = S(132);
+                if (GUI.Button(new Rect(fx, r.y + S(104), bw, S(34)), filters[i], i == _shopFilter ? _tabOn : _tab))
+                {
+                    _shopFilter = i;
+                    _scroll = Vector2.zero;
+                }
+                fx += bw + S(6);
+            }
+            GUI.Label(new Rect(r.xMax - S(330), r.y + S(108), S(70), S(30)), "Szukaj", _small);
+            _shopSearch = GUI.TextField(new Rect(r.xMax - S(260), r.y + S(100), S(260), S(40)), _shopSearch, 40, _field);
+            string query = _shopSearch.Trim().ToLowerInvariant();
+            int sizeOf(TackleItem it)
+            {
+                var m = System.Text.RegularExpressions.Regex.Match(it.DisplayName, @"\b(\d{4,5})\b");
+                return m.Success ? int.Parse(m.Groups[1].Value) : 0;
+            }
+            bool fits(TackleItem it) => _shopFilter == 0 || it switch
+            {
+                RodData rd => (int)rd.Kind == (_shopFilter == 1 ? (int)RodKind.Float : _shopFilter == 2 ? (int)RodKind.Spinning : _shopFilter == 3 ? (int)RodKind.Bottom : (int)RodKind.Carp),
+                ReelData => _shopFilter == 1 ? sizeOf(it) <= 2500 : _shopFilter == 2 ? sizeOf(it) is >= 3000 and <= 5000 : sizeOf(it) >= 6000,
+                _ => true,
+            };
+            var list = items.Where(it => fits(it) && (query.Length == 0 || it.DisplayName.ToLowerInvariant().Contains(query)))
+                .OrderBy(it => it.RequiredLevel).ThenBy(it => it.Price).ToList();
+            GUI.Label(new Rect(r.x, r.y + S(144), r.width, S(24)), $"{list.Count} pozycji", _label);
+            var view = new Rect(r.x, r.y + S(170), r.width, r.height - S(236));
             float rowH = S(66);
             var content = new Rect(0, 0, r.width - S(24), list.Count * rowH);
             _scroll = GUI.BeginScrollView(view, _scroll, content);
@@ -1195,7 +1427,7 @@ namespace FishingSim.Game
         private static string Stats(TackleItem item) => item switch
         {
             RodData r => $"{KindName(r.Kind)} · {(r.Length > 0 ? r.Length : 3.58f):0.00} m · udźwig {r.MaxLoad:0.0} kg · rzut ×{r.CastMult:0.00}",
-            ReelData r => $"hamulec do {r.DragMax:0.0} kg · zwijanie {r.ReelSpeed:0.0} m/s · {r.LineCapacity:0} m żyłki",
+            ReelData r => $"hamulec do {r.DragMax:0.0} kg · {r.ReelSpeed * 0.24f * 100f:0} cm żyłki na obrót korby · {r.LineCapacity:0} m żyłki",
             LineData l => $"{l.Diameter:0.00} mm · wytrzymałość {l.Strength:0.0} kg · widoczność {l.Visibility:0.00}",
             HookData k => $"{k.DisplayName} · wytrzymałość {k.Strength:0.0} kg · {k.WeightG:0.00} g",
             AccessoryData a => a.Description.Length > 90 ? a.Description.Substring(0, 90) + "…" : a.Description,

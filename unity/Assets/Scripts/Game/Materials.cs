@@ -7,7 +7,7 @@ namespace FishingSim.Game
     {
         private static Texture2D? _grain;
 
-        private static Shader Find(string name) =>
+        public static Shader Find(string name) =>
             Shader.Find(name) ?? throw new System.InvalidOperationException($"Shader {name} missing from the build");
 
         /// <summary>A tileable grain picture (soil, bark, stone texture under the vertex colours), made once.</summary>

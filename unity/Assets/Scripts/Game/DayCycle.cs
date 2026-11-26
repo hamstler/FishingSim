@@ -256,8 +256,12 @@ namespace FishingSim.Game
             float hazeLight = Mathf.Clamp(day + 0.3f * twilight, 0.06f, 1f);
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Exponential;
-            RenderSettings.fogDensity = Mathf.Lerp(0.0016f, 0.004f, _cloud) + _rain * 0.006f + 0.0006f * mist;
-            RenderSettings.fogColor = Color.Lerp(Color.Lerp(hor, new Color(0.55f, 0.66f, 0.74f), 0.4f), sunColour * 0.85f, 0.2f * golden) * hazeLight;
+            // (Godot: density 0.0016 with aerial perspective 0.75, which blends the far land towards the sky's darker blue
+            // above the horizon, not its pale band: the mountains kept their brown slopes. Faded to the pale horizon here
+            // they went bleached beige, so the clear-day haze is thinner and a deeper blue-grey.)
+            RenderSettings.fogDensity = Mathf.Lerp(0.0011f, 0.004f, _cloud) + _rain * 0.006f + 0.0006f * mist;
+            var haze = Color.Lerp(Color.Lerp(hor, new Color(0.42f, 0.53f, 0.63f), 0.55f), sunColour * 0.85f, 0.2f * golden);
+            RenderSettings.fogColor = Color.Lerp(haze * 0.82f, haze, _cloud) * hazeLight;
 
             // mist banks (dawn mist glows with the low sun; at dusk it goes blue-grey)
             if (_mistMat != null && _mistRenderer != null)

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Borealis Method Feeder 3 m · method feeder (krótka)"
+Kind = 2
+CastMult = 1.11
+MaxLoad = 9.22
+ShockAbsorb = 0.206
+Action = 0.65
+Price = 370
+RequiredLevel = 4
+Description = "Feeder do koszyczków method: krótkie rzuty, pewne zacięcia. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy."
+BlankColor = Color(0.35, 0.25, 0.12, 1)
+WhipColor = Color(0.85, 0.12, 0.1, 1)
+FoamGrip = true
+Length = 3
+Model = "rods/feeder_borealis"
+ModelTint = Color(0.95, 0.75, 0.5, 1)

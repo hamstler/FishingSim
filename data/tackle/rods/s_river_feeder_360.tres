@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Ostoja Rzeczny Feeder 3,6 m · feeder rzeczny (krótka)"
+Kind = 2
+CastMult = 1.22
+MaxLoad = 12.2
+ShockAbsorb = 0.17
+Action = 0.5
+Price = 460
+RequiredLevel = 5
+Description = "Mocny feeder na prąd i ciężkie koszyki: brzany i klenie. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy."
+BlankColor = Color(0.12, 0.25, 0.12, 1)
+WhipColor = Color(0.78, 0.62, 0.3, 1)
+FoamGrip = true
+Length = 3.6
+Model = "rods/feeder_ostoja"
+ModelTint = Color(0.55, 0.8, 0.55, 1)

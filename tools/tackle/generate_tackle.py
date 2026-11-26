@@ -446,6 +446,44 @@ ROD_SERIES = [
      (0.04, 0.07, 0.2), (0.82, 0.84, 0.88), False, "karpiówka",
      "Karpiówka z najwyższej półki: korek, lakierowany blank, rzuty na 100 m."),
 ]
+
+# More series on the same Meshy models, each with its own finish (ModelTint: the model's pictures multiplied by it in
+# the game) and its own figures: 27 series x 3 lengths = 81 rods.
+#   same fields as ROD_SERIES, then the finish's tint
+EXTRA_ROD_SERIES = [
+    ("kage", "Kaminari Kage Finesse", 1, "rods/spin_kaminari", (1.9, 2.1, 2.3), 4.0, 0.3, 0.2, 1.1, 290, 2,
+     (0.1, 0.11, 0.13), (0.7, 0.72, 0.76), False, "finesse", "Lekki kij do gumek i drop shota na okonie.", (0.55, 0.58, 0.62)),
+    ("tsunami", "Kaminari Tsunami Jerk", 1, "rods/spin_kaminari", (1.8, 2.0, 2.2), 25.0, 0.15, 0.06, 1.0, 890, 7,
+     (0.06, 0.1, 0.3), (0.85, 0.85, 0.88), True, "jerkowy", "Krótki, twardy kij do ciężkich jerków i wielkich szczupaków.", (0.35, 0.45, 0.85)),
+    ("yuki", "Hokuto Yuki Trout", 1, "rods/spin_hokuto", (1.7, 1.9, 2.1), 2.0, 0.4, 0.28, 0.95, 190, 1,
+     (0.8, 0.78, 0.72), (0.4, 0.3, 0.2), False, "pstrągowy", "Bardzo lekka wędka na pstrągi i klenie na małych rzekach.", (1.0, 0.95, 0.88)),
+    ("sakura", "Hokuto Sakura ML", 1, "rods/spin_hokuto", (2.1, 2.3, 2.5), 6.0, 0.32, 0.2, 1.15, 330, 3,
+     (0.55, 0.28, 0.32), (0.9, 0.85, 0.85), False, "spinning średni", "Średni spinning na bolenie i okonie z mocnym dolnikiem.", (1.0, 0.72, 0.75)),
+    ("grizzly", "Ironwood Grizzly", 1, "rods/spin_ironwood", (2.4, 2.7, 3.0), 30.0, 0.25, 0.08, 1.25, 980, 8,
+     (0.12, 0.2, 0.1), (0.08, 0.08, 0.08), True, "bardzo ciężki spinning", "Pałka na sumy na spinning i wielkie gumy.", (0.45, 0.62, 0.4)),
+    ("method", "Borealis Method Feeder", 2, "rods/feeder_borealis", (3.0, 3.3, 3.6), 9.0, 0.65, 0.22, 1.2, 420, 4,
+     (0.35, 0.25, 0.12), (0.85, 0.12, 0.1), True, "method feeder", "Feeder do koszyczków method: krótkie rzuty, pewne zacięcia.", (0.95, 0.75, 0.5)),
+    ("river_feeder", "Ostoja Rzeczny Feeder", 2, "rods/feeder_ostoja", (3.6, 3.9, 4.2), 12.0, 0.5, 0.18, 1.3, 520, 5,
+     (0.12, 0.25, 0.12), (0.78, 0.62, 0.3), True, "feeder rzeczny", "Mocny feeder na prąd i ciężkie koszyki: brzany i klenie.", (0.55, 0.8, 0.55)),
+    ("barbel", "Ironwood Barbel Specimen", 2, "rods/feeder_ironwood", (3.3, 3.6, 3.9), 16.0, 0.8, 0.14, 1.15, 780, 6,
+     (0.45, 0.35, 0.22), (0.06, 0.06, 0.06), True, "specimen", "Specjalistyczny kij na duże brzany i liny.", (1.0, 0.85, 0.65)),
+    ("telescope", "Ostoja Teleskop", 0, "rods/float_ostoja", (3.0, 4.0, 5.0), 3.0, 0.45, 0.32, 0.95, 90, 1,
+     (0.25, 0.2, 0.15), (0.6, 0.5, 0.35), False, "teleskop", "Tani teleskop: tyczka na płocie i ukleje z pomostu.", (0.65, 0.6, 0.55)),
+    ("waggler", "Borealis Waggler Pro", 0, "rods/float_borealis", (3.6, 3.9, 4.2), 5.0, 0.42, 0.3, 1.3, 410, 4,
+     (0.12, 0.18, 0.4), (0.78, 0.62, 0.3), False, "waggler", "Szybki match do wagglera na dalekie łowisko.", (0.6, 0.7, 1.0)),
+    ("lagoon", "Fjordline Lagoon", 0, "rods/float_fjordline", (3.3, 3.9, 4.5), 4.5, 0.35, 0.32, 1.15, 260, 2,
+     (0.15, 0.35, 0.35), (0.42, 0.26, 0.14), False, "spławikowa", "Lekka spławikówka na staw i jezioro.", (0.55, 0.85, 0.85)),
+    ("sztorm", "Fjordline Sztorm Bolo", 0, "rods/float_fjordline", (4.5, 5.0, 6.0), 6.0, 0.28, 0.28, 1.1, 480, 5,
+     (0.4, 0.12, 0.1), (0.42, 0.26, 0.14), False, "długa bolonka", "Długa bolonka na rzekę z mocnym dolnikiem.", (0.85, 0.5, 0.45)),
+    ("stalker", "Ostoja Stalker", 3, "rods/carp_ostoja", (2.7, 3.0, 3.3), 9.0, 0.8, 0.16, 1.0, 360, 3,
+     (0.2, 0.28, 0.12), (0.78, 0.62, 0.3), True, "podchodówka", "Krótka karpiówka do podchodu w zarośniętych łowiskach.", (0.6, 0.7, 0.45)),
+    ("dragon", "Kaminari Dragon Spod", 3, "rods/carp_kaminari", (3.6, 3.9, 4.2), 16.0, 0.65, 0.1, 1.35, 820, 7,
+     (0.4, 0.06, 0.05), (0.85, 0.85, 0.88), True, "spodówka", "Mocny kij do rakiet zanętowych i bardzo dalekich rzutów.", (0.95, 0.45, 0.4)),
+    ("aurora", "Borealis Aurora", 3, "rods/carp_borealis", (3.3, 3.6, 3.9), 12.0, 0.72, 0.13, 1.25, 720, 6,
+     (0.3, 0.2, 0.45), (0.82, 0.84, 0.88), False, "karpiówka", "Smukła karpiówka z lekkim blankiem: długi hol bez spinki.", (0.75, 0.62, 0.95)),
+]
+ROD_TINT = {se[0]: se[16] for se in EXTRA_ROD_SERIES}
+ROD_SERIES = ROD_SERIES + [se[:16] for se in EXTRA_ROD_SERIES]
 LENGTH_WORD = ("krótka", "średnia", "długa")
 
 
@@ -487,6 +525,8 @@ FoamGrip = {"true" if se[13] else "false"}
 Length = {L:g}
 Model = {q(se[3])}
 """
+            if se[0] in ROD_TINT:
+                body += f"ModelTint = {col(ROD_TINT[se[0]])}\n"
             with open(os.path.join(RODS, ident + ".tres"), "w", encoding="utf-8") as f:
                 f.write(body)
     return ids
@@ -509,8 +549,76 @@ NEW_REELS = [
 ]
 
 
+# The reel catalogue on the six Meshy reels: each family in its sizes, each size in three finishes (the model's
+# pictures tinted, the model scaled by the size), the figures from the size: line capacity, drag, retrieve, price.
+#   model, brand + line, sizes, price factor, kind word
+REEL_FAMILIES = [
+    ("reels/small_hokuto", "Hokuto Mizu", (1000, 1500, 2000, 2500, 3000), 1.0, "lekki spinningowy"),
+    ("reels/small_fjordline", "Fjordline Fjell", (1000, 1500, 2000, 2500, 3000), 0.9, "lekki uniwersalny"),
+    ("reels/medium_hokuto", "Hokuto Kaiten", (3000, 3500, 4000, 4500, 5000), 1.2, "średni z przednim hamulcem"),
+    ("reels/baitrunner_fjordline", "Fjordline Frispole", (5000, 6000, 8000, 10000), 1.4, "z wolnym biegiem"),
+    ("reels/baitrunner_kaminari", "Kaminari Long Cast", (5000, 6000, 8000, 10000), 1.5, "dalekorzutowy z wolnym biegiem"),
+    ("reels/big_ironwood", "Ironwood Titan", (8000, 10000, 12000, 14000), 1.6, "sumowy, mocny hamulec"),
+]
+#   id suffix, name suffix, tint, retrieve +, drag x, price x, level +
+REEL_FINISHES = [
+    ("", "", (1.0, 1.0, 1.0), 0.0, 1.0, 1.0, 0),
+    ("hs", " HS", (0.55, 0.6, 0.68), 0.45, 0.95, 1.2, 1),
+    ("pro", " Pro", (1.0, 0.82, 0.55), 0.2, 1.15, 1.5, 2),
+]
+
+
+def reel_catalogue():
+    out = []
+    for model, name, sizes, pf, word in REEL_FAMILIES:
+        mid = sizes[len(sizes) // 2]
+        for size in sizes:
+            k = size / 1000.0
+            for suffix, fword, tint, speed, dragx, pricex, lvl in REEL_FINISHES:
+                ident = f"r_{slug(name)}_{size}{suffix}"
+                drag = min(2.4 + 1.25 * k, 22.0) * dragx
+                capacity = round(35 * k + 25)
+                retrieve = min(3.0 + 0.12 * k, 4.4) + speed
+                price = int(round((55 + 48 * k) * pf * pricex / 5) * 5)
+                level = max(1, min(10, int(round(1 + 0.55 * k + lvl))))
+                scale = max(0.78, min(1.3, (size / mid) ** (1 / 3)))
+                body = tuple(max(0.04, c * 0.25) for c in tint)
+                desc = (f"{name} w rozmiarze {size}: {capacity} m żyłki 0,25 mm, hamulec do {drag:.1f} kg"
+                        + (", szybkie przełożenie." if suffix == "hs" else ", wzmocniona przekładnia i hamulec." if suffix == "pro" else "."))
+                out.append((ident, f"{name} {size}{fword} · {word}", model, drag, retrieve, capacity, price, level, body,
+                            (0.75, 0.62, 0.3), desc, tint, scale))
+    return out
+
+
 def write_reels():
     ids = []
+    catalogue = reel_catalogue()
+    keep = {r[0] for r in NEW_REELS} | {r[0] for r in catalogue}
+    for old in os.listdir(REELS):
+        if old.startswith("r_") and old.endswith(".tres") and old[:-5] not in keep:
+            os.remove(os.path.join(REELS, old))
+    for r in catalogue:
+        ids.append(r[0])
+        with open(os.path.join(REELS, r[0] + ".tres"), "w", encoding="utf-8") as f:
+            f.write(f"""[gd_resource type="Resource" script_class="ReelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/ReelData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = {q(r[1])}
+DragMax = {r[3]:.1f}
+ReelSpeed = {r[4]:.2f}
+LineCapacity = {r[5]:.1f}
+Price = {r[6]}
+RequiredLevel = {r[7]}
+Description = {q(r[10])}
+BodyColor = {col(r[8])}
+TrimColor = {col(r[9])}
+Model = {q(r[2])}
+ModelTint = {col(r[11])}
+ModelScale = {r[12]:.3f}
+""")
     for r in NEW_REELS:
         ids.append(r[0])
         body = f"""[gd_resource type="Resource" script_class="ReelData" load_steps=2 format=3]

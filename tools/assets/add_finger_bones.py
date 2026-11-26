@@ -7,7 +7,7 @@ each; rolled so a turn about the bone's own X curls the finger towards the palm)
 out to them as the nearest vertices of the finger-rigged figure share theirs. The animations are dropped; the file is
 saved for posing (pose_apose_grip.py).
 
-    blender -b --factory-startup --python tools/assets/add_finger_bones.py -- MESHY_RIGGED.glb FINGER_RIGGED.glb OUT.blend
+    blender -b --factory-startup --python tools/assets/add_finger_bones.py -- MESHY_RIGGED.glb FINGER_RIGGED.glb OUT.blend [--keep-bones]
 """
 import math
 import os
@@ -18,6 +18,9 @@ from mathutils import Matrix, Vector
 from mathutils.kdtree import KDTree
 
 FINGERS = ("thumb", "index", "middle", "ring", "pinky")
+# --keep-bones: the original bones keep their directions (only shortened), for a file that keeps its clips; without it
+# the arms' bones are laid joint to joint for IK (pose_apose_grip.py)
+KEEP_BONES = "--keep-bones" in sys.argv
 SIDE = {"l": "Left", "r": "Right"}
 
 
@@ -61,6 +64,8 @@ def main():
     meshy = load(meshy_path)
     m_arm = next(o for o in meshy if o.type == "ARMATURE")
     m_body = next(o for o in meshy if o.type == "MESH")
+    for act in bpy.data.actions:
+        act.use_fake_user = True            # the clips stay in the file (Action Editor), only unassigned
     m_arm.animation_data_clear()            # the walk and run clips (also as NLA tracks)
     for pb in m_arm.pose.bones:
         pb.matrix_basis = Matrix.Identity(4)
@@ -138,8 +143,11 @@ def main():
                 made.append(bone.name)
     # Meshy's arm bones point anywhere (their tails metres away from the next joint): IK solves along the bones, so
     # each one is laid from its joint to the next (the mesh is bound at rest, so this changes no shape)
-    for side in "lr":
-        up, low, hand = (eb[f"{SIDE[side]}{n}"] for n in ("UpperArm", "LowerArm", "Hand"))
+    def named(side, *names):
+        return next(eb[f"{SIDE[side]}{n}"] for n in names if f"{SIDE[side]}{n}" in eb)
+    for side in ("" if KEEP_BONES else "lr"):
+        # Unity Humanoid (UpperArm, LowerArm) or the Meshy rig (Arm, ForeArm)
+        up, low, hand = named(side, "UpperArm", "Arm"), named(side, "LowerArm", "ForeArm"), named(side, "Hand")
         up.tail = low.head.copy()
         low.tail = hand.head.copy()
         hand.tail = eb[f"middle_01_{side}"].head.copy()
@@ -200,9 +208,70 @@ def main():
     for o in finger:
         bpy.data.objects.remove(o, do_unlink=True)
     m_arm.data.pose_position = "POSE"
+    organise(m_arm)
     m_arm.name, m_body.name = "Szkielet", "Wedkarz"
     bpy.ops.wm.save_as_mainfile(filepath=out)
     print("FINGERS saved", out)
+
+
+# bone collections by limb, each its own colour: pick a hand's fingers (or one arm) with one click in the Bone Collections
+# panel, hide the rest
+LIMBS = [
+    ("Tulow i glowa", "THEME09", lambda n: n.startswith(("Hips", "Spine", "Chest", "UpperChest", "Neck", "neck", "Head", "head"))),
+    ("Lewa reka", "THEME04", lambda n: n in ("LeftShoulder", "LeftArm", "LeftUpperArm", "LeftForeArm", "LeftLowerArm", "LeftHand")),
+    ("Prawa reka", "THEME01", lambda n: n in ("RightShoulder", "RightArm", "RightUpperArm", "RightForeArm", "RightLowerArm", "RightHand")),
+    ("Palce lewej dloni", "THEME03", lambda n: n.startswith(FINGERS) and n.endswith("_l")),
+    ("Palce prawej dloni", "THEME02", lambda n: n.startswith(FINGERS) and n.endswith("_r")),
+    ("Lewa noga", "THEME06", lambda n: n.startswith(("LeftUpLeg", "LeftUpperLeg", "LeftLeg", "LeftLowerLeg", "LeftFoot", "LeftToe"))),
+    ("Prawa noga", "THEME07", lambda n: n.startswith(("RightUpLeg", "RightUpperLeg", "RightLeg", "RightLowerLeg", "RightFoot", "RightToe"))),
+]
+
+
+def organise(arm):
+    data = arm.data
+    # the glTF importer's bone-shape helper (a 2 m icosphere at the origin) and any custom shapes on the bones go
+    for pb in arm.pose.bones:
+        pb.custom_shape = None
+    for o in list(bpy.data.objects):
+        if o.type == "MESH" and o.name.startswith("Icosphere"):
+            bpy.data.objects.remove(o, do_unlink=True)
+    # Meshy's bones run tens of metres past their joints (drawn as huge shapes over the figure): each one from its joint
+    # to its child's (the first child that sits away from it), a leaf a third of its parent's length (at most 8 cm).
+    # The mesh is bound at rest, so the figure keeps its shape.
+    bpy.context.view_layer.objects.active = arm
+    bpy.ops.object.mode_set(mode="EDIT")
+    eb = data.edit_bones
+    prefer = {"Hips": "Spine02", "Head": "head_end", "Spine02": "Spine01", "Spine01": "Spine"}
+    for b in eb:
+        if b.name.startswith(FINGERS):
+            continue
+        kids = [c for c in b.children if (c.head - b.head).length > 1e-4]
+        want = prefer.get(b.name)
+        kid = next((c for c in kids if c.name == want), kids[0] if len(kids) == 1 else None)
+        if kid is None and kids:
+            kid = min(kids, key=lambda c: abs((c.head - b.head).normalized().dot((b.tail - b.head).normalized()) - 1.0))
+        # only the length changes, never the direction (the clips in the file turn the bones about their own axes)
+        d = (b.tail - b.head).normalized()
+        if kid is not None:
+            length = max((kid.head - b.head).length, 1e-3)
+        else:
+            par = b.parent.length if b.parent is not None else (b.tail - b.head).length
+            length = min(par / 3.0, 0.08 / max(arm.matrix_world.to_scale().x, 1e-6))
+        b.tail = b.head + d * length
+    bpy.ops.object.mode_set(mode="OBJECT")
+    for c in list(data.collections_all):
+        data.collections.remove(c)
+    made = {name: (data.collections.new(name), theme) for name, theme, _ in LIMBS}
+    for bone in data.bones:
+        for name, theme, test in LIMBS:
+            if test(bone.name):
+                made[name][0].assign(bone)
+                bone.color.palette = theme
+                break
+    data.display_type = "OCTAHEDRAL"
+    arm.show_in_front = True
+    counts = {name: len(c.bones) for name, (c, _) in made.items()}
+    print("FINGERS bone collections:", counts)
 
 
 main()

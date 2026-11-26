@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Ostoja Teleskop 5 m · teleskop (długa)"
+Kind = 0
+CastMult = 1.14
+MaxLoad = 2.84
+ShockAbsorb = 0.374
+Action = 0.45
+Price = 105
+RequiredLevel = 1
+Description = "Tani teleskop: tyczka na płocie i ukleje z pomostu. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy."
+BlankColor = Color(0.25, 0.2, 0.15, 1)
+WhipColor = Color(0.6, 0.5, 0.35, 1)
+FoamGrip = false
+Length = 5
+Model = "rods/float_ostoja"
+ModelTint = Color(0.65, 0.6, 0.55, 1)

@@ -49,6 +49,9 @@ Shader "FS/GrassCard"
             v.vertex.x += bend * 0.3 + flutter;
             v.vertex.z += bend * 0.18;
             v.vertex.y -= bend * 0.06;
+            // the cards' normals lean up (a clump is lit like the meadow it stands in: upright cards facing the high sun
+            // edge-on went black on one side and glared white on the other)
+            v.normal = normalize(lerp(v.normal, float3(0, 1, 0), 0.65));
             float3 base = UNITY_ACCESS_INSTANCED_PROP(Props, _Tint).rgb;
             float macro = tex2Dlod(_Noise, float4(origin.xz * 0.013, 0, 0)).r;
             float mid = tex2Dlod(_Noise, float4(origin.xz * 0.09 + float2(0.37, 0.11), 0, 0)).r;
@@ -60,7 +63,8 @@ Shader "FS/GrassCard"
             k *= lerp(0.88, 1.08, macro);
             k = lerp(k, k * float3(1.16, 1.02, 0.7), dry * 0.55);
             k = lerp(k, k * float3(0.8, 0.9, 0.76), lush * 0.45);
-            o.tintK = clamp(k, 0.3, 2.2);
+            // never much brighter than the photographed clump (up to 2.2x it glared yellow-white at noon)
+            o.tintK = clamp(k, 0.35, 1.25);
         }
 
         void surf(Input IN, inout SurfaceOutputStandard o)
@@ -74,7 +78,7 @@ Shader "FS/GrassCard"
             o.Albedo = c.rgb * IN.tintK;
             o.Emission = c.rgb * IN.tintK * 0.06 * t;
             o.Occlusion = lerp(0.55, 1.0, t);
-            o.Smoothness = 0.4;
+            o.Smoothness = 0.1;      // matt blades (0.4 gave the meadow a white sheen in the sun)
         }
         ENDCG
     }

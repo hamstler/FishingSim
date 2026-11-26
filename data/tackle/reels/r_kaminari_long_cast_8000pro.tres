@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ReelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/ReelData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Kaminari Long Cast 8000 Pro · dalekorzutowy z wolnym biegiem"
+DragMax = 14.3
+ReelSpeed = 4.16
+LineCapacity = 305.0
+Price = 990
+RequiredLevel = 7
+Description = "Kaminari Long Cast w rozmiarze 8000: 305 m żyłki 0,25 mm, hamulec do 14.3 kg, wzmocniona przekładnia i hamulec."
+BodyColor = Color(0.25, 0.205, 0.138, 1)
+TrimColor = Color(0.75, 0.62, 0.3, 1)
+Model = "reels/baitrunner_kaminari"
+ModelTint = Color(1, 0.82, 0.55, 1)
+ModelScale = 1.000

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Hokuto Yuki Trout 2,1 m · pstrągowy (długa)"
+Kind = 1
+CastMult = 1.03
+MaxLoad = 1.95
+ShockAbsorb = 0.3
+Action = 0.4
+Price = 220
+RequiredLevel = 1
+Description = "Bardzo lekka wędka na pstrągi i klenie na małych rzekach. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy."
+BlankColor = Color(0.8, 0.78, 0.72, 1)
+WhipColor = Color(0.4, 0.3, 0.2, 1)
+FoamGrip = false
+Length = 2.1
+Model = "rods/spin_hokuto"
+ModelTint = Color(1, 0.95, 0.88, 1)

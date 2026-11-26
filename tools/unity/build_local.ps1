@@ -30,6 +30,7 @@ if (-not $SkipConvert) {
     }
     $py = "$venv\Scripts\python.exe"
     $sa = Join-Path $Root "unity\Assets\StreamingAssets"
+    & $py -I tools\unity\tres_to_json.py --out "$sa\data"
     & $py -I tools\unity\convert_glb.py assets\fish\meshy "$sa\Models\fish" --fish --max 2048
     & $py -I tools\unity\convert_glb.py assets\models "$sa\Models" --max 4096
     & $py -I tools\unity\convert_glb.py assets\characters "$sa\Models\characters" --max 2048

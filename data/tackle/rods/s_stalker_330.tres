@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Ostoja Stalker 3,3 m · podchodówka (długa)"
+Kind = 3
+CastMult = 1.08
+MaxLoad = 8.79
+ShockAbsorb = 0.171
+Action = 0.8
+Price = 415
+RequiredLevel = 3
+Description = "Krótka karpiówka do podchodu w zarośniętych łowiskach. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy."
+BlankColor = Color(0.2, 0.28, 0.12, 1)
+WhipColor = Color(0.78, 0.62, 0.3, 1)
+FoamGrip = true
+Length = 3.3
+Model = "rods/carp_ostoja"
+ModelTint = Color(0.6, 0.7, 0.45, 1)

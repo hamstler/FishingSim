@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ReelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/ReelData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Hokuto Mizu 3000 HS · lekki spinningowy"
+DragMax = 5.8
+ReelSpeed = 3.81
+LineCapacity = 130.0
+Price = 240
+RequiredLevel = 4
+Description = "Hokuto Mizu w rozmiarze 3000: 130 m żyłki 0,25 mm, hamulec do 5.8 kg, szybkie przełożenie."
+BodyColor = Color(0.138, 0.15, 0.17, 1)
+TrimColor = Color(0.75, 0.62, 0.3, 1)
+Model = "reels/small_hokuto"
+ModelTint = Color(0.55, 0.6, 0.68, 1)
+ModelScale = 1.145

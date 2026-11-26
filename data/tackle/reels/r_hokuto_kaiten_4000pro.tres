@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ReelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/ReelData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Hokuto Kaiten 4000 Pro · średni z przednim hamulcem"
+DragMax = 8.5
+ReelSpeed = 3.68
+LineCapacity = 165.0
+Price = 445
+RequiredLevel = 5
+Description = "Hokuto Kaiten w rozmiarze 4000: 165 m żyłki 0,25 mm, hamulec do 8.5 kg, wzmocniona przekładnia i hamulec."
+BodyColor = Color(0.25, 0.205, 0.138, 1)
+TrimColor = Color(0.75, 0.62, 0.3, 1)
+Model = "reels/medium_hokuto"
+ModelTint = Color(1, 0.82, 0.55, 1)
+ModelScale = 1.000

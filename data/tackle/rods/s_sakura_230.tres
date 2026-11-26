@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Hokuto Sakura ML 2,3 m · spinning średni (średnia)"
+Kind = 1
+CastMult = 1.15
+MaxLoad = 6
+ShockAbsorb = 0.2
+Action = 0.32
+Price = 330
+RequiredLevel = 3
+Description = "Średni spinning na bolenie i okonie z mocnym dolnikiem. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy."
+BlankColor = Color(0.55, 0.28, 0.32, 1)
+WhipColor = Color(0.9, 0.85, 0.85, 1)
+FoamGrip = false
+Length = 2.3
+Model = "rods/spin_hokuto"
+ModelTint = Color(1, 0.72, 0.75, 1)

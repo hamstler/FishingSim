@@ -54,7 +54,7 @@ namespace FishingSim.Game
         private Transform _bobber = null!, _fish = null!;
         private MeshFilter _fishMesh = null!;
         private Renderer _bobberRenderer = null!;
-        private LineRenderer _line = null!;
+        private LineRibbon _line = null!;
         private Vector3 _velocity, _origin;
         private float _stateTime, _biteTimer, _nibbleLeft, _dip, _lineSlack = 1f;
         private bool _readyToStrike;
@@ -69,7 +69,7 @@ namespace FishingSim.Game
         private readonly List<Transform> _guides = new();
         private readonly Vector3[] _ropePts = new Vector3[Core.Physics.LineRope.Points];
         private readonly Vector3[] _inRod = new Vector3[16];
-        private LineRenderer _inRodLine = null!;
+        private LineRibbon _inRodLine = null!;
         private Transform? _bail, _spoolLine, _lineExit;
         private Transform _builtReel = null!, _builtRotor = null!, _builtCrank = null!, _builtBail = null!, _builtSpoolLine = null!, _builtLineExit = null!;
         private Vector3 _bailAxis = Vector3.right;
@@ -313,6 +313,9 @@ namespace FishingSim.Game
         public Transform? Frame => _frame;
         public Transform? CrankPivot => _crank;
 
+        /// <summary>The straight blank's tip in the rod's frame (butt to tip along +Y).</summary>
+        public Vector3 TipRestLocal => new(0f, BlankStart + _section * 10f, 0f);
+
         private bool _framed;
         private Quaternion _frameTurn = Quaternion.identity;
 
@@ -330,7 +333,7 @@ namespace FishingSim.Game
         }
 
         private Quaternion RestTurn(float lift) => _framed ? Quaternion.Euler(lift, 0f, 0f) * _frameTurn : RigRest(lift);
-        private string _shownRod = "", _shownReel = "";
+        private string _shownRod = "", _shownReel = "", _shownRodItem = "", _shownReelItem = "";
 
         /// <summary>The rod's and the reel's model ids now shown ("" while the built ones show).</summary>
         public string ShownRodId => _shownRod;
@@ -491,9 +494,11 @@ namespace FishingSim.Game
                 _guides[i].localPosition = new Vector3(g.x, section - 0.01f, g.z);
             }
             float k = section / SegmentLength;
-            if (rodId != _shownRod)
+            // a new item on the same model has its own finish: the model is made again
+            if (rodId != _shownRod || (rod?.ItemId ?? "") != _shownRodItem)
             {
                 _shownRod = rodId;
+                _shownRodItem = rod?.ItemId ?? "";
                 foreach (Transform c in _rodModel)
                     Destroy(c.gameObject);
                 for (int i = 0; i < _segments.Count; i++)
@@ -504,6 +509,9 @@ namespace FishingSim.Game
                 bool ok = model != null;
                 if (model != null)
                 {
+                    // the series' finish (generate_tackle.py: series on one model look apart)
+                    if (rod != null)
+                        Finish(model, new Color(rod.ModelTint.R, rod.ModelTint.G, rod.ModelTint.B));
                     for (int i = 0; i < _segments.Count; i++)
                         if (ModelLibrary.Find(model.transform, $"Seg{i}") is { } seg)
                         {
@@ -527,9 +535,10 @@ namespace FishingSim.Game
                 foreach (Transform c in _segments[i])
                     if (c.name.StartsWith("Model"))
                         c.localScale = new Vector3(1f, k, 1f);
-            if (reelId != _shownReel)
+            if (reelId != _shownReel || (reel?.ItemId ?? "") != _shownReelItem)
             {
                 _shownReel = reelId;
+                _shownReelItem = reel?.ItemId ?? "";
                 GripLeft.SetParent(_frame, false);
                 GripLeft.localPosition = new Vector3(0f, -0.2f, 0.02f);
                 foreach (Transform c in _reelModel)
@@ -537,6 +546,13 @@ namespace FishingSim.Game
                 _rotor = _crank = _bail = _spoolLine = _lineExit = null;
                 var model = ModelLibrary.Spawn(reelId, _reelModel);
                 _modelledReel = false;
+                // the reel's size and finish: a 1000 is smaller than a 5000 on the same body (scaled about the reel's
+                // foot at the seat, so it stays on the rod)
+                float reelScale = reel != null && reel.ModelScale > 0.1f ? reel.ModelScale : 1f;
+                _reelModel.localScale = Vector3.one * reelScale;
+                _reelModel.localPosition = new Vector3(0f, 0.1f, 0f) * (1f - reelScale);
+                if (model != null && reel != null)
+                    Finish(model, new Color(reel.ModelTint.R, reel.ModelTint.G, reel.ModelTint.B));
                 if (model != null)
                 {
                     foreach (var r in model.GetComponentsInChildren<Renderer>())
@@ -596,6 +612,25 @@ namespace FishingSim.Game
                 _spoolFill = -1f;
                 SetCrank(_crankAngle);
                 SetBail(_bailOpen);
+            }
+        }
+
+        /// <summary>A model's finish: each of its materials (copied for this model) multiplied by the tint.</summary>
+        private static void Finish(GameObject model, Color tint)
+        {
+            if (Mathf.Abs(tint.r - 1f) + Mathf.Abs(tint.g - 1f) + Mathf.Abs(tint.b - 1f) < 0.01f)
+                return;
+            foreach (var r in model.GetComponentsInChildren<Renderer>(true))
+            {
+                var mats = r.materials;          // instances: the shared model's materials stay as they are
+                foreach (var m in mats)
+                    foreach (var prop in new[] { "baseColorFactor", "_BaseColor", "_Color" })
+                        if (m.HasProperty(prop))
+                        {
+                            m.SetColor(prop, m.GetColor(prop) * tint);
+                            break;
+                        }
+                r.materials = mats;
             }
         }
 
@@ -760,22 +795,15 @@ namespace FishingSim.Game
 
         private void BuildLine()
         {
-            var go = new GameObject("Line");
-            _line = go.AddComponent<LineRenderer>();
-            _line.sharedMaterial = Materials.Unlit(new Color(0.85f, 0.85f, 0.8f));
-            _line.widthMultiplier = 0.004f;
-            _line.numCapVertices = 0;
-            _line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            _line.receiveShadows = false;
-            go.SetActive(false);
-            var inRod = new GameObject("LineInRod");
-            _inRodLine = inRod.AddComponent<LineRenderer>();
-            _inRodLine.sharedMaterial = _line.sharedMaterial;
-            _inRodLine.widthMultiplier = 0.0012f;
-            _inRodLine.numCapVertices = 0;
-            _inRodLine.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            _inRodLine.receiveShadows = false;
-            _line.positionCount = _ropePts.Length;
+            // the line paid out and the line inside the rod (spool lip, guides, tip-top): ribbons of FS/FishingLine, as
+            // thick as the line or a pixel, dimmed at night, glinting in the sun (Godot: fishing_line.gdshader)
+            _line = LineRibbon.Create("Line", _ropePts.Length);
+            _line.Color = new Color(0.85f, 0.85f, 0.8f);
+            _line.Diameter = 0.00025f;
+            _line.gameObject.SetActive(false);
+            _inRodLine = LineRibbon.Create("LineInRod", _inRod.Length);
+            _inRodLine.Color = _line.Color;
+            _inRodLine.Diameter = 0.00025f;
         }
 
         /// <summary>The rod shows only in play (the menu's flying camera carries it otherwise).</summary>
@@ -784,7 +812,7 @@ namespace FishingSim.Game
             if (_rodRoot != null)
                 _rodRoot.gameObject.SetActive(show);
             if (_inRodLine != null)
-                _inRodLine.enabled = show;
+                _inRodLine.gameObject.SetActive(show);
         }
 
         // ------------------------------------------------------------------ tackle
@@ -811,8 +839,8 @@ namespace FishingSim.Game
             if (line != null)
             {
                 var c = line.LineColor;
-                _line.sharedMaterial.color = new Color(c.R, c.G, c.B);
-                _line.widthMultiplier = Mathf.Clamp(line.Diameter * 0.012f, 0.0025f, 0.006f);
+                _line.Color = _inRodLine.Color = new Color(c.R, c.G, c.B);
+                _line.Diameter = _inRodLine.Diameter = Mathf.Max(line.Diameter, 0.05f) * 0.001f;   // LineData: millimetres
             }
             if (rod != null && bait() is { } b)
                 Method = FishingSim.Core.Methods.Method.For(rod.Kind, b.Kind);
@@ -827,8 +855,6 @@ namespace FishingSim.Game
                 var (sink, floats) = Core.Physics.LineRope.Behaviour((int)line.Kind);
                 _rope.SinkSpeed = sink;
                 _rope.Floats = floats;
-                var c = line.LineColor;
-                _line.startColor = _line.endColor = Color.white;
             }
             _rope.WaterY = 0f;
             _rope.BottomY = (x, z) => World.Lake.HeightAt(x, z);
@@ -866,7 +892,8 @@ namespace FishingSim.Game
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             _stateTime += dt;
             bool canAct = !Blocked && Cursor.lockState == CursorLockMode.Locked;
-            bool lmbDown = canAct && Input.GetMouseButtonDown(0), lmb = canAct && Input.GetMouseButton(0) || SmokeReel, lmbUp = canAct && Input.GetMouseButtonUp(0);
+            bool lmbDown = canAct && Input.GetMouseButtonDown(0) || SmokeCharge && State == RodState.Idle, lmb = canAct && Input.GetMouseButton(0) || SmokeReel || SmokeCharge,
+                lmbUp = canAct && Input.GetMouseButtonUp(0);
             bool rmbDown = canAct && Input.GetMouseButtonDown(1), rmb = canAct && Input.GetMouseButton(1);
             if (canAct)
             {
@@ -910,9 +937,23 @@ namespace FishingSim.Game
                     }
                     break;
                 case RodState.Charging:
-                    CastPower = Mathf.PingPong(_stateTime / 1.1f, 1f);
-                    if (lmbUp || !lmb)
-                        Cast();
+                    // the rod goes up to 60 degrees while the button is held; let go, it swings fast back to where it was
+                    // and the end tackle leaves the tip at the end of the swing (the power is held from the release)
+                    if (_swing < 0f)
+                    {
+                        CastPower = Mathf.PingPong(_stateTime / 1.1f, 1f);
+                        if (lmbUp || !lmb)
+                            _swing = 0f;
+                    }
+                    else
+                    {
+                        _swing += dt;
+                        if (_swing >= SwingSeconds)
+                        {
+                            _swing = -1f;
+                            Cast();
+                        }
+                    }
                     break;
                 case RodState.Flying:
                     TickFlight(dt);
@@ -987,7 +1028,25 @@ namespace FishingSim.Game
         {
             State = s;
             _stateTime = 0f;
+            _swing = -1f;
         }
+
+        /// <summary>Crank turns a second: a steady wind 1.1, Shift fast 1.8.</summary>
+        public float CrankTurns => Input.GetKey(KeyCode.LeftShift) ? 1.8f : 1.1f;
+
+        /// <summary>
+        /// Metres of line one turn of the crank lays on the spool: the reel's gear (ReelData.ReelSpeed, about 0.84 m a turn
+        /// on a full spool of a 3.5) times how full the spool is (a spool run low has a smaller diameter, so it brings in
+        /// less a turn: down to 70 %).
+        /// </summary>
+        public float MetresPerTurn => (Reel?.ReelSpeed ?? 3f) * 0.24f * (0.7f + 0.3f * Mathf.Clamp01(_spoolFill < 0f ? 1f : _spoolFill));
+
+        /// <summary>Line brought in a second while cranking (m/s).</summary>
+        public float RetrieveRate => CrankTurns * MetresPerTurn;
+
+        /// <summary>The cast's forward swing: seconds from the release to the end tackle leaving the tip (-1 = not swinging).</summary>
+        private float _swing = -1f;
+        private const float SwingSeconds = 0.16f, CastLift = 60f;
 
         private void Cast()
         {
@@ -1011,10 +1070,15 @@ namespace FishingSim.Game
             }
             _origin = Player.transform.position;
             _bobber.position = _tip.position;
-            float flight = 0.6f + distance / 28f;
-            var target = _origin + dir * distance;
-            _velocity = (target - _bobber.position) / flight;
-            _velocity.y = (0f - _bobber.position.y) / flight + 9.81f * flight * 0.5f;
+            // a real flight: launched from the tip at LaunchDegrees, gravity, air drag by the end tackle's weight and
+            // size (a light float rig slows fast, a feeder flies on), carried by the wind as Casting.WindCatch says.
+            // The launch speed is the one that, without wind, lands where the cast's power aims (the old balance kept)
+            _flightDrag = AirDrag(weight);
+            _flightWind = WindVelocity * Casting.WindCatch(Method, weight);
+            float start = _bobber.position.y - Waves.HeightAt(_bobber.position.x, _bobber.position.z, Time.time);
+            float v0 = LaunchSpeed(distance, _flightDrag, start);
+            float a = LaunchDegrees * Mathf.Deg2Rad;
+            _velocity = dir * (v0 * Mathf.Cos(a)) + Vector3.up * (v0 * Mathf.Sin(a));
             _bobber.gameObject.SetActive(true);
             _line.gameObject.SetActive(true);
             _lineLength = 0.3f;
@@ -1023,9 +1087,57 @@ namespace FishingSim.Game
             Set(RodState.Flying);
         }
 
+        /// <summary>The cast's launch angle above the horizon (degrees).</summary>
+        private const float LaunchDegrees = 32f;
+
+        private float _flightDrag;
+        private Vector3 _flightWind;
+
+        /// <summary>The wind at the water (m/s), as the line and the flight feel it.</summary>
+        private Vector3 WindVelocity => new Vector3(0.8f, 0f, 0.6f) * (Day != null ? Day.Wind * 3f : 0.6f);
+
+        /// <summary>Quadratic air drag of the end tackle (1/m): 1/2 rho Cd A / m, the cross-section growing a little with
+        /// the weight (a 4.5 g float rig about 0.02, a 40 g feeder about 0.006, a 10 g lure about 0.008).</summary>
+        private static float AirDrag(float weightG)
+        {
+            float area = 1.1e-4f + 6e-6f * weightG;       // m2
+            return 0.5f * 1.2f * 0.85f * area / (Mathf.Max(weightG, 1f) / 1000f);
+        }
+
+        /// <summary>How far a launch at this speed carries (no wind), from a height above the water.</summary>
+        private static float Carry(float v0, float drag, float height)
+        {
+            float a = LaunchDegrees * Mathf.Deg2Rad;
+            float vx = v0 * Mathf.Cos(a), vy = v0 * Mathf.Sin(a), x = 0f, y = height;
+            const float dt = 0.01f;
+            for (int i = 0; i < 2000 && y > 0f; i++)
+            {
+                float v = Mathf.Sqrt(vx * vx + vy * vy);
+                vx -= drag * v * vx * dt;
+                vy -= (9.81f + drag * v * vy) * dt;
+                x += vx * dt;
+                y += vy * dt;
+            }
+            return x;
+        }
+
+        /// <summary>The launch speed that carries <paramref name="distance"/> metres (bisection on <see cref="Carry"/>).</summary>
+        private static float LaunchSpeed(float distance, float drag, float height)
+        {
+            float lo = 1f, hi = 90f;
+            for (int i = 0; i < 24; i++)
+            {
+                float mid = 0.5f * (lo + hi);
+                if (Carry(mid, drag, height) < distance) lo = mid; else hi = mid;
+            }
+            return 0.5f * (lo + hi);
+        }
+
         private void TickFlight(float dt)
         {
-            _velocity += Vector3.down * 9.81f * dt;
+            // gravity and the drag of the air moving past the end tackle (the wind's velocity taken off it)
+            var air = _velocity - _flightWind;
+            _velocity += (Vector3.down * 9.81f - air * (_flightDrag * air.magnitude)) * dt;
             _bobber.position += _velocity * dt;
             // the line runs off the open spool behind the flying end tackle
             _lineLength = Mathf.Max(_lineLength, TipDistance() * 1.04f);
@@ -1064,6 +1176,12 @@ namespace FishingSim.Game
         // ------------------------------------------------------------------ automated test (Smoke)
         /// <summary>Held down by the smoke test: reels as if the left button were held.</summary>
         public bool SmokeReel { get; set; }
+
+        /// <summary>Held by the smoke test: the cast button held (charging); let go, the rod swings and casts.</summary>
+        public bool SmokeCharge { get; set; }
+
+        /// <summary>The cast's forward swing is under way (the smoke test photographs it).</summary>
+        public bool Swinging => _swing >= 0f;
 
         /// <summary>Puts the end tackle at a point of the lake as if cast there.</summary>
         public void SmokeCast(Vector3 target)
@@ -1157,7 +1275,7 @@ namespace FishingSim.Game
                     p += toAngler.normalized * dart;
                 Twitch(0.3f);
             }
-            float retrieve = lmb ? (Reel?.ReelSpeed ?? 3f) * (Input.GetKey(KeyCode.LeftShift) ? 0.6f : 0.3f) : 0f;
+            float retrieve = lmb ? RetrieveRate : 0f;
             bool wasSnagged = lure.Snagged;
             lure.Step(dt, retrieve, Mathf.Max(DepthHere, 0.05f), _rng);
             if (!wasSnagged && lure.Snagged)
@@ -1176,7 +1294,7 @@ namespace FishingSim.Game
             // retrieve: the float/feeder comes in, the lure works
             if (lmb && State == RodState.Waiting && !Snagged)
             {
-                float speed = (Reel?.ReelSpeed ?? 3f) * (Method == FishingMethod.Spinning ? 0.35f : 0.22f);
+                float speed = RetrieveRate;
                 var toAngler = Flat(Player.transform.position - p);
                 if (toAngler.magnitude < 2.2f || World.Lake.HeightAt(p.x, p.z) > -0.08f)
                 {
@@ -1639,17 +1757,17 @@ namespace FishingSim.Game
             }
 
             // the rod lifts while charging and in the fight when lifting
-            float lift = State == RodState.Charging ? -25f * CastPower : State == RodState.Fight && Input.GetMouseButton(1) ? -18f : 0f;
-            _rodRoot.localRotation = Quaternion.Slerp(_rodRoot.localRotation, RestTurn(lift), 1f - Mathf.Exp(-dt * 10f));
+            // charging: up to 60 degrees over half a second; the release swings it back fast (the cast's snap)
+            float lift = State == RodState.Charging && _swing < 0f ? -CastLift * Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(_stateTime / 0.5f))
+                : State == RodState.Fight && Input.GetMouseButton(1) ? -18f : 0f;
+            float rate = State == RodState.Charging && _swing >= 0f ? 28f : 10f;
+            _rodRoot.localRotation = Quaternion.Slerp(_rodRoot.localRotation, RestTurn(lift), 1f - Mathf.Exp(-dt * rate));
 
             // the crank turns with the line wound in: the rotor lays 2 pi r of line a turn, 5.2 turns to one of the crank
             bool reeling = (State == RodState.Fight || State == RodState.Waiting) && (Input.GetMouseButton(0) || SmokeReel) && !Blocked;
             Reeling = reeling;
             if (reeling)
-            {
-                float metres = (Reel?.ReelSpeed ?? 3f) * (State == RodState.Fight ? 0.5f : Method == FishingMethod.Spinning ? 0.35f : 0.22f);
-                SetCrank(_crankAngle + dt * metres / (2f * Mathf.PI * 0.025f) / 5.2f * 2f * Mathf.PI);
-            }
+                SetCrank(_crankAngle + dt * CrankTurns * 2f * Mathf.PI);     // the crank at the turns the line comes in by
 
             // the spool empties as the line goes out and fills as it is wound back
             float capacity = Mathf.Max(Reel?.LineCapacity ?? 100f, 10f);
@@ -1657,13 +1775,8 @@ namespace FishingSim.Game
             SetSpoolFill(1f - (outside ? Mathf.Min(_lineLength, capacity) : 0f) / capacity);
 
             // the line inside the rod: from the spool's lip through the guides to the tip-top, bending with the blank
-            if (_inRodLine != null && _inRodLine.enabled)
-            {
-                int n = LinePath(_inRod);
-                _inRodLine.positionCount = n;
-                for (int i = 0; i < n; i++)
-                    _inRodLine.SetPosition(i, _inRod[i]);
-            }
+            if (_inRodLine != null && _inRodLine.gameObject.activeSelf)
+                _inRodLine.SetPositions(_inRod, LinePath(_inRod));
 
             if (State == RodState.Landed && Species != null)
             {
@@ -1734,10 +1847,9 @@ namespace FishingSim.Game
                 }
                 _ropePts[i] = p;
             }
-            _line.positionCount = pts.Length;
-            _line.SetPositions(_ropePts);
             var c = LineItem?.LineColor ?? new Compat.Color(0.9f, 0.9f, 0.86f);
-            _line.sharedMaterial.color = Color.Lerp(new Color(c.R, c.G, c.B), new Color(1f, 0.2f, 0.15f), Mathf.Clamp01((ratio - 0.5f) * 2f));
+            _line.Color = Color.Lerp(new Color(c.R, c.G, c.B), new Color(1f, 0.2f, 0.15f), Mathf.Clamp01((ratio - 0.5f) * 2f));
+            _line.SetPositions(_ropePts, pts.Length);
         }
     }
 
