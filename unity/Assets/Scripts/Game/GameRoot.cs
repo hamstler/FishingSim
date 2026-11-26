@@ -1088,6 +1088,7 @@ namespace FishingSim.Game
         /// <summary>The smoke test's picture of a shop tab (-1 = none), and of the fisheries' panel.</summary>
         public static int ShopShotTab { get; set; } = -1;
         public static bool ShowTravelForShot { get; set; }
+        public static bool ShowJournalForShot { get; set; }
 
         private void OnGUI()
         {
@@ -1124,10 +1125,13 @@ namespace FishingSim.Game
                 DrawWorkshopNav(w);
                 return;
             }
-            if (ShowTravelForShot)
+            if (ShowTravelForShot || ShowJournalForShot)
             {
                 GUI.BeginGroup(new Rect(0, S(64), w, h - S(64)));
-                DrawTravel(w, h - S(64));
+                if (ShowTravelForShot)
+                    DrawTravel(w, h - S(64));
+                else
+                    DrawRecords(w, h - S(64));
                 GUI.EndGroup();
                 DrawWorkshopNav(w);
                 return;
@@ -1768,24 +1772,104 @@ namespace FishingSim.Game
                 ClosePanel();
         }
 
+        private FishSpecies? _journalSelection;
+        private string _journalSearch = "";
+        private bool _journalCaughtOnly;
+
         private void DrawRecords(float w, float h)
         {
-            var r = Centre(w, h, S(620), S(640));
-            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), $"REKORDY  <size={(int)S(18)}><color=#9AA3AA>{_profile.Records.Count}/{Tackle.AllSpecies.Count} gatunków</color></size>", _title);
-            var view = new Rect(r.x, r.y + S(60), r.width, r.height - S(120));
+            InventoryArt();
+            GUI.DrawTexture(new Rect(0, 0, w, h), _dim!);
+            float margin = S(14), top = S(36), pad = S(18), height = h - top - margin;
+            var catalogue = new Rect(margin, top, w * .54f - 2f * margin, height);
+            var detail = new Rect(w * .54f, top, w * .46f - margin, height);
+            GUI.Box(catalogue, GUIContent.none, _inventorySurface);
+            GUI.Box(detail, GUIContent.none, _inventorySurface);
+
+            float left = catalogue.x + pad, width = catalogue.width - 2f * pad;
+            GUI.Label(new Rect(left, top + pad, width, S(42)), "Dziennik połowów", _title);
             var species = Tackle.AllSpecies;
-            var content = new Rect(0, 0, r.width - S(24), species.Count * S(32));
-            _scroll = GUI.BeginScrollView(view, _scroll, content);
-            for (int i = 0; i < species.Count; i++)
+            int caught = species.Count(fish => _profile.Records.ContainsKey(fish.SpeciesName));
+            GUI.Label(new Rect(left, top + S(61), width, S(24)), $"{caught} / {species.Count} gatunków złowionych", _small);
+            var progress = new Rect(left, top + S(90), width, S(7));
+            GUI.Box(progress, GUIContent.none, _bar);
+            progress.width *= caught / (float)Mathf.Max(species.Count, 1);
+            GUI.Box(progress, GUIContent.none, _barFill);
+
+            var filter = new Rect(left, top + S(115), S(168), S(41));
+            if (GUI.Button(filter, _journalCaughtOnly ? "Tylko złowione" : "Wszystkie gatunki",
+                _journalCaughtOnly ? _accentButton : _button))
             {
-                var sp = species[i];
-                string rec = _profile.Records.TryGetValue(sp.SpeciesName, out float best) ? $"{best:0.000} kg" : "—";
-                GUI.Label(new Rect(0, i * S(32), content.width * 0.6f, S(30)), sp.SpeciesName, _profile.Records.ContainsKey(sp.SpeciesName) ? _text : _small);
-                GUI.Label(new Rect(content.width * 0.6f, i * S(32), content.width * 0.4f, S(30)), rec, _small);
+                _journalCaughtOnly = !_journalCaughtOnly;
+                _scroll = Vector2.zero;
+            }
+            var search = new Rect(filter.xMax + S(9), filter.y, width - filter.width - S(9), filter.height);
+            GUI.SetNextControlName("JournalSearch");
+            string query = GUI.TextField(search, _journalSearch, 60, _field);
+            if (query != _journalSearch)
+            {
+                _journalSearch = query;
+                _scroll = Vector2.zero;
+            }
+            if (query.Length == 0 && GUI.GetNameOfFocusedControl() != "JournalSearch")
+                GUI.Label(new Rect(search.x + S(12), search.y + S(8), search.width - S(24), S(28)), "Szukaj gatunku…", _small);
+            string term = query.Trim();
+            var list = species.Where(fish => (!_journalCaughtOnly || _profile.Records.ContainsKey(fish.SpeciesName)) &&
+                (term.Length == 0 || fish.SpeciesName.IndexOf(term, StringComparison.CurrentCultureIgnoreCase) >= 0 ||
+                 fish.LatinName.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0))
+                .OrderBy(fish => fish.SpeciesName).ToList();
+            if (_journalSelection == null || !list.Contains(_journalSelection))
+                _journalSelection = list.FirstOrDefault();
+            var view = new Rect(left, filter.yMax + S(13), width, catalogue.yMax - pad - filter.yMax - S(13));
+            float itemHeight = S(61), rowWidth = view.width - S(27);
+            _scroll = GUI.BeginScrollView(view, _scroll, new Rect(0, 0, rowWidth, list.Count * itemHeight));
+            for (int i = 0; i < list.Count; i++)
+            {
+                var row = new Rect(0, i * itemHeight, rowWidth, itemHeight - S(5));
+                if (row.yMax < _scroll.y || row.y > _scroll.y + view.height)
+                    continue;
+                var fish = list[i];
+                bool selected = fish == _journalSelection;
+                if (GUI.Button(row, GUIContent.none, selected ? _inventorySelected : _inventoryCard))
+                    _journalSelection = fish;
+                DrawGearGlyph(new Rect(row.x + S(9), row.y + S(9), S(36), S(36)), 4, selected ? Accent : Muted);
+                GUI.Label(new Rect(row.x + S(53), row.y + S(5), row.width - S(208), S(27)), fish.SpeciesName, _text);
+                GUI.Label(new Rect(row.x + S(53), row.y + S(31), row.width - S(208), S(22)), fish.LatinName, _small);
+                string record = _profile.Records.TryGetValue(fish.SpeciesName, out float best) ? $"{best:0.000} kg" : "Jeszcze nie złowiono";
+                GUI.Label(new Rect(row.xMax - S(149), row.y + S(18), S(143), S(28)), record, _small);
             }
             GUI.EndScrollView();
-            if (GUI.Button(new Rect(r.x, r.yMax - S(50), r.width, S(48)), "Zamknij", _button))
-                ClosePanel();
+
+            if (_journalSelection is not { } chosen)
+            {
+                GUI.Label(new Rect(left, view.y + pad, width, S(55)),
+                    _journalCaughtOnly && caught == 0 ? "Twój pierwszy połów pojawi się tutaj." : "Brak pasujących gatunków.", _text);
+                return;
+            }
+            var display = new Rect(detail.x + pad, top + pad, detail.width - 2f * pad, height * .36f);
+            _tacklePreview ??= new TacklePreview();
+            bool model = _tacklePreview.Draw(display, chosen);
+            if (!model)
+            {
+                GUI.Box(display, GUIContent.none, _inventoryHero);
+                float icon = Mathf.Min(S(118), display.height);
+                DrawGearGlyph(new Rect(display.center.x - icon * .5f, display.center.y - icon * .5f, icon, icon), 4, Muted);
+            }
+            string hint = model ? "Przeciągnij, aby obrócić · kółko przybliża" : _tacklePreview.Loading ? "Wczytywanie modelu…" : "";
+            GUI.Label(new Rect(display.x, display.yMax + S(4), display.width, S(24)), hint, _small);
+            float y = display.yMax + S(33);
+            GUI.Label(new Rect(display.x, y, display.width, S(38)), chosen.SpeciesName, _title);
+            GUI.Label(new Rect(display.x, y + S(39), display.width, S(26)), chosen.LatinName, _small);
+            var recordCard = new Rect(display.x, y + S(79), display.width, S(52));
+            GUI.Box(recordCard, GUIContent.none, _inventorySelected);
+            string personal = _profile.Records.TryGetValue(chosen.SpeciesName, out float recordWeight)
+                ? $"Twój rekord  ·  {recordWeight:0.000} kg" : "Twój rekord  ·  jeszcze brak połowu";
+            GUI.Label(new Rect(recordCard.x + S(14), recordCard.y + S(14), recordCard.width - S(28), S(28)), personal, _text);
+            GUI.Label(new Rect(display.x, y + S(147), display.width, S(29)),
+                $"Typowa masa w grze  ·  {chosen.MinWeight:0.##}–{chosen.MaxWeight:0.##} kg", _small);
+            var lakes = _locations.Where(loc => loc.AbundanceOf(chosen.SpeciesName) > 0f).Select(loc => loc.DisplayName);
+            GUI.Label(new Rect(display.x, y + S(179), display.width, S(57)), "Łowiska  ·  " + string.Join(", ", lakes), _small);
+            GUI.Label(new Rect(display.x, y + S(243), display.width, Mathf.Max(0f, detail.yMax - y - S(251))), chosen.Description, _text);
         }
 
         private void DrawCooking(float w, float h)
@@ -2085,7 +2169,8 @@ namespace FishingSim.Game
             for (int i = 0; i < destinations.Length; i++)
             {
                 var destination = destinations[i];
-                bool selected = (ShopShotTab >= 0 ? Panel.Shop : ShowTravelForShot ? Panel.Travel : _panel) == destination;
+                bool selected = (ShopShotTab >= 0 ? Panel.Shop : ShowTravelForShot ? Panel.Travel :
+                    ShowJournalForShot ? Panel.Records : _panel) == destination;
                 if (GUI.Button(new Rect(S(10) + i * buttonWidth, S(7), buttonWidth - S(5), height - S(14)),
                     labels[i], selected ? _inventoryAction : _button) && !selected)
                 {

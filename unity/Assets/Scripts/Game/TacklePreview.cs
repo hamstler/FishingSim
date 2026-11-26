@@ -1,6 +1,8 @@
 using System;
+using System.IO;
 using FishingSim.Data;
 using UnityEngine;
+using Resource = FishingSim.Compat.Resource;
 
 namespace FishingSim.Game
 {
@@ -12,7 +14,7 @@ namespace FishingSim.Game
         private readonly Camera _camera;
         private GameObject? _model;
         private RenderTexture? _target;
-        private TackleItem? _item;
+        private Resource? _item;
         private string _modelId = "";
         private Quaternion _turn;
         private Bounds _bounds;
@@ -51,7 +53,7 @@ namespace FishingSim.Game
 
         public bool Loading => _modelId.Length != 0 && !ModelLibrary.Settled(_modelId);
 
-        public bool Draw(Rect area, TackleItem item)
+        public bool Draw(Rect area, Resource item)
         {
             if (!ReferenceEquals(_item, item))
                 Select(item);
@@ -82,7 +84,7 @@ namespace FishingSim.Game
             return true;
         }
 
-        private void Select(TackleItem item)
+        private void Select(Resource item)
         {
             if (_model != null)
             {
@@ -95,20 +97,30 @@ namespace FishingSim.Game
             {
                 RodData rod => string.IsNullOrEmpty(rod.Model) ? "rods/float_ostoja" : rod.Model,
                 ReelData reel => string.IsNullOrEmpty(reel.Model) ? "reels/small_hokuto" : reel.Model,
+                FishSpecies fish => "fish/" + Path.GetFileNameWithoutExtension(fish.ResourcePath),
                 _ => "",
             };
             if (_modelId.Length != 0)
                 ModelLibrary.Start(_modelId);
-            _turn = item is RodData ? Quaternion.Euler(0f, -15f, -62f) : Quaternion.Euler(18f, -35f, -14f);
+            _turn = item switch
+            {
+                RodData => Quaternion.Euler(0f, -15f, -62f),
+                FishSpecies => Quaternion.Euler(3f, -82f, -3f),
+                _ => Quaternion.Euler(18f, -35f, -14f),
+            };
             _zoom = 1f;
         }
 
-        private bool PrepareModel(TackleItem item)
+        private bool PrepareModel(Resource item)
         {
-            var model = ModelLibrary.Spawn(_modelId, _stage.transform);
+            var model = item is FishSpecies fish
+                ? ModelLibrary.Fish(Path.GetFileNameWithoutExtension(fish.ResourcePath))
+                : ModelLibrary.Spawn(_modelId, _stage.transform);
             if (model == null)
                 return false;
             _model = model;
+            if (item is FishSpecies)
+                model.transform.SetParent(_stage.transform, false);
 
             Color tint = Color.white;
             if (item is RodData rod)

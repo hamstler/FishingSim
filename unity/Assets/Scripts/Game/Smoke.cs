@@ -90,10 +90,13 @@ namespace FishingSim.Game
                          ("gui_login", on => GameRoot.ShowLoginForShot = on),
                          ("gui_loading", on => GameRoot.ShowLoadingForShot = on),
                          ("gui_travel", on => GameRoot.ShowTravelForShot = on),
+                         ("gui_journal", on => GameRoot.ShowJournalForShot = on),
                          ("gui_play", _ => { }),
                      })
             {
                 show(true);
+                if (GameRoot.ShowJournalForShot)
+                    yield return new WaitForSecondsRealtime(1.5f);
                 for (int i = 0; i < 3; i++)
                     yield return null;
                 yield return new WaitForEndOfFrame();
