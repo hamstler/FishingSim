@@ -222,7 +222,7 @@ namespace FishingSim.Game
             {
                 ids.AddRange(Village.ModelIds(_world.Lake != null && _world.Lake.Location == loc ? _world.Lake : new Lake(loc)));
                 foreach (var id in ModelLibrary.IdsIn("characters"))
-                    if (id != GripArms.ModelId && id != "characters/player_angler")
+                    if (!id.StartsWith("characters/angler_") && id != "characters/player_angler")
                         ids.Add(id);
                 ids.Add("stone_fire_pit");
                 ids.AddRange(Anglers.ModelIds);
