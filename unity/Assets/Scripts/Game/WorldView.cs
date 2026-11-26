@@ -101,8 +101,8 @@ namespace FishingSim.Game
 
             // --- plants and stones, built on worker threads per cell
             var cells = new List<Vector2Int>();
-            for (int cz = Mathf.FloorToInt(-Lake.Outer / 64f); cz < Mathf.CeilToInt(Lake.Outer / 64f); cz++)
-                for (int cx = Mathf.FloorToInt(-Lake.Outer / 64f); cx < Mathf.CeilToInt(Lake.Outer / 64f); cx++)
+            for (int cz = Mathf.FloorToInt((Lake.ZMin - Lake.ForestMargin) / 64f); cz < Mathf.CeilToInt((Lake.ZMax + Lake.ForestMargin) / 64f); cz++)
+                for (int cx = Mathf.FloorToInt((Lake.XMin - Lake.ForestMargin) / 64f); cx < Mathf.CeilToInt((Lake.XMax + Lake.ForestMargin) / 64f); cx++)
                     cells.Add(new Vector2Int(cx, cz));
             var built = new (MeshKit Solid, MeshKit Leaves, MeshKit Grass)[cells.Count];
             LoadLog.Begin("plants and stones");
@@ -173,19 +173,19 @@ namespace FishingSim.Game
             Ready = true;
         }
 
-        /// <summary>Grid lines every 2.5 m over the map and 30 m around it, widening to 14 m out to the mountains.</summary>
+        /// <summary>Grid lines every 2.5 m, coarser in the forest just outside the map.</summary>
         private static List<float> GridLines(float min, float max)
         {
             var list = new List<float>();
-            float lo = min - 30f, hi = max + 30f;
-            float x = -Lake.Outer;
-            while (x < Lake.Outer)
+            float lo = min - Lake.ForestMargin, hi = max + Lake.ForestMargin;
+            float x = lo;
+            while (x < hi)
             {
                 list.Add(x);
-                float d = x < lo ? lo - x : x > hi ? x - hi : 0f;
+                float d = x < min ? min - x : x > max ? x - max : 0f;
                 x += Mathf.Clamp(2.5f + d * 0.06f, 2.5f, 14f);
             }
-            list.Add(Lake.Outer);
+            list.Add(hi);
             return list;
         }
 

@@ -3,9 +3,9 @@
  "DisplayName": "Zbiornik Kamienna Zapora",
  "Description": "Największy i najgłębszy akwen. Przy dnie żeruje sandacz, a nad stokiem krąży boleń.",
  "RequiredLevel": 27,
- "OutlineRx": 114.0,
- "OutlineRz": 75.0,
- "OutlineCz": -75.0,
+ "OutlineRx": 146.0,
+ "OutlineRz": 92.0,
+ "OutlineCz": -90.0,
  "Slope": 0.2,
  "MaxDepth": 17,
  "HolePos": {
@@ -32,7 +32,9 @@
   "83,-110,35,24"
  ],
  "Islands": [
-  "-43,-104,11"
+  "-43,-104,14",
+  "51,-123,11",
+  "32,-26,9"
  ],
  "WaterShallowColor": {
   "R": 0.06,
@@ -62,9 +64,17 @@
  },
  "VillageStyle": "fishing",
  "Buildings": [
-  "general,-12,17",
-  "office,13,18",
-  "busstop,5,10",
-  "bench,-4,9"
+  "general,-32,22",
+  "office,24,29",
+  "busstop,9,10",
+  "fishbuyer,-17,38",
+  "boathouse,46,11",
+  "house,66,31"
+ ],
+ "HillScale": 1.1,
+ "Landmarks": [
+  "dike,0,-186,0,72",
+  "bridge,32,-15,90,32",
+  "rocks,-67,-95"
  ]
 }

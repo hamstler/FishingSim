@@ -3,9 +3,9 @@
  "DisplayName": "Jezioro Sosnowe",
  "Description": "Chłodny akwen pośród sosen. Głębokie rynny są domem sielawy i siei.",
  "RequiredLevel": 16,
- "OutlineRx": 96.0,
- "OutlineRz": 64.0,
- "OutlineCz": -64.0,
+ "OutlineRx": 127.0,
+ "OutlineRz": 81.0,
+ "OutlineCz": -79.0,
  "Slope": 0.2,
  "MaxDepth": 13,
  "HolePos": {
@@ -32,7 +32,8 @@
   "69,-100,33,18"
  ],
  "Islands": [
-  "27,-92,8"
+  "27,-92,11",
+  "-44,-128,9"
  ],
  "WaterShallowColor": {
   "R": 0.06,
@@ -62,9 +63,16 @@
  },
  "VillageStyle": "mountain",
  "Buildings": [
-  "general,-12,17",
-  "office,13,18",
-  "busstop,5,10",
-  "bench,-4,9"
+  "general,-29,24",
+  "office,13,32",
+  "busstop,5,17",
+  "cabin,-53,35",
+  "cabin,51,30",
+  "woodpile,-40,28"
+ ],
+ "HillScale": 0.95,
+ "Landmarks": [
+  "tower,92,-24",
+  "platforms,-45,-7,54"
  ]
 }

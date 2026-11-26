@@ -3,9 +3,9 @@
  "DisplayName": "Górskie Jezioro",
  "Description": "Chłodne jezioro wśród sosen i skał. Głębokie, czyste, z dużymi szczupakami.",
  "RequiredLevel": 4,
- "OutlineCz": -49.0,
- "OutlineRx": 72.0,
- "OutlineRz": 51.0,
+ "OutlineCz": -62.0,
+ "OutlineRx": 98.0,
+ "OutlineRz": 64.0,
  "Slope": 0.2,
  "MaxDepth": 12.0,
  "HolePos": {
@@ -92,7 +92,7 @@
  "RimHeight": 130.0,
  "SnowLine": 34.0,
  "RockLine": 12.0,
- "HillScale": 2.3,
+ "HillScale": 1.45,
  "TreeDensity": 0.9,
  "TreeMix": {
   "pine": 1.0,
@@ -150,11 +150,11 @@
   "-38,-85,15,22"
  ],
  "Islands": [
-  "22,-88,6",
-  "38,-76,3.5"
+  "22,-88,9",
+  "38,-76,5"
  ],
  "Landmarks": [
-  "waterfall,-52,-174,0",
+  "waterfall,-52,-145,0",
   "rocks,22,-88",
   "rocks,38,-76"
  ],

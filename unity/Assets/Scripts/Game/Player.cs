@@ -80,6 +80,8 @@ namespace FishingSim.Game
             float h = World.Lake.HeightAt(x, z);
             if (Lake.OnPier(x, z))
                 h = Mathf.Max(h, WorldView.PierDeck);
+            if (World.Lake.TryBridgeDeck(x, z, out float deck))
+                h = Mathf.Max(h, deck);
             return Mathf.Max(h, -Lake.WadeDepth);
         }
 

@@ -3,9 +3,9 @@
  "DisplayName": "Jezioro Brzozowe",
  "Description": "Jasne skarpy opadają do czystej wody. Okonie polują nad kamienistymi krawędziami.",
  "RequiredLevel": 9,
- "OutlineRx": 83.0,
- "OutlineRz": 56.0,
- "OutlineCz": -56.0,
+ "OutlineRx": 112.0,
+ "OutlineRz": 72.0,
+ "OutlineCz": -70.0,
  "Slope": 0.11,
  "MaxDepth": 7,
  "HolePos": {
@@ -32,7 +32,8 @@
   "62,-82,26,17"
  ],
  "Islands": [
-  "-37,-75,6"
+  "-37,-75,9",
+  "46,-96,12"
  ],
  "WaterShallowColor": {
   "R": 0.06,
@@ -62,9 +63,16 @@
  },
  "VillageStyle": "fishing",
  "Buildings": [
-  "general,-12,17",
-  "office,13,18",
-  "busstop,5,10",
-  "bench,-4,9"
+  "general,18,25",
+  "office,-26,21",
+  "busstop,-5,12",
+  "house,43,31",
+  "house,-54,28",
+  "well,9,24"
+ ],
+ "HillScale": 0.83,
+ "Landmarks": [
+  "chapel,69,7",
+  "platforms,-68,-16,58"
  ]
 }

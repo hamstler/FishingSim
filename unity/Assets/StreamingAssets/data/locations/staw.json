@@ -1,9 +1,9 @@
 {
  "$type": "LocationData",
  "DisplayName": "Staw Karpiowy",
- "OutlineCz": -45.0,
- "OutlineRx": 60.0,
- "OutlineRz": 45.0,
+ "OutlineCz": -54.0,
+ "OutlineRx": 84.0,
+ "OutlineRz": 56.0,
  "Slope": 0.08,
  "MaxDepth": 3.5,
  "HolePos": {
@@ -84,7 +84,7 @@
  "RimHeight": 50.0,
  "SnowLine": 999.0,
  "RockLine": 30.0,
- "HillScale": 0.6,
+ "HillScale": 0.42,
  "TreeDensity": 0.45,
  "TreeMix": {
   "oak": 1.0,
@@ -151,11 +151,13 @@
   "-53,-45,14,18"
  ],
  "Landmarks": [
-  "dike,0,-95,0,64",
-  "platforms,60,-20,-90",
-  "platforms,60,-58,-90",
-  "platforms,-60,-30,90"
+  "dike,0,-113,0,64",
+  "platforms,69,-58,-90",
+  "bridge,24,-16,90,36"
  ],
  "WaterClarity": 2.2,
- "WaterTemperature": 21.5
+ "WaterTemperature": 21.5,
+ "Islands": [
+  "24,-29,9"
+ ]
 }

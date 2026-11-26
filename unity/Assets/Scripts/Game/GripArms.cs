@@ -17,12 +17,13 @@ namespace FishingSim.Game
     public sealed class GripArms : MonoBehaviour
     {
         public const string ModelId = "characters/angler_grip";
+        private const int ArmsLayer = 29;
 
         public Fishing Rod { get; set; } = null!;
 
         /// <summary>Where the reel seat (the right hand) sits in the camera's space before the shift right: low in the
         /// middle of the screen, within the arm's reach.</summary>
-        public static readonly Vector3 SeatOnScreen = new(0f, -0.16f, 0.38f);
+        public static readonly Vector3 SeatOnScreen = new(0f, -0.197f, 0.45f);
 
         /// <summary>How far right of the screen's middle the rod stands, as a share of the screen's width (the user: 15 %).</summary>
         public const float ShiftRight = 0.15f;
@@ -39,6 +40,7 @@ namespace FishingSim.Game
         }
 
         private Transform _model = null!, _frame = null!;
+        private Light _fill = null!;
         private Arm? _right, _left;
         private readonly List<(Transform Bone, Quaternion AtRest)> _rest = new();
 
@@ -53,8 +55,17 @@ namespace FishingSim.Game
             arms.Rod = rod;
             arms._model = model.transform;
             arms._frame = rod.Frame;
+            var fill = new GameObject("Forearm fill").AddComponent<Light>();
+            fill.transform.SetParent(holder.transform, false);
+            fill.transform.localEulerAngles = new Vector3(-24f, 155f, 0f);
+            fill.type = LightType.Directional;
+            fill.color = new Color(0.83f, 0.89f, 1f);
+            fill.cullingMask = 1 << ArmsLayer;
+            fill.shadows = LightShadows.None;
+            arms._fill = fill;
             foreach (var r in model.GetComponentsInChildren<Renderer>())
             {
+                r.gameObject.layer = ArmsLayer;
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 if (r is SkinnedMeshRenderer s)
                     s.updateWhenOffscreen = true;
@@ -100,7 +111,7 @@ namespace FishingSim.Game
             else
                 arm.Offset = _frame.InverseTransformPoint(hand.position);
             // the elbows point out and down from the body
-            arm.PoleSide = new Vector3(side == "r" ? 0.35f : -0.35f, -0.55f, -0.1f);
+            arm.PoleSide = new Vector3(side == "r" ? 0.22f : -0.22f, -0.62f, -0.19f);
             return arm;
         }
 
@@ -148,8 +159,10 @@ namespace FishingSim.Game
                 return;
             bool show = Rod.RodVisible && ShowAngler;
             _model.gameObject.SetActive(show);
+            _fill.enabled = show;
             if (!show)
                 return;
+            _fill.intensity = Mathf.Lerp(0.02f, 0.55f, Rod.Day.Light);
             foreach (var (bone, rest) in _rest)
                 bone.localRotation = rest;
             if (_right != null)
@@ -162,7 +175,13 @@ namespace FishingSim.Game
         {
             var pole = arm.Upper.position + transform.TransformDirection(arm.PoleSide);
             Solve(arm.Upper, arm.Lower, arm.Hand, wrist, pole);
-            arm.Hand.rotation = _frame.rotation * arm.Turn;
+            var desired = _frame.rotation * arm.Turn;
+            var axis = (arm.Hand.position - arm.Lower.position).normalized;
+            var difference = desired * Quaternion.Inverse(arm.Hand.rotation);
+            float along = Vector3.Dot(new Vector3(difference.x, difference.y, difference.z), axis);
+            float roll = Mathf.DeltaAngle(0f, 2f * Mathf.Atan2(along, difference.w) * Mathf.Rad2Deg);
+            arm.Lower.rotation = Quaternion.AngleAxis(Mathf.Clamp(roll * .5f, -55f, 55f), axis) * arm.Lower.rotation;
+            arm.Hand.rotation = desired;
         }
 
         /// <summary>Two-bone IK (as AnglerArms.Solve): the elbow in the pole's plane, the wrist at the target.</summary>

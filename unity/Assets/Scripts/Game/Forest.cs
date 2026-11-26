@@ -305,8 +305,7 @@ namespace FishingSim.Game
                 Plant(pick < 0.65f ? 2 : 1, foot.x, foot.z, foot.y + 0.1f, R(rng, 1.15f, 1.45f), (float)rng.NextDouble() * Mathf.PI * 2f, R(rng, -0.1f, 0.1f), false);
             }
 
-            // the rim forest: dense at the edge, thinning up the slopes to the tree line
-            float treeLine = MathF.Min(loc.SnowLine - 3f, loc.RimHeight * 0.75f);
+            // A band of trees closes the view around the lake and village.
             var rimWeights = new float[Kinds.Length];
             for (int k = 0; k < Kinds.Length; k++)
                 rimWeights[k] = Kinds[k] switch
@@ -318,17 +317,18 @@ namespace FishingSim.Game
                     _ => 0f,
                 };
             const float cell = 3.4f;
-            for (float gz = Lake.ZMin - 140f; gz <= Lake.ZMax + 140f; gz += cell)
-                for (float gx = Lake.XMin - 140f; gx <= Lake.XMax + 140f; gx += cell)
+            for (float gz = Lake.ZMin - Lake.ForestMargin; gz < Lake.ZMax + Lake.ForestMargin - cell; gz += cell)
+                for (float gx = Lake.XMin - Lake.ForestMargin; gx < Lake.XMax + Lake.ForestMargin - cell; gx += cell)
                 {
                     float x = gx + (float)rng.NextDouble() * cell, z = gz + (float)rng.NextDouble() * cell;
                     float s = R(rng, 0.9f, 2f), yaw = (float)rng.NextDouble() * Mathf.PI * 2f, tint = R(rng, -0.06f, 0.05f), pick = (float)rng.NextDouble();
                     float keep = (float)rng.NextDouble();
                     float d = lake.PlayDistance(x, z);
-                    if (d < -34f || d > 140f || (d > 2f && keep > 0.3f) || (d < -20f && keep > 0.6f))
+                    float shore = -lake.InsideMetres(x, z);
+                    if (shore < 11f || (shore < 22f && keep > .4f) || (d < -22f && keep > .58f))
                         continue;
                     float h = lake.HeightAt(x, z);
-                    if (h < 1.2f || h > treeLine - keep * 8f || lake.InsideMetres(x, z) > -3f || (d < 0f && !Clear(lake, x, z)))
+                    if (h < 0.9f || !Clear(lake, x, z))
                         continue;
                     float slope = MathF.Abs(lake.HeightAt(x + 1.5f, z) - h) + MathF.Abs(lake.HeightAt(x, z + 1.5f) - h);
                     if (slope > 1.4f)
@@ -596,7 +596,7 @@ namespace FishingSim.Game
             int mountain = 0;
             for (int tries = 0; mountain < 60 + 50 * loc.RockDensity && tries < 20000; tries++)
             {
-                float x = R(rng, Lake.XMin - 110f, Lake.XMax + 110f), z = R(rng, Lake.ZMin - 110f, Lake.ZMax + 110f);
+                float x = R(rng, Lake.XMin, Lake.XMax), z = R(rng, Lake.ZMin, Lake.ZMax);
                 float d = lake.PlayDistance(x, z);
                 if (d < -6f || d > 100f)
                     continue;

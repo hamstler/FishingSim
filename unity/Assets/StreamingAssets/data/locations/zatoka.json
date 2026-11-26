@@ -1,9 +1,9 @@
 {
  "$type": "LocationData",
  "DisplayName": "Zatoka Szuwarowa",
- "OutlineCz": -46.0,
- "OutlineRx": 66.0,
- "OutlineRz": 48.0,
+ "OutlineCz": -59.0,
+ "OutlineRx": 91.0,
+ "OutlineRz": 61.0,
  "Slope": 0.1,
  "MaxDepth": 5.0,
  "HolePos": {
@@ -88,7 +88,7 @@
  "RimHeight": 46.0,
  "SnowLine": 999.0,
  "RockLine": 30.0,
- "HillScale": 0.5,
+ "HillScale": 0.68,
  "TreeDensity": 0.8,
  "TreeMix": {
   "willow": 1.0,
@@ -152,12 +152,13 @@
   "0,-89,18,11"
  ],
  "Islands": [
-  "-24,-51,5",
-  "22,-39,4",
-  "33,-62,5"
+  "-33,-57,8",
+  "22,-39,7",
+  "44,-78,11"
  ],
  "Landmarks": [
-  "stilthouse,66,-30"
+  "stilthouse,74,-30",
+  "platforms,-64,-29,80"
  ],
  "WaterClarity": 1.6,
  "WaterTemperature": 19.5

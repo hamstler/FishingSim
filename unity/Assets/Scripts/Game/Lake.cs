@@ -13,7 +13,7 @@ namespace FishingSim.Game;
 public sealed class Lake
 {
     public const float XMin = -190f, XMax = 190f, ZMin = -220f, ZMax = 100f;
-    public const float Outer = 380f;
+    public const float ForestMargin = 35f;
     public const float ShoreTaper = 6f;
     public const float WadeDepth = 0.5f;
 
@@ -38,6 +38,7 @@ public sealed class Lake
     private readonly List<(Vector2 C, float R, float H)> _pads = new();
     private readonly List<(Vector2 A, Vector2 B)> _paths = new();
     private readonly List<(float X, float Z, float R)> _reach = new();
+    private readonly List<(float X, float Z, float Cos, float Sin, float HalfLength, float Deck)> _bridges = new();
 
     /// <summary>How far from the water the angler may walk (the user: at most 10 m) where nothing else is worth going to.</summary>
     public const float ShoreReach = 10f;
@@ -57,6 +58,13 @@ public sealed class Lake
         foreach (var entry in loc.Islands)
             if (LocationData.Numbers(entry) is { Length: >= 3 } n)
                 _islands.Add((n[0], n[1], n[2]));
+        foreach (var entry in loc.Landmarks)
+            if (entry.StartsWith("bridge,", StringComparison.Ordinal) &&
+                LocationData.Numbers(entry.Substring(7)) is { Length: >= 4 } bridge && bridge[3] > 0f)
+            {
+                float angle = bridge[2] * MathF.PI / 180f;
+                _bridges.Add((bridge[0], bridge[1], MathF.Cos(angle), MathF.Sin(angle), bridge[3] * 0.5f, 0.93f));
+            }
         _flat.Add((loc.PlazaCenter, 14f));
         Specs.AddRange(loc.BuildingSpecs());
         foreach (var spec in Specs)
@@ -250,19 +258,6 @@ public sealed class Lake
         return outside + MathF.Min(MathF.Max(qx, qz), 0f) - r + _noise.Get(x * 0.8f + 300f, z * 0.8f) * 7f;
     }
 
-    public float RimAt(float x, float z)
-    {
-        float d = PlayDistance(x, z);
-        if (d < -45f)
-            return 0f;
-        float t = Smooth(-40f, 170f, d);
-        float n = _noise.Get(x * 0.45f + 77f, z * 0.45f - 31f);
-        float ridge = 1f - MathF.Sqrt(n * n + 0.03f);
-        float peaks = 0.5f + 0.45f * ridge * ridge + 0.12f * _noise.Get(x * 0.9f - 12f, z * 0.9f + 40f);
-        float bank = 5f * Smooth(-14f, 12f, d);
-        return Location.RimHeight * MathF.Pow(t, 1.6f) * peaks + bank;
-    }
-
     private static float Hash(int x, int z, int k, int seed)
     {
         unchecked
@@ -380,16 +375,31 @@ public sealed class Lake
         h += KnollsAt(x, z) * Smooth(4f, 12f, sd) * (0.35f + 0.65f * free);
         float hollow = HollowsAt(x, z) * Smooth(9f, 22f, sd) * free * (1f - 0.4f * village);
         h = MathF.Max(h - hollow, MathF.Min(h, 0.9f));
-        h += RimAt(x, z);
-        return h;
+        return h + (1.8f - h) * Smooth(22f, 48f, sd);
     }
 
     public static bool OnPier(float x, float z) => MathF.Abs(x) <= 1.6f && z >= -4.2f && z <= 6.2f;
 
+    public bool TryBridgeDeck(float x, float z, out float height)
+    {
+        foreach (var bridge in _bridges)
+        {
+            float dx = x - bridge.X, dz = z - bridge.Z;
+            if (MathF.Abs(dx * bridge.Cos - dz * bridge.Sin) <= bridge.HalfLength &&
+                MathF.Abs(dx * bridge.Sin + dz * bridge.Cos) <= 1.05f)
+            {
+                height = bridge.Deck;
+                return true;
+            }
+        }
+        height = 0f;
+        return false;
+    }
+
     /// <summary>True where the angler may stand: on land, in the shallows, or on the pier.</summary>
     public bool IsWalkable(float x, float z, float wadeLimit = WadeDepth)
     {
-        if (OnPier(x, z))
+        if (OnPier(x, z) || TryBridgeDeck(x, z, out _))
             return true;
         if (PlayDistance(x, z) > 0f || !InReach(x, z))
             return false;

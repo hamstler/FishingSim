@@ -49,6 +49,7 @@ namespace FishingSim.Game
                 float size = n.Length >= 4 ? n[3] : depth;
                 float y = kind switch
                 {
+                    "bridge" => 0.93f,
                     "stilthouse" or "platforms" => 0f,
                     "rocks" => ground > 0f ? ground - 0.4f : ground * 0.3f,
                     "waterfall" => MathF.Max(ground, 0f) - 0.4f,
@@ -67,6 +68,7 @@ namespace FishingSim.Game
                     case "waterfall": Waterfall(k, w); break;
                     case "rocks": Rocks(k); break;
                     case "platforms": Platform(k, MathF.Max(size, 0.8f)); break;
+                    case "bridge": Bridge(k, size, MathF.Max(depth, 1f)); break;
                     default: continue;
                 }
                 var root = new GameObject("Landmark " + kind);
@@ -284,6 +286,29 @@ namespace FishingSim.Game
                 float x = -length / 2f + i * length / n;
                 if (MathF.Abs(x) >= 4f)
                     trees.Add(new Vector3(x, 1.05f, -1.05f));
+            }
+        }
+
+        private static void Bridge(Kit k, float length, float depth)
+        {
+            var deck = Wood(0.62f, 0.48f, 0.34f);
+            var frame = Wood(0.43f, 0.31f, 0.22f);
+            int planks = Mathf.CeilToInt(length / 0.23f);
+            float pitch = length / planks;
+            for (int i = 0; i < planks; i++)
+                Box(k, new Vector3(pitch - 0.006f, 0.08f, 2.28f),
+                    new Vector3(-length * .5f + (i + .5f) * pitch, -.04f, 0f), deck);
+            int spans = Mathf.CeilToInt(length / 2.8f);
+            foreach (float side in new[] { -1.03f, 1.03f })
+            {
+                Box(k, new Vector3(length, 0.18f, 0.12f), new Vector3(0, -.17f, side * .84f), frame);
+                Box(k, new Vector3(length, .09f, .09f), new Vector3(0, .78f, side), deck);
+                for (int i = 0; i <= spans; i++)
+                {
+                    float x = (i / (float)spans - .5f) * (length - .2f);
+                    Box(k, new Vector3(.16f, depth + 1.7f, .16f),
+                        new Vector3(x, -.5f * (depth + .1f), side), frame);
+                }
             }
         }
 

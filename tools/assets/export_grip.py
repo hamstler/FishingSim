@@ -8,7 +8,7 @@ hangs it on the rod as it hangs the rod's and reel's models. Helper nodes:
                  follows the knob as the crank turns;
   * Eyes, EyesAhead, EyesUp - the figure's eyes, 1 m ahead of them and 1 m above: the game puts its camera there.
 
-    blender -b FILE.blend --python tools/assets/export_grip.py -- OUT.glb
+    blender -b FILE.blend --python tools/assets/export_grip.py -- OUT.glb [--upper-body]
 """
 import os
 import sys
@@ -16,7 +16,9 @@ import sys
 import bpy
 from mathutils import Vector
 
-out = os.path.abspath(sys.argv[sys.argv.index("--") + 1])
+args = sys.argv[sys.argv.index("--") + 1:]
+out = os.path.abspath(args[0])
+upper_body = "--upper-body" in args
 scene = bpy.context.scene
 figure = bpy.data.objects["Wedkarz"]
 arm = bpy.data.objects["Szkielet"]
@@ -75,7 +77,20 @@ import bmesh
 bm = bmesh.new()
 bm.from_mesh(figure.data)
 bm.faces.ensure_lookup_table()
-bmesh.ops.delete(bm, geom=[f for f in bm.faces if all(alone[v.index] for v in f.verts)], context="FACES")
+if upper_body:
+    # Keep the shirt across both shoulders so skinning weights cannot leave holes along the sleeves.
+    hips = arm.matrix_world @ arm.pose.bones["Hips"].head
+    neck = arm.matrix_world @ arm.pose.bones["Neck"].head
+    local = figure.matrix_world.inverted()
+    up = (figure.matrix_world.to_3x3().transposed() @ Vector((0, 0, 1))).normalized()
+    for height, lower in ((hips.z - 0.12, True), (neck.z + 0.024, False)):
+        bmesh.ops.bisect_plane(
+            bm, geom=list(bm.verts) + list(bm.edges) + list(bm.faces),
+            dist=0.00001, plane_co=local @ Vector((0, 0, height)), plane_no=up,
+            clear_inner=lower, clear_outer=not lower,
+        )
+else:
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if all(alone[v.index] for v in f.verts)], context="FACES")
 loose = [v for v in bm.verts if not v.link_faces]
 bmesh.ops.delete(bm, geom=loose, context="VERTS")
 bm.to_mesh(figure.data)

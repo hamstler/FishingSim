@@ -3,9 +3,9 @@
  "DisplayName": "Starorzecze Wierzbowe",
  "Description": "Zarośnięte zakola i podwodne półki. Lin i wzdręga trzymają się roślin.",
  "RequiredLevel": 6,
- "OutlineRx": 76.0,
- "OutlineRz": 52.0,
- "OutlineCz": -52.0,
+ "OutlineRx": 104.0,
+ "OutlineRz": 68.0,
+ "OutlineCz": -66.0,
  "Slope": 0.11,
  "MaxDepth": 4.5,
  "HolePos": {
@@ -32,7 +32,8 @@
   "-62,-46,21,14"
  ],
  "Islands": [
-  "19,-62,7"
+  "19,-62,10",
+  "-19,-26,9"
  ],
  "WaterShallowColor": {
   "R": 0.1,
@@ -62,9 +63,16 @@
  },
  "VillageStyle": "fishing",
  "Buildings": [
-  "general,-12,17",
-  "office,13,18",
-  "busstop,5,10",
-  "bench,-4,9"
+  "general,-16,29",
+  "office,17,25",
+  "busstop,7,14",
+  "boathouse,-38,8",
+  "smokehouse,28,21",
+  "lamp,-10,17"
+ ],
+ "HillScale": 0.37,
+ "Landmarks": [
+  "bridge,-19,-12,90,28",
+  "stilthouse,-57,-17"
  ]
 }

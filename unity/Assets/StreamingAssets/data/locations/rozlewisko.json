@@ -3,9 +3,9 @@
  "DisplayName": "Rozlewisko Czarne",
  "Description": "Rozległe, ciemne rozlewisko z wyspami. Po zmroku warto szukać suma.",
  "RequiredLevel": 21,
- "OutlineRx": 104.0,
- "OutlineRz": 68.0,
- "OutlineCz": -68.0,
+ "OutlineRx": 136.0,
+ "OutlineRz": 86.0,
+ "OutlineCz": -84.0,
  "Slope": 0.11,
  "MaxDepth": 8,
  "HolePos": {
@@ -32,8 +32,9 @@
   "-90,-39,28,18"
  ],
  "Islands": [
-  "-44,-69,10",
-  "38,-87,12"
+  "-44,-69,13",
+  "38,-87,14",
+  "-22,-31,11"
  ],
  "WaterShallowColor": {
   "R": 0.1,
@@ -63,9 +64,16 @@
  },
  "VillageStyle": "fishing",
  "Buildings": [
-  "general,-12,17",
-  "office,13,18",
-  "busstop,5,10",
-  "bench,-4,9"
+  "general,-24,31",
+  "office,33,20",
+  "busstop,-10,13",
+  "boathouse,50,7",
+  "dryingrack,26,11",
+  "smokehouse,-39,23"
+ ],
+ "HillScale": 0.3,
+ "Landmarks": [
+  "bridge,-22,-16,90,35",
+  "stilthouse,53,-8"
  ]
 }

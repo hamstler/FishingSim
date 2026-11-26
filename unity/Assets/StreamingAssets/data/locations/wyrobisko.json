@@ -3,9 +3,9 @@
  "DisplayName": "Żwirownia Krzemienna",
  "Description": "Strome uskoki i żwirowe blaty. Szukaj sandacza pod krawędzią głębokiego dołu.",
  "RequiredLevel": 12,
- "OutlineRx": 89.0,
- "OutlineRz": 60.0,
- "OutlineCz": -60.0,
+ "OutlineRx": 119.0,
+ "OutlineRz": 76.0,
+ "OutlineCz": -74.0,
  "Slope": 0.2,
  "MaxDepth": 11,
  "HolePos": {
@@ -60,9 +60,16 @@
  },
  "VillageStyle": "mountain",
  "Buildings": [
-  "general,-12,17",
-  "office,13,18",
-  "busstop,5,10",
-  "bench,-4,9"
+  "general,-22,15",
+  "office,32,31",
+  "busstop,9,16",
+  "barn,54,22",
+  "crates,17,22",
+  "fence,41,24"
+ ],
+ "HillScale": 1.25,
+ "Landmarks": [
+  "rocks,72,-16",
+  "platforms,38,-5,-45"
  ]
 }
