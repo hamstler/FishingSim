@@ -1833,6 +1833,99 @@ namespace FishingSim.Game
         // ------------------------------------------------------------------ shop
         private static readonly string[] ShopTabs = { "Wędki", "Kołowrotki", "Żyłki", "Haczyki", "Przynęty", "Akcesoria" };
         private static readonly string[] RigSlots = { "Wędka", "Kołowrotek", "Żyłka", "Haczyk", "Przynęta" };
+        private GUIStyle? _inventorySurface, _inventoryCard, _inventorySelected, _inventoryHero, _inventoryAction;
+        private Texture2D[]? _gearGlyphs;
+        private TackleItem? _inventoryInspect;
+
+        private static Texture2D InventorySkin(Color bottom, Color top, Color border)
+        {
+            const int size = 48;
+            const float radius = 13f;
+            var image = new Texture2D(size, size, TextureFormat.RGBA32, false)
+                { hideFlags = HideFlags.HideAndDontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    var corner = Vector2.Max(Vector2.zero, new Vector2(Mathf.Abs(x - 23.5f), Mathf.Abs(y - 23.5f)) - Vector2.one * (24f - radius));
+                    float coverage = Mathf.Clamp01(radius - corner.magnitude);
+                    var color = Color.Lerp(bottom, top, y / 47f);
+                    color = Color.Lerp(color, border, 1f - Mathf.Clamp01(radius - corner.magnitude - 0.7f));
+                    color.a *= coverage;
+                    pixels[y * size + x] = color;
+                }
+            image.SetPixels(pixels);
+            image.Apply(false, true);
+            return image;
+        }
+
+        private static Texture2D GearGlyph(params Vector2[][] strokes)
+        {
+            const int size = 80;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+                { hideFlags = HideFlags.HideAndDontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    var point = new Vector2(x, y);
+                    float distance = float.PositiveInfinity;
+                    foreach (var stroke in strokes)
+                        for (int i = 1; i < stroke.Length; i++)
+                        {
+                            var from = stroke[i - 1];
+                            var edge = stroke[i] - from;
+                            float t = Mathf.Clamp01(Vector2.Dot(point - from, edge) / edge.sqrMagnitude);
+                            distance = Mathf.Min(distance, (point - from - edge * t).sqrMagnitude);
+                        }
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(2.3f - Mathf.Sqrt(distance)));
+                }
+            texture.SetPixels(pixels);
+            texture.Apply(false, true);
+            return texture;
+        }
+
+        private void InventoryArt()
+        {
+            if (_inventorySurface != null)
+                return;
+            GUIStyle Skin(Color bottom, Color top, Color border) => new()
+            {
+                border = new RectOffset(15, 15, 15, 15),
+                normal = { background = InventorySkin(bottom, top, border) },
+            };
+            _inventorySurface = Skin(new Color(.035f, .065f, .073f, .98f), new Color(.09f, .155f, .16f, .99f), new Color(.22f, .35f, .35f));
+            _inventoryCard = Skin(new Color(.07f, .12f, .13f), new Color(.13f, .2f, .21f), new Color(.19f, .29f, .29f));
+            _inventorySelected = Skin(new Color(.18f, .17f, .12f), new Color(.27f, .25f, .16f), new Color(.74f, .61f, .31f));
+            _inventoryHero = Skin(new Color(.045f, .085f, .09f), new Color(.15f, .26f, .25f), new Color(.24f, .37f, .35f));
+            _inventoryAction = Skin(new Color(.72f, .53f, .23f), new Color(.97f, .81f, .45f), new Color(.98f, .85f, .53f));
+            _inventoryAction.alignment = TextAnchor.MiddleCenter;
+            _inventoryAction.normal.textColor = new Color(.08f, .1f, .095f);
+            Vector2[] Stroke(params int[] xy)
+            {
+                var points = new Vector2[xy.Length / 2];
+                for (int i = 0; i < points.Length; i++)
+                    points[i] = new Vector2(xy[i * 2], xy[i * 2 + 1]);
+                return points;
+            }
+            _gearGlyphs = new[]
+            {
+                GearGlyph(Stroke(10,14,26,29,42,45,56,56,71,63), Stroke(17,14,12,19,27,34,32,29,17,14), Stroke(31,34,33,26,42,27,43,36,36,40), Stroke(71,63,72,43)),
+                GearGlyph(Stroke(17,51,60,51), Stroke(42,51,42,38,31,32), Stroke(15,35,31,35,38,28,38,17,31,11,15,11,9,17,9,29,15,35), Stroke(38,24,54,24,63,32,69,32)),
+                GearGlyph(Stroke(23,57,57,57,62,52,62,29,57,24,23,24,18,29,18,52,23,57), Stroke(21,47,59,47), Stroke(21,39,59,39), Stroke(21,31,57,31), Stroke(57,24,65,17,73,21)),
+                GearGlyph(Stroke(44,67,51,61,45,55,39,61,44,67), Stroke(45,55,45,27,40,16,31,13,21,15,15,23,15,32,23,40,22,30)),
+                GearGlyph(Stroke(11,48,24,52,47,47,61,38,71,46,69,27,61,34,46,29,24,30,11,39,11,48), Stroke(24,46,26,46), Stroke(38,30,38,19,31,15,25,20,28,26)),
+                GearGlyph(Stroke(12,49,67,49,67,18,12,18,12,49), Stroke(12,42,67,42), Stroke(29,49,29,58,50,58,50,49), Stroke(35,42,35,34,44,34,44,42)),
+            };
+        }
+
+        private void DrawGearGlyph(Rect rectangle, int slot, Color tint)
+        {
+            var previous = GUI.color;
+            GUI.color = tint;
+            GUI.DrawTexture(rectangle, _gearGlyphs![slot], ScaleMode.ScaleToFit);
+            GUI.color = previous;
+        }
 
         private void OpenInventory()
         {
@@ -1842,6 +1935,7 @@ namespace FishingSim.Game
             _rigDraft[3] = _rod.HookItem;
             _rigDraft[4] = _rod.BaitItem;
             _inventoryTab = 0;
+            _inventoryInspect = _rigDraft[0];
             OpenPanel(Panel.Inventory);
         }
 
@@ -1851,26 +1945,35 @@ namespace FishingSim.Game
 
         private void DrawInventory(float w, float h)
         {
-            var r = Centre(w, h, Mathf.Min(S(1040), w * 0.96f), Mathf.Min(S(730), h * 0.94f));
-            GUI.Label(new Rect(r.x, r.y, r.width, S(42)), "EKWIPUNEK", _title);
-            float slotsWidth = r.width * 0.36f;
+            InventoryArt();
+            GUI.DrawTexture(new Rect(0, 0, w, h), _dim!);
+            float width = Mathf.Min(S(1280), w * 0.96f), height = Mathf.Min(S(780), h * 0.94f);
+            var panel = new Rect((w - width) * .5f, (h - height) * .5f, width, height);
+            GUI.Box(panel, GUIContent.none, _inventorySurface);
+            var r = new Rect(panel.x + S(29), panel.y + S(22), panel.width - S(58), panel.height - S(44));
+            GUI.Label(new Rect(r.x, r.y, r.width, S(42)), "Ekwipunek", _title);
+            float slotsWidth = r.width * 0.30f;
+            float heroWidth = r.width * 0.29f;
             float listX = r.x + slotsWidth + S(18);
-            float listWidth = r.xMax - listX;
+            float listWidth = r.xMax - heroWidth - S(18) - listX;
             GUI.Label(new Rect(r.x, r.y + S(50), slotsWidth, S(26)), "Zestaw do zmontowania", _text);
             for (int i = 0; i < RigSlots.Length; i++)
             {
                 var row = new Rect(r.x, r.y + S(82 + i * 67), slotsWidth, S(61));
-                if (GUI.Button(row, GUIContent.none, _inventoryTab == i ? _tabOn : _tab))
+                if (GUI.Button(row, GUIContent.none, _inventoryTab == i ? _inventorySelected : _inventoryCard))
                 {
                     _inventoryTab = i;
+                    _inventoryInspect = _rigDraft[i];
                     _scroll = Vector2.zero;
                 }
-                GUI.Label(new Rect(row.x + S(10), row.y + S(2), row.width - S(20), S(20)), RigSlots[i], _small);
-                GUI.Label(new Rect(row.x + S(10), row.y + S(20), row.width - S(20), S(39)), _rigDraft[i]?.DisplayName ?? "Wybierz element", _text);
+                DrawGearGlyph(new Rect(row.x + S(8), row.y + S(8), S(44), S(44)), i, Accent);
+                GUI.Label(new Rect(row.x + S(57), row.y + S(4), row.width - S(64), S(20)), RigSlots[i], _small);
+                GUI.Label(new Rect(row.x + S(57), row.y + S(20), row.width - S(64), S(39)), _rigDraft[i]?.DisplayName ?? "Wybierz element", _text);
             }
             if (GUI.Button(new Rect(r.x, r.y + S(422), slotsWidth, S(36)), "Akcesoria", _inventoryTab == 5 ? _tabOn : _tab))
             {
                 _inventoryTab = 5;
+                _inventoryInspect = null;
                 _scroll = Vector2.zero;
             }
 
@@ -1888,23 +1991,35 @@ namespace FishingSim.Game
             if (owned.Count == 0)
                 GUI.Label(new Rect(listX, r.y + S(84), listWidth, S(30)), "Nie masz przedmiotów w tej kategorii.", _small);
             var view = new Rect(listX, r.y + S(82), listWidth, Mathf.Max(1f, r.height - S(152)));
-            float itemHeight = S(62);
+            float itemHeight = S(76);
             var content = new Rect(0, 0, view.width - S(22), owned.Count * itemHeight);
             _scroll = GUI.BeginScrollView(view, _scroll, content);
             for (int i = 0; i < owned.Count; i++)
             {
                 var item = owned[i];
                 var row = new Rect(0, i * itemHeight, content.width, itemHeight - S(4));
-                bool selected = _inventoryTab < _rigDraft.Length && _rigDraft[_inventoryTab]?.ItemId == item.ItemId;
-                if (_inventoryTab < _rigDraft.Length && GUI.Button(row, GUIContent.none, selected ? _cardHot : _card))
-                    _rigDraft[_inventoryTab] = item;
-                else if (_inventoryTab == 5)
-                    GUI.Box(row, GUIContent.none, _card);
+                bool selected = _inventoryInspect?.ItemId == item.ItemId;
+                if (GUI.Button(row, GUIContent.none, selected ? _inventorySelected : _inventoryCard))
+                {
+                    _inventoryInspect = item;
+                    if (_inventoryTab < _rigDraft.Length)
+                        _rigDraft[_inventoryTab] = item;
+                }
+                DrawGearGlyph(new Rect(row.x + S(7), row.y + S(14), S(42), S(42)), _inventoryTab, selected ? Accent : Muted);
                 string count = item is BaitData { Reusable: false } ? $" ×{_profile.BaitCount(item.ItemId)}" : "";
-                GUI.Label(new Rect(row.x + S(10), row.y + S(4), row.width - S(20), S(26)), item.DisplayName + count, _text);
-                GUI.Label(new Rect(row.x + S(10), row.y + S(30), row.width - S(20), S(24)), Stats(item), _small);
+                GUI.Label(new Rect(row.x + S(53), row.y + S(10), row.width - S(65), row.height - S(18)), item.DisplayName + count, _text);
             }
             GUI.EndScrollView();
+            var hero = new Rect(r.xMax - heroWidth, r.y + S(82), heroWidth, Mathf.Min(S(418), view.height));
+            GUI.Box(hero, GUIContent.none, _inventoryHero);
+            float icon = Mathf.Min(hero.width * .72f, hero.height * .42f);
+            DrawGearGlyph(new Rect(hero.center.x - icon * .5f, hero.y + S(14), icon, icon), _inventoryTab, Accent);
+            if (_inventoryInspect is { } detail)
+            {
+                var name = new Rect(hero.x + S(17), hero.y + icon + S(20), hero.width - S(34), S(94));
+                GUI.Label(name, detail.DisplayName, _title);
+                GUI.Label(new Rect(name.x, name.yMax + S(4), name.width, S(76)), Stats(detail), _small);
+            }
 
             bool ready = _rigDraft.All(item => item != null && HasInventoryItem(item));
             bool idle = _rod.State == RodState.Idle && !_rod.Swinging;
@@ -1912,7 +2027,9 @@ namespace FishingSim.Game
                 !ready ? "Wybierz wszystkie części i dostępną przynętę." : "";
             GUI.Label(new Rect(r.x, r.yMax - S(60), r.width, S(22)), hint, _small);
             GUI.enabled = ready && idle;
-            if (GUI.Button(new Rect(r.x, r.yMax - S(38), S(240), S(38)), "Zmontuj i załóż", _accentButton))
+            _inventoryAction!.font = _fontBold;
+            _inventoryAction.fontSize = _button!.fontSize;
+            if (GUI.Button(new Rect(r.x, r.yMax - S(38), S(240), S(38)), "Zmontuj i załóż", _inventoryAction))
             {
                 foreach (var item in _rigDraft)
                     SetEquippedItem(item!);
