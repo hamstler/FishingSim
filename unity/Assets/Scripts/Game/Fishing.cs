@@ -329,7 +329,7 @@ namespace FishingSim.Game
         // at 0.1, the blank from 0.25 in ten sections, the reel hanging at -Z), so the user's Meshy rod and reel models
         // (laid in that frame by tools/assets/meshy_rod_split.py) fit as they are. _frame turns it into the camera's
         // rod root: +Y along the rod (+Z), the reel side down.
-        private const float ButtY = -0.33f, BlankStart = 0.25f, SegmentLength = 0.3f;
+        internal const float ButtY = -0.33f, BlankStart = 0.25f, SegmentLength = 0.3f;
         private Transform _frame = null!, _procHandle = null!, _rodModel = null!, _reelModel = null!;
         private readonly List<GameObject> _procBlank = new();
         private Transform? _rotor, _crank;
@@ -604,10 +604,7 @@ namespace FishingSim.Game
                     {
                         _modelledReel = true;
                         // the moving parts are stored in their own pivots' frames (meshy_rod_split.py): each goes to its pivot
-                        _rotor = Pivot(model.transform, model.transform, "Rotor", M(frames.rotor));
-                        _crank = Pivot(model.transform, model.transform, "Crank", M(frames.hub));
-                        if (_rotor != null && frames.bail_pivot is { Length: 3 })
-                            _bail = Pivot(model.transform, _rotor, "Bail", M(frames.bail_pivot));
+                        (_rotor, _crank, _bail) = AssembleReel(model.transform, frames);
                         _bailAxis = frames.bail_axis is { Length: 3 } ? M(frames.bail_axis).normalized : Vector3.right;
                         // the wound line cut out of the body, shrinking towards the spool's axis as line goes out
                         var rotorAt = M(frames.rotor);
@@ -677,7 +674,7 @@ namespace FishingSim.Game
         }
 
         [Serializable]
-        private sealed class ReelFrame
+        internal sealed class ReelFrame
         {
             public float[]? hub;
             public float[]? rotor;
@@ -690,6 +687,15 @@ namespace FishingSim.Game
 
         /// <summary>A point of the reel's json (the Godot rig's frame) in the imported model's frame (glTF x mirrored).</summary>
         private static Vector3 M(float[] a) => new(-a[0], a[1], a[2]);
+
+        internal static (Transform? Rotor, Transform? Crank, Transform? Bail) AssembleReel(Transform model, ReelFrame frames)
+        {
+            var rotor = frames.rotor is { Length: 3 } ? Pivot(model, model, "Rotor", M(frames.rotor)) : null;
+            var crank = frames.hub is { Length: 3 } ? Pivot(model, model, "Crank", M(frames.hub)) : null;
+            var bail = rotor != null && frames.bail_pivot is { Length: 3 }
+                ? Pivot(model, rotor, "Bail", M(frames.bail_pivot)) : null;
+            return (rotor, crank, bail);
+        }
 
         /// <summary>
         /// A pivot for a reel part whose mesh is stored in its own frame (meshy_rod_split.py: the rotor about the spool's

@@ -173,7 +173,16 @@ namespace FishingSim.Game
                 var smoke = gameObject.AddComponent<Smoke>();
                 smoke.Ready = () => _world.Ready && _screen == Screen.Play && !_loading;
                 smoke.EnterPlay = EnterPlay;
-                smoke.InventoryForShot = show => { if (show) OpenInventory(); else ClosePanel(); };
+                smoke.InventoryForShot = tab =>
+                {
+                    if (tab < 0)
+                        ClosePanel();
+                    else
+                    {
+                        OpenInventory();
+                        SelectInventoryTab(tab);
+                    }
+                };
                 smoke.LoadMap = index => StartCoroutine(LoadMap(index, true));
                 smoke.Locations = _locations.Count;
                 smoke.Rod = _rod;
@@ -302,7 +311,11 @@ namespace FishingSim.Game
             }
         }
 
-        private void OnDestroy() => Application.logMessageReceived -= OnLog;
+        private void OnDestroy()
+        {
+            Application.logMessageReceived -= OnLog;
+            _tacklePreview?.Dispose();
+        }
 
         /// <summary>Errors go to logs/errors.txt in the game's user folder (beside Unity's own Player.log).</summary>
         private static void OnLog(string text, string stack, LogType type)
@@ -822,6 +835,11 @@ namespace FishingSim.Game
 
         private void ClosePanel()
         {
+            if (_panel == Panel.Inventory)
+            {
+                _tacklePreview?.Dispose();
+                _tacklePreview = null;
+            }
             _panel = Panel.None;
             SetCursor(true);
             _rod.ApplyTackle();
@@ -1836,6 +1854,7 @@ namespace FishingSim.Game
         private GUIStyle? _inventorySurface, _inventoryCard, _inventorySelected, _inventoryHero, _inventoryAction;
         private Texture2D[]? _gearGlyphs;
         private TackleItem? _inventoryInspect;
+        private TacklePreview? _tacklePreview;
 
         private static Texture2D InventorySkin(Color bottom, Color top, Color border)
         {
@@ -1934,9 +1953,15 @@ namespace FishingSim.Game
             _rigDraft[2] = _rod.LineInUse;
             _rigDraft[3] = _rod.HookItem;
             _rigDraft[4] = _rod.BaitItem;
-            _inventoryTab = 0;
-            _inventoryInspect = _rigDraft[0];
             OpenPanel(Panel.Inventory);
+            SelectInventoryTab(0);
+        }
+
+        private void SelectInventoryTab(int tab)
+        {
+            _inventoryTab = tab;
+            _inventoryInspect = tab < _rigDraft.Length ? _rigDraft[tab] : null;
+            _scroll = Vector2.zero;
         }
 
         private bool HasInventoryItem(TackleItem item) => item is BaitData { Reusable: false }
@@ -1961,21 +1986,13 @@ namespace FishingSim.Game
             {
                 var row = new Rect(r.x, r.y + S(82 + i * 67), slotsWidth, S(61));
                 if (GUI.Button(row, GUIContent.none, _inventoryTab == i ? _inventorySelected : _inventoryCard))
-                {
-                    _inventoryTab = i;
-                    _inventoryInspect = _rigDraft[i];
-                    _scroll = Vector2.zero;
-                }
+                    SelectInventoryTab(i);
                 DrawGearGlyph(new Rect(row.x + S(8), row.y + S(8), S(44), S(44)), i, Accent);
                 GUI.Label(new Rect(row.x + S(57), row.y + S(4), row.width - S(64), S(20)), RigSlots[i], _small);
                 GUI.Label(new Rect(row.x + S(57), row.y + S(20), row.width - S(64), S(39)), _rigDraft[i]?.DisplayName ?? "Wybierz element", _text);
             }
             if (GUI.Button(new Rect(r.x, r.y + S(422), slotsWidth, S(36)), "Akcesoria", _inventoryTab == 5 ? _tabOn : _tab))
-            {
-                _inventoryTab = 5;
-                _inventoryInspect = null;
-                _scroll = Vector2.zero;
-            }
+                SelectInventoryTab(5);
 
             GUI.Label(new Rect(listX, r.y + S(50), listWidth, S(26)), ShopTabs[_inventoryTab], _text);
             IEnumerable<TackleItem> items = _inventoryTab switch
@@ -2012,11 +2029,26 @@ namespace FishingSim.Game
             GUI.EndScrollView();
             var hero = new Rect(r.xMax - heroWidth, r.y + S(82), heroWidth, Mathf.Min(S(418), view.height));
             GUI.Box(hero, GUIContent.none, _inventoryHero);
-            float icon = Mathf.Min(hero.width * .72f, hero.height * .42f);
-            DrawGearGlyph(new Rect(hero.center.x - icon * .5f, hero.y + S(14), icon, icon), _inventoryTab, Accent);
+            var previewArea = new Rect(hero.x + S(10), hero.y + S(10), hero.width - S(20), hero.height * .51f);
+            bool hasPreview = false;
+            if (_inventoryInspect is RodData or ReelData)
+            {
+                _tacklePreview ??= new TacklePreview();
+                hasPreview = _tacklePreview.Draw(previewArea, _inventoryInspect);
+            }
+            var hintArea = new Rect(hero.x + S(17), previewArea.yMax + S(5), hero.width - S(34), S(24));
+            if (hasPreview)
+                GUI.Label(hintArea, "Przeciągnij, aby obrócić · kółko przybliża", _small);
+            else
+            {
+                float icon = Mathf.Min(previewArea.width * .72f, previewArea.height);
+                DrawGearGlyph(new Rect(previewArea.center.x - icon * .5f, previewArea.center.y - icon * .5f, icon, icon), _inventoryTab, Accent);
+                if (_inventoryInspect is RodData or ReelData && _tacklePreview!.Loading)
+                    GUI.Label(hintArea, "Wczytywanie modelu…", _small);
+            }
             if (_inventoryInspect is { } detail)
             {
-                var name = new Rect(hero.x + S(17), hero.y + icon + S(20), hero.width - S(34), S(94));
+                var name = new Rect(hero.x + S(17), hintArea.yMax + S(4), hero.width - S(34), S(94));
                 GUI.Label(name, detail.DisplayName, _title);
                 GUI.Label(new Rect(name.x, name.yMax + S(4), name.width, S(76)), Stats(detail), _small);
             }

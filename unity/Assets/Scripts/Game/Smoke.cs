@@ -16,7 +16,7 @@ namespace FishingSim.Game
     {
         public Func<bool> Ready { get; set; } = () => false;
         public Action EnterPlay { get; set; } = () => { };
-        public Action<bool> InventoryForShot { get; set; } = _ => { };
+        public Action<int> InventoryForShot { get; set; } = _ => { };
         public Action<int> LoadMap { get; set; } = _ => { };
         public int Locations { get; set; }
         public Fishing Rod { get; set; } = null!;
@@ -103,13 +103,16 @@ namespace FishingSim.Game
                 show(false);
             }
             EnterPlay();
-            InventoryForShot(true);
-            yield return null;
-            yield return new WaitForEndOfFrame();
-            var inventory = ScreenCapture.CaptureScreenshotAsTexture();
-            SaveFull(inventory, "gui_inventory");
-            Destroy(inventory);
-            InventoryForShot(false);
+            foreach (var (tab, shot) in new[] { (0, "gui_inventory"), (1, "gui_inventory_reel") })
+            {
+                InventoryForShot(tab);
+                yield return null;
+                yield return new WaitForEndOfFrame();
+                var inventory = ScreenCapture.CaptureScreenshotAsTexture();
+                SaveFull(inventory, shot);
+                Destroy(inventory);
+            }
+            InventoryForShot(-1);
             if (HandsOnly)
             {
                 Settings.Quality = 3;
