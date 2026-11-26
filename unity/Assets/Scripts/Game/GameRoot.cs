@@ -831,6 +831,8 @@ namespace FishingSim.Game
             if (p != _panel)
                 ReleaseTacklePreview();
             _panel = p;
+            if (p == Panel.Travel)
+                _travelSelection = _loadedLocation;
             _scroll = Vector2.zero;
             SetCursor(false);
         }
@@ -1124,7 +1126,10 @@ namespace FishingSim.Game
             }
             if (ShowTravelForShot)
             {
-                DrawTravel(w, h);
+                GUI.BeginGroup(new Rect(0, S(64), w, h - S(64)));
+                DrawTravel(w, h - S(64));
+                GUI.EndGroup();
+                DrawWorkshopNav(w);
                 return;
             }
             switch (_screen)
@@ -1372,50 +1377,82 @@ namespace FishingSim.Game
         }
 
         /// <summary>The fisheries (in the game: M or the pause menu), each with its picture; a click travels there.</summary>
+        private int _travelSelection = -1;
+
         private void DrawTravel(float w, float h)
         {
-            var r = Centre(w, h, Mathf.Min(S(980), w * 0.94f), Mathf.Min(S(150) + _locations.Count * S(132) + S(80), h * 0.94f));
-            GUI.Label(new Rect(r.x, r.y, r.width, S(40)), "ŁOWISKA", _title);
-            GUI.Label(new Rect(r.x, r.y + S(38), r.width, S(24)), "Podróż zajmuje chwilę: zestaw zostaje zwinięty, siatka jedzie z tobą.", _small);
-            var view = new Rect(r.x, r.y + S(78), r.width, Mathf.Max(1f, r.height - S(136)));
-            float rowWidth = view.width - S(24);
-            _scroll = GUI.BeginScrollView(view, _scroll, new Rect(0, 0, rowWidth, _locations.Count * S(132)));
-            float y = 0f;
+            InventoryArt();
+            GUI.DrawTexture(new Rect(0, 0, w, h), _dim!);
+            float margin = S(14), top = S(36), pad = S(16);
+            float panelHeight = h - top - margin;
+            var detail = new Rect(w * .68f, top, w * .32f - margin, panelHeight);
+            var catalogue = new Rect(margin, top, detail.x - margin * 2f, panelHeight);
+            GUI.Box(catalogue, GUIContent.none, _inventorySurface);
+            GUI.Box(detail, GUIContent.none, _inventorySurface);
+            GUI.Label(new Rect(catalogue.x + pad, top + pad, catalogue.width - 2f * pad, S(38)), "Łowiska", _title);
+            GUI.Label(new Rect(catalogue.x + pad, top + S(54), catalogue.width - 2f * pad, S(26)),
+                $"{_locations.Count(loc => loc.RequiredLevel <= _profile.Level)} / {_locations.Count} dostępnych", _small);
+            if (_locations.Count == 0)
+                return;
+            if (_travelSelection < 0 || _travelSelection >= _locations.Count)
+                _travelSelection = Mathf.Clamp(_loadedLocation, 0, _locations.Count - 1);
+
+            var view = new Rect(catalogue.x + pad, top + S(89), catalogue.width - 2f * pad, panelHeight - S(103));
+            int columns = view.width > S(870) ? 3 : 2;
+            float cardWidth = (view.width - S(28)) / columns, cardHeight = S(223);
+            _scroll = GUI.BeginScrollView(view, _scroll,
+                new Rect(0, 0, cardWidth * columns, Mathf.CeilToInt(_locations.Count / (float)columns) * cardHeight));
             for (int i = 0; i < _locations.Count; i++)
             {
+                var card = new Rect(i % columns * cardWidth, i / columns * cardHeight, cardWidth - S(9), cardHeight - S(9));
+                if (card.yMax < _scroll.y || card.y > _scroll.y + view.height)
+                    continue;
                 var loc = _locations[i];
-                bool here = i == _loadedLocation;
-                bool locked = loc.RequiredLevel > _profile.Level;
-                var row = new Rect(0, y, rowWidth, S(120));
-                GUI.enabled = !locked;
-                if (GUI.Button(row, GUIContent.none, here ? _cardHot : _card) && !locked)
-                {
-                    if (here)
-                        ClosePanel();
-                    else
-                    {
-                        _profile.Save();
-                        int index = i;
-                        StartCoroutine(LoadMap(index, true));
-                    }
-                }
-                GUI.enabled = true;
-                var pic = Picture(i);
-                var thumb = new Rect(row.x + S(14), row.y + S(12), S(171), S(96));
-                if (pic != null)
-                    GUI.DrawTexture(thumb, pic, ScaleMode.ScaleAndCrop);
+                bool active = i == _travelSelection;
+                if (GUI.Button(card, GUIContent.none, active ? _inventorySelected : _inventoryCard))
+                    _travelSelection = i;
+                var thumb = new Rect(card.x + S(7), card.y + S(7), card.width - S(14), S(139));
+                if (Picture(i) is { } picture)
+                    GUI.DrawTexture(thumb, picture, ScaleMode.ScaleAndCrop);
                 else
-                    GUI.Box(thumb, GUIContent.none, _bar);
-                float tx = thumb.xMax + S(20), tw = row.xMax - tx - S(170);
-                GUI.Label(new Rect(tx, row.y + S(12), tw, S(32)), loc.DisplayName, _title);
-                GUI.Label(new Rect(tx, row.y + S(48), tw, S(64)), Shorten(loc.Description, 170), _small);
-                string state = here ? "<color=#EBC766>TU JESTEŚ</color>" : locked ? $"OD POZIOMU {loc.RequiredLevel}" : "JEDŹ";
-                GUI.Label(new Rect(row.xMax - S(160), row.y + S(48), S(140), S(24)), state, new GUIStyle(_label!) { alignment = TextAnchor.MiddleRight, normal = { textColor = locked ? Faint : Ink } });
-                y += S(132);
+                    GUI.Box(thumb, GUIContent.none, _inventoryHero);
+                GUI.Label(new Rect(card.x + S(12), thumb.yMax + S(7), card.width - S(24), S(46)), loc.DisplayName, _text);
+                string status = i == _loadedLocation ? "<color=#EBC766>Tu jesteś</color>" :
+                    loc.RequiredLevel > _profile.Level ? $"Od poziomu {loc.RequiredLevel}" : "Dostępne";
+                GUI.Label(new Rect(card.x + S(12), card.yMax - S(24), card.width - S(24), S(20)), status, _small);
             }
             GUI.EndScrollView();
-            if (GUI.Button(new Rect(r.x, r.yMax - S(48), S(220), S(46)), "Zamknij", _button))
-                ClosePanel();
+
+            int index = _travelSelection;
+            var selected = _locations[index];
+            float bodyWidth = detail.width - 2f * pad;
+            var preview = new Rect(detail.x + pad, detail.y + pad, bodyWidth, Mathf.Min(detail.height * .40f, bodyWidth * .62f));
+            if (Picture(index) is { } selectedPicture)
+                GUI.DrawTexture(preview, selectedPicture, ScaleMode.ScaleAndCrop);
+            else
+                GUI.Box(preview, GUIContent.none, _inventoryHero);
+            float ty = preview.yMax + S(14);
+            GUI.Label(new Rect(preview.x, ty, bodyWidth, S(67)), selected.DisplayName, _title);
+            GUI.Label(new Rect(preview.x, ty + S(66), bodyWidth, S(105)), selected.Description, _text);
+            var species = selected.Abundance.Where(pair => pair.Value > 0f)
+                .OrderByDescending(pair => pair.Value).Take(6).Select(pair => pair.Key);
+            GUI.Label(new Rect(preview.x, ty + S(170), bodyWidth, S(27)), "Najczęściej spotykane ryby", _text);
+            GUI.Label(new Rect(preview.x, ty + S(200), bodyWidth, S(67)), string.Join(" · ", species), _small);
+            bool here = index == _loadedLocation;
+            bool locked = selected.RequiredLevel > _profile.Level;
+            var action = new Rect(preview.x, detail.yMax - S(64), bodyWidth, S(48));
+            GUI.enabled = here || !locked;
+            if (GUI.Button(action, here ? "Wróć do łowienia" : locked ? $"Od poziomu {selected.RequiredLevel}" : "Podróżuj", _accentButton))
+            {
+                if (here)
+                    ClosePanel();
+                else
+                {
+                    _profile.Save();
+                    StartCoroutine(LoadMap(index, true));
+                }
+            }
+            GUI.enabled = true;
         }
 
         private Rect Centre(float w, float h, float pw, float ph)
@@ -2048,7 +2085,7 @@ namespace FishingSim.Game
             for (int i = 0; i < destinations.Length; i++)
             {
                 var destination = destinations[i];
-                bool selected = (ShopShotTab >= 0 ? Panel.Shop : _panel) == destination;
+                bool selected = (ShopShotTab >= 0 ? Panel.Shop : ShowTravelForShot ? Panel.Travel : _panel) == destination;
                 if (GUI.Button(new Rect(S(10) + i * buttonWidth, S(7), buttonWidth - S(5), height - S(14)),
                     labels[i], selected ? _inventoryAction : _button) && !selected)
                 {

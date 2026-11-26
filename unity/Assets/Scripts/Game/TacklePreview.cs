@@ -218,7 +218,8 @@ namespace FishingSim.Game
         {
             if (_target == null)
                 return;
-            _camera.targetTexture = null;
+            if (_camera != null)
+                _camera.targetTexture = null;
             _target.Release();
             UnityEngine.Object.Destroy(_target);
             _target = null;
