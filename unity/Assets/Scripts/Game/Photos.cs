@@ -21,36 +21,34 @@ namespace FishingSim.Game
             string key = $"{id}/{name}/{linear}/{Limit}";
             if (Pictures.TryGetValue(key, out var t))
                 return t;
-            t = null;
-            foreach (var ext in new[] { ".png", ".jpg" })
-            {
-                string path = Path.Combine(GroundLayers.Dir(id), name + ext);
-                if (!File.Exists(path))
-                    continue;
-                var raw = new Texture2D(2, 2, TextureFormat.RGBA32, false, linear);
-                raw.LoadImage(File.ReadAllBytes(path), false);
-                int w = raw.width, h = raw.height;
-                if (Mathf.Max(w, h) > Limit)
-                {
-                    float k = Limit / (float)Mathf.Max(w, h);
-                    w = Mathf.Max(1, Mathf.RoundToInt(w * k));
-                    h = Mathf.Max(1, Mathf.RoundToInt(h * k));
-                }
-                var rt = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGB32, linear ? RenderTextureReadWrite.Linear : RenderTextureReadWrite.sRGB);
-                Graphics.Blit(raw, rt);
-                var prev = RenderTexture.active;
-                RenderTexture.active = rt;
-                t = new Texture2D(w, h, TextureFormat.RGBA32, true, linear) { name = key, wrapMode = TextureWrapMode.Repeat, anisoLevel = 16, filterMode = FilterMode.Trilinear };
-                t.ReadPixels(new Rect(0, 0, w, h), 0, 0);
-                t.Apply(true);
-                RenderTexture.active = prev;
-                RenderTexture.ReleaseTemporary(rt);
-                Object.Destroy(raw);
-                t.Compress(true);
-                t.Apply(true, true);
-                break;
-            }
+            // compressed on worker threads and kept in TexCache (BC1: the shader reads only the colour)
+            string? file = TexCache.Find(Path.Combine(GroundLayers.Dir(id), name), ".png", ".jpg");
+            t = file != null ? TexCache.Picture(file, Limit, linear, false, key, TextureWrapMode.Repeat, 16) : null;
             return Pictures[key] = t;
+        }
+
+        /// <summary>The sets' pictures made ahead over several frames (the login screen): diff and nor of each.</summary>
+        public static System.Collections.IEnumerator Prewarm(params string[] ids)
+        {
+            foreach (var id in ids)
+                foreach (var (name, linear) in new[] { ("diff", false), ("nor", true) })
+                {
+                    string key = $"{id}/{name}/{linear}/{Limit}";
+                    if (Pictures.ContainsKey(key))
+                        continue;
+                    string? file = TexCache.Find(Path.Combine(GroundLayers.Dir(id), name), ".png", ".jpg");
+                    if (file == null)
+                    {
+                        Pictures[key] = null;
+                        continue;
+                    }
+                    Texture2D? made = null;
+                    yield return TexCache.PictureAsync(file, Limit, linear, false, key, t => made = t, TextureWrapMode.Repeat, 16);
+                    if (!Pictures.ContainsKey(key))
+                        Pictures[key] = made;
+                    else if (made != null)
+                        Object.Destroy(made);
+                }
         }
 
         /// <summary>A picture's average colour (linear), from a 16 px copy.</summary>

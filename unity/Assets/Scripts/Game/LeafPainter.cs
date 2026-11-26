@@ -18,8 +18,21 @@ namespace FishingSim.Game
         private static readonly int LeafCell = (int)(512 * LK);
         private static Texture2D? _leaves, _needles;
 
-        public static Texture2D Leaves => _leaves ??= Upload(PaintCluster(false), "Leaves");
-        public static Texture2D Needles => _needles ??= Upload(PaintCluster(true), "Needles");
+        public static Texture2D Leaves => _leaves ??= Cached("Leaves", () => PaintCluster(false));
+        public static Texture2D Needles => _needles ??= Cached("Needles", () => PaintCluster(true));
+
+        /// <summary>Bump when the painting changes (the atlases are kept in TexCache).</summary>
+        private const int PaintVersion = 1;
+
+        /// <summary>The atlas from TexCache, else painted, compressed and saved there (painting took seconds of the
+        /// main thread at every start).</summary>
+        private static Texture2D Cached(string name, Func<(Color32[] Px, int Size)> paint)
+        {
+            string key = $"paint_{name}_{LeafCell}_v{PaintVersion}";
+            if (TexCache.Read(key) is { } e)
+                return TexCache.Make(e, name, TextureWrapMode.Clamp, 8);
+            return Upload(paint(), name, 0, key);
+        }
 
         private sealed class Canvas
         {
@@ -234,7 +247,7 @@ namespace FishingSim.Game
         /// A texture from top-down rows (flipped so Unity's v runs up as in the painted picture's Godot UVs mirrored), its
         /// mipmaps box-filtered with the alpha rescaled to keep the coverage of the alpha test (PreserveAlphaCoverage).
         /// </summary>
-        public static Texture2D Upload((Color32[] Px, int Size) painted, string name, int width = 0)
+        public static Texture2D Upload((Color32[] Px, int Size) painted, string name, int width = 0, string? cacheKey = null)
         {
             int w = width > 0 ? width : painted.Size, h = painted.Px.Length / w;
             var tex = new Texture2D(w, h, TextureFormat.RGBA32, true, false) { name = name, wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 8 };
@@ -286,6 +299,8 @@ namespace FishingSim.Game
             }
             tex.Apply(false, false);
             tex.Compress(true);
+            if (cacheKey != null)
+                TexCache.WriteLater(cacheKey, TexCache.FromTexture(tex));
             tex.Apply(false, true);
             return tex;
         }

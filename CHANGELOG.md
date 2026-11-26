@@ -1,5 +1,13 @@
 # Zmiany
 
+## 0.11.0 (Unity 6)
+- Start jak w nowoczesnej grze wędkarskiej: najpierw logowanie na konto (statyczny obraz łowiska), potem statyczny ekran wczytywania łowiska z nazwą, opisem, wskazówką i postępem, potem gra. Menu z kartami łowisk zastąpione panelem „Łowiska” w grze (M lub pauza).
+- Szybsze wczytywanie: tekstury gruntu, zdjęcia materiałów, liście i tekstury postaci kompresowane na wątkach roboczych i zapisywane w pamięci podręcznej (texcache), więc kolejne starty tylko je odczytują; gra wczytuje tylko modele potrzebne na łowisku (wędka i kołowrotek w ręku, wioska, ryby tego jeziora) zamiast wszystkich 66 ryb i całego katalogu sprzętu.
+- Grafika i modele przygotowują się w tle już podczas logowania; ekran wczytywania kończy się rozgrzewką shaderów (łowisko renderowane raz w każdą stronę, z deszczem, mgłą i rybami), więc pierwsze sekundy gry nie przycinają.
+- Nowy wygląd interfejsu: płaskie ciemne panele, systemowy krój Bahnschrift, jeden ciepły akcent; HUD bez kart: godzina i pogoda w rogu, na dole długość żyłki, paski obciążenia żyłki i wędki z punktem poślizgu hamulca, hamulec w procentach i kilogramach, siła i zasięg rzutu.
+- Deszcz z cienkich smug w kolorze nieba (bez białych pasów przy kamerze), horyzont zlewający się z mgłą przy zachmurzeniu, szare niebo bez beżowego odcienia.
+- Z poprzednich wersji testowych: konta graczy (hasła solone i haszowane), 81 wędek i 87 kołowrotków o różnych parametrach i wykończeniu, rzut z oporem powietrza i wiatrem, zwijanie korbką (cm żyłki na obrót), włosowo cienka żyłka z odblaskiem słońca.
+
 ## 0.9.4 (Unity 6)
 - Grafika przenoszona z wersji Godot: teren z siedmiu fotograficznych warstw (trawa, ściółka, piasek, ścieżki, dno, skały, śnieg), woda z falami Gerstnera, załamaniem światła, kolorem toni i pianą przy brzegu.
 - Las jak w Godocie: świerki, sosny, dęby, brzozy i wierzby z kory ze zdjęć i koron z malowanych liści, krzewy, leszczyna, paprocie, głazy z mchem, kępy trawy wokół gracza.

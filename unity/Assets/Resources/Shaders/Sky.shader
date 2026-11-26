@@ -32,6 +32,7 @@ Shader "FS/Sky"
             #include "UnityCG.cginc"
             sampler2D _CloudNoise;
             float _CloudCover, _Night, _Stars, _Twilight, _Turbidity, _SunEnergy, _SunOn, _Stylize, _CloudDrift;
+            float _SkyFogBlend, _SkyFogHeight;   // DayCycle: how much and how high the horizon melts into the fog's colour
             float4 _SunFlat, _SunDir, _SunColor;
 
             struct v2f { float4 pos : SV_POSITION; float3 dir : TEXCOORD0; };
@@ -170,6 +171,13 @@ Shader "FS/Sky"
                     float cl = smoothstep(threshold - 0.05, threshold + 0.12, cloud_shape(uv));
                     color += float3(0.9, 0.95, 1.0) * star * twinkle * smoothstep(0.02, 0.25, eye.y) * _Stars * 2.0 * (1.0 - cl);
                 }
+                // the horizon melts into the fog's colour, so the far land fogged by Unity meets the sky without a seam
+                // (under a grey sky and in rain the hills fade into it as they do; on clear days only a thin haze band)
+                float low = 1.0 - smoothstep(-0.04, max(_SkyFogHeight, 0.02), eye.y);
+                color = lerp(color, unity_FogColor.rgb, saturate(low * _SkyFogBlend));
+                // an overcast sky is a neutral, slightly cool grey: the sunlit clouds' warmth fades with the cover
+                float lumc = dot(color, float3(0.3, 0.59, 0.11));
+                color = lerp(color, lumc * float3(0.95, 0.98, 1.03), _CloudCover * _CloudCover * 0.9);
                 return float4(color, 1);
             }
             ENDCG

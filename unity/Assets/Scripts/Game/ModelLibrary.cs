@@ -114,6 +114,19 @@ namespace FishingSim.Game
 
         public static bool Has(string id) => Templates.TryGetValue(id, out var t) && t != null;
 
+        /// <summary>The model is loaded or known to be missing (no longer loading).</summary>
+        public static bool Settled(string id) => Templates.ContainsKey(id);
+
+        /// <summary>How many of <paramref name="ids"/> are settled (loaded or missing), for the loading screen.</summary>
+        public static int SettledCount(IReadOnlyList<string> ids)
+        {
+            int n = 0;
+            foreach (var id in ids)
+                if (Templates.ContainsKey(id) || !File.Exists(FileOf(id)))
+                    n++;
+            return n;
+        }
+
         /// <summary>A copy of a loaded model, or null (not loaded or missing).</summary>
         public static GameObject? Spawn(string id, Transform? parent = null)
         {
@@ -180,17 +193,22 @@ namespace FishingSim.Game
                 string path = Path.Combine(Root, pathWithoutExtension + ext);
                 if (!File.Exists(path))
                     continue;
-                t = new Texture2D(2, 2, TextureFormat.RGBA32, true, linear) { name = pathWithoutExtension, anisoLevel = 8 };
-                t.LoadImage(File.ReadAllBytes(path), false);
-                if (grade != null)
+                // compressed once and kept in TexCache (Texture2D.Compress ran on the main thread for every person)
+                string cacheKey = $"model_{pathWithoutExtension}_{(linear ? "l" : "s")}_{(grade != null ? "g" : "p")}_{TexCache.Stamp(path)}";
+                if (TexCache.Read(cacheKey) is { } cached)
                 {
-                    var px = t.GetPixels32();
-                    grade(px);
-                    t.SetPixels32(px);
-                    t.Apply(true);
+                    t = TexCache.Make(cached, pathWithoutExtension, TextureWrapMode.Repeat, 8);
+                    break;
                 }
-                t.Compress(true);
-                t.Apply(true, true);
+                var raw = new Texture2D(2, 2, TextureFormat.RGBA32, false, linear);
+                raw.LoadImage(File.ReadAllBytes(path), false);
+                var px = raw.GetPixels32();
+                int w = raw.width, h = raw.height;
+                Object.Destroy(raw);
+                grade?.Invoke(px);
+                var entry = TexCache.Encode(px, w, h, linear, true);
+                TexCache.WriteLater(cacheKey, entry);
+                t = TexCache.Make(entry, pathWithoutExtension, TextureWrapMode.Repeat, 8);
                 break;
             }
             Pictures[key] = t;

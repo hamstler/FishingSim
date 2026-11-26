@@ -50,6 +50,7 @@ namespace FishingSim.Game
             _moon = MakeLight("Moon", 0.15f, LightShadows.None);
             _moon.color = new Color(0.55f, 0.65f, 0.9f);
             RenderSettings.sun = _sun;
+            Shader.SetGlobalFloat("_GradeStrength", 1f);
         }
 
         private Light MakeLight(string name, float intensity, LightShadows shadows)
@@ -262,6 +263,9 @@ namespace FishingSim.Game
             RenderSettings.fogDensity = Mathf.Lerp(0.0011f, 0.004f, _cloud) + _rain * 0.006f + 0.0006f * mist;
             var haze = Color.Lerp(Color.Lerp(hor, new Color(0.42f, 0.53f, 0.63f), 0.55f), sunColour * 0.85f, 0.2f * golden);
             RenderSettings.fogColor = Color.Lerp(haze * 0.82f, haze, _cloud) * hazeLight;
+            // under a grey sky the haze is a neutral grey (the blue haze stood apart from the grey sky above the hills)
+            float fogGrey = RenderSettings.fogColor.grayscale;
+            RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, new Color(fogGrey * 0.98f, fogGrey, fogGrey * 1.03f), Mathf.Clamp01(_cloud * 1.1f - 0.2f) * 0.8f);
 
             // mist banks (dawn mist glows with the low sun; at dusk it goes blue-grey)
             if (_mistMat != null && _mistRenderer != null)
@@ -272,6 +276,11 @@ namespace FishingSim.Game
                 _mistMat.SetColor("_MistColor", Color.Lerp(SunColour(Mathf.Clamp01(el)), new Color(0.75f, 0.8f, 0.86f), 0.6f) * Mathf.Clamp(0.18f + el * 2.2f, 0.18f, 0.85f));
             }
 
+            // the post's warm grade fades under a grey sky (it turned overcast beige); the sky's horizon melts into the
+            // fog's colour, thin on clear days, high and full under cloud and in rain (the far hills fade into it)
+            Shader.SetGlobalFloat("_GradeStrength", Mathf.Lerp(1f, 0.3f, Mathf.Clamp01(_cloud * 1.2f - 0.15f)));
+            Shader.SetGlobalFloat("_SkyFogBlend", Mathf.Lerp(0.35f, 1f, Mathf.Clamp01(_cloud * 1.3f - 0.2f)));
+            Shader.SetGlobalFloat("_SkyFogHeight", Mathf.Lerp(0.08f, 0.4f, _cloud) + 0.2f * _rain);
             Shader.SetGlobalColor("_SkyTop", Color.Lerp(top, grey, cover * 0.6f) * Mathf.Lerp(0.15f, 1f, day));
             Shader.SetGlobalColor("_SkyHorizon", hor * hazeLight);
             Shader.SetGlobalVector("_SunDirection", sunDir);
@@ -313,12 +322,29 @@ namespace FishingSim.Game
             }
         }
 
-        /// <summary>Rain (7000 drops) and the mist banks over the map; made once.</summary>
+        /// <summary>
+        /// The rain and the mist banks drawn whatever the weather (the loading screen's warm-up render: their shaders
+        /// are made before play), then back as the weather has them.
+        /// </summary>
+        public void ShowEffects(bool on)
+        {
+            if (_rainRenderer != null)
+            {
+                _rainRenderer.enabled = on || _rain > 0.02f;
+                _rainMat?.SetFloat("_Shown", on ? Mathf.Max(_rain, 0.25f) : _rain > 0.02f ? Mathf.Clamp(_rain, 0.05f, 1f) : 0f);
+            }
+            if (_mistRenderer != null && on)
+                _mistRenderer.enabled = true;
+            if (!on)
+                _applied = (float.NaN, 0f, 0f);
+        }
+
+        /// <summary>Rain (16000 thin streaks) and the mist banks over the map; made once.</summary>
         public void BuildEffects()
         {
             if (_rainRenderer == null)
             {
-                const int drops = 7000;
+                const int drops = 16000;
                 var v = new Vector3[drops * 4];
                 var uv = new Vector2[drops * 4];
                 var uv2 = new Vector4[drops * 4];

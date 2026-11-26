@@ -16,6 +16,8 @@ namespace FishingSim.Game
     {
         public Func<bool> Ready { get; set; } = () => false;
         public Action EnterPlay { get; set; } = () => { };
+        public Action<int> LoadMap { get; set; } = _ => { };
+        public int Locations { get; set; }
         public Fishing Rod { get; set; } = null!;
         public Player Player { get; set; } = null!;
         public DayCycle Day { get; set; } = null!;
@@ -71,23 +73,34 @@ namespace FishingSim.Game
                 yield return null;
             }
             Debug.Log($"SMOKE map loaded in {Time.realtimeSinceStartup - started:0.0} s");
-            // the interface: the main menu over the lake, then the login card
+            if (Environment.GetEnvironmentVariable("FISHSIM_SMOKE_PICTURES") == "1")
+            {
+                yield return Pictures();
+                Application.Quit(0);
+                yield break;
+            }
+            // the interface: the login screen, the loading screen, the fisheries' panel, the play view
             Settings.Quality = 3;
             Settings.Apply(Player.Camera);
             for (int i = 0; i < 30; i++)
                 yield return null;
-            yield return new WaitForEndOfFrame();
-            var gm = ScreenCapture.CaptureScreenshotAsTexture();
-            SaveFull(gm, "gui_menu");
-            Destroy(gm);
-            GameRoot.ShowLoginForShot = true;
-            for (int i = 0; i < 3; i++)
-                yield return null;
-            yield return new WaitForEndOfFrame();
-            var gl = ScreenCapture.CaptureScreenshotAsTexture();
-            SaveFull(gl, "gui_login");
-            Destroy(gl);
-            GameRoot.ShowLoginForShot = false;
+            foreach (var (shot, show) in new (string, Action<bool>)[]
+                     {
+                         ("gui_login", on => GameRoot.ShowLoginForShot = on),
+                         ("gui_loading", on => GameRoot.ShowLoadingForShot = on),
+                         ("gui_travel", on => GameRoot.ShowTravelForShot = on),
+                         ("gui_play", _ => { }),
+                     })
+            {
+                show(true);
+                for (int i = 0; i < 3; i++)
+                    yield return null;
+                yield return new WaitForEndOfFrame();
+                var g = ScreenCapture.CaptureScreenshotAsTexture();
+                SaveFull(g, shot);
+                Destroy(g);
+                show(false);
+            }
             EnterPlay();
             if (HandsOnly)
             {
@@ -283,6 +296,49 @@ namespace FishingSim.Game
             Application.Quit(ok ? 0 : 1);
         }
 
+        /// <summary>
+        /// FISHSIM_SMOKE_PICTURES=1: each fishery's loading-screen picture, rendered by the game itself (the view of
+        /// the Godot menu pictures: 7 m over the pier, clear sky, no rod or HUD) at 17:20 and 10:00 into
+        /// FISHSIM_SMOKE_DIR/menu/&lt;id&gt;_17.jpg and _10.jpg (copied to StreamingAssets/Menu for the build).
+        /// </summary>
+        private IEnumerator Pictures()
+        {
+            string dir = System.IO.Path.Combine(Environment.GetEnvironmentVariable("FISHSIM_SMOKE_DIR") ?? ".", "menu");
+            System.IO.Directory.CreateDirectory(dir);
+            Settings.Quality = 4;
+            Settings.View = 2;
+            Settings.Apply(Player.Camera);
+            for (int index = 0; index < Locations; index++)
+            {
+                LoadMap(index);
+                yield return null;
+                float t0 = Time.realtimeSinceStartup;
+                while (!Ready() && Time.realtimeSinceStartup - t0 < 300f)
+                    yield return null;
+                string id = System.IO.Path.GetFileNameWithoutExtension(Player.World.Lake.Location.ResourcePath);
+                Day.SetWeatherNow(Core.Weather.Clear);
+                GameRoot.HideHud = true;
+                Rod.ShowRod(false);
+                foreach (var (hour, suffix) in new[] { (17.3f, "17"), (10f, "10") })
+                {
+                    Player.Place(new Vector3(0f, WorldView.PierDeck + 7f, -3.5f), 210f);
+                    Player.Look(210f, 6f);
+                    Day.Hour = hour;
+                    Day.Apply();
+                    for (int i = 0; i < 40; i++)
+                        yield return null;
+                    yield return new WaitForEndOfFrame();
+                    var shot = ScreenCapture.CaptureScreenshotAsTexture();
+                    string file = System.IO.Path.Combine(dir, $"{id}_{suffix}.jpg");
+                    System.IO.File.WriteAllBytes(file, shot.EncodeToJPG(90));
+                    Debug.Log($"SMOKE picture {file} {shot.width}x{shot.height}");
+                    Destroy(shot);
+                }
+                GameRoot.HideHud = false;
+                Rod.ShowRod(true);
+            }
+        }
+
         /// <summary>FISHSIM_SMOKE_HANDS=1: only the hands on the rod (while their grips are being fitted).</summary>
         public static bool HandsOnly => Environment.GetEnvironmentVariable("FISHSIM_SMOKE_HANDS") == "1";
 
@@ -432,6 +488,17 @@ namespace FishingSim.Game
             Rod.SmokeReel = false;
             Destroy(cam.gameObject);
             Debug.Log($"SMOKE reeling: state {Rod.State} after the cast ({waited:0.0} s)");
+            // a fight: a pike on, reeled for a moment, the gauges photographed
+            Rod.SmokeHook("Szczupak", 2.5f);
+            Rod.SmokeReel = true;
+            float fought = 0f;
+            while (fought < 1.5f && Rod.State == RodState.Fight) { fought += Time.deltaTime; yield return null; }
+            yield return new WaitForEndOfFrame();
+            var fs = ScreenCapture.CaptureScreenshotAsTexture();
+            SaveFull(fs, "fight");
+            Destroy(fs);
+            Rod.SmokeReel = false;
+            Debug.Log($"SMOKE fight: state {Rod.State}, load {Rod.LoadKg:0.00} kg of {Rod.EffectiveLimit:0.0}, line out {Rod.Fight?.LineOut ?? 0f:0.0} m");
         }
 
         private static Texture2D Downscale(Texture2D src, int w, int h)

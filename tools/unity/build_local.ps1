@@ -10,6 +10,7 @@ param(
     [switch]$SkipConvert,
     [switch]$Smoke,
     [switch]$Run,
+    [switch]$Pictures,
     [int]$Quality = 3,
     [string]$Unity = "C:\Program Files\Unity\Hub\Editor\6000.0.64f1\Editor\Unity.exe"
 )
@@ -61,7 +62,21 @@ if ($Smoke) {
     $env:FISHSIM_SMOKE_DIR = Join-Path $Out "shots"; $env:FISHSIM_SMOKE_QUALITY = "$Quality"; $env:FISHSIM_SMOKE_VIEW = "2"
     $g = Start-Process -FilePath $exe -Wait -PassThru -ArgumentList @("-screen-fullscreen", "0", "-screen-width", "1600", "-screen-height", "900", "-logFile", "`"$Out\smoke.log`"")
     Remove-Item Env:FISHSIM_SMOKE, Env:FISHSIM_NO_SAVE, Env:FISHSIM_SMOKE_DIR, Env:FISHSIM_SMOKE_QUALITY, Env:FISHSIM_SMOKE_VIEW
-    Select-String -Path "$Out\smoke.log" -Pattern "SMOKE|Exception" | Where-Object { $_.Line -notmatch "SMOKE JPEG" } | ForEach-Object { $_.Line }
+    Select-String -Path "$Out\smoke.log" -Pattern "SMOKE|LOAD |Exception" | Where-Object { $_.Line -notmatch "SMOKE JPEG" } | ForEach-Object { $_.Line }
     Write-Host "== smoke exit $($g.ExitCode); screenshots: $Out\shots"
+}
+if ($Pictures) {
+    # the fisheries' loading-screen pictures, rendered by the built game itself (Smoke.Pictures: 7 m over the pier,
+    # clear sky, 17:20 and 10:00), copied into StreamingAssets/Menu for the next build
+    Write-Host "== loading-screen pictures (build\local\shots\menu -> unity\Assets\StreamingAssets\Menu)"
+    $env:FISHSIM_SMOKE = "1"; $env:FISHSIM_NO_SAVE = "1"; $env:FISHSIM_SMOKE_PICTURES = "1"
+    $env:FISHSIM_SMOKE_DIR = Join-Path $Out "shots"
+    $g = Start-Process -FilePath $exe -Wait -PassThru -ArgumentList @("-screen-fullscreen", "0", "-screen-width", "1920", "-screen-height", "1080", "-logFile", "`"$Out\pictures.log`"")
+    Remove-Item Env:FISHSIM_SMOKE, Env:FISHSIM_NO_SAVE, Env:FISHSIM_SMOKE_PICTURES, Env:FISHSIM_SMOKE_DIR
+    Select-String -Path "$Out\pictures.log" -Pattern "SMOKE|LOAD |Exception" | ForEach-Object { $_.Line }
+    $menu = Join-Path $Root "unity\Assets\StreamingAssets\Menu"
+    New-Item -ItemType Directory -Force -Path $menu | Out-Null
+    Copy-Item (Join-Path $Out "shots\menu\*.jpg") $menu -Force
+    Write-Host "== pictures exit $($g.ExitCode); rebuild to ship them"
 }
 if ($Run) { Start-Process -FilePath $exe }

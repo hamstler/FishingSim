@@ -22,10 +22,12 @@ namespace FishingSim.Game
     {
         public static string Version => Application.version;
 
-        private enum Screen { Login, Menu, Loading, Play }
-        private enum Panel { None, Pause, Shop, Settings, Help, Keepnet, Records, Smokehouse, Cooking, Notices }
+        // the account first (a still picture: nothing of the world is drawn), then the fishery's loading screen (still
+        // too), then play; another fishery is chosen in the game (Panel.Travel), like in modern fishing games
+        private enum Screen { Login, Loading, Play }
+        private enum Panel { None, Pause, Shop, Settings, Help, Keepnet, Records, Smokehouse, Cooking, Notices, Travel }
 
-        private Screen _screen = Screen.Menu;
+        private Screen _screen = Screen.Login;
         private Panel _panel = Panel.None;
         private Profile _profile = null!;
         private WorldView _world = null!;
@@ -54,9 +56,24 @@ namespace FishingSim.Game
         private int _shopTab, _shopFilter;
         private string _shopSearch = "";
         private Vector2 _scroll;
-        private float _menuOrbit;
         private Panel _settingsBack = Panel.None;
         private float _autosave;
+
+        // the still screens: a camera that only clears (the world's camera is off), the fisheries' pictures
+        private Camera _backdrop = null!;
+        private readonly Dictionary<string, Texture2D?> _pictures = new();
+
+        // the work done while the login screen shows (textures, models, the lake's fish), then the map's loading
+        private bool _prepared;
+        private float _prepareProgress;
+        private string _prepareStep = "";
+        private float _loadProgress;
+        private string _loadStep = "";
+        private int _loadingIndex;
+        private string _tip = "";
+        private int _warmedFor = -1;
+        private bool _loading;
+        private int _guessLocation;
 
         // the account logged in (null: the login screen; a test run plays as a guest without saving)
         private string? _user;
@@ -72,24 +89,14 @@ namespace FishingSim.Game
 
         private void Awake()
         {
+            LoadLog.Mark("start");
             DataStore.Root = Path.Combine(Application.streamingAssetsPath, "data");
             bool noSave = Environment.GetEnvironmentVariable("FISHSIM_NO_SAVE") == "1";
             Profile.SavePath = null;            // a profile is saved once an account logs in (Accounts.ProfilePath)
             Application.logMessageReceived += OnLog;
             Settings.Load();
+            TexCache.Tidy();
             _profile = Profile.Load();
-            // the login screen first; the smoke test and runs without saving play as a guest
-            if (noSave || Smoke.Enabled)
-            {
-                _user = "gość";
-                _screen = Screen.Menu;
-            }
-            else
-            {
-                _screen = Screen.Login;
-                _loginName = Accounts.LastUser;
-                _registering = Accounts.Count == 0;
-            }
             foreach (var path in Lake.LocationPaths)
                 if (DataStore.Load<LocationData>(path) is { } loc)
                     _locations.Add(loc);
@@ -128,37 +135,157 @@ namespace FishingSim.Game
             Settings.Apply(_player.Camera);
             _player.Frozen = true;
             _rod.Blocked = true;
-            StartCoroutine(PreloadModels());
+
+            // the still screens draw no world: its camera is off and this one only clears the screen
+            _backdrop = new GameObject("Backdrop").AddComponent<Camera>();
+            _backdrop.clearFlags = CameraClearFlags.SolidColor;
+            _backdrop.backgroundColor = new Color(0.03f, 0.035f, 0.04f);
+            _backdrop.cullingMask = 0;
+            _backdrop.depth = -100f;
+            _backdrop.allowHDR = false;
+            _backdrop.allowMSAA = false;
+            ShowWorld(false);
+            SetCursor(false);
+
+            // the login screen first (an account's last fishery is guessed, so its pictures and models are made while
+            // the name and password are typed); the smoke test and runs without saving play as a guest
+            var guess = GuessProfile();
+            _guessLocation = guess.Location;
+            if (noSave || Smoke.Enabled)
+            {
+                _user = "gość";
+                guess = _profile;
+            }
+            else
+            {
+                _screen = Screen.Login;
+                _loginName = Accounts.LastUser;
+                _registering = Accounts.Count == 0;
+            }
             if (_locations.Count > 0)
-                StartCoroutine(LoadMap(Mathf.Clamp(_profile.Location, 0, _locations.Count - 1), false));
+                StartCoroutine(Prepare(guess));
+            if (_user != null && _locations.Count > 0)
+                StartCoroutine(LoadMap(Mathf.Clamp(_profile.Location, 0, _locations.Count - 1), true));
             if (Smoke.Enabled)
             {
                 var smoke = gameObject.AddComponent<Smoke>();
-                smoke.Ready = () => _world.Ready && _screen == Screen.Menu;
+                smoke.Ready = () => _world.Ready && _screen == Screen.Play && !_loading;
                 smoke.EnterPlay = EnterPlay;
+                smoke.LoadMap = index => StartCoroutine(LoadMap(index, true));
+                smoke.Locations = _locations.Count;
                 smoke.Rod = _rod;
                 smoke.Player = _player;
                 smoke.Day = _day;
             }
         }
 
-        /// <summary>Rods, reels, the people and the camp props first, then every fish (in the background).</summary>
-        private IEnumerator PreloadModels()
+        /// <summary>The last account's profile (its fishery and tackle), read without logging in; the blank one without it.</summary>
+        private Profile GuessProfile()
         {
-            var first = new List<string>();
-            first.AddRange(ModelLibrary.IdsIn("rods"));
-            first.AddRange(ModelLibrary.IdsIn("reels"));
-            first.Add("stone_fire_pit");
-            first.Add("characters/player_angler");
-            yield return ModelLibrary.Preload(first);
-            _rod.ApplyTackle();
-            yield return ModelLibrary.Preload(ModelLibrary.IdsIn("characters"));
-            yield return ModelLibrary.Preload(ModelLibrary.IdsIn("fish"));
+            string last = Accounts.LastUser;
+            if (last.Length == 0 || !File.Exists(Accounts.ProfilePath(last)))
+                return _profile;
+            try
+            {
+                Profile.SavePath = Accounts.ProfilePath(last);
+                return Profile.Load();
+            }
+            catch (Exception)
+            {
+                return _profile;
+            }
+            finally
+            {
+                Profile.SavePath = null;
+            }
         }
+
+        /// <summary>The models a fishery needs: its village and people, the camp, the other anglers, its fish.</summary>
+        private List<string> ModelsFor(int index)
+        {
+            var ids = new List<string>();
+            var loc = _locations[Mathf.Clamp(index, 0, _locations.Count - 1)];
+            bool village = !(Smoke.Enabled && Smoke.HandsOnly);
+            if (village)
+            {
+                ids.AddRange(Village.ModelIds(_world.Lake != null && _world.Lake.Location == loc ? _world.Lake : new Lake(loc)));
+                foreach (var id in ModelLibrary.IdsIn("characters"))
+                    if (id != GripArms.ModelId && id != "characters/player_angler")
+                        ids.Add(id);
+                ids.Add("stone_fire_pit");
+                ids.AddRange(Anglers.ModelIds);
+            }
+            foreach (var sp in Tackle.AllSpecies)
+                if (loc.AbundanceOf(sp.SpeciesName) > 0f)
+                    ids.Add("fish/" + Path.GetFileNameWithoutExtension(sp.ResourcePath));
+            return ids;
+        }
+
+        /// <summary>
+        /// The work done while the login screen shows (the user's idea: the game loads its graphics meanwhile): the
+        /// painted and photographed textures (from TexCache after the first start), the tackle in hand, then the guessed
+        /// fishery's models and fish. The map's loading screen waits only for what is not ready yet.
+        /// </summary>
+        private IEnumerator Prepare(Profile guess)
+        {
+            LoadLog.Begin("prepare");
+            _prepareStep = "Przygotowanie tekstur";
+            _ = ProcTextures.NoiseField;
+            yield return null;
+            _ = ProcTextures.CloudNoise;
+            yield return null;
+            _ = ProcTextures.Caustics;
+            _ = ProcTextures.Ripples;
+            _ = ProcTextures.Foam;
+            yield return null;
+            _ = LeafPainter.Leaves;
+            yield return null;
+            _ = LeafPainter.Needles;
+            _prepareProgress = 0.1f;
+            yield return null;
+            _prepareStep = "Przygotowanie terenu";
+            var ground = GroundLayers.Prepare(GroundLayers.SizeForQuality);
+            while (ground.MoveNext())
+            {
+                _prepareProgress = 0.1f + 0.4f * GroundLayers.Progress;
+                yield return ground.Current;
+            }
+            _prepareStep = "Przygotowanie materiałów";
+            yield return Photos.Prewarm("weathered_brown_planks", "white_planks_clean");
+            _prepareProgress = 0.55f;
+            // the tackle in hand first, then the fishery's models (glTFast keeps each frame within its time budget)
+            _prepareStep = "Wczytywanie modeli";
+            var ids = new List<string> { WantedRod(guess), WantedReel(guess) };
+            ids.AddRange(ModelsFor(guess.Location));
+            foreach (var id in ids)
+                ModelLibrary.Start(id);
+            while (true)
+            {
+                int done = ModelLibrary.SettledCount(ids);
+                _prepareProgress = 0.55f + 0.45f * done / Mathf.Max(ids.Count, 1);
+                if (done >= ids.Count)
+                    break;
+                yield return null;
+            }
+            _rod.ApplyTackle();
+            _prepareProgress = 1f;
+            _prepareStep = "";
+            _prepared = true;
+            LoadLog.End("prepare");
+        }
+
+        private static string WantedRod(Profile p) => Tackle.Rod(p.Rod) is { } r && r.Model.Length > 0 ? r.Model : "rods/float_ostoja";
+        private static string WantedReel(Profile p) => Tackle.Reel(p.Reel) is { } r && r.Model.Length > 0 ? r.Model : "reels/small_hokuto";
 
         private IEnumerator MakeArms()
         {
             yield return null;   // the rod is built in its Start
+            if (!GripArms.ShowAngler)
+            {
+                // the angler is hidden for now (the user): only the rod's framing, no arms' model loaded at all
+                GripArms.FrameOnly(_player.Camera, _rod);
+                yield break;
+            }
             yield return ModelLibrary.Preload(new[] { GripArms.ModelId, "characters/player_angler" });
             try
             {
@@ -191,13 +318,70 @@ namespace FishingSim.Game
             }
         }
 
+        private static readonly string[] Tips =
+        {
+            "Za mocno dokręcony hamulec zrywa żyłkę, za słaby pozwala rybie odejść z całą szpulą.",
+            "Ryby przy brzegu płoszą kroki: podchodź spokojnie i nie biegaj po pomoście.",
+            "Duże ryby rzadko biorą na małe haczyki, a małe nie połkną dużych.",
+            "Spadające ciśnienie i pochmurny dzień ożywiają żerowanie.",
+            "O świcie i o zmierzchu ryby podchodzą płyciej, w południe schodzą głębiej.",
+            "Kręgi na wodzie zdradzają żerujące ryby: rzuć w ich pobliże.",
+            "Garść zanęty przy spławiku (V) przyciąga ryby do łowiska.",
+            "Zbyt długi hol męczy rybę, a ryba trzymana w powietrzu traci kondycję.",
+            "Przynęta w wodzie z czasem traci świeżość: zmieniaj ją po kilku rzutach.",
+            "W zielsku i wśród zatopionych gałęzi ryby chętnie stoją, ale łatwo tam o zaczep.",
+            "Skręcona żyłka plącze się przy rzucie: krętlik ogranicza skręcanie przy spinningu.",
+            "Tępy haczyk gorzej zacina: osełka (B) przywraca mu ostrość.",
+        };
+
+        /// <summary>
+        /// A fishery's loading screen (a still picture with its name, a tip and the progress): what the login screen
+        /// did not prepare yet, the world, the village and its people, then one render in each direction so the GPU
+        /// makes the shaders and takes the meshes and textures before play (no stutter in the first seconds).
+        /// </summary>
         private IEnumerator LoadMap(int index, bool play)
         {
+            if (_loading)
+                yield break;
+            _loading = true;
             _screen = Screen.Loading;
+            _panel = Panel.None;
+            _loadingIndex = index;
+            _loadProgress = 0f;
+            _loadStep = "Przygotowanie";
+            _tip = Tips[UnityEngine.Random.Range(0, Tips.Length)];
+            ShowWorld(false);
+            SetCursor(false);
             _rod.Reset();
-            yield return null;
-            if (_loadedLocation != index)
+            yield return null;   // the loading screen shows first
+            string name = _locations[index].DisplayName;
+            LoadLog.Begin($"map {name}");
+            bool fresh = _loadedLocation != index;
+            if (fresh)
             {
+                // the textures (usually ready from the login screen) and this fishery's models
+                _loadStep = "Wczytywanie modeli";
+                var ids = new List<string> { _rod.WantedRodModel, _rod.WantedReelModel };
+                ids.AddRange(ModelsFor(index));
+                foreach (var id in ids)
+                    ModelLibrary.Start(id);
+                var ground = GroundLayers.Prepare(GroundLayers.SizeForQuality);
+                while (ground.MoveNext())
+                {
+                    _loadProgress = 0.15f * GroundLayers.Progress;
+                    yield return ground.Current;
+                }
+                while (true)
+                {
+                    int done = ModelLibrary.SettledCount(ids);
+                    _loadProgress = 0.15f + 0.25f * done / Mathf.Max(ids.Count, 1);
+                    if (done >= ids.Count)
+                        break;
+                    yield return null;
+                }
+                LoadLog.Mark("models ready");
+                _rod.ApplyTackle();
+                _loadStep = "Budowanie łowiska";
                 var build = _world.Build(_locations[index]);
                 while (true)
                 {
@@ -212,18 +396,19 @@ namespace FishingSim.Game
                     {
                         _error = "Nie udało się zbudować mapy: " + e.Message;
                         Debug.LogException(e);
+                        _loading = false;
                         yield break;
                     }
+                    _loadProgress = 0.4f + 0.35f * _world.Progress;
                     yield return step;
                 }
+                LoadLog.Mark("world built");
                 // the village's buildings and its people (not for the smoke test's hands-only run: only the rod matters)
+                _loadStep = "Wioska i ludzie";
+                _loadProgress = 0.78f;
+                yield return null;
                 bool village = !(Smoke.Enabled && Smoke.HandsOnly);
-                var needed = village ? Village.ModelIds(_world.Lake).ToList() : new List<string>();
-                needed.AddRange(ModelLibrary.IdsIn("characters"));
-                needed.Add("stone_fire_pit");
-                needed.AddRange(Anglers.ModelIds);
-                if (village)
-                    yield return ModelLibrary.Preload(needed);
+                LoadLog.Begin("village");
                 try
                 {
                     if (village)
@@ -233,6 +418,10 @@ namespace FishingSim.Game
                 {
                     Debug.LogException(e);   // the map stays playable without its village
                 }
+                LoadLog.End("village");
+                _loadProgress = 0.82f;
+                yield return null;
+                LoadLog.Begin("camp and people");
                 try
                 {
                     if (village)
@@ -245,6 +434,7 @@ namespace FishingSim.Game
                 {
                     Debug.LogException(e);
                 }
+                LoadLog.End("camp and people");
                 _player.Solids.Clear();
                 _player.Solids.AddRange(_village.Solids);
                 _player.Solids.AddRange(_world.Solids);
@@ -258,7 +448,10 @@ namespace FishingSim.Game
                 {
                     Debug.LogException(e);
                 }
+                _loadProgress = 0.86f;
+                yield return null;
                 _loadedLocation = index;
+                _warmedFor = -1;
                 _day.Water = _world.WaterMaterial;
                 _day.BuildEffects();
                 _rod.ClearPlace();
@@ -286,20 +479,105 @@ namespace FishingSim.Game
             _boat.ResetToMooring();
             _player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
             _day.Apply();
-            _screen = play ? Screen.Play : _user == null ? Screen.Login : Screen.Menu;
+            if (_warmedFor != index)
+            {
+                _loadStep = "Przygotowanie shaderów";
+                yield return WarmUp(index);
+                _warmedFor = index;
+            }
+            _loadProgress = 1f;
+            LoadLog.End($"map {name}");
+            _loading = false;
             if (play)
                 EnterPlay();
             else
+            {
+                _screen = Screen.Login;
                 SetCursor(false);
+            }
+        }
+
+        /// <summary>
+        /// Renders the fishery once in eight directions (into a small picture nobody sees) with everything that may
+        /// show in play switched on: rain, mist, one of each of the lake's fish beside the angler. The GPU then makes
+        /// the shader variants, the shadows' and the post effects' too, and takes the meshes and pictures now instead
+        /// of in the first seconds of play.
+        /// </summary>
+        private IEnumerator WarmUp(int index)
+        {
+            LoadLog.Begin("warm-up");
+            var cam = _player.Camera;
+            var rt = new RenderTexture(Mathf.Max(320, UnityEngine.Screen.width / 2), Mathf.Max(180, UnityEngine.Screen.height / 2), 24, RenderTextureFormat.DefaultHDR)
+            {
+                name = "WarmUp",
+                antiAliasing = Mathf.Max(1, QualitySettings.antiAliasing),
+            };
+            var oldTarget = cam.targetTexture;
+            var oldTurn = cam.transform.localRotation;
+            var oldPlayerTurn = _player.transform.rotation;
+            _rod.ShowRod(true);
+            _day.ShowEffects(true);
+            var shown = new List<GameObject>();
+            var loc = _locations[index];
+            var eye = cam.transform.position;
+            var ahead = Vector3.ProjectOnPlane(cam.transform.forward, Vector3.up).normalized;
+            int n = 0;
+            foreach (var sp in Tackle.AllSpecies)
+            {
+                if (loc.AbundanceOf(sp.SpeciesName) <= 0f)
+                    continue;
+                if (ModelLibrary.Fish(Path.GetFileNameWithoutExtension(sp.ResourcePath)) is not { } fish)
+                    continue;
+                fish.transform.position = eye + ahead * (2.2f + 0.25f * (n % 4)) + Vector3.Cross(Vector3.up, ahead) * (0.3f * (n % 5) - 0.6f) - Vector3.up * 0.35f;
+                fish.transform.localScale = Vector3.one * 0.35f;
+                shown.Add(fish);
+                n++;
+            }
+            cam.targetTexture = rt;
+            const int views = 8;
+            for (int i = 0; i < views; i++)
+            {
+                float pitch = i < 6 ? 8f : i == 6 ? 40f : -25f;
+                _player.transform.rotation = Quaternion.Euler(0f, oldPlayerTurn.eulerAngles.y + i * 60f, 0f);
+                cam.transform.localRotation = Quaternion.Euler(pitch, 0f, 0f);
+                try
+                {
+                    cam.Render();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
+                _loadProgress = 0.9f + 0.1f * (i + 1) / views;
+                yield return null;
+            }
+            cam.targetTexture = oldTarget;
+            cam.transform.localRotation = oldTurn;
+            _player.transform.rotation = oldPlayerTurn;
+            foreach (var go in shown)
+                Destroy(go);
+            _day.ShowEffects(false);
+            rt.Release();
+            Destroy(rt);
+            LoadLog.End("warm-up");
         }
 
         private void EnterPlay()
         {
             _screen = Screen.Play;
             _panel = Panel.None;
+            ShowWorld(true);
             SetCursor(true);
             if (_profile.ClaimFreeKit())
                 Say("Sklep dał ci darmowy zestaw startowy.");
+        }
+
+        /// <summary>The world's camera on (play) or off (the still login and loading screens: only the backdrop clears).</summary>
+        private void ShowWorld(bool on)
+        {
+            _player.Camera.enabled = on;
+            _backdrop.enabled = !on;
+            AudioListener.volume = on ? 1f : 0f;
         }
 
         private void SetCursor(bool captured)
@@ -320,18 +598,10 @@ namespace FishingSim.Game
 
         private void Update()
         {
-            _profile.Hour = _day.Hour;
-            _profile.Clock += _day.LastStepHours;
-            if (_screen is Screen.Menu or Screen.Login && _world.Ready)
-            {
-                // the menu shows the lake from a slowly circling camera
-                _menuOrbit += Time.deltaTime * 0.02f;
-                var cam = _player.Camera.transform;
-                cam.position = new Vector3(Mathf.Sin(_menuOrbit) * 70f, 22f, -75f + Mathf.Cos(_menuOrbit) * 95f);
-                cam.LookAt(new Vector3(0f, 2f, -60f));
-            }
             if (_screen != Screen.Play)
                 return;
+            _profile.Hour = _day.Hour;
+            _profile.Clock += _day.LastStepHours;
             _autosave += Time.unscaledDeltaTime;
             if (_autosave > 60f)
             {
@@ -372,6 +642,8 @@ namespace FishingSim.Game
                     OpenPanel(Panel.Help);
                 if (Input.GetKeyDown(KeyCode.J))
                     OpenPanel(Panel.Records);
+                if (Input.GetKeyDown(KeyCode.M))
+                    OpenPanel(Panel.Travel);
                 if (Input.GetMouseButtonDown(0) && Cursor.lockState != CursorLockMode.Locked)
                     SetCursor(true);
             }
@@ -580,9 +852,20 @@ namespace FishingSim.Game
         private void OnApplicationQuit() => _profile.Save();
 
         // ================================================================== GUI
+        // The look of a modern fishing game rather than a web page: one condensed sans-serif (Bahnschrift on Windows),
+        // flat dark panels with square corners and a hairline edge, white text, one warm accent for what is chosen or
+        // pressed, status colours only where they mean something; the HUD is a few bars and numbers, no cards.
         private GUIStyle? _panelStyle, _title, _text, _small, _button, _accentButton, _bar, _barFill, _chip;
-        private Texture2D? _dim;
-        private float _scale = 1f;
+        private GUIStyle? _field, _card, _cardHot, _tab, _tabOn, _label, _logo, _danger;
+        private Texture2D? _dim, _fadeUp, _fadeRight;
+        private static Texture2D White => Texture2D.whiteTexture;
+        private float _scale = 1f, _styledFor = -1f;
+
+        private static readonly Color Ink = new(0.94f, 0.95f, 0.96f);
+        private static readonly Color Muted = new(0.66f, 0.7f, 0.74f);
+        private static readonly Color Faint = new(0.68f, 0.72f, 0.76f);
+        private static readonly Color Accent = new(0.93f, 0.78f, 0.4f);
+        private static readonly Color GoodCol = new(0.46f, 0.82f, 0.46f), WarnCol = new(0.96f, 0.72f, 0.26f), BadCol = new(0.94f, 0.3f, 0.24f);
 
         private static Texture2D Tex(Color c)
         {
@@ -592,114 +875,184 @@ namespace FishingSim.Game
             return t;
         }
 
-        /// <summary>
-        /// A rounded box for 9-slice styles (GUIStyle.border = the radius): fill, a hairline border and optionally an
-        /// accent line along the top (the Godot UI's graphite-glass panels with an amber edge), antialiased corners.
-        /// </summary>
-        private static Texture2D Round(Color fill, Color edge, int radius, Color? top = null, int size = 48)
+        /// <summary>A flat box for 9-slice styles: the fill with a one-pixel edge (square corners).</summary>
+        private static Texture2D Flat(Color fill, Color edge)
         {
-            var t = new Texture2D(size, size, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, wrapMode = TextureWrapMode.Clamp };
+            const int size = 8;
+            var t = new Texture2D(size, size, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Point };
             var px = new Color[size * size];
             for (int y = 0; y < size; y++)
                 for (int x = 0; x < size; x++)
-                {
-                    float cx = Mathf.Clamp(x + 0.5f, radius, size - radius), cy = Mathf.Clamp(y + 0.5f, radius, size - radius);
-                    float d = Mathf.Sqrt((x + 0.5f - cx) * (x + 0.5f - cx) + (y + 0.5f - cy) * (y + 0.5f - cy));
-                    float inside = Mathf.Clamp01(radius - d + 0.5f);
-                    float rim = Mathf.Clamp01(1f - Mathf.Abs(radius - 1f - d));
-                    var c = Color.Lerp(fill, edge, edge.a > 0f ? rim : 0f);
-                    if (top is { } accent && y >= size - 3 && x > radius * 0.6f && x < size - radius * 0.6f)
-                        c = accent;
-                    c.a = (edge.a > 0f && rim > 0f ? Mathf.Max(fill.a, edge.a * rim) : fill.a) * inside;
-                    if (top is { } a2 && y >= size - 3 && x > radius * 0.6f && x < size - radius * 0.6f)
-                        c.a = a2.a * inside;
-                    px[y * size + x] = c;
-                }
+                    px[y * size + x] = edge.a > 0f && (x == 0 || y == 0 || x == size - 1 || y == size - 1) ? edge : fill;
             t.SetPixels(px);
             t.Apply();
             return t;
         }
 
-        private GUIStyle? _field, _card, _cardHot, _tab, _tabOn, _label, _logo, _danger;
+        /// <summary>A fill with a bar of <paramref name="mark"/> along one side (bottom: tabs; left: the chosen row).</summary>
+        private static Texture2D Marked(Color fill, Color mark, bool left)
+        {
+            const int size = 8;
+            var t = new Texture2D(size, size, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Point };
+            var px = new Color[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                    px[y * size + x] = left ? (x < 3 ? mark : fill) : (y < 2 ? mark : fill);
+            t.SetPixels(px);
+            t.Apply();
+            return t;
+        }
+
+        /// <summary>A gradient of black from transparent to <paramref name="peak"/> (vertical: up from the bottom; else to the right).</summary>
+        private static Texture2D Fade(float peak, bool vertical)
+        {
+            const int n = 256;
+            var t = new Texture2D(vertical ? 1 : n, vertical ? n : 1, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, wrapMode = TextureWrapMode.Clamp };
+            for (int i = 0; i < n; i++)
+            {
+                float f = i / (n - 1f);
+                float a = peak * (vertical ? Mathf.SmoothStep(0f, 1f, 1f - f) : Mathf.SmoothStep(0f, 1f, 1f - f));
+                if (vertical)
+                    t.SetPixel(0, i, new Color(0.01f, 0.012f, 0.015f, a));
+                else
+                    t.SetPixel(i, 0, new Color(0.01f, 0.012f, 0.015f, a));
+            }
+            t.Apply();
+            return t;
+        }
+
+        private static Font? _font, _fontBold;
+
+        /// <summary>The first of these fonts installed on this computer (none shipped), else Unity's own.</summary>
+        private static Font PickFont(params string[] names)
+        {
+            try
+            {
+                var installed = new HashSet<string>(Font.GetOSInstalledFontNames(), StringComparer.OrdinalIgnoreCase);
+                foreach (var n in names)
+                    if (installed.Contains(n))
+                        return Font.CreateDynamicFontFromOSFont(n, 18);
+            }
+            catch (Exception)
+            {
+                // the built-in font below
+            }
+            return Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        }
 
         private void Styles()
         {
             _scale = Mathf.Clamp(UnityEngine.Screen.height / 1080f, 0.7f, 2f);
-            if (_panelStyle != null && Mathf.Approximately(_panelStyle.fontSize, Mathf.RoundToInt(20 * _scale)))
+            if (_panelStyle != null && Mathf.Approximately(_styledFor, _scale))
                 return;
+            _styledFor = _scale;
+            _font ??= PickFont("Bahnschrift", "Segoe UI", "DejaVu Sans", "Liberation Sans", "Arial");
+            _fontBold ??= PickFont("Bahnschrift SemiBold", "Bahnschrift", "Segoe UI Semibold", "DejaVu Sans", "Arial");
             int F(int size) => Mathf.RoundToInt(size * _scale);
             RectOffset B(int r) => new(r, r, r, r);
-            // a modern fishing game's look: deep graphite-teal glass, light text, amber for what matters
-            var text = new Color(0.9f, 0.93f, 0.95f);
-            var muted = new Color(0.66f, 0.72f, 0.76f);
-            var amber = new Color(0.96f, 0.7f, 0.26f);
-            var glass = new Color(0.05f, 0.08f, 0.1f, 0.84f);
-            var hair = new Color(1f, 1f, 1f, 0.1f);
-            _dim = Tex(new Color(0.01f, 0.02f, 0.03f, 0.55f));
+            var hair = new Color(1f, 1f, 1f, 0.09f);
+            _dim = Tex(new Color(0.01f, 0.012f, 0.015f, 0.62f));
+            _fadeUp = Fade(0.9f, true);
+            _fadeRight = Fade(0.88f, false);
             _panelStyle = new GUIStyle
             {
-                normal = { background = Round(glass, hair, 12, new Color(amber.r, amber.g, amber.b, 0.9f)), textColor = text },
-                border = B(14),
+                normal = { background = Flat(new Color(0.055f, 0.062f, 0.07f, 0.94f), hair), textColor = Ink },
+                border = B(2),
                 padding = new RectOffset(F(22), F(22), F(18), F(18)),
-                fontSize = F(20),
+                font = _font,
+                fontSize = F(19),
                 alignment = TextAnchor.UpperLeft,
             };
-            _logo = new GUIStyle(GUI.skin.label) { fontSize = F(52), fontStyle = FontStyle.Bold, normal = { textColor = Color.white }, richText = true };
-            _title = new GUIStyle(GUI.skin.label) { fontSize = F(32), fontStyle = FontStyle.Bold, normal = { textColor = amber }, wordWrap = true, richText = true };
-            _text = new GUIStyle(GUI.skin.label) { fontSize = F(19), normal = { textColor = text }, wordWrap = true, richText = true };
-            _small = new GUIStyle(_text) { fontSize = F(15), normal = { textColor = muted } };
-            _label = new GUIStyle(_small) { fontSize = F(14), fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.55f, 0.75f, 0.78f) } };
+            _logo = new GUIStyle { font = _fontBold, fontSize = F(50), normal = { textColor = Ink }, richText = true };
+            _title = new GUIStyle { font = _fontBold, fontSize = F(27), normal = { textColor = Ink }, wordWrap = true, richText = true };
+            _text = new GUIStyle { font = _font, fontSize = F(19), normal = { textColor = Ink }, wordWrap = true, richText = true };
+            _small = new GUIStyle(_text) { fontSize = F(16), normal = { textColor = Muted } };
+            _label = new GUIStyle(_text) { font = _fontBold, fontSize = F(13), normal = { textColor = Faint }, wordWrap = false };
             _button = new GUIStyle
             {
+                font = _font,
                 fontSize = F(18),
                 alignment = TextAnchor.MiddleCenter,
-                normal = { background = Round(new Color(0.12f, 0.17f, 0.19f, 0.95f), hair, 8), textColor = text },
-                hover = { background = Round(new Color(0.17f, 0.24f, 0.27f, 1f), new Color(1f, 1f, 1f, 0.2f), 8), textColor = Color.white },
-                active = { background = Round(new Color(0.08f, 0.12f, 0.13f, 1f), hair, 8), textColor = amber },
-                border = B(9),
+                richText = true,
+                normal = { background = Flat(new Color(0.12f, 0.13f, 0.145f, 0.96f), hair), textColor = Ink },
+                hover = { background = Flat(new Color(0.18f, 0.19f, 0.21f, 1f), new Color(1f, 1f, 1f, 0.16f)), textColor = Color.white },
+                active = { background = Flat(new Color(0.08f, 0.085f, 0.095f, 1f), Accent), textColor = Accent },
+                onNormal = { background = Flat(new Color(0.12f, 0.13f, 0.145f, 0.96f), Accent), textColor = Accent },
+                border = B(2),
                 padding = new RectOffset(F(14), F(14), F(8), F(8)),
             };
             _accentButton = new GUIStyle(_button)
             {
-                normal = { background = Round(new Color(0.92f, 0.62f, 0.2f, 1f), new Color(1f, 0.85f, 0.5f, 0.6f), 8), textColor = new Color(0.1f, 0.07f, 0.02f) },
-                hover = { background = Round(new Color(1f, 0.72f, 0.28f, 1f), new Color(1f, 0.9f, 0.6f, 0.8f), 8), textColor = Color.black },
-                active = { background = Round(new Color(0.8f, 0.52f, 0.14f, 1f), hair, 8), textColor = Color.black },
-                fontStyle = FontStyle.Bold,
+                font = _fontBold,
+                normal = { background = Flat(Accent, new Color(1f, 0.9f, 0.62f, 1f)), textColor = new Color(0.07f, 0.06f, 0.04f) },
+                hover = { background = Flat(new Color(1f, 0.85f, 0.5f), new Color(1f, 0.94f, 0.75f)), textColor = Color.black },
+                active = { background = Flat(new Color(0.8f, 0.65f, 0.3f), Accent), textColor = Color.black },
             };
-            _danger = new GUIStyle(_button) { normal = { background = Round(new Color(0.3f, 0.1f, 0.09f, 0.95f), hair, 8), textColor = new Color(1f, 0.85f, 0.82f) } };
-            _chip = new GUIStyle(_button) { fontSize = F(15), padding = new RectOffset(F(12), F(12), F(5), F(5)), border = B(14),
-                normal = { background = Round(new Color(0.12f, 0.17f, 0.19f, 0.9f), hair, 14), textColor = muted },
-                hover = { background = Round(new Color(0.18f, 0.25f, 0.28f, 1f), hair, 14), textColor = Color.white } };
-            _tab = new GUIStyle(_chip);
-            _tabOn = new GUIStyle(_chip) { fontStyle = FontStyle.Bold, normal = { background = Round(new Color(0.96f, 0.7f, 0.26f, 0.95f), hair, 14), textColor = Color.black } };
-            _card = new GUIStyle(_button) { alignment = TextAnchor.MiddleLeft, padding = new RectOffset(F(18), F(18), F(10), F(10)), richText = true, wordWrap = true,
-                normal = { background = Round(new Color(0.1f, 0.15f, 0.17f, 0.9f), hair, 10), textColor = text },
-                hover = { background = Round(new Color(0.15f, 0.22f, 0.25f, 0.95f), new Color(0.96f, 0.7f, 0.26f, 0.5f), 10), textColor = Color.white }, border = B(11) };
-            _cardHot = new GUIStyle(_card) { normal = { background = Round(new Color(0.16f, 0.2f, 0.18f, 0.95f), new Color(0.96f, 0.7f, 0.26f, 0.9f), 10), textColor = Color.white } };
-            _field = new GUIStyle(GUI.skin.textField)
+            _danger = new GUIStyle(_button) { normal = { background = Flat(new Color(0.28f, 0.09f, 0.08f, 0.96f), hair), textColor = new Color(1f, 0.86f, 0.83f) } };
+            // tabs and chips: text with an accent bar under the chosen one
+            _tab = new GUIStyle(_button)
             {
-                fontSize = F(19),
-                normal = { background = Round(new Color(0.02f, 0.04f, 0.05f, 0.9f), new Color(1f, 1f, 1f, 0.16f), 7), textColor = text },
-                focused = { background = Round(new Color(0.03f, 0.06f, 0.07f, 0.95f), new Color(0.96f, 0.7f, 0.26f, 0.9f), 7), textColor = Color.white },
-                hover = { background = Round(new Color(0.03f, 0.05f, 0.06f, 0.92f), new Color(1f, 1f, 1f, 0.26f), 7), textColor = text },
-                border = B(8),
-                padding = new RectOffset(F(12), F(12), F(9), F(9)),
-                alignment = TextAnchor.MiddleLeft,
+                font = _fontBold,
+                fontSize = F(15),
+                normal = { background = Flat(new Color(0f, 0f, 0f, 0f), new Color(0f, 0f, 0f, 0f)), textColor = Muted },
+                hover = { background = Marked(new Color(1f, 1f, 1f, 0.04f), new Color(1f, 1f, 1f, 0.25f), false), textColor = Ink },
+                active = { background = Marked(new Color(1f, 1f, 1f, 0.06f), Accent, false), textColor = Accent },
+                border = new RectOffset(0, 0, 0, 3),
+                padding = new RectOffset(F(10), F(10), F(6), F(8)),
             };
-            _bar = new GUIStyle { normal = { background = Round(new Color(1f, 1f, 1f, 0.14f), new Color(0, 0, 0, 0), 3, null, 12) }, border = B(4) };
-            _barFill = new GUIStyle { normal = { background = Round(Color.white, new Color(0, 0, 0, 0), 3, null, 12) }, border = B(4) };
+            _tabOn = new GUIStyle(_tab) { normal = { background = Marked(new Color(1f, 1f, 1f, 0.05f), Accent, false), textColor = Ink } };
+            _chip = _tab;
+            _card = new GUIStyle(_button)
+            {
+                alignment = TextAnchor.MiddleLeft,
+                padding = new RectOffset(F(18), F(18), F(10), F(10)),
+                wordWrap = true,
+                normal = { background = Flat(new Color(0.09f, 0.1f, 0.11f, 0.94f), hair), textColor = Ink },
+                hover = { background = Marked(new Color(0.14f, 0.15f, 0.165f, 0.98f), new Color(1f, 1f, 1f, 0.3f), true), textColor = Color.white },
+                border = new RectOffset(4, 1, 1, 1),
+            };
+            _cardHot = new GUIStyle(_card) { normal = { background = Marked(new Color(0.11f, 0.12f, 0.13f, 0.96f), Accent, true), textColor = Color.white } };
+            _field = new GUIStyle
+            {
+                font = _font,
+                fontSize = F(19),
+                normal = { background = Flat(new Color(0.025f, 0.03f, 0.035f, 0.94f), new Color(1f, 1f, 1f, 0.14f)), textColor = Ink },
+                focused = { background = Flat(new Color(0.03f, 0.036f, 0.042f, 0.97f), Accent), textColor = Color.white },
+                hover = { background = Flat(new Color(0.03f, 0.036f, 0.042f, 0.95f), new Color(1f, 1f, 1f, 0.26f)), textColor = Ink },
+                border = B(2),
+                padding = new RectOffset(F(12), F(12), F(10), F(10)),
+                alignment = TextAnchor.MiddleLeft,
+                clipping = TextClipping.Clip,
+            };
+            _bar = new GUIStyle { normal = { background = Flat(new Color(1f, 1f, 1f, 0.13f), new Color(0f, 0f, 0f, 0f)) }, border = B(1) };
+            _barFill = new GUIStyle { normal = { background = Flat(Color.white, new Color(0f, 0f, 0f, 0f)) }, border = B(1) };
+            GUI.skin.settings.cursorColor = Accent;
+            GUI.skin.settings.selectionColor = new Color(Accent.r, Accent.g, Accent.b, 0.35f);
         }
 
         private float S(float v) => v * _scale;
 
+        /// <summary>Text over the world without a panel: a soft dark shadow under it (colour tags left out of the shadow).</summary>
+        private void Shadowed(Rect r, string text, GUIStyle style)
+        {
+            var old = GUI.color;
+            GUI.color = new Color(0f, 0f, 0f, 0.7f * old.a);
+            string plain = System.Text.RegularExpressions.Regex.Replace(text, "</?color[^>]*>", "");
+            GUI.Label(new Rect(r.x + S(1.5f), r.y + S(1.5f), r.width, r.height), plain, style);
+            GUI.color = old;
+            GUI.Label(r, text, style);
+        }
+
         /// <summary>Screenshots of the scenery only (the smoke test's menu-picture views).</summary>
         public static bool HideHud { get; set; }
 
-        /// <summary>The smoke test's picture of the login screen: drawn over whatever screen this frame.</summary>
+        /// <summary>The smoke test's pictures of the login and loading screens: drawn over whatever screen this frame.</summary>
         public static bool ShowLoginForShot { get; set; }
+        public static bool ShowLoadingForShot { get; set; }
 
-        /// <summary>The smoke test's picture of a shop tab (-1 = none).</summary>
+        /// <summary>The smoke test's picture of a shop tab (-1 = none), and of the fisheries' panel.</summary>
         public static int ShopShotTab { get; set; } = -1;
+        public static bool ShowTravelForShot { get; set; }
 
         private void OnGUI()
         {
@@ -709,9 +1062,11 @@ namespace FishingSim.Game
             float w = UnityEngine.Screen.width, h = UnityEngine.Screen.height;
             if (_error.Length > 0)
             {
-                GUI.Box(new Rect(w * 0.25f, h * 0.35f, w * 0.5f, h * 0.3f), "", _panelStyle);
-                GUI.Label(new Rect(w * 0.27f, h * 0.37f, w * 0.46f, h * 0.2f), _error, _text);
-                if (GUI.Button(new Rect(w * 0.42f, h * 0.57f, w * 0.16f, S(44)), "Zamknij grę", _button))
+                GUI.DrawTexture(new Rect(0, 0, w, h), _dim!);
+                var er = new Rect(w * 0.3f, h * 0.38f, w * 0.4f, S(220));
+                GUI.Box(er, "", _panelStyle);
+                GUI.Label(new Rect(er.x + S(24), er.y + S(20), er.width - S(48), S(130)), _error, _text);
+                if (GUI.Button(new Rect(er.x + S(24), er.yMax - S(66), er.width - S(48), S(46)), "Zamknij grę", _button))
                     Application.Quit();
                 return;
             }
@@ -720,10 +1075,20 @@ namespace FishingSim.Game
                 DrawLogin(w, h);
                 return;
             }
+            if (ShowLoadingForShot)
+            {
+                DrawLoading(w, h);
+                return;
+            }
             if (ShopShotTab >= 0)
             {
                 _shopTab = ShopShotTab;
                 DrawShop(w, h);
+                return;
+            }
+            if (ShowTravelForShot)
+            {
+                DrawTravel(w, h);
                 return;
             }
             switch (_screen)
@@ -732,13 +1097,13 @@ namespace FishingSim.Game
                     DrawLoading(w, h);
                     break;
                 case Screen.Login:
-                    DrawLogin(w, h);
-                    break;
-                case Screen.Menu:
                     if (_panel == Panel.Settings)
+                    {
+                        DrawBackdrop(w, h, LoginPicture());
                         DrawSettings(w, h);
+                    }
                     else
-                        DrawMenu(w, h);
+                        DrawLogin(w, h);
                     break;
                 case Screen.Play:
                     DrawHud(w, h);
@@ -755,18 +1120,75 @@ namespace FishingSim.Game
                         case Panel.Smokehouse: DrawSmokehouse(w, h); break;
                         case Panel.Cooking: DrawCooking(w, h); break;
                         case Panel.Notices: DrawNotices(w, h); break;
+                        case Panel.Travel: DrawTravel(w, h); break;
                     }
                     break;
             }
         }
 
+        /// <summary>A fishery's picture (StreamingAssets/Menu/&lt;id&gt;_17 or _10.jpg: renders of the game), or null.</summary>
+        private Texture2D? Picture(int index)
+        {
+            if (_locations.Count == 0)
+                return null;
+            var loc = _locations[Mathf.Clamp(index, 0, _locations.Count - 1)];
+            string id = Path.GetFileNameWithoutExtension(loc.ResourcePath);
+            if (_pictures.TryGetValue(id, out var t))
+                return t;
+            t = null;
+            foreach (var name in new[] { id + "_17", id + "_10", id })
+                if (TexCache.Find(Path.Combine(Application.streamingAssetsPath, "Menu", name)) is { } file)
+                {
+                    t = new Texture2D(2, 2, TextureFormat.RGB24, false) { name = "Menu " + name, wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.HideAndDontSave };
+                    t.LoadImage(File.ReadAllBytes(file), true);
+                    break;
+                }
+            return _pictures[id] = t;
+        }
+
+        /// <summary>The login screen's picture: the last account's fishery.</summary>
+        private Texture2D? LoginPicture() => Picture(_guessLocation);
+
+        private void DrawBackdrop(float w, float h, Texture2D? picture)
+        {
+            if (picture != null)
+                GUI.DrawTexture(new Rect(0, 0, w, h), picture, ScaleMode.ScaleAndCrop);
+            else
+            {
+                var old = GUI.color;
+                GUI.color = new Color(0.05f, 0.06f, 0.07f);
+                GUI.DrawTexture(new Rect(0, 0, w, h), White);
+                GUI.color = old;
+            }
+        }
+
+        /// <summary>
+        /// A fishery's loading screen: its picture, still (nothing moves but the progress bar), the name and its
+        /// description at the lower left, a tip at the lower right, a thin bar along the bottom with the step.
+        /// </summary>
         private void DrawLoading(float w, float h)
         {
-            GUI.DrawTexture(new Rect(0, 0, w, h), Texture2D.blackTexture);
-            string name = _locations.Count > 0 ? _locations[Mathf.Clamp(_profile.Location, 0, _locations.Count - 1)].DisplayName : "";
-            GUI.Label(new Rect(w * 0.3f, h * 0.42f, w * 0.4f, S(50)), "Fishing Sim", _title);
-            GUI.Label(new Rect(w * 0.3f, h * 0.42f + S(52), w * 0.4f, S(30)), $"Wczytywanie: {name}…", _text);
-            Bar(new Rect(w * 0.3f, h * 0.42f + S(92), w * 0.4f, S(10)), _world.Progress, new Color(0.95f, 0.72f, 0.3f));
+            int index = _screen == Screen.Loading ? _loadingIndex : _profile.Location;
+            DrawBackdrop(w, h, Picture(index));
+            GUI.DrawTexture(new Rect(0, h * 0.52f, w, h * 0.48f), _fadeUp!);
+            var loc = _locations.Count > 0 ? _locations[Mathf.Clamp(index, 0, _locations.Count - 1)] : null;
+            float x = Mathf.Max(S(48), w * 0.05f), bottom = h - S(64);
+            GUI.Label(new Rect(x, bottom - S(196), S(600), S(20)), "ŁOWISKO", _label);
+            GUI.Label(new Rect(x, bottom - S(176), w * 0.6f, S(64)), loc?.DisplayName ?? "", _logo);
+            GUI.Label(new Rect(x, bottom - S(104), Mathf.Min(w * 0.46f, S(760)), S(76)), loc != null ? Shorten(loc.Description, 230) : "", _small);
+            // the tip, lower right
+            float tw = Mathf.Min(w * 0.32f, S(520));
+            GUI.Label(new Rect(w - x - tw, bottom - S(112), tw, S(20)), "WSKAZÓWKA", _label);
+            GUI.Label(new Rect(w - x - tw, bottom - S(90), tw, S(80)), _tip, _small);
+            // the progress: the step and the per cent above a thin bar across the screen's foot
+            float p = _screen == Screen.Loading ? _loadProgress : 1f;
+            GUI.Label(new Rect(x, h - S(44), w * 0.5f, S(24)), $"{(_loadStep.Length > 0 ? _loadStep : "Wczytywanie")}  ·  {p * 100f:0}%", _small);
+            var old = GUI.color;
+            GUI.color = new Color(1f, 1f, 1f, 0.12f);
+            GUI.DrawTexture(new Rect(0, h - S(6), w, S(6)), White);
+            GUI.color = Accent;
+            GUI.DrawTexture(new Rect(0, h - S(6), w * Mathf.Clamp01(p), S(6)), White);
+            GUI.color = old;
         }
 
         private void Bar(Rect r, float value, Color colour)
@@ -778,61 +1200,84 @@ namespace FishingSim.Game
             GUI.color = old;
         }
 
-
-        /// <summary>The login screen: the lake behind, a card with logging in or creating an account (Accounts).</summary>
+        /// <summary>
+        /// The login screen: the last fishery's picture (still: the world is not drawn), the game's name and the form
+        /// in a column on the left, the background work's progress at the foot (textures and models load meanwhile).
+        /// </summary>
         private void DrawLogin(float w, float h)
         {
-            GUI.DrawTexture(new Rect(0, 0, w, h), _dim!);
-            float cw = S(560), ch = S(_registering ? 560 : 470);
-            var card = new Rect((w - cw) / 2f, (h - ch) / 2f + S(30), cw, ch);
-            GUI.Label(new Rect(card.x, card.y - S(120), cw, S(70)), "FISHING <color=#F5B342>SIM</color>", _logo);
-            GUI.Label(new Rect(card.x + S(4), card.y - S(56), cw, S(30)), "Symulator wędkarstwa · jeziora, rzeki i stawy", _small);
-            GUI.Box(card, "", _panelStyle);
-            var r = new Rect(card.x + S(28), card.y + S(26), cw - S(56), ch - S(52));
-            float tw = (r.width - S(10)) / 2f;
-            if (GUI.Button(new Rect(r.x, r.y, tw, S(40)), "Zaloguj się", _registering ? _tab : _tabOn))
+            DrawBackdrop(w, h, LoginPicture());
+            GUI.DrawTexture(new Rect(0, 0, Mathf.Max(w * 0.48f, S(700)), h), _fadeRight!);
+            float x = Mathf.Max(S(56), w * 0.06f), cw = S(440);
+            float y = h * 0.18f;
+            GUI.Label(new Rect(x, y, S(900), S(64)), "FISHING SIM", _logo);
+            var old = GUI.color;
+            GUI.color = Accent;
+            GUI.DrawTexture(new Rect(x + S(2), y + S(66), S(56), S(3)), White);
+            GUI.color = old;
+            GUI.Label(new Rect(x, y + S(78), S(700), S(28)), "Symulator wędkarstwa", _small);
+            y += S(150);
+            // logging in or a new account: two text tabs
+            float tw = S(160);
+            if (GUI.Button(new Rect(x, y, tw, S(38)), "LOGOWANIE", _registering ? _tab : _tabOn))
             {
                 _registering = false;
                 _loginError = "";
             }
-            if (GUI.Button(new Rect(r.x + tw + S(10), r.y, tw, S(40)), "Utwórz konto", _registering ? _tabOn : _tab))
+            if (GUI.Button(new Rect(x + tw + S(8), y, tw, S(38)), "NOWE KONTO", _registering ? _tabOn : _tab))
             {
                 _registering = true;
                 _loginError = "";
             }
-            float y = r.y + S(70);
-            GUI.Label(new Rect(r.x, y, r.width, S(22)), "NAZWA KONTA", _label);
+            y += S(60);
+            GUI.Label(new Rect(x, y, cw, S(20)), "NAZWA KONTA", _label);
             GUI.SetNextControlName("login_name");
-            _loginName = GUI.TextField(new Rect(r.x, y + S(24), r.width, S(48)), _loginName, 20, _field);
-            y += S(88);
-            GUI.Label(new Rect(r.x, y, r.width, S(22)), "HASŁO", _label);
-            _loginPass = GUI.PasswordField(new Rect(r.x, y + S(24), r.width, S(48)), _loginPass, '•', 64, _field);
-            y += S(88);
+            _loginName = GUI.TextField(new Rect(x, y + S(22), cw, S(48)), _loginName, 20, _field!);
+            y += S(86);
+            GUI.Label(new Rect(x, y, cw, S(20)), "HASŁO", _label);
+            GUI.SetNextControlName("login_pass");
+            _loginPass = GUI.PasswordField(new Rect(x, y + S(22), cw, S(48)), _loginPass, '•', 64, _field!);
+            y += S(86);
             if (_registering)
             {
-                GUI.Label(new Rect(r.x, y, r.width, S(22)), "POWTÓRZ HASŁO", _label);
-                _loginRepeat = GUI.PasswordField(new Rect(r.x, y + S(24), r.width, S(48)), _loginRepeat, '•', 64, _field);
-                y += S(88);
+                GUI.Label(new Rect(x, y, cw, S(20)), "POWTÓRZ HASŁO", _label);
+                _loginRepeat = GUI.PasswordField(new Rect(x, y + S(22), cw, S(48)), _loginRepeat, '•', 64, _field!);
+                y += S(86);
             }
             if (_loginError.Length > 0)
-                GUI.Label(new Rect(r.x, y, r.width, S(28)), $"<color=#FF8A7A>{_loginError}</color>", _text);
-            y += S(38);
+                GUI.Label(new Rect(x, y - S(4), cw, S(28)), $"<color=#F2806E>{_loginError}</color>", _small);
+            y += S(30);
             bool enter = Event.current.type == EventType.KeyDown && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter);
-            if (GUI.Button(new Rect(r.x, y, r.width, S(54)), _registering ? "Utwórz konto i graj" : "Zaloguj się", _accentButton) || enter)
+            if (GUI.Button(new Rect(x, y, cw, S(52)), _registering ? "UTWÓRZ KONTO I GRAJ" : "ZALOGUJ", _accentButton) || enter)
             {
                 _loginError = (_registering ? Accounts.Register(_loginName, _loginPass, _loginRepeat) : Accounts.Login(_loginName, _loginPass)) ?? "";
                 if (_loginError.Length == 0)
                     LogIn(_loginName.Trim());
             }
             y += S(66);
-            GUI.Label(new Rect(r.x, y, r.width, S(40)), _registering
+            GUI.Label(new Rect(x, y, cw, S(48)), _registering
                 ? "Konto i postępy zapisują się na tym komputerze. Hasło nie jest nigdzie zapisane wprost."
-                : "Nie masz konta? Wybierz „Utwórz konto”.", _small);
-            if (GUI.Button(new Rect(w - S(150), h - S(70), S(120), S(44)), "Wyjdź", _button))
+                : "Pierwszy raz? Wybierz „Nowe konto”.", _small);
+            // the foot: the background work, the version, settings and quit
+            if (!_prepared && _prepareStep.Length > 0)
+            {
+                GUI.Label(new Rect(x, h - S(70), S(600), S(22)), $"{_prepareStep}…  {_prepareProgress * 100f:0}%", _small);
+                Bar(new Rect(x, h - S(44), cw, S(3)), _prepareProgress, Accent);
+            }
+            GUI.Label(new Rect(x, h - S(34), S(400), S(22)), $"wersja {Version}", _label);
+            if (GUI.Button(new Rect(w - S(56) - S(300), h - S(80), S(144), S(44)), "Ustawienia", _button))
+            {
+                _settingsBack = Panel.None;
+                _panel = Panel.Settings;
+            }
+            if (GUI.Button(new Rect(w - S(56) - S(144), h - S(80), S(144), S(44)), "Wyjdź", _button))
                 Application.Quit();
+            // the name field has the focus at first (or the password when the name is remembered)
+            if (Event.current.type == EventType.Repaint && GUI.GetNameOfFocusedControl().Length == 0)
+                GUI.FocusControl(_loginName.Length > 0 ? "login_pass" : "login_name");
         }
 
-        /// <summary>The account's own profile in place of the one shown behind the login screen.</summary>
+        /// <summary>The account's own profile, then its fishery's loading screen.</summary>
         private void LogIn(string user)
         {
             bool fresh = !File.Exists(Accounts.ProfilePath(user));
@@ -847,74 +1292,79 @@ namespace FishingSim.Game
             _profile = Profile.Load();
             _rod.Profile = _profile;
             _rod.ApplyTackle();
+            FrameRod();
             _day.Hour = _profile.Hour;
             _user = user;
             _loginPass = _loginRepeat = "";
-            _screen = Screen.Menu;
+            GUI.FocusControl(null);
+            if (_locations.Count > 0)
+                StartCoroutine(LoadMap(Mathf.Clamp(_profile.Location, 0, _locations.Count - 1), true));
             Say($"Witaj, {user}!");
         }
 
-        private void DrawMenu(float w, float h)
+        /// <summary>The rod framed for its length (the user's framing: upright, right of the middle, tip on the line of sight).</summary>
+        private void FrameRod()
         {
-            // a column of cards over the lake: the game's name, the angler, the fisheries, settings
-            float pw = S(560), x = S(64), y = h * 0.09f;
-            var shade = new Rect(0, 0, pw + S(140), h);
-            GUI.DrawTexture(shade, _dim!);
-            GUI.Label(new Rect(x, y, pw, S(70)), "FISHING <color=#F5B342>SIM</color>", _logo);
-            GUI.Label(new Rect(x + S(4), y + S(66), pw, S(26)), $"wersja {Version}", _small);
-            y += S(112);
-            // the angler's card: name, level with its progress, money and catches
-            var me = new Rect(x, y, pw, S(124));
-            GUI.Box(me, "", _panelStyle);
-            GUI.Label(new Rect(me.x + S(22), me.y + S(16), pw * 0.6f, S(34)), $"<b>{_user}</b>", _text);
-            if (_user != "gość" && GUI.Button(new Rect(me.xMax - S(140), me.y + S(14), S(118), S(36)), "Wyloguj", _chip))
-            {
-                _profile.Save();
-                _user = null;
-                Profile.SavePath = null;
-                _loginName = Accounts.LastUser;
-                _registering = false;
-                _screen = Screen.Login;
-            }
-            int lvl = _profile.Level;
-            float from = Core.Progression.XpForLevel(lvl), to = Core.Progression.XpForLevel(lvl + 1);
-            GUI.Label(new Rect(me.x + S(22), me.y + S(54), pw * 0.5f, S(26)), $"Poziom {lvl}", _small);
-            Bar(new Rect(me.x + S(130), me.y + S(64), me.width - S(152), S(8)), (_profile.Xp - from) / Mathf.Max(to - from, 1f), new Color(0.96f, 0.7f, 0.26f));
-            GUI.Label(new Rect(me.x + S(22), me.y + S(84), me.width - S(44), S(28)),
-                $"<color=#F5B342>{_profile.Money} zł</color>   ·   złowione ryby: {_profile.Caught}   ·   rekordy: {_profile.Records.Count}", _small);
-            y += S(146);
-            GUI.Label(new Rect(x, y, pw, S(24)), "ŁOWISKA", _label);
-            y += S(28);
+            if (!GripArms.ShowAngler)
+                GripArms.FrameOnly(_player.Camera, _rod);
+        }
+
+        private void LogOut()
+        {
+            _rod.Reset();
+            _profile.Save();
+            _user = null;
+            Profile.SavePath = null;
+            _loginName = Accounts.LastUser;
+            _loginPass = _loginRepeat = _loginError = "";
+            _registering = false;
+            _panel = Panel.None;
+            _screen = Screen.Login;
+            ShowWorld(false);
+            SetCursor(false);
+        }
+
+        /// <summary>The fisheries (in the game: M or the pause menu), each with its picture; a click travels there.</summary>
+        private void DrawTravel(float w, float h)
+        {
+            var r = Centre(w, h, Mathf.Min(S(980), w * 0.94f), Mathf.Min(S(150) + _locations.Count * S(132) + S(80), h * 0.94f));
+            GUI.Label(new Rect(r.x, r.y, r.width, S(40)), "ŁOWISKA", _title);
+            GUI.Label(new Rect(r.x, r.y + S(38), r.width, S(24)), "Podróż zajmuje chwilę: zestaw zostaje zwinięty, siatka jedzie z tobą.", _small);
+            float y = r.y + S(78);
             for (int i = 0; i < _locations.Count; i++)
             {
                 var loc = _locations[i];
+                bool here = i == _loadedLocation;
                 bool locked = loc.RequiredLevel > _profile.Level;
-                string desc = loc.Description.Length > 90 ? loc.Description.Substring(0, 88).TrimEnd() + "…" : loc.Description;
-                string label = locked
-                    ? $"<b>{loc.DisplayName}</b>   <color=#9AA6AC>· od poziomu {loc.RequiredLevel}</color>\n<size={Mathf.RoundToInt(14 * _scale)}><color=#7F8C92>{desc}</color></size>"
-                    : $"<b>{loc.DisplayName}</b>\n<size={Mathf.RoundToInt(14 * _scale)}><color=#A9B6BC>{desc}</color></size>";
+                var row = new Rect(r.x, y, r.width, S(120));
                 GUI.enabled = !locked;
-                if (GUI.Button(new Rect(x, y, pw, S(74)), label, i == _profile.Location ? _cardHot : _card))
+                if (GUI.Button(row, GUIContent.none, here ? _cardHot : _card) && !locked)
                 {
-                    int index = i;
-                    StartCoroutine(LoadMap(index, true));
+                    if (here)
+                        ClosePanel();
+                    else
+                    {
+                        _profile.Save();
+                        int index = i;
+                        StartCoroutine(LoadMap(index, true));
+                    }
                 }
                 GUI.enabled = true;
-                y += S(82);
+                var pic = Picture(i);
+                var thumb = new Rect(row.x + S(14), row.y + S(12), S(171), S(96));
+                if (pic != null)
+                    GUI.DrawTexture(thumb, pic, ScaleMode.ScaleAndCrop);
+                else
+                    GUI.Box(thumb, GUIContent.none, _bar);
+                float tx = thumb.xMax + S(20), tw = row.xMax - tx - S(170);
+                GUI.Label(new Rect(tx, row.y + S(12), tw, S(32)), loc.DisplayName, _title);
+                GUI.Label(new Rect(tx, row.y + S(48), tw, S(64)), Shorten(loc.Description, 170), _small);
+                string state = here ? "<color=#EBC766>TU JESTEŚ</color>" : locked ? $"OD POZIOMU {loc.RequiredLevel}" : "JEDŹ";
+                GUI.Label(new Rect(row.xMax - S(160), row.y + S(48), S(140), S(24)), state, new GUIStyle(_label!) { alignment = TextAnchor.MiddleRight, normal = { textColor = locked ? Faint : Ink } });
+                y += S(132);
             }
-            y += S(10);
-            if (GUI.Button(new Rect(x, y, pw * 0.48f, S(48)), "Ustawienia", _button))
-            {
-                _settingsBack = Panel.None;
-                _panel = Panel.Settings;
-            }
-            if (GUI.Button(new Rect(x + pw * 0.52f, y, pw * 0.48f, S(48)), "Wyjdź z gry", _button))
-            {
-                _profile.Save();
-                Application.Quit();
-            }
-            y += S(62);
-            GUI.Label(new Rect(x, y, pw, S(48)), "Wybierz łowisko, żeby zacząć. W grze F1 pokazuje sterowanie, T otwiera sklep.", _small);
+            if (GUI.Button(new Rect(r.x, r.yMax - S(48), S(220), S(46)), "Zamknij", _button))
+                ClosePanel();
         }
 
         private Rect Centre(float w, float h, float pw, float ph)
@@ -922,62 +1372,66 @@ namespace FishingSim.Game
             GUI.DrawTexture(new Rect(0, 0, w, h), _dim!);
             var r = new Rect((w - pw) / 2f, (h - ph) / 2f, pw, ph);
             GUI.Box(r, "", _panelStyle);
-            return new Rect(r.x + S(22), r.y + S(18), r.width - S(44), r.height - S(36));
+            return new Rect(r.x + S(26), r.y + S(22), r.width - S(52), r.height - S(44));
         }
 
         private void DrawPause(float w, float h)
         {
-            var r = Centre(w, h, S(460), S(520));
-            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), "Pauza", _title);
-            float y = r.y + S(70);
-            string[] labels = { "Wróć do gry", "Sklep wędkarski (T)", "Siatka z rybami (K)", "Rekordy (J)", "Ustawienia", "Zapisz i wyjdź do menu" };
+            // a column at the left over the dimmed game, as games do
+            GUI.DrawTexture(new Rect(0, 0, w, h), _dim!);
+            GUI.DrawTexture(new Rect(0, 0, S(560), h), _fadeRight!);
+            float x = Mathf.Max(S(56), w * 0.05f), y = h * 0.2f, bw = S(360);
+            GUI.Label(new Rect(x, y, S(600), S(40)), "PAUZA", _title);
+            GUI.Label(new Rect(x, y + S(38), S(600), S(24)), $"{_user}  ·  poziom {_profile.Level}  ·  {_profile.Money} zł", _small);
+            y += S(86);
+            string[] labels = { "Wróć do gry", "Łowiska (M)", "Sklep wędkarski (T)", "Siatka z rybami (K)", "Rekordy (J)", "Sterowanie (F1)", "Ustawienia", "Wyloguj", "Wyjdź z gry" };
             for (int i = 0; i < labels.Length; i++)
             {
-                if (GUI.Button(new Rect(r.x, y, r.width, S(48)), labels[i], i == 0 ? _accentButton : _button))
+                if (i == 7)
+                    y += S(14);
+                if (GUI.Button(new Rect(x, y, bw, S(46)), labels[i], i == 0 ? _accentButton : _button))
                 {
                     switch (i)
                     {
                         case 0: ClosePanel(); break;
-                        case 1:
+                        case 1: OpenPanel(Panel.Travel); break;
+                        case 2:
                             if (_rod.State == RodState.Idle) _panel = Panel.Shop;
                             else Say("Najpierw wyjmij zestaw z wody.");
                             break;
-                        case 2: _panel = Panel.Keepnet; break;
-                        case 3: _panel = Panel.Records; break;
-                        case 4: _settingsBack = Panel.Pause; _panel = Panel.Settings; break;
-                        case 5:
-                            _rod.Reset();
+                        case 3: _panel = Panel.Keepnet; break;
+                        case 4: _panel = Panel.Records; break;
+                        case 5: _panel = Panel.Help; break;
+                        case 6: _settingsBack = Panel.Pause; _panel = Panel.Settings; break;
+                        case 7: LogOut(); break;
+                        case 8:
                             _profile.Save();
-                            _panel = Panel.None;
-                            _screen = Screen.Menu;
-                            _player.Camera.transform.localPosition = new Vector3(0f, Player.EyeHeight, 0f);
-                            SetCursor(false);
-                            _player.Frozen = true;
-                            _rod.Blocked = true;
+                            Application.Quit();
                             break;
                     }
                 }
-                y += S(58);
+                y += S(54);
             }
         }
 
         private void DrawSettings(float w, float h)
         {
-            var r = Centre(w, h, S(640), S(560));
-            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), "Ustawienia", _title);
-            float y = r.y + S(70);
+            var r = Centre(w, h, S(680), S(600));
+            GUI.Label(new Rect(r.x, r.y, r.width, S(40)), "USTAWIENIA", _title);
+            float y = r.y + S(64);
             Row(ref y, r, "Jakość grafiki", Settings.QualityNames[Settings.Quality], d => Settings.Quality = Mathf.Clamp(Settings.Quality + d, 0, 4));
             Row(ref y, r, "Zasięg widzenia", Settings.ViewNames[Settings.View], d => Settings.View = Mathf.Clamp(Settings.View + d, 0, 2));
             Row(ref y, r, "Limit FPS", Settings.FpsLimits[Settings.Fps] == 0 ? "bez limitu" : Settings.FpsLimits[Settings.Fps].ToString(), d => Settings.Fps = Mathf.Clamp(Settings.Fps + d, 0, Settings.FpsLimits.Length - 1));
             Row(ref y, r, "Synchronizacja pionowa", Settings.VSync ? "włączona" : "wyłączona", _ => Settings.VSync = !Settings.VSync);
             Row(ref y, r, "Pełny ekran", Settings.Fullscreen ? "tak" : "nie (okno)", _ => Settings.Fullscreen = !Settings.Fullscreen);
             Row(ref y, r, "Czułość myszy", Settings.Mouse.ToString("0.0"), d => Settings.Mouse = Mathf.Clamp(Settings.Mouse + d * 0.2f, 0.4f, 6f));
-            y += S(16);
-            if (GUI.Button(new Rect(r.x, y, r.width, S(48)), "Gotowe", _accentButton))
+            GUI.Label(new Rect(r.x, y + S(4), r.width, S(44)), "Jakość tekstur zmienia się przy następnym wczytaniu łowiska.", _small);
+            if (GUI.Button(new Rect(r.x, r.yMax - S(48), r.width, S(46)), "Gotowe", _accentButton))
             {
                 Settings.Save();
                 Settings.Apply(_player.Camera);
                 _player.Sensitivity = Settings.Mouse;
+                FrameRod();
                 if (_screen == Screen.Play)
                 {
                     _panel = _settingsBack;
@@ -991,20 +1445,20 @@ namespace FishingSim.Game
 
         private void Row(ref float y, Rect r, string label, string value, Action<int> change)
         {
-            GUI.Label(new Rect(r.x, y + S(8), r.width * 0.5f, S(32)), label, _text);
-            if (GUI.Button(new Rect(r.x + r.width * 0.5f, y, S(44), S(44)), "<", _button))
+            GUI.Label(new Rect(r.x, y + S(10), r.width * 0.5f, S(30)), label, _text);
+            if (GUI.Button(new Rect(r.x + r.width * 0.5f, y, S(44), S(44)), "‹", _button))
                 change(-1);
-            GUI.Label(new Rect(r.x + r.width * 0.5f + S(52), y + S(8), r.width * 0.5f - S(110), S(32)), value, _text);
-            if (GUI.Button(new Rect(r.x + r.width - S(44), y, S(44), S(44)), ">", _button))
+            GUI.Label(new Rect(r.x + r.width * 0.5f + S(44), y + S(10), r.width * 0.5f - S(88), S(30)), value, new GUIStyle(_text!) { alignment = TextAnchor.UpperCenter });
+            if (GUI.Button(new Rect(r.x + r.width - S(44), y, S(44), S(44)), "›", _button))
                 change(1);
             y += S(56);
         }
 
         private void DrawHelp(float w, float h)
         {
-            var r = Centre(w, h, S(720), S(620));
-            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), "Sterowanie", _title);
-            GUI.Label(new Rect(r.x, r.y + S(64), r.width, r.height - S(130)),
+            var r = Centre(w, h, S(760), S(660));
+            GUI.Label(new Rect(r.x, r.y, r.width, S(40)), "STEROWANIE", _title);
+            GUI.Label(new Rect(r.x, r.y + S(56), r.width, r.height - S(120)),
                 "<b>W A S D</b> – chodzenie, <b>Shift</b> – bieg, <b>mysz</b> – rozglądanie\n" +
                 "<b>LPM (przytrzymaj)</b> – siła rzutu, puść, żeby zarzucić\n" +
                 "<b>LPM</b> w wodzie – zwijanie zestawu (przynęta pracuje, spławik płynie do brzegu)\n" +
@@ -1013,84 +1467,160 @@ namespace FishingSim.Game
                 "Spinning: <b>PPM</b> – podszarpnięcie przynęty, <b>Shift+LPM</b> – szybciej; zaczep: <b>PPM</b> szarpnij, <b>LPM</b> ciągnij\n" +
                 "<b>Ctrl+kółko</b> – grunt spławika (przed rzutem), <b>V</b> – garść zanęty przy spławiku, <b>B</b> – ostrzenie haczyka (osełka)\n" +
                 "Złowiona ryba: <b>E</b> – do siatki, <b>R</b> – wypuść\n" +
-                "<b>T</b> – sklep, <b>K</b> – siatka, <b>J</b> – rekordy, <b>Esc</b> – pauza\n" +
+                "<b>T</b> – sklep, <b>K</b> – siatka, <b>J</b> – rekordy, <b>M</b> – łowiska, <b>Tab</b> – szczegóły, <b>Esc</b> – pauza\n" +
                 "<b>E</b> – sklepy, skup, wędzarnia, łódka, ognisko, tablica ogłoszeń, grzyby i jagody\n" +
                 "<b>G</b> – kopanie łopatą, <b>H</b> – siatka na owady, <b>L</b> – podrywka (akcesoria ze sklepu)\n" +
                 "Łódka: <b>W/S</b> wiosła, <b>A/D</b> skręt, <b>X</b> kotwica\n\n" +
-                "Za mocny hamulec zrywa żyłkę, za słaby pozwala rybie odejść z całą żyłką. Wybieraj haczyk do ryby: duże ryby rzadko biorą na małe haczyki, małe nie połkną dużych.",
+                "Pasek ŻYŁKA pokazuje obciążenie żyłki z haczykiem, pasek WĘDKA obciążenie kija; biała kreska to punkt, w którym hamulec zaczyna oddawać żyłkę. Za mocny hamulec zrywa żyłkę, za słaby pozwala rybie odejść.",
                 _text);
-            if (GUI.Button(new Rect(r.x, r.yMax - S(50), r.width, S(48)), "Zamknij", _accentButton))
+            if (GUI.Button(new Rect(r.x, r.yMax - S(48), S(220), S(46)), "Zamknij", _button))
                 ClosePanel();
         }
 
         private void DrawHud(float w, float h)
         {
-            // clock, weather, place (top right)
+            // the time, the weather and the place, top left: text over the world, no panel
             int hh = Mathf.FloorToInt(_day.Hour), mm = Mathf.FloorToInt((_day.Hour - hh) * 60f);
             string weather = _day.Weather switch { Weather.Clear => "pogodnie", Weather.Cloudy => "pochmurno", _ => "deszcz" };
             var place = _world.Lake?.Location.DisplayName ?? "";
-            var box = new Rect(w - S(300), S(16), S(284), S(108));
-            GUI.Box(box, "", _panelStyle);
-            GUI.Label(new Rect(box.x + S(14), box.y + S(8), box.width, S(36)), $"<b><size={(int)S(30)}>{hh:00}:{mm:00}</size></b>  {weather}", _text);
-            GUI.Label(new Rect(box.x + S(14), box.y + S(46), box.width, S(26)), place, _small);
-            GUI.Label(new Rect(box.x + S(14), box.y + S(70), box.width, S(26)), $"Poz. {_profile.Level} · {_profile.Money} zł · siatka {_profile.Keepnet.Count}", _small);
+            float x0 = S(28), y0 = S(22);
+            var clock = new GUIStyle(_title!) { fontSize = Mathf.RoundToInt(34 * _scale), wordWrap = false };
+            Shadowed(new Rect(x0, y0, S(140), S(44)), $"{hh:00}:{mm:00}", clock);
+            Shadowed(new Rect(x0 + S(112), y0 + S(4), S(360), S(24)), weather + (_day.Wind > 0.55f ? ", wietrznie" : ""), new GUIStyle(_text!) { wordWrap = false });
+            Shadowed(new Rect(x0 + S(112), y0 + S(26), S(420), S(22)), place, new GUIStyle(_small!) { wordWrap = false });
+            Shadowed(new Rect(x0, y0 + S(52), S(520), S(22)), $"poziom {_profile.Level}  ·  {_profile.Money} zł  ·  siatka {_profile.Keepnet.Count}", new GUIStyle(_small!) { wordWrap = false });
+            if (_profile.ActiveMeal is { } meal)
+                Shadowed(new Rect(x0, y0 + S(74), S(520), S(22)), $"{meal.Name}: {(_profile.MealUntil - _profile.Clock):0.0} godz.", new GUIStyle(_small!) { wordWrap = false });
 
             if (Boat.Aboard && _profile.HasAccessory("echosonda"))
             {
-                var er = new Rect(S(16), h * 0.4f, S(220), S(70));
+                var er = new Rect(S(28), h * 0.42f, S(190), S(76));
                 GUI.Box(er, "", _panelStyle);
-                GUI.Label(new Rect(er.x + S(14), er.y + S(8), er.width, S(56)), $"Echosonda\n<b><size={(int)S(26)}>{_boat.DepthUnder:0.0} m</size></b>", _text);
+                GUI.Label(new Rect(er.x + S(14), er.y + S(8), er.width, S(18)), "ECHOSONDA", _label);
+                GUI.Label(new Rect(er.x + S(14), er.y + S(28), er.width, S(40)), $"<size={(int)S(28)}>{_boat.DepthUnder:0.0} m</size>", _text);
             }
-            if (_profile.ActiveMeal is { } meal)
-                GUI.Label(new Rect(w - S(300), S(128), S(284), S(26)), $"{meal.Name}: {(_profile.MealUntil - _profile.Clock):0.0} godz.", _small);
-            // crosshair dot
+            // a small dot in the middle
             if (_panel == Panel.None && _rod.State != RodState.Landed)
-                GUI.Label(new Rect(w / 2f - S(4), h / 2f - S(12), S(12), S(24)), "·", _text);
-
-            // tackle line and the load bar (bottom)
-            var rod = Tackle.Rod(_profile.Rod);
-            var bait = Tackle.Bait(_profile.Bait);
-            string baitText = bait == null ? "brak przynęty" : bait.Reusable ? bait.DisplayName : $"{bait.DisplayName} ×{_profile.BaitCount(_profile.Bait)}";
-            GUI.Label(new Rect(S(20), h - S(40), w * 0.6f, S(30)),
-                $"{rod?.DisplayName ?? "brak wędki"} · {Tackle.Hook(_profile.Hook)?.DisplayName ?? "brak haczyka"} · {baitText}", _small);
-            var bar = new Rect(w / 2f - S(240), h - S(78), S(480), S(14));
-            switch (_rod.State)
             {
-                case RodState.Charging:
-                    Bar(bar, _rod.CastPower, new Color(0.95f, 0.72f, 0.3f));
-                    break;
-                case RodState.Fight when _rod.Fight is { } f:
-                    float load = f.Tension / Mathf.Max(_rod.EffectiveLimit, 0.1f);
-                    Bar(bar, load, Color.Lerp(new Color(0.35f, 0.8f, 0.4f), new Color(0.95f, 0.2f, 0.15f), Mathf.Clamp01((load - 0.4f) / 0.6f)));
-                    GUI.Label(new Rect(bar.x, bar.y - S(30), bar.width, S(28)),
-                        $"Żyłka {f.LineOut:0} m · hamulec {_rod.DragSetting * 100f:0}% · siła ryby {f.Stamina * 100f:0}%", _small);
-                    break;
-                case RodState.Waiting:
-                case RodState.Nibble:
-                case RodState.Bite:
-                    GUI.Label(new Rect(bar.x, bar.y - S(4), bar.width, S(28)),
-                        $"{_rod.Distance:0} m · głębokość {_rod.DepthHere:0.0} m · hamulec {_rod.DragSetting * 100f:0}%", _small);
-                    break;
-                case RodState.Idle:
-                    GUI.Label(new Rect(bar.x, bar.y - S(4), bar.width, S(28)), $"Hamulec {_rod.DragSetting * 100f:0}% (kółko myszy) · F1 – sterowanie", _small);
-                    break;
+                var old = GUI.color;
+                GUI.color = new Color(1f, 1f, 1f, 0.55f);
+                GUI.DrawTexture(new Rect(w / 2f - S(2), h / 2f - S(2), S(4), S(4)), White);
+                GUI.color = old;
+            }
+
+            if (_panel == Panel.None && _rod.RodVisible)
+            {
+                // a soft shade along the foot of the screen keeps the bars and numbers readable over bright water
+                var shade = GUI.color;
+                GUI.color = new Color(1f, 1f, 1f, 0.55f);
+                GUI.DrawTexture(new Rect(0, h - S(170), w, S(170)), _fadeUp!);
+                GUI.color = shade;
+                DrawIndicators(w, h);
+                DrawTackleLines(w, h);
             }
             if (_hint.Length > 0 && _panel == Panel.None && _rod.State == RodState.Idle)
             {
-                var hint = _hint;
-                float hw = Mathf.Min(_text!.CalcSize(new GUIContent(hint)).x + S(40), w * 0.9f);
-                var hr = new Rect(w / 2f - hw / 2f, h * 0.6f, hw, S(40));
-                GUI.Box(hr, "", _panelStyle);
-                GUI.Label(new Rect(hr.x + S(16), hr.y + S(6), hr.width - S(32), S(30)), hint, _text);
+                // "[E] what it does": the key in a small box, the rest as text
+                string key = _hint.Length > 2 && _hint[1] == ' ' ? _hint.Substring(0, 1) : "";
+                string what = key.Length > 0 ? _hint.Substring(_hint.IndexOf('–') >= 0 ? _hint.IndexOf('–') + 1 : 2).Trim() : _hint;
+                var style = new GUIStyle(_text!) { wordWrap = false };
+                float tw = Mathf.Min(style.CalcSize(new GUIContent(what)).x, w * 0.8f);
+                float total = tw + (key.Length > 0 ? S(44) : 0f);
+                float hx = (w - total) / 2f, hy = h * 0.62f;
+                if (key.Length > 0)
+                {
+                    GUI.Box(new Rect(hx, hy, S(32), S(32)), GUIContent.none, _panelStyle);
+                    GUI.Label(new Rect(hx, hy + S(4), S(32), S(26)), key, new GUIStyle(_text!) { alignment = TextAnchor.UpperCenter, font = _fontBold });
+                    hx += S(44);
+                }
+                Shadowed(new Rect(hx, hy + S(4), tw + S(4), S(28)), what, style);
             }
             if (Time.unscaledTime < _messageUntil)
             {
-                var size = _text!.CalcSize(new GUIContent(_message));
-                float mw = Mathf.Min(size.x + S(40), w * 0.8f);
-                var mr = new Rect((w - mw) / 2f, h * 0.2f, mw, S(48));
+                var style = new GUIStyle(_text!) { wordWrap = false, alignment = TextAnchor.MiddleCenter };
+                float mw = Mathf.Min(style.CalcSize(new GUIContent(_message)).x + S(56), w * 0.8f);
+                var mr = new Rect((w - mw) / 2f, h * 0.14f, mw, S(44));
                 GUI.Box(mr, "", _panelStyle);
-                GUI.Label(new Rect(mr.x + S(20), mr.y + S(10), mr.width - S(40), S(30)), _message, _text);
+                GUI.Label(mr, _message, style);
             }
+        }
+
+        /// <summary>
+        /// The fishing indicators at the bottom middle: the line out on the left, two bars (the line with its hook and
+        /// the rod: load against what each holds, green to red, the drag's slipping point marked white on the line's
+        /// bar), the drag on the right; while the cast is held, its power and where it would land.
+        /// </summary>
+        private void DrawIndicators(float w, float h)
+        {
+            float bw = Mathf.Min(S(380), w * 0.34f);
+            float cx = w / 2f, y = h - S(78);
+            var big = new GUIStyle(_title!) { fontSize = Mathf.RoundToInt(28 * _scale), wordWrap = false, alignment = TextAnchor.UpperRight };
+            var bigLeft = new GUIStyle(big) { alignment = TextAnchor.UpperLeft };
+            var label = new GUIStyle(_label!) { wordWrap = false };
+            var labelRight = new GUIStyle(label) { alignment = TextAnchor.UpperRight };
+            float barX = cx - bw / 2f;
+            bool fight = _rod.State == RodState.Fight;
+            bool wet = _rod.State is not (RodState.Idle or RodState.Charging or RodState.Landed);
+            if (_rod.State == RodState.Charging)
+            {
+                // the cast: power and the distance it would reach without wind
+                Shadowed(new Rect(barX - S(150), y - S(8), S(136), S(40)), $"{_rod.AimDistance:0} m", big);
+                Shadowed(new Rect(barX, y - S(16), bw, S(18)), "SIŁA RZUTU", label);
+                Bar(new Rect(barX, y + S(6), bw, S(8)), _rod.CastPower, Color.Lerp(new Color(0.75f, 0.82f, 0.88f), Accent, _rod.CastPower));
+            }
+            else
+            {
+                float load = _rod.LoadKg;
+                float line = load / Mathf.Max(_rod.LineLimit, 0.05f), rod = load / Mathf.Max(_rod.RodLimit, 0.05f);
+                Color Load(float k) => k < 0.6f ? Color.Lerp(GoodCol, WarnCol, Mathf.Clamp01((k - 0.35f) / 0.25f)) : Color.Lerp(WarnCol, BadCol, Mathf.Clamp01((k - 0.6f) / 0.3f));
+                // the line out (the fish's distance in a fight)
+                string outText = wet ? $"{(fight && _rod.Fight != null ? _rod.Fight.LineOut : _rod.LineOut):0.0}" : "—";
+                Shadowed(new Rect(barX - S(150), y - S(8), S(118), S(40)), outText, big);
+                Shadowed(new Rect(barX - S(30), y + S(6), S(26), S(18)), wet ? "m" : "", label);
+                Shadowed(new Rect(barX, y - S(16), bw * 0.5f, S(18)), "ŻYŁKA", label);
+                Shadowed(new Rect(barX + bw * 0.5f, y - S(16), bw * 0.5f, S(18)), $"{load:0.00} / {_rod.LineLimit:0.0} kg", labelRight);
+                // a fight near the break: the line's bar pulses
+                float pulse = fight && line > 0.85f ? 0.55f + 0.45f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * 9f)) : 1f;
+                var lineBar = new Rect(barX, y + S(4), bw, S(9));
+                Bar(lineBar, line, Load(line) * new Color(1f, 1f, 1f, pulse));
+                float slip = Mathf.Clamp01(_rod.DragKg / Mathf.Max(_rod.LineLimit, 0.05f));
+                var old = GUI.color;
+                GUI.color = new Color(1f, 1f, 1f, 0.95f);
+                GUI.DrawTexture(new Rect(lineBar.x + lineBar.width * slip - S(1), lineBar.y - S(4), S(2), lineBar.height + S(8)), White);
+                GUI.color = old;
+                Bar(new Rect(barX, y + S(20), bw, S(5)), rod, Load(rod));
+                Shadowed(new Rect(barX, y + S(28), bw * 0.5f, S(18)), "WĘDKA", label);
+                if (Input.GetKey(KeyCode.Tab) && fight && _rod.Fight is { } tf)
+                    Shadowed(new Rect(barX, y - S(44), bw, S(22)),
+                        $"ryba {tf.Distance:0} m · siła {tf.Stamina * 100f:0}% · {(tf.Slipping ? "hamulec oddaje żyłkę" : tf.Running ? "odjazd" : "zmęczona")}",
+                        new GUIStyle(_small!) { wordWrap = false, alignment = TextAnchor.UpperCenter });
+            }
+            // the drag, right of the bars
+            float rx = barX + bw + S(22);
+            Shadowed(new Rect(rx, y - S(16), S(160), S(18)), "HAMULEC", label);
+            string verdict = _rod.DragKg > _rod.EffectiveLimit * 0.85f ? "  <color=#F2806E>za mocno</color>" : _rod.DragKg < _rod.EffectiveLimit * 0.2f ? "  <color=#A6CBEF>luźno</color>" : "";
+            Shadowed(new Rect(rx, y - S(2), S(120), S(40)), $"{_rod.DragSetting * 100f:0}%", bigLeft);
+            Shadowed(new Rect(rx, y + S(30), S(260), S(20)), $"{_rod.DragKg:0.0} kg{verdict}", new GUIStyle(_small!) { wordWrap = false });
+            if (_rod.Reeling)
+                Shadowed(new Rect(barX, y + S(46), bw, S(20)), $"zwijanie {_rod.CrankTurns:0.0} obr/s · {_rod.RetrieveRate:0.00} m/s",
+                    new GUIStyle(_small!) { wordWrap = false, alignment = TextAnchor.UpperCenter });
+        }
+
+        /// <summary>The tackle in hand, bottom right, in three quiet lines.</summary>
+        private void DrawTackleLines(float w, float h)
+        {
+            string Short(string? name) => name == null ? "—" : name.Split('·')[0].Trim();
+            var rod = _rod.RodItem;
+            var reel = _rod.ReelItem;
+            var line = _rod.LineInUse;
+            var bait = _rod.BaitItem;
+            var hook = _rod.HookItem;
+            string baitText = bait == null ? "brak przynęty" : bait.Reusable ? Short(bait.DisplayName) : $"{Short(bait.DisplayName)} ×{_profile.BaitCount(_profile.Bait)}";
+            var style = new GUIStyle(_small!) { wordWrap = false, alignment = TextAnchor.UpperRight };
+            float tw = Mathf.Min(S(520), w * 0.3f), x = w - S(28) - tw, y = h - S(96);
+            Shadowed(new Rect(x, y, tw, S(22)), $"{Short(rod?.DisplayName)}  ·  {Short(reel?.DisplayName)}", style);
+            Shadowed(new Rect(x, y + S(22), tw, S(22)), line == null ? "brak żyłki" : $"{Short(line.DisplayName)} {line.Diameter:0.00} mm  ·  {(hook != null ? Short(hook.DisplayName) : "brak haczyka")}", style);
+            Shadowed(new Rect(x, y + S(44), tw, S(22)), $"{baitText}  ·  na szpuli {_rod.SpoolLeft:0} m", style);
         }
 
         private void DrawCatch(float w, float h)
@@ -1102,7 +1632,7 @@ namespace FishingSim.Game
             var box = new Rect((w - S(640)) / 2f, h - S(430), S(640), S(400));
             GUI.Box(box, "", _panelStyle);
             var r = new Rect(box.x + S(22), box.y + S(18), box.width - S(44), box.height - S(36));
-            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), sp.SpeciesName, _title);
+            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), sp.SpeciesName.ToUpperInvariant(), _title);
             GUI.Label(new Rect(r.x, r.y + S(48), r.width, S(26)), sp.LatinName, _small);
             int value = Progression.FishValue(sp, _rod.Weight);
             int xp = Progression.FishXp(sp, _rod.Weight);
@@ -1127,7 +1657,7 @@ namespace FishingSim.Game
         private void DrawKeepnet(float w, float h)
         {
             var r = Centre(w, h, S(620), S(640));
-            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), "Siatka", _title);
+            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), "SIATKA", _title);
             float y = r.y + S(60);
             var view = new Rect(r.x, y, r.width, r.height - S(170));
             var content = new Rect(0, 0, r.width - S(24), Mathf.Max(_profile.Keepnet.Count * S(34), view.height));
@@ -1153,7 +1683,7 @@ namespace FishingSim.Game
         private void DrawRecords(float w, float h)
         {
             var r = Centre(w, h, S(620), S(640));
-            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), $"Rekordy ({_profile.Records.Count}/{Tackle.AllSpecies.Count} gatunków)", _title);
+            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), $"REKORDY  <size={(int)S(18)}><color=#9AA3AA>{_profile.Records.Count}/{Tackle.AllSpecies.Count} gatunków</color></size>", _title);
             var view = new Rect(r.x, r.y + S(60), r.width, r.height - S(120));
             var species = Tackle.AllSpecies;
             var content = new Rect(0, 0, r.width - S(24), species.Count * S(32));
@@ -1173,7 +1703,7 @@ namespace FishingSim.Game
         private void DrawCooking(float w, float h)
         {
             var r = Centre(w, h, S(760), S(640));
-            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), "Gotowanie", _title);
+            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), "GOTOWANIE", _title);
             var pantry = string.Join(", ", _profile.Pantry.Where(p => p.Value > 0).Select(p => $"{Core.Camp.Foraging.NameOf(p.Key)} {p.Value}"));
             GUI.Label(new Rect(r.x, r.y + S(48), r.width, S(26)), $"Siatka: {_profile.Keepnet.Count} ryb · spiżarnia: {(pantry.Length > 0 ? pantry : "pusta")}", _small);
             float y = r.y + S(84);
@@ -1201,7 +1731,7 @@ namespace FishingSim.Game
         private void DrawNotices(float w, float h)
         {
             var r = Centre(w, h, S(820), S(660));
-            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), "Tablica ogłoszeń", _title);
+            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), "TABLICA OGŁOSZEŃ", _title);
             var notes = Camp.Notices(_world.Lake, _profile, _profile.Location);
             int day = (int)(_profile.Clock / 24f);
             float y = r.y + S(60);
@@ -1260,7 +1790,7 @@ namespace FishingSim.Game
         private void DrawSmokehouse(float w, float h)
         {
             var r = Centre(w, h, S(620), S(420));
-            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), "Wędzarnia", _title);
+            GUI.Label(new Rect(r.x, r.y, r.width, S(46)), "WĘDZARNIA", _title);
             string state;
             if (_profile.Smoking.Count == 0)
                 state = $"Wędzarz przyjmie wymiarowe ryby od 100 g z twojej siatki ({_profile.Keepnet.Count} ryb). " +
@@ -1292,7 +1822,7 @@ namespace FishingSim.Game
         private void DrawShop(float w, float h)
         {
             var r = Centre(w, h, Mathf.Min(S(1100), w * 0.92f), Mathf.Min(S(820), h * 0.92f));
-            GUI.Label(new Rect(r.x, r.y, r.width * 0.6f, S(46)), "Sklep wędkarski", _title);
+            GUI.Label(new Rect(r.x, r.y, r.width * 0.6f, S(46)), "SKLEP WĘDKARSKI", _title);
             GUI.Label(new Rect(r.x + r.width * 0.6f, r.y + S(10), r.width * 0.4f, S(30)), $"Portfel: <b>{_profile.Money} zł</b> · poziom {_profile.Level}", _text);
             float x = r.x;
             for (int i = 0; i < ShopTabs.Length; i++)
@@ -1422,6 +1952,7 @@ namespace FishingSim.Game
                 case BaitData: _profile.Bait = item.ItemId; break;
             }
             _rod.ApplyTackle();
+            FrameRod();   // a longer or shorter rod: its tip back on the line of sight
         }
 
         private static string Stats(TackleItem item) => item switch

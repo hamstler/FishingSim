@@ -73,17 +73,29 @@ namespace FishingSim.Game
             }
             if (task.Exception != null)
                 throw task.Exception;
-            Progress = 0.35f;
+            Progress = 0.3f;
+            LoadLog.Mark("terrain heights done");
             yield return null;
-            int size = Settings.Quality <= 1 ? 1024 : Settings.Quality == 2 ? 2048 : 4096;   // the Textures setting: Low 1K, Medium 2K, High+ 4K (as in Godot)
-            bool photos = GroundLayers.Build(size);
+            int size = GroundLayers.SizeForQuality;
+            // the ground's photographs (usually ready: GameRoot prepares them while the login screen shows)
+            var ground = GroundLayers.Prepare(size);
+            while (ground.MoveNext())
+            {
+                Progress = 0.3f + 0.1f * GroundLayers.Progress;
+                yield return ground.Current;
+            }
+            bool photos = GroundLayers.Ready(size);
+            LoadLog.Begin("terrain mesh");
             MakeTerrain(xs, zs, heights, colours, weightsA, weightsB, photos ? TerrainMaterial(location) : Materials.Ground());
+            LoadLog.End("terrain mesh");
             Progress = 0.45f;
             yield return null;
 
             // --- water
+            LoadLog.Begin("water and pier");
             MakeWater(location);
             MakePier();
+            LoadLog.End("water and pier");
             Progress = 0.5f;
             yield return null;
 
@@ -93,6 +105,7 @@ namespace FishingSim.Game
                 for (int cx = Mathf.FloorToInt(-Lake.Outer / 64f); cx < Mathf.CeilToInt(Lake.Outer / 64f); cx++)
                     cells.Add(new Vector2Int(cx, cz));
             var built = new (MeshKit Solid, MeshKit Leaves, MeshKit Grass)[cells.Count];
+            LoadLog.Begin("plants and stones");
             var plants = Task.Run(() => Parallel.For(0, cells.Count, k => built[k] = Scatter(lake, cells[k])));
             while (!plants.IsCompleted)
             {
@@ -110,15 +123,20 @@ namespace FishingSim.Game
                     Part($"Leaves{cells[k]}", leaves.ToMesh(), _foliage, true);
                 if (grass.Count > 0)
                     Part($"Grass{cells[k]}", grass.ToMesh(), _foliageTwoSided, false);
-                Progress = 0.6f + 0.4f * k / cells.Count;
+                Progress = 0.6f + 0.2f * k / cells.Count;
                 if (k % 8 == 0)
                     yield return null;
             }
+            LoadLog.End("plants and stones");
             // the woods, bushes, boulders and the meadow (Scenery's placement, instanced)
             Solids.Clear();
+            LoadLog.Begin("landmarks");
             _landmarks ??= new GameObject("Landmarks").AddComponent<Landmarks>();
             _landmarks.transform.SetParent(transform, false);
             _landmarks.Build(Lake);
+            LoadLog.End("landmarks");
+            Progress = 0.85f;
+            yield return null;
             Solids.AddRange(_landmarks.Solids);
             Forest.Reserved.Clear();
             foreach (var entry in location.Landmarks)
@@ -143,9 +161,14 @@ namespace FishingSim.Game
             Forest.LandmarkTrees.Clear();
             Forest.LandmarkTrees.AddRange(_landmarks.TreeSpots);
             _forest ??= gameObject.AddComponent<Forest>();
+            LoadLog.Begin("forest");
             var forest = _forest.Build(Lake, Solids);
             while (forest.MoveNext())
+            {
+                Progress = Mathf.Min(Progress + 0.01f, 0.99f);
                 yield return forest.Current;
+            }
+            LoadLog.End("forest");
             Progress = 1f;
             Ready = true;
         }

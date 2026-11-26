@@ -1,4 +1,6 @@
+using System.Collections;
 using System.IO;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace FishingSim.Game
@@ -7,7 +9,8 @@ namespace FishingSim.Game
     /// The seven photographed ground layers of World/Props/GroundTextures (Poly Haven CC0 sets in
     /// StreamingAssets/Textures/&lt;id&gt;: diff, nor, disp): albedo with the height map in alpha and the normal map's
     /// tilt (RG) as two texture arrays, block compressed, at the Textures setting's size; plus each layer's mean colour
-    /// (linear) for the map's tints.
+    /// (linear) for the map's tints. Made once and kept in <see cref="TexCache"/> (the compression on worker threads),
+    /// so later starts only read them back; <see cref="Prepare"/> runs while the login screen shows.
     /// </summary>
     public static class GroundLayers
     {
@@ -20,92 +23,118 @@ namespace FishingSim.Game
         public static Texture2DArray? Normal { get; private set; }
         public static readonly Color[] Means = new Color[Count];
         private static int _builtSize;
+        private static bool _building;
+
+        /// <summary>How far <see cref="Prepare"/> is (0..1), for the loading screen.</summary>
+        public static float Progress { get; private set; }
 
         public static string Dir(string id) => System.IO.Path.Combine(Application.streamingAssetsPath, "Textures", id);
 
-        private static Texture2D? Read(string id, string name, bool linear)
+        /// <summary>The sets are there (else the terrain keeps its painted colours).</summary>
+        public static bool Available()
         {
-            foreach (var ext in new[] { ".jpg", ".png" })
-            {
-                string path = System.IO.Path.Combine(Dir(id), name + ext);
-                if (!File.Exists(path))
-                    continue;
-                var t = new Texture2D(2, 2, TextureFormat.RGBA32, false, linear);
-                t.LoadImage(File.ReadAllBytes(path), false);
-                return t;
-            }
-            return null;
-        }
-
-        private static Color32[] Pixels(Texture2D t, int size, bool srgb = false)
-        {
-            if (t.width == size && t.height == size)
-                return t.GetPixels32();
-            // resample through the GPU
-            var rt = RenderTexture.GetTemporary(size, size, 0, RenderTextureFormat.ARGB32, srgb ? RenderTextureReadWrite.sRGB : RenderTextureReadWrite.Linear);
-            Graphics.Blit(t, rt);
-            var prev = RenderTexture.active;
-            RenderTexture.active = rt;
-            var copy = new Texture2D(size, size, TextureFormat.RGBA32, false, !srgb);
-            copy.ReadPixels(new Rect(0, 0, size, size), 0, 0);
-            copy.Apply();
-            RenderTexture.active = prev;
-            RenderTexture.ReleaseTemporary(rt);
-            var px = copy.GetPixels32();
-            Object.Destroy(copy);
-            return px;
-        }
-
-        /// <summary>Builds the arrays (once per size); false when the sets are missing.</summary>
-        public static bool Build(int size)
-        {
-            if (Albedo != null && _builtSize == size)
-                return true;
             foreach (var id in Ids)
-                if (!File.Exists(System.IO.Path.Combine(Dir(id), "diff.jpg")))
+                if (TexCache.Find(System.IO.Path.Combine(Dir(id), "diff")) == null)
                     return false;
+            return true;
+        }
+
+        public static bool Ready(int size) => Albedo != null && _builtSize == size;
+
+        /// <summary>The Textures setting: Low 1K, Medium 2K, High and up 4K (as in Godot).</summary>
+        public static int SizeForQuality => Settings.Quality <= 1 ? 1024 : Settings.Quality == 2 ? 2048 : 4096;
+
+        private static string Key(string id, int size, string part) =>
+            $"ground_{id}_{size}_{part}_{TexCache.Stamp(TexCache.Find(System.IO.Path.Combine(Dir(id), "diff")) ?? "")}_{TexCache.Stamp(TexCache.Find(System.IO.Path.Combine(Dir(id), "nor")) ?? "")}_{TexCache.Stamp(TexCache.Find(System.IO.Path.Combine(Dir(id), "disp")) ?? "")}";
+
+        /// <summary>Builds the arrays for <paramref name="size"/> over several frames (a coroutine); a second caller waits for the first.</summary>
+        public static IEnumerator Prepare(int size)
+        {
+            while (_building)
+                yield return null;
+            if (Ready(size) || !Available())
+            {
+                Progress = 1f;
+                yield break;
+            }
+            _building = true;
+            Progress = 0f;
+            LoadLog.Begin($"ground layers {size}");
             var albedo = new Texture2DArray(size, size, Count, TextureFormat.DXT5, true, false) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 8, name = "GroundAlbedo" };
             var normal = new Texture2DArray(size, size, Count, TextureFormat.DXT5, true, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 8, name = "GroundNormal" };
             for (int layer = 0; layer < Count; layer++)
             {
-                var diff = Read(Ids[layer], "diff", false)!;
-                var disp = Read(Ids[layer], "disp", true);
-                var nor = Read(Ids[layer], "nor", true);
-                var a = Pixels(diff, size, true);
-                var h = disp != null ? Pixels(disp, size) : null;
-                double r = 0, g = 0, b = 0;
-                for (int i = 0; i < a.Length; i++)
+                string id = Ids[layer];
+                string keyA = Key(id, size, "a"), keyN = Key(id, size, "n");
+                var read = Task.Run(() => (TexCache.Read(keyA), TexCache.Read(keyN)));
+                while (!read.IsCompleted)
+                    yield return null;
+                var (ea, en) = read.Result;
+                if (ea == null || en == null || ea.Format != TextureFormat.DXT5 || en.Format != TextureFormat.DXT5 || ea.Width != size || en.Width != size)
                 {
-                    a[i].a = h != null ? h[i].r : (byte)((a[i].r + a[i].g * 2 + a[i].b) / 4);
-                    var lin = ((Color)a[i]).linear;
-                    r += lin.r; g += lin.g; b += lin.b;
+                    // not cached yet: decode the pictures here (Unity's decoder is the main thread's), the rest on workers
+                    string dir = Dir(id);
+                    var a = TexCache.Decode(TexCache.Find(System.IO.Path.Combine(dir, "diff"))!, size, false, out int aw, out int ah);
+                    if (a == null || aw != size || ah != size)
+                        a = Fit(a, aw, ah, size, false);   // a set smaller than the array: scaled up through the GPU
+                    yield return null;
+                    string? dispFile = TexCache.Find(System.IO.Path.Combine(dir, "disp"));
+                    Color32[]? h = null;
+                    if (dispFile != null)
+                    {
+                        h = TexCache.Decode(dispFile, size, true, out int hw, out int hh0);
+                        if (h != null && (hw != size || hh0 != size))
+                            h = Fit(h, hw, hh0, size, true);
+                    }
+                    yield return null;
+                    string? norFile = TexCache.Find(System.IO.Path.Combine(dir, "nor"));
+                    Color32[]? n = null;
+                    if (norFile != null)
+                    {
+                        n = TexCache.Decode(norFile, size, true, out int nw, out int nh);
+                        if (n != null && (nw != size || nh != size))
+                            n = Fit(n, nw, nh, size, true);
+                    }
+                    yield return null;
+                    var hh = h != null && h.Length == a.Length ? h : null;
+                    var nn = n != null && n.Length == a.Length ? n : null;
+                    var px = a;
+                    var work = Task.Run(() =>
+                    {
+                        double r = 0, g = 0, b = 0;
+                        for (int i = 0; i < px.Length; i++)
+                        {
+                            px[i].a = hh != null ? hh[i].r : (byte)((px[i].r + px[i].g * 2 + px[i].b) / 4);
+                            r += Linear[px[i].r]; g += Linear[px[i].g]; b += Linear[px[i].b];
+                        }
+                        var mean = new[] { (float)(r / px.Length), (float)(g / px.Length), (float)(b / px.Length) };
+                        var A = TexCache.Encode(px, size, size, false, true, mean);
+                        if (nn == null)
+                        {
+                            nn = new Color32[size * size];
+                            for (int i = 0; i < nn.Length; i++)
+                                nn[i] = new Color32(128, 128, 255, 255);
+                        }
+                        var N = TexCache.Encode(nn, size, size, true, true);
+                        TexCache.Write(keyA, A);
+                        TexCache.Write(keyN, N);
+                        return (A, N);
+                    });
+                    while (!work.IsCompleted)
+                        yield return null;
+                    if (work.Exception != null)
+                    {
+                        Debug.LogException(work.Exception);
+                        _building = false;
+                        yield break;
+                    }
+                    (ea, en) = work.Result;
                 }
-                Means[layer] = new Color((float)(r / a.Length), (float)(g / a.Length), (float)(b / a.Length));
-                var at = new Texture2D(size, size, TextureFormat.RGBA32, true, false);
-                at.SetPixels32(a);
-                at.Apply(true);
-                at.Compress(true);
-                for (int m = 0; m < at.mipmapCount && m < albedo.mipmapCount; m++)
-                    Graphics.CopyTexture(at, 0, m, albedo, layer, m);
-                Color32[] np;
-                if (nor != null)
-                    np = Pixels(nor, size);
-                else
-                {
-                    np = new Color32[size * size];
-                    for (int i = 0; i < np.Length; i++) np[i] = new Color32(128, 128, 255, 255);
-                }
-                var nt = new Texture2D(size, size, TextureFormat.RGBA32, true, true);
-                nt.SetPixels32(np);
-                nt.Apply(true);
-                nt.Compress(true);
-                for (int m = 0; m < nt.mipmapCount && m < normal.mipmapCount; m++)
-                    Graphics.CopyTexture(nt, 0, m, normal, layer, m);
-                Object.Destroy(diff);
-                if (disp != null) Object.Destroy(disp);
-                if (nor != null) Object.Destroy(nor);
-                Object.Destroy(at);
-                Object.Destroy(nt);
+                Means[layer] = ea.Extra.Length >= 3 ? new Color(ea.Extra[0], ea.Extra[1], ea.Extra[2]) : Color.gray;
+                TexCache.ToArray(albedo, layer, ea);
+                TexCache.ToArray(normal, layer, en);
+                Progress = (layer + 1f) / Count;
+                yield return null;
             }
             albedo.Apply(false, true);
             normal.Apply(false, true);
@@ -114,7 +143,51 @@ namespace FishingSim.Game
             Albedo = albedo;
             Normal = normal;
             _builtSize = size;
-            return true;
+            _building = false;
+            Progress = 1f;
+            LoadLog.End($"ground layers {size}");
+        }
+
+        /// <summary>Scales texels to size x size through the GPU (a set smaller than the array).</summary>
+        private static Color32[] Fit(Color32[]? px, int w, int h, int size, bool linear)
+        {
+            if (px == null)
+            {
+                var grey = new Color32[size * size];
+                for (int i = 0; i < grey.Length; i++)
+                    grey[i] = new Color32(128, 128, 128, 255);
+                return grey;
+            }
+            var src = new Texture2D(w, h, TextureFormat.RGBA32, false, linear);
+            src.SetPixels32(px);
+            src.Apply(false, false);
+            var rt = RenderTexture.GetTemporary(size, size, 0, RenderTextureFormat.ARGB32, linear ? RenderTextureReadWrite.Linear : RenderTextureReadWrite.sRGB);
+            Graphics.Blit(src, rt);
+            var prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            var copy = new Texture2D(size, size, TextureFormat.RGBA32, false, linear);
+            copy.ReadPixels(new Rect(0, 0, size, size), 0, 0);
+            copy.Apply(false, false);
+            RenderTexture.active = prev;
+            RenderTexture.ReleaseTemporary(rt);
+            var result = copy.GetPixels32();
+            Object.Destroy(src);
+            Object.Destroy(copy);
+            return result;
+        }
+
+        /// <summary>sRGB byte to linear (worker threads: Unity's Color.linear is the engine's own code).</summary>
+        private static readonly float[] Linear = MakeLinear();
+
+        private static float[] MakeLinear()
+        {
+            var t = new float[256];
+            for (int i = 0; i < 256; i++)
+            {
+                double c = i / 255.0;
+                t[i] = (float)(c <= 0.04045 ? c / 12.92 : System.Math.Pow((c + 0.055) / 1.055, 2.4));
+            }
+            return t;
         }
 
         private static float Lum(Color c) => 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;

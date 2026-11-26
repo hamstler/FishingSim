@@ -681,33 +681,9 @@ namespace FishingSim.Game
             string key = id + "/" + name;
             if (Loaded.TryGetValue(key, out var t))
                 return t;
-            t = null;
-            foreach (var ext in new[] { ".jpg", ".png" })
-            {
-                string path = Path.Combine(GroundLayers.Dir(id), name + ext);
-                if (!File.Exists(path))
-                    continue;
-                t = new Texture2D(2, 2, TextureFormat.RGBA32, true) { name = key, anisoLevel = 8, wrapMode = TextureWrapMode.Repeat };
-                t.LoadImage(File.ReadAllBytes(path), false);
-                int limit = Settings.Quality <= 1 ? 1024 : Settings.Quality == 2 ? 2048 : 4096;   // the Textures setting: Low 1K, Medium 2K, High+ 4K (as in Godot)
-                if (t.width > limit)
-                {
-                    var rt = RenderTexture.GetTemporary(limit, limit * t.height / t.width, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
-                    Graphics.Blit(t, rt);
-                    var prev = RenderTexture.active;
-                    RenderTexture.active = rt;
-                    var small = new Texture2D(rt.width, rt.height, TextureFormat.RGBA32, true) { name = key, anisoLevel = 8, wrapMode = TextureWrapMode.Repeat };
-                    small.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
-                    small.Apply(true);
-                    RenderTexture.active = prev;
-                    RenderTexture.ReleaseTemporary(rt);
-                    Destroy(t);
-                    t = small;
-                }
-                t.Compress(true);
-                t.Apply(true, true);
-                break;
-            }
+            // the Textures setting's size (Low 1K, Medium 2K, High+ 4K), compressed once and kept in TexCache
+            string? file = TexCache.Find(Path.Combine(GroundLayers.Dir(id), name));
+            t = file != null ? TexCache.Picture(file, GroundLayers.SizeForQuality, false, true, key, TextureWrapMode.Repeat, 8) : null;
             return Loaded[key] = t;
         }
 

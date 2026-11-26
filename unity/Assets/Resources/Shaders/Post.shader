@@ -15,6 +15,7 @@ Shader "Hidden/FS/Post"
     float4 _MainTex_TexelSize;
     UNITY_DECLARE_DEPTH_TEXTURE(_CameraDepthTexture);
     float _SceneExposure, _Threshold, _GlowIntensity, _AOStrength, _AORadius, _Contrast, _Saturation, _White, _UseAO;
+    float _GradeStrength;   // DayCycle: 1 on a clear day .. about 0.3 under a grey sky (the warm highlights turned overcast beige)
 
     struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
     v2f vert(appdata_img v) { v2f o; o.pos = UnityObjectToClipPos(v.vertex); o.uv = v.texcoord; return o; }
@@ -166,7 +167,8 @@ Shader "Hidden/FS/Post"
         c = lerp(0.5, c, _Contrast);
         c = lerp(dot(c, 1) / 3.0, c, _Saturation);
         c = saturate(c);
-        c = float3(tex2D(_Grade, float2(c.r, 0.5)).r, tex2D(_Grade, float2(c.g, 0.5)).g, tex2D(_Grade, float2(c.b, 0.5)).b);
+        float3 graded = float3(tex2D(_Grade, float2(c.r, 0.5)).r, tex2D(_Grade, float2(c.g, 0.5)).g, tex2D(_Grade, float2(c.b, 0.5)).b);
+        c = lerp(c, graded, _GradeStrength);
         // debanding (Godot's use_debanding): a triangular dither of one 8-bit step before the output is quantised, so
         // the sky's gentle gradients do not break into flat sheets with stepped edges
         float2 px = i.uv * _ScreenParams.xy;

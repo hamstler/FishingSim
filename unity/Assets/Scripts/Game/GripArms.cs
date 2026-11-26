@@ -64,8 +64,15 @@ namespace FishingSim.Game
             arms._right = arms.Bind("r");
             arms._left = arms.Bind("l");
             arms.ToBody();
-            arms.FrameRod(camera);
+            FrameRod(camera, rod);
             return arms;
+        }
+
+        /// <summary>Only the rod's framing (the angler hidden: GameRoot does not even load the arms' model).</summary>
+        public static void FrameOnly(Camera camera, Fishing rod)
+        {
+            if (rod.Frame != null)
+                FrameRod(camera, rod);
         }
 
         private static Transform? Bone(Transform model, string side, string mine, string humanoid) =>
@@ -119,19 +126,20 @@ namespace FishingSim.Game
         /// The rod where the user wants it: upright on the screen, ShiftRight of the width right of the middle, the reel
         /// seat low (SeatOnScreen) and the tip on the line of sight, the reel hanging under the blank.
         /// </summary>
-        private void FrameRod(Camera camera)
+        private static void FrameRod(Camera camera, Fishing rod)
         {
+            var frame = rod.Frame!;
             float k = 2f * ShiftRight * Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad) * camera.aspect;
             var seat = new Vector3(k * SeatOnScreen.z, SeatOnScreen.y, SeatOnScreen.z);
-            float reach = Rod.TipRestLocal.y - 0.1f;
+            float reach = rod.TipRestLocal.y - 0.1f;
             float zt = seat.z + Mathf.Sqrt(Mathf.Max(reach * reach - seat.y * seat.y, 0.01f));
             var along = (new Vector3(k * zt, 0f, zt) - seat).normalized;
             var down = Vector3.ProjectOnPlane(Vector3.down, along).normalized;
             // the rod's frame: +Y along the blank, the reel on its -Z side
             var frameTurn = Quaternion.LookRotation(-down, along);
-            var rootTurn = frameTurn * Quaternion.Inverse(_frame.localRotation);
-            var pos = seat - rootTurn * (_frame.localRotation * new Vector3(0f, 0.1f, 0f));
-            Rod.SetFraming(pos, rootTurn);
+            var rootTurn = frameTurn * Quaternion.Inverse(frame.localRotation);
+            var pos = seat - rootTurn * (frame.localRotation * new Vector3(0f, 0.1f, 0f));
+            rod.SetFraming(pos, rootTurn);
             Debug.Log($"GRIPARMS the reel seat at {seat}, the tip {zt:0.00} m ahead on the line of sight");
         }
 

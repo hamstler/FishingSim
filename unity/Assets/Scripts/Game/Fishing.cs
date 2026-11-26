@@ -31,6 +31,10 @@ namespace FishingSim.Game
         public FishSpecies? Species { get; private set; }
         public float Weight { get; private set; }
         public float EffectiveLimit { get; private set; } = 3f;
+
+        /// <summary>What the line (with the hook) holds and what the rod holds (kg): the HUD's two load bars.</summary>
+        public float LineLimit { get; private set; } = 3f;
+        public float RodLimit { get; private set; } = 3f;
         public float Distance => _bobber != null ? Flat(_bobber.position - Player.transform.position).magnitude : 0f;
         public float DepthHere { get; private set; }
         public bool Blocked { get; set; }
@@ -270,6 +274,32 @@ namespace FishingSim.Game
             }
         }
 
+        /// <summary>The tackle in use, for the HUD.</summary>
+        public RodData? RodItem => Rod;
+        public ReelData? ReelItem => Reel;
+        public LineData? LineInUse => LineItem;
+        public HookData? HookItem => Hook;
+        public BaitData? BaitItem => Bait;
+
+        /// <summary>What the drag holds before it gives line (kg).</summary>
+        public float DragKg => DragSetting * (Reel?.DragMax ?? 3f);
+
+        /// <summary>What pulls the line now (kg): the fight's tension, else what the tip carries (BendLoad).</summary>
+        public float LoadKg => State == RodState.Fight && Fight != null ? Fight.Tension : BendLoad();
+
+        /// <summary>Line still on the spool (m).</summary>
+        public float SpoolLeft => Mathf.Max(0f, (Reel?.LineCapacity ?? 100f) - (State is RodState.Idle or RodState.Charging or RodState.Landed ? 0f : (Fight?.LineOut ?? _lineLength)));
+
+        /// <summary>Where a cast at the power held now would land, without wind (m).</summary>
+        public float AimDistance => Mathf.Lerp(5f, CastReach(), Mathf.Max(CastPower, 0.08f));
+
+        /// <summary>A full-power cast's reach with this rod and end tackle (m).</summary>
+        private float CastReach()
+        {
+            float weight = Method == FishingMethod.Bottom ? 40f : Method == FishingMethod.Spinning ? Mathf.Max(Bait?.WeightG ?? 8f, 3f) : 4.5f;
+            return (14f + 30f * Mathf.Clamp01(weight / 25f)) * (Rod?.CastMult ?? 1f);
+        }
+
         private RodData? Rod => Tackle.Rod(Profile.Rod);
         private ReelData? Reel => Tackle.Reel(Profile.Reel);
         private LineData? LineItem => Tackle.Line(Profile.Line);
@@ -507,6 +537,12 @@ namespace FishingSim.Game
                             Destroy(c.gameObject);
                 var model = ModelLibrary.Spawn(rodId, _rodModel);
                 bool ok = model != null;
+                // only the tackle in use is loaded: a rod bought or taken from the shop loads now and shows when ready
+                if (model == null && !ModelLibrary.Settled(rodId))
+                {
+                    ModelLibrary.Start(rodId);
+                    _waitRod = rodId;
+                }
                 if (model != null)
                 {
                     // the series' finish (generate_tackle.py: series on one model look apart)
@@ -546,6 +582,12 @@ namespace FishingSim.Game
                 _rotor = _crank = _bail = _spoolLine = _lineExit = null;
                 var model = ModelLibrary.Spawn(reelId, _reelModel);
                 _modelledReel = false;
+                if (model == null && !ModelLibrary.Settled(reelId))
+                {
+                    ModelLibrary.Start(reelId);
+                    _waitReel = reelId;
+                    _shownReel = "";   // tried again once loaded
+                }
                 // the reel's size and finish: a 1000 is smaller than a 5000 on the same body (scaled about the reel's
                 // foot at the seat, so it stays on the rod)
                 float reelScale = reel != null && reel.ModelScale > 0.1f ? reel.ModelScale : 1f;
@@ -836,6 +878,8 @@ namespace FishingSim.Game
             // a worn line holds less (LineWear.Strength)
             float lineHold = line != null ? LineWear.Strength(line.Strength, Profile.WearOf(Profile.Line)) : 1f;
             EffectiveLimit = Mathf.Min(lineHold, Mathf.Min(rod?.MaxLoad ?? 1f, hook?.Strength ?? 1f));
+            LineLimit = Mathf.Min(lineHold, hook?.Strength ?? 1f);
+            RodLimit = rod?.MaxLoad ?? 1f;
             if (line != null)
             {
                 var c = line.LineColor;
@@ -887,10 +931,22 @@ namespace FishingSim.Game
         private IReadOnlyList<FishSpecies> SpeciesHere => Tackle.AllSpecies;
 
         // ------------------------------------------------------------------ per frame
+        private string? _waitRod, _waitReel;
+
+        /// <summary>The rod's and the reel's model ids this rig wants (the shop's choice), loaded or not.</summary>
+        public string WantedRodModel => Rod != null && Rod.Model.Length > 0 ? Rod.Model : "rods/float_ostoja";
+        public string WantedReelModel => Reel != null && Reel.Model.Length > 0 ? Reel.Model : "reels/small_hokuto";
+
         private void Update()
         {
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             _stateTime += dt;
+            // a rod or reel model that was still loading when the tackle was put together: shown now
+            if ((_waitRod != null && ModelLibrary.Settled(_waitRod)) || (_waitReel != null && ModelLibrary.Settled(_waitReel)))
+            {
+                _waitRod = _waitReel = null;
+                ApplyTackle();
+            }
             bool canAct = !Blocked && Cursor.lockState == CursorLockMode.Locked;
             bool lmbDown = canAct && Input.GetMouseButtonDown(0) || SmokeCharge && State == RodState.Idle, lmb = canAct && Input.GetMouseButton(0) || SmokeReel || SmokeCharge,
                 lmbUp = canAct && Input.GetMouseButtonUp(0);
@@ -1053,7 +1109,7 @@ namespace FishingSim.Game
             var rod = Rod!;
             float power = Mathf.Max(CastPower, 0.08f);
             float weight = Method == FishingMethod.Bottom ? 40f : Method == FishingMethod.Spinning ? Mathf.Max(Bait?.WeightG ?? 8f, 3f) : 4.5f;
-            float reach = (14f + 30f * Mathf.Clamp01(weight / 25f)) * rod.CastMult;
+            float reach = CastReach();
             var dir = Flat(Player.Forward).normalized;
             var (degrees, speedFactor) = Casting.Scatter(power, _rng);     // a soft bell round the aim, wider at full power
             dir = Quaternion.Euler(0f, degrees, 0f) * dir;
@@ -1176,6 +1232,16 @@ namespace FishingSim.Game
         // ------------------------------------------------------------------ automated test (Smoke)
         /// <summary>Held down by the smoke test: reels as if the left button were held.</summary>
         public bool SmokeReel { get; set; }
+
+        /// <summary>The smoke test hooks a fish on the end tackle in the water (a fight to photograph the HUD in).</summary>
+        public void SmokeHook(string species, float weight)
+        {
+            if (State is not (RodState.Waiting or RodState.Nibble or RodState.Bite) || Tackle.Species(species) is not { } sp)
+                return;
+            Species = sp;
+            Weight = weight;
+            StartFight(1f);
+        }
 
         /// <summary>Held by the smoke test: the cast button held (charging); let go, the rod swings and casts.</summary>
         public bool SmokeCharge { get; set; }
