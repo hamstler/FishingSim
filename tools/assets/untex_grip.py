@@ -172,7 +172,7 @@ def remake_hand_weights(s, S):
         new = {nm: 1.0}
         L = math.sqrt(L2[k])
         # across a joint: share with the parent near the head, with the (only) child near the tail
-        band = min(0.012, 0.35 * L)
+        band = min(0.016, 0.45 * L)     # a wide blend over each joint: a sharp one collapsed a bent knuckle into folds
         if parent[nm] and tk * L < band:
             share = 0.5 * (1 - tk * L / band)
             new = {nm: 1 - share, parent[nm]: share}
@@ -290,6 +290,59 @@ for fc in bm.faces:
     if len(owners) >= 2 and level >= 2 and not any(o.startswith("kciuk") for o in owners):
         bridges.append(fc)
 bmesh.ops.delete(bm, geom=bridges, context="FACES")
+# the openings the strips leave on each finger (the inside showed through as cracks): closed per finger, run by run
+# of one finger's vertices beyond the web (never at the knuckles, never across two fingers), small runs only, fanned
+# to the run's middle with that finger's own weights
+nexts = {}
+for e in bm.edges:
+    if not e.is_boundary:
+        continue
+    a_, b_ = e.verts
+    if dom.get(a_.index, (None, 0))[1] >= 2 and dom.get(b_.index, (None, 0))[1] >= 2 and dom[a_.index][0] == dom[b_.index][0]:
+        nexts.setdefault(a_, []).append(b_)
+        nexts.setdefault(b_, []).append(a_)
+seen, new_faces, patched = set(), [], 0
+for start in list(nexts):
+    if start in seen:
+        continue
+    # walk the run both ways from start
+    run = [start]
+    seen.add(start)
+    for direction in (0, 1):
+        cur, prev = start, None
+        while True:
+            nxt = [v for v in nexts.get(cur, []) if v is not prev and v not in seen]
+            if not nxt:
+                break
+            prev, cur = cur, nxt[0]
+            seen.add(cur)
+            if direction == 0:
+                run.append(cur)
+            else:
+                run.insert(0, cur)
+    if len(run) < 3:
+        continue
+    pts_ = [v.co for v in run]
+    extent = max((a__ - b__).length for a__ in pts_ for b__ in pts_) if len(pts_) < 60 else 1.0
+    if extent > 0.015:
+        continue
+    closed = run[0] in nexts.get(run[-1], [])
+    centre = bm.verts.new(sum(pts_, Vector()) / len(pts_))
+    mid = run[len(run) // 2]
+    for k_, w_ in mid[dl].items():
+        centre[dl][k_] = w_
+    pairs = list(zip(run, run[1:])) + ([(run[-1], run[0])] if closed else [])
+    for a_, b_ in pairs:
+        try:
+            new_faces.append(bm.faces.new((a_, b_, centre)))
+        except ValueError:
+            pass
+    patched += 1
+if new_faces:
+    bmesh.ops.recalc_face_normals(bm, faces=new_faces)
+    for fc in new_faces:
+        fc.smooth = True
+log(f"finger openings closed: {patched} patches, {len(new_faces)} faces")
 bm.to_mesh(me)
 bm.free()
 me.update()
@@ -681,14 +734,35 @@ def close_finger(s, finger, palm_n, limits=(85, 100, 80, 40), couple=(1.0, 1.1, 
             rotate_world(n, Quaternion(ax, math.radians(angles[i] - total[i])))
             total[i] = angles[i]
 
-    # skin already touching at the start (a finger's side against the reel's stem) may stay touching, never go in
-    base = distances(skinned(s, owned), TREE[s])
+    # the neighbouring fingers and the palm are obstacles too (curled fingers went through each other): their skin as
+    # it lies now, in a tree of its own
+    others = set()
+    order = ("kciuk", "wskazujacy", "srodkowy", "serdeczny", "maly")
+    i_ = order.index(finger)
+    for j in (i_ - 1, i_ + 1):
+        if 0 <= j < len(order) and order[j] != "kciuk" and finger != "kciuk":
+            others |= set(chain(s, order[j]))
+    opts = skinned(s, others) if others else np.zeros((0, 3))
+    kd_o = kdtree.KDTree(max(len(opts), 1))
+    for k_, p_ in enumerate(opts):
+        kd_o.insert(Vector(p_), k_)
+    kd_o.balance()
+
+    def dist_all(pts):
+        d = distances(pts, TREE[s])
+        if len(opts):
+            d = np.minimum(d, np.array([kd_o.find(Vector(p_))[2] for p_ in pts]))
+        return d
+
+    # skin already touching at the start (a finger's side against the reel's stem or its neighbour) may stay
+    # touching, never go in
+    base = dist_all(skinned(s, owned))
     stuck = base < CLEAR + 0.003
 
     def ok(angles):
         apply(angles)
         pts = skinned(s, owned)
-        d = distances(pts, TREE[s])
+        d = dist_all(pts)
         if extra is not None and extra(pts) < CLEAR:
             return False
         return bool(np.all(d[~stuck] >= CLEAR) and np.all(d[stuck] >= np.minimum(base[stuck], CLEAR) - 0.001))
@@ -856,7 +930,7 @@ def stages():
     f, a, n, knuckles, w = hand_frame(s, S)
     hand_rot = (AW @ pose["dlon_P"].matrix).to_3x3().normalized()
     base_wrist = head("dlon_P")
-    touch = {"dlon_P", "srodrecze_P"}
+    touch = {"srodrecze_P"}            # the palm itself (the wrist's skin now eases into the hand and lies by the handle's diagonal)
 
 
     def slide(off):
@@ -955,9 +1029,9 @@ def stages():
     log(f"  left hand: turned {deg} deg about the knob, wrist {tuple(round(c, 3) for c in head('dlon_L'))}, off by {(head('dlon_L') - wrist_new).length * 1000:.1f} mm")
     yield "lewa dlon przy galce"
     f, a, n, knuckles, w = hand_frame(s, S)
-    spread(s, "wskazujacy", n, a)      # off the crank's arm, towards the thumb side
+    spread(s, "wskazujacy", n, a, max_deg=6.0)      # off the crank's arm, towards the thumb side (more opened the web)
     for finger in ("wskazujacy", "srodkowy", "serdeczny", "maly"):
-        close_finger(s, finger, n, limits=(90, 100, 80, 40), toward=knob if finger in ("wskazujacy", "srodkowy") else None)
+        close_finger(s, finger, n, limits=((90, 100, 80, 40) if finger == "wskazujacy" else (60, 70, 55, 25) if finger == "srodkowy" else (50, 65, 45, 20)), toward=knob if finger in ("wskazujacy", "srodkowy") else None)
         yield f"palec {finger}"
     # the thumb over the knob from the other side
     close_finger(s, "kciuk", n, limits=(40, 60, 60, 30), couple=(0.6, 1.0, 0.9, 0.5), start=0, toward=knob)
