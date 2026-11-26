@@ -25,7 +25,7 @@ namespace FishingSim.Game
         // the account first (a still picture: nothing of the world is drawn), then the fishery's loading screen (still
         // too), then play; another fishery is chosen in the game (Panel.Travel), like in modern fishing games
         private enum Screen { Login, Loading, Play }
-        private enum Panel { None, Pause, Shop, Settings, Help, Keepnet, Records, Smokehouse, Cooking, Notices, Travel }
+        private enum Panel { None, Pause, Shop, Settings, Help, Keepnet, Records, Smokehouse, Cooking, Notices, Travel, Inventory }
 
         private Screen _screen = Screen.Login;
         private Panel _panel = Panel.None;
@@ -54,6 +54,8 @@ namespace FishingSim.Game
         private float _messageUntil;
         private string _error = "";
         private int _shopTab, _shopFilter;
+        private int _inventoryTab;
+        private readonly TackleItem?[] _rigDraft = new TackleItem?[5];
         private string _shopSearch = "";
         private Vector2 _scroll;
         private Panel _settingsBack = Panel.None;
@@ -171,6 +173,7 @@ namespace FishingSim.Game
                 var smoke = gameObject.AddComponent<Smoke>();
                 smoke.Ready = () => _world.Ready && _screen == Screen.Play && !_loading;
                 smoke.EnterPlay = EnterPlay;
+                smoke.InventoryForShot = show => { if (show) OpenInventory(); else ClosePanel(); };
                 smoke.LoadMap = index => StartCoroutine(LoadMap(index, true));
                 smoke.Locations = _locations.Count;
                 smoke.Rod = _rod;
@@ -616,6 +619,13 @@ namespace FishingSim.Game
                     OpenPanel(Panel.Pause);
                 else
                     ClosePanel();
+            }
+            if (Input.GetKeyDown(KeyCode.I))
+            {
+                if (_panel == Panel.Inventory)
+                    ClosePanel();
+                else if (_panel == Panel.None && _rod.State != RodState.Landed)
+                    OpenInventory();
             }
             _village.SetNight(_day.Night);
             _world.SetNight(_day.Night);
@@ -1113,6 +1123,7 @@ namespace FishingSim.Game
                     {
                         case Panel.Pause: DrawPause(w, h); break;
                         case Panel.Shop: DrawShop(w, h); break;
+                        case Panel.Inventory: DrawInventory(w, h); break;
                         case Panel.Settings: DrawSettings(w, h); break;
                         case Panel.Help: DrawHelp(w, h); break;
                         case Panel.Keepnet: DrawKeepnet(w, h); break;
@@ -1305,8 +1316,7 @@ namespace FishingSim.Game
         /// <summary>The rod framed for its length (the user's framing: upright, right of the middle, tip on the line of sight).</summary>
         private void FrameRod()
         {
-            if (!GripArms.ShowAngler)
-                GripArms.FrameOnly(_player.Camera, _rod);
+            GripArms.FrameOnly(_player.Camera, _rod);
         }
 
         private void LogOut()
@@ -1471,7 +1481,7 @@ namespace FishingSim.Game
                 "Spinning: <b>PPM</b> – podszarpnięcie przynęty, <b>Shift+LPM</b> – szybciej; zaczep: <b>PPM</b> szarpnij, <b>LPM</b> ciągnij\n" +
                 "<b>Ctrl+kółko</b> – grunt spławika (przed rzutem), <b>V</b> – garść zanęty przy spławiku, <b>B</b> – ostrzenie haczyka (osełka)\n" +
                 "Złowiona ryba: <b>E</b> – do siatki, <b>R</b> – wypuść\n" +
-                "<b>T</b> – sklep, <b>K</b> – siatka, <b>J</b> – rekordy, <b>M</b> – łowiska, <b>Tab</b> – szczegóły, <b>Esc</b> – pauza\n" +
+                "<b>I</b> – ekwipunek i montaż zestawu, <b>T</b> – sklep, <b>K</b> – siatka, <b>J</b> – rekordy, <b>M</b> – łowiska, <b>Tab</b> – szczegóły, <b>Esc</b> – pauza\n" +
                 "<b>E</b> – sklepy, skup, wędzarnia, łódka, ognisko, tablica ogłoszeń, grzyby i jagody\n" +
                 "<b>G</b> – kopanie łopatą, <b>H</b> – siatka na owady, <b>L</b> – podrywka (akcesoria ze sklepu)\n" +
                 "Łódka: <b>W/S</b> wiosła, <b>A/D</b> skręt, <b>X</b> kotwica\n\n" +
@@ -1822,6 +1832,98 @@ namespace FishingSim.Game
 
         // ------------------------------------------------------------------ shop
         private static readonly string[] ShopTabs = { "Wędki", "Kołowrotki", "Żyłki", "Haczyki", "Przynęty", "Akcesoria" };
+        private static readonly string[] RigSlots = { "Wędka", "Kołowrotek", "Żyłka", "Haczyk", "Przynęta" };
+
+        private void OpenInventory()
+        {
+            _rigDraft[0] = _rod.RodItem;
+            _rigDraft[1] = _rod.ReelItem;
+            _rigDraft[2] = _rod.LineInUse;
+            _rigDraft[3] = _rod.HookItem;
+            _rigDraft[4] = _rod.BaitItem;
+            _inventoryTab = 0;
+            OpenPanel(Panel.Inventory);
+        }
+
+        private bool HasInventoryItem(TackleItem item) => item is BaitData { Reusable: false }
+            ? _profile.BaitCount(item.ItemId) > 0
+            : _profile.Owned.Contains(item.ItemId);
+
+        private void DrawInventory(float w, float h)
+        {
+            var r = Centre(w, h, Mathf.Min(S(1040), w * 0.96f), Mathf.Min(S(730), h * 0.94f));
+            GUI.Label(new Rect(r.x, r.y, r.width, S(42)), "EKWIPUNEK", _title);
+            float slotsWidth = r.width * 0.36f;
+            float listX = r.x + slotsWidth + S(18);
+            float listWidth = r.xMax - listX;
+            GUI.Label(new Rect(r.x, r.y + S(50), slotsWidth, S(26)), "Zestaw do zmontowania", _text);
+            for (int i = 0; i < RigSlots.Length; i++)
+            {
+                var row = new Rect(r.x, r.y + S(82 + i * 67), slotsWidth, S(61));
+                if (GUI.Button(row, GUIContent.none, _inventoryTab == i ? _tabOn : _tab))
+                {
+                    _inventoryTab = i;
+                    _scroll = Vector2.zero;
+                }
+                GUI.Label(new Rect(row.x + S(10), row.y + S(2), row.width - S(20), S(20)), RigSlots[i], _small);
+                GUI.Label(new Rect(row.x + S(10), row.y + S(20), row.width - S(20), S(39)), _rigDraft[i]?.DisplayName ?? "Wybierz element", _text);
+            }
+            if (GUI.Button(new Rect(r.x, r.y + S(422), slotsWidth, S(36)), "Akcesoria", _inventoryTab == 5 ? _tabOn : _tab))
+            {
+                _inventoryTab = 5;
+                _scroll = Vector2.zero;
+            }
+
+            GUI.Label(new Rect(listX, r.y + S(50), listWidth, S(26)), ShopTabs[_inventoryTab], _text);
+            IEnumerable<TackleItem> items = _inventoryTab switch
+            {
+                0 => Tackle.Rods,
+                1 => Tackle.Reels,
+                2 => Tackle.Lines,
+                3 => Tackle.Hooks,
+                4 => Tackle.Baits,
+                _ => Tackle.Accessories,
+            };
+            var owned = items.Where(HasInventoryItem).OrderBy(it => it.DisplayName).ToList();
+            if (owned.Count == 0)
+                GUI.Label(new Rect(listX, r.y + S(84), listWidth, S(30)), "Nie masz przedmiotów w tej kategorii.", _small);
+            var view = new Rect(listX, r.y + S(82), listWidth, Mathf.Max(1f, r.height - S(152)));
+            float itemHeight = S(62);
+            var content = new Rect(0, 0, view.width - S(22), owned.Count * itemHeight);
+            _scroll = GUI.BeginScrollView(view, _scroll, content);
+            for (int i = 0; i < owned.Count; i++)
+            {
+                var item = owned[i];
+                var row = new Rect(0, i * itemHeight, content.width, itemHeight - S(4));
+                bool selected = _inventoryTab < _rigDraft.Length && _rigDraft[_inventoryTab]?.ItemId == item.ItemId;
+                if (_inventoryTab < _rigDraft.Length && GUI.Button(row, GUIContent.none, selected ? _cardHot : _card))
+                    _rigDraft[_inventoryTab] = item;
+                else if (_inventoryTab == 5)
+                    GUI.Box(row, GUIContent.none, _card);
+                string count = item is BaitData { Reusable: false } ? $" ×{_profile.BaitCount(item.ItemId)}" : "";
+                GUI.Label(new Rect(row.x + S(10), row.y + S(4), row.width - S(20), S(26)), item.DisplayName + count, _text);
+                GUI.Label(new Rect(row.x + S(10), row.y + S(30), row.width - S(20), S(24)), Stats(item), _small);
+            }
+            GUI.EndScrollView();
+
+            bool ready = _rigDraft.All(item => item != null && HasInventoryItem(item));
+            bool idle = _rod.State == RodState.Idle && !_rod.Swinging;
+            string hint = !idle ? "Wyjmij zestaw z wody, aby zmienić części." :
+                !ready ? "Wybierz wszystkie części i dostępną przynętę." : "";
+            GUI.Label(new Rect(r.x, r.yMax - S(60), r.width, S(22)), hint, _small);
+            GUI.enabled = ready && idle;
+            if (GUI.Button(new Rect(r.x, r.yMax - S(38), S(240), S(38)), "Zmontuj i załóż", _accentButton))
+            {
+                foreach (var item in _rigDraft)
+                    SetEquippedItem(item!);
+                ClosePanel();
+                FrameRod();
+                Say("Zestaw zmontowany.");
+            }
+            GUI.enabled = true;
+            if (GUI.Button(new Rect(r.xMax - S(160), r.yMax - S(38), S(160), S(38)), "Zamknij", _button))
+                ClosePanel();
+        }
 
         private void DrawShop(float w, float h)
         {
@@ -1947,6 +2049,13 @@ namespace FishingSim.Game
 
         private void Equip(TackleItem item)
         {
+            SetEquippedItem(item);
+            _rod.ApplyTackle();
+            FrameRod();   // a longer or shorter rod: its tip back on the line of sight
+        }
+
+        private void SetEquippedItem(TackleItem item)
+        {
             switch (item)
             {
                 case RodData: _profile.Rod = item.ItemId; break;
@@ -1955,8 +2064,6 @@ namespace FishingSim.Game
                 case HookData: _profile.Hook = item.ItemId; break;
                 case BaitData: _profile.Bait = item.ItemId; break;
             }
-            _rod.ApplyTackle();
-            FrameRod();   // a longer or shorter rod: its tip back on the line of sight
         }
 
         private static string Stats(TackleItem item) => item switch
