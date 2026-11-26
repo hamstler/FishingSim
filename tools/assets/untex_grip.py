@@ -140,12 +140,28 @@ def remake_hand_weights(s, S):
     L2 = np.maximum((D * D).sum(1), 1e-9)
     gidx = {g.name: g for g in body.vertex_groups}
     changed = 0
+    elbow = np.array(AW @ arm.data.bones[f"przedramie_{S}"].head_local)
     for v in body.data.vertices:
         p = np.array(body.matrix_world @ v.co)
         sdist = float((p - wrist) @ fore_dir)
-        if sdist < -0.025:
+        if np.linalg.norm(p - wrist) > 0.25 or sdist < -0.09:
             continue
-        if np.linalg.norm(p - wrist) > 0.25:
+        # the wrist's zone: weights by position alone, never by the nearest bone (the scan's cuff carried the thumb's and
+        # the hand's weights, so a bent hand tore the sleeve's hem). Behind the wrist all forearm (the sleeve stays on
+        # the arm), over the joint easing into the hand
+        if sdist < 0.03:
+            radial = np.linalg.norm((p - elbow) - fore_dir * float((p - elbow) @ fore_dir))
+            if radial > 0.08:
+                continue
+            k = min(1.0, max(0.0, sdist / 0.03))
+            k = k * k * (3 - 2 * k)
+            for g in list(v.groups):
+                body.vertex_groups[g.group].remove([v.index])
+            if 1 - k > 0.001:
+                gidx[f"przedramie_{S}"].add([v.index], 1 - k, "REPLACE")
+            if k > 0.001:
+                gidx[f"dlon_{S}"].add([v.index], k, "REPLACE")
+            changed += 1
             continue
         t = np.clip(((p - H) * D).sum(1) / L2, 0, 1)
         d = np.linalg.norm(H + D * t[:, None] - p, axis=1)
@@ -288,7 +304,7 @@ def smooth_wrist(S_, iterations=14):
     fore /= np.linalg.norm(fore)
     co = np.array([body.matrix_world @ v.co for v in me.vertices])
     sd = (co - wrist) @ fore
-    band = np.nonzero((sd > -0.008) & (sd < 0.06) & (np.linalg.norm(co - wrist, axis=1) < 0.11))[0]
+    band = np.nonzero((sd > 0.02) & (sd < 0.06) & (np.linalg.norm(co - wrist, axis=1) < 0.11))[0]
     pos = {int(v): i for i, v in enumerate(band)}
     W = np.zeros((len(band), len(groups)))
     other = np.zeros(len(band))
@@ -388,12 +404,41 @@ def cam(v):
 # the rod at the hips (the user): the reel seat a hand's breadth over the hip joint, in front of the belly a little to
 # the right, the blank rising 25 degrees ahead; the reel under it, its crank on the left within the left hand's reach
 hips = AW @ arm.data.bones["biodra"].head_local
-seat_world = hips + Vector((-0.08, -0.18, 0.10))
+# the handle's butt runs 43 cm back from the seat: it must pass beside the right hip under the forearm, not through
+# the belly. The torso's and legs' skin (what the arms do not move) as a tree; the rod turned a little across the body
+# and the seat moved right by the least that keeps the whole handle a centimetre off it
+_arm_groups = {i for i, n in gname.items() if any(k in n for k in ("ramie", "przedramie", "dlon", "srodrecze", "kciuk", "wskazujacy", "srodkowy", "serdeczny", "maly"))}
+torso_pts = [rest[v.index] for v in body.data.vertices if v.groups and max(v.groups, key=lambda g: g.weight).group not in _arm_groups]
+KD_TORSO = kdtree.KDTree(len(torso_pts))
+for i, p_ in enumerate(torso_pts):
+    KD_TORSO.insert(Vector(p_), i)
+KD_TORSO.balance()
 pitch = math.radians(25.0)
-along = (Vector((0, -1, 0)) * math.cos(pitch) + Vector((0, 0, 1)) * math.sin(pitch)).normalized()
-down = (Vector((0, 0, -1)) - along * along.dot(Vector((0, 0, -1)))).normalized()
-xr = down.cross(along)
-ROD = Matrix((xr, down, along)).transposed()          # columns: X (figure's right), Y (reel side, down), Z (towards tip)
+
+
+def rod_frame(seat, yaw):
+    fwd = Vector((math.sin(yaw), -math.cos(yaw), 0.0))
+    al = (fwd * math.cos(pitch) + Vector((0, 0, 1)) * math.sin(pitch)).normalized()
+    dn = (Vector((0, 0, -1)) - al * al.dot(Vector((0, 0, -1)))).normalized()
+    return Matrix((dn.cross(al), dn, al)).transposed()
+
+
+def handle_clear(seat, frame):
+    worst = 1.0
+    for z in np.arange(-0.33, 0.12, 0.02):
+        c = seat + frame @ Vector((0, 0, z - 0.1))
+        worst = min(worst, KD_TORSO.find(c)[2] - 0.016)
+    return worst
+
+
+# the placement that keeps both forearms' twist small (straight ahead, a hand over the hips); the butt's distance to
+# the body is measured and reported
+pitch = math.radians(25.0)
+seat_world = hips + Vector((-0.08, -0.18, 0.10))
+ROD = rod_frame(seat_world, 0.0)
+butt = handle_clear(seat_world, ROD)
+log(f"handle: the butt {'clears the body by' if butt >= 0 else 'goes into the body by'} {abs(butt) * 1000:.0f} mm")
+along = ROD.col[2].copy()
 rod_origin = seat_world - ROD @ Vector((0, 0, 0.1))
 section = 0.3                       # the rod model's own sections (no stretching)
 log("reel seat at", tuple(round(c, 3) for c in seat_world), f"({(seat_world.z - hips.z) * 100:.0f} cm over the hips), rod along", tuple(round(c, 3) for c in along))
@@ -684,6 +729,16 @@ def spread(s, finger, palm_n, towards, max_deg=16.0):
         done += 1.0
     log(f"  {finger}_{s}: spread {done:.0f} deg, clearance {clearance(skinned(s, owned), TREE[s]) * 1000:.1f} mm")
 
+def twist_angle(lower, hand):
+    """The hand's twist about the forearm (rad) relative to the rest, as untwist() would spread it."""
+    hand_world = (AW @ pose[hand].matrix).to_3x3().normalized()
+    fore = (AW @ pose[lower].matrix).to_3x3().normalized()
+    rest_rel = arm.data.bones[lower].matrix_local.to_3x3().inverted() @ arm.data.bones[hand].matrix_local.to_3x3()
+    delta = ((fore.inverted() @ hand_world) @ rest_rel.inverted()).to_quaternion()
+    tw = Quaternion((delta.w, 0.0, delta.y, 0.0)).normalized()
+    return 2 * math.atan2(tw.y, tw.w)
+
+
 def untwist(lower, hand, share=1.0):
     """The hand's twist about the forearm goes into the forearm's twist bone (the skin twists evenly along the
     forearm), the hand's world turn kept: left all in the wrist it tore the cuff and the wrist into shards, put all in
@@ -705,7 +760,7 @@ def untwist(lower, hand, share=1.0):
 POLE = {"P": Vector((-0.6, 0.1, -1)), "L": Vector((0.6, 0.1, -1))}
 
 
-def straight_wrist_pole(S_, wrist_target, hand_rot, apply=True, step=10):
+def straight_wrist_pole(S_, wrist_target, hand_rot, apply=True, step=10, quiet=False, check=("przedramie_P", "przedramie_skret_P")):
     """The elbow's direction (round the shoulder-to-wrist line) that leaves the wrist straightest for the hand's turn:
     the forearm then runs along the hand, as it does on a rod's handle; the elbow not above the arm's line and out
     from the body. Returns the wrist's bend (deg)."""
@@ -723,7 +778,7 @@ def straight_wrist_pole(S_, wrist_target, hand_rot, apply=True, step=10):
             continue
         if S_ == "P":
             # the rod's butt runs back under the forearm: its skin must stay on the cork, never in it
-            if clearance(skinned("r", {"przedramie_P", "przedramie_skret_P"}), KD_GRIP) < 0.0008:
+            if clearance(skinned("r", set(check)), KD_GRIP) < 0.0008:
                 continue
         bend = math.degrees((head(hand) - elbow).angle(hand_dir))
         if best is None or bend < best[0]:
@@ -732,7 +787,8 @@ def straight_wrist_pole(S_, wrist_target, hand_rot, apply=True, step=10):
         best = (180.0, POLE[S_])
     if apply:
         POLE[S_] = best[1]
-        log(f"  {S_}: elbow placed for a straight wrist, bend {best[0]:.0f} deg")
+        if not quiet:
+            log(f"  {S_}: elbow placed for a straight wrist, bend {best[0]:.0f} deg")
         two_bone_ik(upper, lower, hand, wrist_target, POLE[S_])
         set_world_rotation(hand, hand_rot)
     return best[0]
@@ -786,8 +842,10 @@ def stages():
         wrist_new = on_axis - q @ stem_local
         if (wrist_new - head("ramie_P")).length > 0.5:
             continue
-        bend = straight_wrist_pole("P", wrist_new, q.to_matrix() @ hand_rest_r, apply=False, step=20)
-        score = -bend - 1.0 * abs(deg)
+        bend = straight_wrist_pole("P", wrist_new, q.to_matrix() @ hand_rest_r, apply=True, step=20, quiet=True)
+        twist = abs(math.degrees(twist_angle("przedramie_P", "dlon_P")))
+        # little twist too (past ~40 deg the sleeve's cuff crumples)
+        score = -bend - 1.0 * abs(deg) - 0.8 * max(0.0, twist - 40.0)
         if best is None or score > best[0]:
             best = (score, q, wrist_new, deg, bend)
     _, q, wrist_new, deg, bend = best
@@ -834,7 +892,7 @@ def stages():
     untwist("przedramie_P", "dlon_P")
     fa = {"przedramie_P", "przedramie_skret_P"}
     log(f"  right forearm over the butt: {clearance(skinned('r', fa), KD_GRIP) * 1000:.1f} mm before the elbow's last choice")
-    straight_wrist_pole("P", head("dlon_P"), (AW @ pose["dlon_P"].matrix).to_3x3().normalized())
+    straight_wrist_pole("P", head("dlon_P"), (AW @ pose["dlon_P"].matrix).to_3x3().normalized(), check=("przedramie_P", "przedramie_skret_P", "dlon_P"))
     log(f"  right forearm over the butt: {clearance(skinned('r', fa), KD_GRIP) * 1000:.1f} mm")
     yield "skret przedramienia rozlozony"
     log("right hand placed")
@@ -884,9 +942,10 @@ def stages():
         wrist_new = knob - q @ grip_local
         if (wrist_new - shoulder).length > 0.5:
             continue
-        bend = straight_wrist_pole("L", wrist_new, q.to_matrix() @ hand_rest_l, apply=False, step=20)
-        # the palm away from the reel's body (on the outside of the knob)
-        score = -bend + 25.0 * (q @ n).dot(Xr)
+        bend = straight_wrist_pole("L", wrist_new, q.to_matrix() @ hand_rest_l, apply=True, step=20, quiet=True)
+        twist = abs(math.degrees(twist_angle("przedramie_L", "dlon_L")))
+        # the palm away from the reel's body (on the outside of the knob); little twist (the sleeve folds past ~60 deg)
+        score = -bend - 0.8 * max(0.0, twist - 40.0) + 25.0 * (q @ n).dot(Xr)
         if best is None or score > best[0]:
             best = (score, q, wrist_new, deg)
     _, q, wrist_new, deg = best
