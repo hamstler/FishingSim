@@ -51,11 +51,20 @@ def log(*a):
 
 # ------------------------------------------------------------------ the figure
 bpy.ops.import_scene.gltf(filepath=SRC)
+# the file's Icosphere is the bones' custom shape (the round handles the user sees on every bone): kept, but in a
+# hidden collection, so neither the shape mesh itself nor anything else shows in the scene or the renders
+shapes = bpy.data.collections.new("Ksztalty kosci")
+scene.collection.children.link(shapes)
 for o in list(scene.objects):
     if o.type == "MESH" and o.name.startswith("Icosphere"):
-        bpy.data.objects.remove(o, do_unlink=True)
+        for c in list(o.users_collection):
+            c.objects.unlink(o)
+        shapes.objects.link(o)
+        o.hide_render = True
+shapes.hide_render = True
+bpy.context.view_layer.layer_collection.children[shapes.name].exclude = True
 arm = next(o for o in scene.objects if o.type == "ARMATURE")
-body = next(o for o in scene.objects if o.type == "MESH")
+body = next(o for o in scene.objects if o.type == "MESH" and not o.name.startswith("Icosphere"))
 arm.name, body.name = "Szkielet", "Wedkarz"
 
 # SmartRig's numbered bones -> names (the figure faces -Y: its right is -X)
@@ -207,6 +216,14 @@ for S_ in ("P", "L"):
             moved += 1
     log(f"forearm {S_}: {moved} vertices share the twist")
 pose = arm.pose.bones
+for S_ in ("P", "L"):
+    # the twist bone shown like the forearm (the file's round handle), not as a bare octahedron
+    src_pb, dst_pb = pose[f"przedramie_{S_}"], pose[f"przedramie_skret_{S_}"]
+    dst_pb.custom_shape = src_pb.custom_shape
+    dst_pb.custom_shape_scale_xyz = src_pb.custom_shape_scale_xyz * 0.8
+    dst_pb.custom_shape_translation = src_pb.custom_shape_translation
+    dst_pb.custom_shape_rotation_euler = src_pb.custom_shape_rotation_euler
+    dst_pb.use_custom_shape_bone_size = src_pb.use_custom_shape_bone_size
 
 
 # ------------------------------------------------------------------ the fingers parted, the wrist's weights smoothed
