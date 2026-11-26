@@ -31,6 +31,10 @@ public sealed class Lake
     private readonly List<(Vector2 P, float R)> _flat = new();
     private readonly List<(Vector2 C, float R, float H)> _pads = new();
     private readonly List<(Vector2 A, Vector2 B)> _paths = new();
+    private readonly List<(float X, float Z, float R)> _reach = new();
+
+    /// <summary>How far from the water the angler may walk (the user: at most 10 m) where nothing else is worth going to.</summary>
+    public const float ShoreReach = 10f;
 
     /// <summary>The village's buildings and props (LocationData.Buildings).</summary>
     public List<BuildingSpec> Specs { get; } = new();
@@ -84,6 +88,32 @@ public sealed class Lake
             }
             _paths.Add((to, door));
         }
+
+        // what may be visited further from the water: the square, every building with a margin round it, the map's sights
+        _reach.Add((plaza.X, plaza.Y, 24f));
+        foreach (var spec in Specs)
+            _reach.Add((spec.Position.X, spec.Position.Y, spec.PadRadius + 9f));
+        foreach (var entry in loc.Landmarks)
+        {
+            var parts = entry.Split(',');
+            if (parts.Length >= 3 && float.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float lx)
+                && float.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float lz))
+                _reach.Add((lx, lz, parts[0].Trim() == "dike" ? 40f : 18f));
+        }
+    }
+
+    /// <summary>
+    /// The playable ground: within <see cref="ShoreReach"/> of the water, on the paths (the pier to the square, the
+    /// streets, the doors), on the square, round the buildings and the map's sights. The rest is scenery.
+    /// </summary>
+    public bool InReach(float x, float z)
+    {
+        if (InsideMetres(x, z) >= -ShoreReach)
+            return true;
+        foreach (var (rx, rz, r) in _reach)
+            if ((x - rx) * (x - rx) + (z - rz) * (z - rz) <= r * r)
+                return true;
+        return PathDistance(x, z) <= 3.5f;
     }
 
     private static Vector2 Closest(Vector2 a, Vector2 b, Vector2 p)
@@ -355,7 +385,7 @@ public sealed class Lake
     {
         if (OnPier(x, z))
             return true;
-        if (PlayDistance(x, z) > 0f)
+        if (PlayDistance(x, z) > 0f || !InReach(x, z))
             return false;
         return DepthAt(x, z) <= wadeLimit;
     }

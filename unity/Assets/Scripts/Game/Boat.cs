@@ -96,7 +96,9 @@ namespace FishingSim.Game
                     var outer = mid < 0.22f ? tar : white;
                     // outside, then inside (inset 2 cm) in bare wood
                     k.Quad(a, d, c, b, outer);
-                    var n = Vector3.up * 0.02f;
+                    // inset towards the keel line and up (straight up hardly parted the shells on the steep sides: they flickered)
+                    float side = (a.x + c.x) * 0.5f;
+                    var n = new Vector3(-Mathf.Sign(side) * Mathf.Min(Mathf.Abs(side) * 4f, 1f), 0.6f, 0f).normalized * 0.02f;
                     k.Quad(a + n, b + n, c + n, d + n, inside);
                 }
             // thwarts and floorboards

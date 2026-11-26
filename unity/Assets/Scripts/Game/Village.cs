@@ -257,7 +257,7 @@ namespace FishingSim.Game
             go.AddComponent<MeshFilter>().sharedMesh = k.ToMesh(spec.Kind.ToString());
             // the props' wood in the photographed weathered planks (their colours from the mesh, the grain from the photo)
             var mr = go.AddComponent<MeshRenderer>();
-            var weathered = Photos.Weathered("weathered_brown_planks", Color.white, 0.88f, moss: 0.25f, twoSided: true, vertexColour: true);
+            var weathered = Photos.Weathered("weathered_brown_planks", Color.white, 0.88f, weathering: 0.35f, moss: 0.25f, twoSided: true, vertexColour: true);
             mr.sharedMaterial = weathered ?? _lit;
             if (weathered != null)
             {
@@ -267,6 +267,8 @@ namespace FishingSim.Game
             }
             if (spec.PadRadius > 2f)
                 Solids.Add((holder.position, spec.PadRadius * 0.4f));
+            else if (spec.Kind is BuildingKind.Lamp or BuildingKind.Signpost)
+                Solids.Add((holder.position, 0.25f));   // the angler walked into the posts (the camera ended inside one)
         }
     }
 }

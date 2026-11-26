@@ -379,7 +379,12 @@ namespace FishingSim.Game
                     rope.Tube(P(i / (float)segments), P((i + 1) / (float)segments), 0.012f, 0.012f, 4, ropeCol, ropeCol);
                 int count = (int)(Vector3.Distance(a, b) / 0.5f);
                 for (int i = 1; i < count; i++)
-                    bulbs.Box(P(i / (float)count) + Vector3.down * 0.07f, new Vector3(0.09f, 0.11f, 0.09f), Quaternion.identity, Color.white);
+                {
+                    // a small round bulb under a dark socket on the wire (the boxes read as yellow cardboard by day)
+                    var at = P(i / (float)count);
+                    rope.Tube(at, at + Vector3.down * 0.045f, 0.012f, 0.011f, 6, ropeCol, ropeCol, true);
+                    bulbs.Blob(at + Vector3.down * 0.075f, new Vector3(0.026f, 0.034f, 0.026f), i, 0f, Color.white, Color.white, true, 1);
+                }
             }
             bulbs.Box(new Vector3(1.42f, top + 2.1f, 5.6f), new Vector3(0.22f, 0.26f, 0.22f), Quaternion.identity, Color.white);
 
@@ -407,7 +412,7 @@ namespace FishingSim.Game
         public void SetNight(float night)
         {
             if (_bulbs != null)
-                _bulbs.color = Color.Lerp(new Color(0.55f, 0.48f, 0.32f), new Color(2.4f, 1.75f, 0.8f), night);
+                _bulbs.color = Color.Lerp(new Color(0.42f, 0.4f, 0.34f), new Color(2.4f, 1.75f, 0.8f), night);   // unlit glass by day
             if (_pierLamp != null)
             {
                 _pierLamp.intensity = 1.2f * night;

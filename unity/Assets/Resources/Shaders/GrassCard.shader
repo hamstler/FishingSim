@@ -59,12 +59,16 @@ Shader "FS/GrassCard"
             float finer = tex2Dlod(_Noise, float4(origin.xz * 1.7 + float2(0.13, 0.57), 0, 0)).r;
             float dry = smoothstep(0.52, 0.78, macro * 0.6 + fine * 0.25 + finer * 0.15);
             float lush = smoothstep(0.55, 0.8, (1.0 - macro) * 0.55 + mid * 0.45);
-            float3 k = lerp(1.0, base / max(_CardMean.rgb, 0.002), 0.3);
+            // the map's colour as one brightness factor (per channel the division by the atlas mean pushed the meadow
+            // towards a glaring yellow-green), a little of its hue only
+            float lumBase = dot(base, float3(0.3, 0.59, 0.11)), lumMean = max(dot(_CardMean.rgb, float3(0.3, 0.59, 0.11)), 0.002);
+            float3 hue = base / max(lumBase, 0.002) * lumMean / max(_CardMean.rgb, 0.002);
+            float3 k = clamp(lumBase / lumMean, 0.65, 1.0) * lerp(1.0, clamp(hue, 0.85, 1.15), 0.3);
             k *= lerp(0.88, 1.08, macro);
             k = lerp(k, k * float3(1.16, 1.02, 0.7), dry * 0.55);
             k = lerp(k, k * float3(0.8, 0.9, 0.76), lush * 0.45);
             // never much brighter than the photographed clump (up to 2.2x it glared yellow-white at noon)
-            o.tintK = clamp(k, 0.35, 1.25);
+            o.tintK = clamp(k, 0.35, 1.05);
         }
 
         void surf(Input IN, inout SurfaceOutputStandard o)
@@ -76,7 +80,7 @@ Shader "FS/GrassCard"
             clip(saturate(c.a * (1.0 + lod * 0.22)) - 0.5);
             float t = smoothstep(0.0, 1.0, IN.tip);
             o.Albedo = c.rgb * IN.tintK;
-            o.Emission = c.rgb * IN.tintK * 0.06 * t;
+            o.Emission = c.rgb * IN.tintK * 0.02 * t;
             o.Occlusion = lerp(0.55, 1.0, t);
             o.Smoothness = 0.1;      // matt blades (0.4 gave the meadow a white sheen in the sun)
         }

@@ -93,7 +93,7 @@ Shader "FS/Weathered"
                 wn = normalize(T * t.x + B * t.y + wgeo * t.z);
             }
             if (_VertexColour > 0.5)
-                col = IN.color.rgb * saturate(col / max(_Mean.rgb, 0.02) * 0.85 + 0.15);   // the mesh's colour, the photo's grain
+                col = IN.color.rgb * lerp(1.0, clamp(col / max(_Mean.rgb, 0.02), 0.65, 1.35), 0.6);   // the mesh's colour, the photo's grain both ways (saturate only ever darkened it: near-black benches)   // the mesh's colour, the photo's grain
             col *= _Tint.rgb;
             float rough = _Rough;
 

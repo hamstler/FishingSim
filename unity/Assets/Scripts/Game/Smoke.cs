@@ -126,9 +126,9 @@ namespace FishingSim.Game
             var views = new (float Hour, string Name, Vector3 At, float Yaw)[]
             {
                 (12f, "pier", new Vector3(0f, WorldView.PierDeck, 4.5f), 180f),
-                (12f, "village", new Vector3(0f, 0f, 9f), 0f),
+                (12f, "village", new Vector3(-2f, 0f, 9f), 0f),
                 (7f, "dawn", new Vector3(0f, WorldView.PierDeck, 4.5f), 180f),
-                (20.5f, "night", new Vector3(0f, 0f, 9f), 0f),
+                (20.5f, "night", new Vector3(-2f, 0f, 9f), 0f),
             };
             foreach (var (hour, name, at0, yaw) in views)
             {
