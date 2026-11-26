@@ -2011,7 +2011,21 @@ namespace FishingSim.Game
                     }
                 }
             }
-            if (item != null && _gearAtlas != null && _gearRegions.TryGetValue(item.ItemId, out var uv))
+            string thumbnail = item switch
+            {
+                RodData rod => string.IsNullOrEmpty(rod.Model) ? "rods/float_ostoja" : rod.Model,
+                ReelData reel => string.IsNullOrEmpty(reel.Model) ? "reels/small_hokuto" : reel.Model,
+                LineData { Kind: LineKind.Braid } => "line_braid",
+                LineData { Kind: LineKind.Fluoro } => "line_fluoro",
+                LineData => "line_mono",
+                HookData => "hook",
+                BaitData { Kind: BaitKind.Natural } => "bait_worm",
+                BaitData { Kind: BaitKind.Plant } => "bait_corn",
+                BaitData { Kind: BaitKind.Carp } => "bait_carp",
+                _ => "",
+            };
+            if (item != null && _gearAtlas != null &&
+                (_gearRegions.TryGetValue(item.ItemId, out var uv) || _gearRegions.TryGetValue(thumbnail, out uv)))
                 GUI.DrawTextureWithTexCoords(rect, _gearAtlas, uv);
             else
                 DrawGearGlyph(rect, category, item != null ? Muted : Faint);
