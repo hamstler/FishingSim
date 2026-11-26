@@ -1,5 +1,9 @@
 # Zmiany
 
+## 0.12.0 (Unity 6)
+- Nowy wędkarz: widoczne ręce trzymają wędkę i kołowrotek (prawa dłoń na rękojeści, lewa na gałce korbki, kręci się z nią przy zwijaniu). Poza ułożona w Blenderze pomiarem: palce zgięte do kontaktu ze skórą rękojeści i gałki, tylko obroty kości.
+- Dopracowana skóra rąk: wagi palców bez ciągnięcia sąsiednich palców, kość skrętu przedramienia, gładkie mankiety.
+
 ## 0.11.2 (Unity 6)
 - Wędkarz w widoku pierwszoosobowym. Żyłka przechodzi przez obracający się kabłąk, a grubość nawoju odpowiada ilości pozostałej żyłki.
 - Dziesięć łowisk o rosnącej wielkości, z osobnymi progami poziomu i obsadami ryb. Panel podróży można przewijać.
