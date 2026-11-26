@@ -828,6 +828,8 @@ namespace FishingSim.Game
 
         private void OpenPanel(Panel p)
         {
+            if (p != _panel)
+                ReleaseTacklePreview();
             _panel = p;
             _scroll = Vector2.zero;
             SetCursor(false);
@@ -835,15 +837,17 @@ namespace FishingSim.Game
 
         private void ClosePanel()
         {
-            if (_panel == Panel.Inventory)
-            {
-                _tacklePreview?.Dispose();
-                _tacklePreview = null;
-            }
+            ReleaseTacklePreview();
             _panel = Panel.None;
             SetCursor(true);
             _rod.ApplyTackle();
             _profile.Save();
+        }
+
+        private void ReleaseTacklePreview()
+        {
+            _tacklePreview?.Dispose();
+            _tacklePreview = null;
         }
 
         private bool CanKeep(out string why)
@@ -1112,7 +1116,10 @@ namespace FishingSim.Game
             if (ShopShotTab >= 0)
             {
                 _shopTab = ShopShotTab;
-                DrawShop(w, h);
+                GUI.BeginGroup(new Rect(0, S(64), w, h - S(64)));
+                DrawShop(w, h - S(64));
+                GUI.EndGroup();
+                DrawWorkshopNav(w);
                 return;
             }
             if (ShowTravelForShot)
@@ -2027,7 +2034,7 @@ namespace FishingSim.Game
             for (int i = 0; i < destinations.Length; i++)
             {
                 var destination = destinations[i];
-                bool selected = _panel == destination;
+                bool selected = (ShopShotTab >= 0 ? Panel.Shop : _panel) == destination;
                 if (GUI.Button(new Rect(S(10) + i * buttonWidth, S(7), buttonWidth - S(5), height - S(14)),
                     labels[i], selected ? _inventoryAction : _button) && !selected)
                 {
@@ -2219,22 +2226,39 @@ namespace FishingSim.Game
             DrawWorkshopNav(w);
         }
 
+        private TackleItem? _shopSelection;
+
         private void DrawShop(float w, float h)
         {
-            var r = Centre(w, h, Mathf.Min(S(1100), w * 0.92f), Mathf.Min(S(820), h * 0.92f));
-            GUI.Label(new Rect(r.x, r.y, r.width * 0.6f, S(46)), "SKLEP WĘDKARSKI", _title);
-            GUI.Label(new Rect(r.x + r.width * 0.6f, r.y + S(10), r.width * 0.4f, S(30)), $"Portfel: <b>{_profile.Money} zł</b> · poziom {_profile.Level}", _text);
-            float x = r.x;
+            InventoryArt();
+            GUI.DrawTexture(new Rect(0, 0, w, h), _dim!);
+            float top = S(36), gap = S(11), pad = S(14);
+            var rail = new Rect(gap, top, w * .14f, h - top - gap);
+            var detail = new Rect(w * .77f, top, w * .23f - gap, rail.height);
+            var catalogue = new Rect(rail.xMax + gap, top, detail.x - gap - rail.xMax - gap, rail.height);
+            foreach (var panel in new[] { rail, catalogue, detail })
+                GUI.Box(panel, GUIContent.none, _inventorySurface);
+            GUI.Label(new Rect(rail.x + pad, top + pad, rail.width - pad * 2f, S(44)), "Sklep", _title);
+            var r = new Rect(catalogue.x + pad, catalogue.y + pad, catalogue.width - pad * 2f, catalogue.height - pad * 2f);
+            GUI.Label(new Rect(r.x, r.y, r.width, S(45)), "Sprzęt wędkarski", _title);
+            GUI.Label(new Rect(r.x, r.y + S(53), r.width, S(31)), $"Portfel  ·  {_profile.Money:N0} zł", _text);
             for (int i = 0; i < ShopTabs.Length; i++)
             {
-                float bw = S(150);
-                if (GUI.Button(new Rect(x, r.y + S(56), bw, S(40)), ShopTabs[i], i == _shopTab ? _tabOn : _tab))
+                var row = new Rect(rail.x + pad, top + S(65 + i * 52), rail.width - pad * 2f, S(44));
+                bool active = i == _shopTab;
+                if (GUI.Button(row, GUIContent.none, active ? _inventorySelected : _inventoryCard))
                 {
                     _shopTab = i;
                     _shopFilter = 0;
                     _scroll = Vector2.zero;
                 }
-                x += bw + S(8);
+                DrawGearGlyph(new Rect(row.x + S(6), row.y + S(8), S(29), S(29)), i, active ? Accent : Muted);
+                GUI.Label(new Rect(row.x + S(40), row.y + S(10), row.width - S(44), S(28)), ShopTabs[i], _small);
+            }
+            if (GUI.Button(new Rect(rail.x + pad, rail.yMax - S(58), rail.width - pad * 2f, S(42)), "Skup ryb", _button))
+            {
+                ClosePanel();
+                OpenPanel(Panel.Keepnet);
             }
             IEnumerable<TackleItem> items = _shopTab switch
             {
@@ -2255,7 +2279,7 @@ namespace FishingSim.Game
             float fx = r.x;
             for (int i = 0; i < filters.Length; i++)
             {
-                float bw = S(132);
+                float bw = Mathf.Min(S(132), r.width / filters.Length - S(6));
                 if (GUI.Button(new Rect(fx, r.y + S(104), bw, S(34)), filters[i], i == _shopFilter ? _tabOn : _tab))
                 {
                     _shopFilter = i;
@@ -2263,8 +2287,16 @@ namespace FishingSim.Game
                 }
                 fx += bw + S(6);
             }
-            GUI.Label(new Rect(r.xMax - S(330), r.y + S(108), S(70), S(30)), "Szukaj", _small);
-            _shopSearch = GUI.TextField(new Rect(r.xMax - S(260), r.y + S(100), S(260), S(40)), _shopSearch, 40, _field);
+            var search = new Rect(r.x, r.y + S(150), r.width, S(39));
+            GUI.SetNextControlName("ShopSearch");
+            string input = GUI.TextField(search, _shopSearch, 40, _field);
+            if (input != _shopSearch)
+            {
+                _shopSearch = input;
+                _scroll = Vector2.zero;
+            }
+            if (input.Length == 0 && GUI.GetNameOfFocusedControl() != "ShopSearch")
+                GUI.Label(new Rect(search.x + S(12), search.y + S(8), search.width - S(24), S(28)), "Szukaj w sklepie…", _small);
             string query = _shopSearch.Trim().ToLowerInvariant();
             int sizeOf(TackleItem it)
             {
@@ -2279,66 +2311,99 @@ namespace FishingSim.Game
             };
             var list = items.Where(it => fits(it) && (query.Length == 0 || it.DisplayName.ToLowerInvariant().Contains(query)))
                 .OrderBy(it => it.RequiredLevel).ThenBy(it => it.Price).ToList();
-            GUI.Label(new Rect(r.x, r.y + S(144), r.width, S(24)), $"{list.Count} pozycji", _label);
-            var view = new Rect(r.x, r.y + S(170), r.width, r.height - S(236));
-            float rowH = S(66);
-            var content = new Rect(0, 0, r.width - S(24), list.Count * rowH);
+
+            if (_shopSelection == null || !list.Contains(_shopSelection))
+                _shopSelection = list.FirstOrDefault();
+            var view = new Rect(r.x, r.y + S(206), r.width, Mathf.Max(1f, r.height - S(206)));
+            int columns = Mathf.Clamp(Mathf.FloorToInt(view.width / S(145)), 2, 7);
+            float tileWidth = (view.width - S(28)) / columns, tileHeight = S(141);
+            var tileName = new GUIStyle(_small!) { clipping = TextClipping.Clip, normal = { textColor = Ink } };
+            var content = new Rect(0, 0, tileWidth * columns, Mathf.CeilToInt(list.Count / (float)columns) * tileHeight);
             _scroll = GUI.BeginScrollView(view, _scroll, content);
+            float level = _profile.Level;
             for (int i = 0; i < list.Count; i++)
             {
+                var tile = new Rect(i % columns * tileWidth, i / columns * tileHeight, tileWidth - S(6), tileHeight - S(6));
+                if (tile.yMax < _scroll.y || tile.y > _scroll.y + view.height)
+                    continue;
                 var item = list[i];
-                var row = new Rect(0, i * rowH, content.width, rowH - S(6));
-                if (i % 2 == 0)
-                    GUI.Box(row, GUIContent.none, _bar);
-                string id = item.ItemId;
-                bool owned = _profile.Owned.Contains(id);
-                bool equipped = id == _profile.Rod || id == _profile.Reel || id == _profile.Line || id == _profile.Hook || id == _profile.Bait;
-                GUI.Label(new Rect(row.x + S(10), row.y + S(4), row.width * 0.62f, S(30)), item.DisplayName, _text);
-                GUI.Label(new Rect(row.x + S(10), row.y + S(32), row.width * 0.62f, S(26)), Stats(item), _small);
-                bool locked = item.RequiredLevel > _profile.Level;
-                var buy = new Rect(row.xMax - S(300), row.y + S(10), S(170), S(42));
-                var use = new Rect(row.xMax - S(122), row.y + S(10), S(112), S(42));
-                if (item is BaitData bait && !bait.Reusable)
-                {
-                    GUI.enabled = !locked && _profile.Money >= item.Price;
-                    if (GUI.Button(buy, locked ? $"poziom {item.RequiredLevel}" : $"{item.Price} zł (×{bait.PackSize})", _button))
-                    {
-                        _profile.Money -= item.Price;
-                        _profile.Baits[id] = _profile.BaitCount(id) + bait.PackSize;
-                    }
-                    GUI.enabled = _profile.BaitCount(id) > 0 && !equipped;
-                    if (GUI.Button(use, equipped ? "w użyciu" : $"użyj ({_profile.BaitCount(id)})", equipped ? _accentButton : _button))
-                        _profile.Bait = id;
-                    GUI.enabled = true;
-                    continue;
-                }
-                if (item is BaitData lure && owned && !_profile.Baits.ContainsKey(id))
-                    _profile.Baits[id] = 1;
-                GUI.enabled = !owned && !locked && _profile.Money >= item.Price;
-                if (GUI.Button(buy, owned ? "kupione" : locked ? $"poziom {item.RequiredLevel}" : $"{item.Price} zł", _button))
-                {
-                    _profile.Money -= item.Price;
-                    _profile.Owned.Add(id);
-                    _sound.Play(Core.Audio.OneShot.Coins);
-                    if (item is BaitData)
-                        _profile.Baits[id] = 1;
-                    Equip(item);
-                }
-                if (item is AccessoryData)
-                {
-                    GUI.enabled = true;
-                    continue;
-                }
-                GUI.enabled = owned && !equipped;
-                if (GUI.Button(use, equipped ? "w użyciu" : "użyj", equipped ? _accentButton : _button))
-                    Equip(item);
-                GUI.enabled = true;
+                if (GUI.Button(tile, new GUIContent("", item.DisplayName), item == _shopSelection ? _inventorySelected : _inventoryCard))
+                    _shopSelection = item;
+                float icon = S(58);
+                InventoryIcon(new Rect(tile.center.x - icon * .5f, tile.y + S(5), icon, icon), item, _shopTab);
+                GUI.Label(new Rect(tile.x + S(8), tile.y + S(65), tile.width - S(16), S(38)), Shorten(item.DisplayName, 34), tileName);
+                string price = item.RequiredLevel > level ? $"Poziom {item.RequiredLevel}" : HasInventoryItem(item) && item is not BaitData { Reusable: false }
+                    ? "Posiadane" : $"{item.Price:N0} zł";
+                GUI.Label(new Rect(tile.x + S(8), tile.yMax - S(24), tile.width - S(16), S(23)), price, _label);
             }
             GUI.EndScrollView();
-            if (GUI.Button(new Rect(r.x, r.yMax - S(50), r.width * 0.48f, S(48)), "Zamknij", _accentButton))
-                ClosePanel();
-            if (GUI.Button(new Rect(r.x + r.width * 0.52f, r.yMax - S(50), r.width * 0.48f, S(48)), $"Skup ryb (siatka: {_profile.KeepnetValue()} zł)", _button))
-                _panel = Panel.Keepnet;
+
+            if (_shopSelection is not { } selected)
+            {
+                GUI.Label(new Rect(detail.x + pad, detail.y + pad, detail.width - pad * 2f, S(50)), "Brak pasujących przedmiotów.", _text);
+                return;
+            }
+            var display = new Rect(detail.x + pad, detail.y + pad, detail.width - pad * 2f, detail.height * .30f);
+            bool model = false;
+            if (selected is RodData or ReelData)
+            {
+                _tacklePreview ??= new TacklePreview();
+                model = _tacklePreview.Draw(display, selected);
+            }
+            if (!model)
+            {
+                float size = Mathf.Min(display.width, display.height);
+                InventoryIcon(new Rect(display.center.x - size * .5f, display.center.y - size * .5f, size, size), selected, _shopTab);
+            }
+            else
+                GUI.Label(new Rect(display.x, display.yMax, display.width, S(24)), "Przeciągnij, aby obrócić", _small);
+            GUI.Label(new Rect(display.x, display.yMax + S(29), display.width, S(92)), selected.DisplayName, _title);
+            GUI.Label(new Rect(display.x, display.yMax + S(126), display.width, S(95)), Stats(selected), _text);
+            DrawShopActions(selected, detail, pad);
+        }
+
+        private void DrawShopActions(TackleItem item, Rect panel, float pad)
+        {
+            string id = item.ItemId;
+            var bait = item as BaitData;
+            bool consumable = bait is { Reusable: false };
+            bool owned = HasInventoryItem(item);
+            bool locked = item.RequiredLevel > _profile.Level;
+            bool idle = _rod.State == RodState.Idle && !_rod.Swinging;
+            bool equipped = id == _profile.Rod || id == _profile.Reel || id == _profile.Line || id == _profile.Hook || id == _profile.Bait;
+            var buy = new Rect(panel.x + pad, panel.yMax - S(107), panel.width - pad * 2f, S(42));
+            string purchase = locked ? $"Od poziomu {item.RequiredLevel}" :
+                owned && !consumable ? "Posiadane" : consumable ? $"Kup ×{bait!.PackSize} · {item.Price:N0} zł" : $"Kup · {item.Price:N0} zł";
+            GUI.enabled = idle && !locked && (!owned || consumable) && _profile.Money >= item.Price;
+            if (GUI.Button(buy, purchase, _accentButton))
+            {
+                _profile.Money -= item.Price;
+                if (consumable)
+                    _profile.Baits[id] = _profile.BaitCount(id) + bait!.PackSize;
+                else
+                {
+                    _profile.Owned.Add(id);
+                    if (bait != null)
+                        _profile.Baits[id] = 1;
+                    if (item is not AccessoryData)
+                        Equip(item);
+                }
+                _sound.Play(Core.Audio.OneShot.Coins);
+                _profile.Save();
+            }
+            if (item is not AccessoryData)
+            {
+                GUI.enabled = idle && owned && !equipped;
+                if (GUI.Button(new Rect(buy.x, buy.yMax + S(8), buy.width, buy.height),
+                    equipped ? "W użyciu" : consumable ? $"Załóż · {_profile.BaitCount(id)} szt." : "Załóż", _button))
+                {
+                    if (bait is { Reusable: true } && !_profile.Baits.ContainsKey(id))
+                        _profile.Baits[id] = 1;
+                    Equip(item);
+                    _profile.Save();
+                }
+            }
+            GUI.enabled = true;
         }
 
         private void Equip(TackleItem item)
