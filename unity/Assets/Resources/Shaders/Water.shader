@@ -120,15 +120,23 @@ Shader "FS/Water"
 
                 float2 rest = i.wpos.xz - gerstner(i.wpos.xz, 0, VERTEX_WAVES).xz;
                 float nearw = 1.0 - smoothstep(25.0, 140.0, dist);
-                float2 s = gerstner_slope(rest, 0, VERTEX_WAVES).xy + gerstner_slope(rest, VERTEX_WAVES, WAVES).xy * (0.6 + 2.4 * nearw);
+                // Grazing angles can cover a large patch of water even close to the camera.
+                float footprint = max(length(ddx(i.wpos.xz)), length(ddy(i.wpos.xz)));
+                float restFootprint = max(length(ddx(rest)), length(ddy(rest)));
+                float shortWaves = nearw * (1.0 - smoothstep(0.10, 0.38, restFootprint));
+                float2 s = gerstner_slope(rest, 0, VERTEX_WAVES).xy;
+                s += gerstner_slope(rest, VERTEX_WAVES, WAVES).xy * (0.6 + 2.4 * nearw) * shortWaves;
                 float2 wd = normalize(_WaterDir + float2(1e-5, 0));
                 float2 across = float2(-wd.y, wd.x);
                 float chop = (0.08 + _Wind * 1.45) * _Detail;
                 float2 r1 = ripple_map(i.wpos.xz / 6.5 + wd * _WaterTime * 0.045);
                 float2 r2 = ripple_map(i.wpos.xz / 2.3 - across * _WaterTime * 0.07 + wd * _WaterTime * 0.03);
-                s += (r1 * 0.26 * (0.4 + 0.6 * nearw) + r2 * 0.17 * nearw) * chop;
+                float rippleWide = (1.0 - smoothstep(25.0, 120.0, dist)) * (1.0 - smoothstep(0.025, 0.12, footprint));
+                float rippleFine = (1.0 - smoothstep(12.0, 65.0, dist)) * (1.0 - smoothstep(0.01, 0.045, footprint));
+                s += (r1 * 0.26 * rippleWide + r2 * 0.17 * rippleFine) * chop;
                 if (_Rain > 0.01)
-                    s += rain_slope(i.wpos.xz) * (1.0 - smoothstep(6.0, 25.0, dist));
+                    s += rain_slope(i.wpos.xz) * (1.0 - smoothstep(6.0, 25.0, dist))
+                        * (1.0 - smoothstep(0.015, 0.05, footprint));
                 float3 n = normalize(float3(-s.x, 1.0, -s.y));
 
                 float cosv = saturate(dot(n, V));
@@ -142,15 +150,14 @@ Shader "FS/Water"
                 float thickness = max(behind - dist, 0.0);
                 float below = thickness * clamp(V.y, 0.05, 1.0);
 
-                // refraction: the bottom seen shifted through the waves (not where the shifted point is in front)
+                // Distort the colour lookup, but keep absorption on the original water ray.
                 float3 nView = mul((float3x3)UNITY_MATRIX_V, n);
                 float2 shift = nView.xy * 0.045 * saturate(thickness * 0.7) / (1.0 + dist * 0.03);
                 float2 border = min(suv, 1.0 - suv);
                 shift *= smoothstep(0.0, 0.07, min(border.x, border.y));
                 float2 ruv = suv + shift, rguv = guv + shift;
                 float rbehind = scene_dist(ruv, rd);
-                if (rbehind < dist) { ruv = suv; rguv = guv; }
-                else thickness = max(rbehind - dist, 0.0);
+                if (rbehind < dist) rguv = guv;
                 float3 refracted = tex2Dlod(_WaterGrab, float4(rguv, 0, 0)).rgb;
 
                 float3 extinction = _Extinction.rgb * (1.4 / max(_Clarity, 0.3));
@@ -158,11 +165,13 @@ Shader "FS/Water"
                 float seen = (through.r + through.g + through.b) / 3.0;
                 float2 muv = (i.wpos.xz - _MapRect.xy) / _MapRect.zw;
                 float bed = tex2D(_DepthMap, muv).r * _MaxDepth;
-                float3 body = lerp(_Shallow.rgb, _Deep.rgb, smoothstep(0.5, 6.0, max(bed, below)));
+                float3 body = lerp(_Shallow.rgb, _Deep.rgb, smoothstep(1.0, 10.0, max(bed, below)));
 
                 // screen-space reflection of what stands above the water
                 float3 reflected = 0;
+                float3 farCol = 0;
                 float hit = 0;
+                float wfar = 0;
                 float3 R = reflect(-V, n);
                 if (_SsrSteps > 0 && fresnel > 0.03)
                 {
@@ -172,9 +181,10 @@ Shader "FS/Water"
                         if (k >= (int)_SsrSteps) break;
                         float3 p = i.wpos + R * t;
                         float4 clip = UnityWorldToClipPos(p);
+                        if (clip.w <= 0.0) break;
                         float4 sp4 = ComputeScreenPos(clip);
                         float2 sp = sp4.xy / sp4.w;
-                        if (sp.x < 0 || sp.x > 1 || sp.y < 0 || sp.y > 1 || clip.w < 0) break;
+                        if (sp.x < 0 || sp.x > 1 || sp.y < 0 || sp.y > 1) break;
                         float3 pr = p - cam;
                         float pd = length(pr);
                         float sd = scene_dist(sp, pr / pd);
@@ -197,29 +207,39 @@ Shader "FS/Water"
                     float D = 80.0;
                     float2 sp = -1;
                     float4 clip = 0;
+                    float sceneY = 0;
                     for (int k = 0; k < 3; k++)
                     {
                         float3 p = i.wpos + R * D;
                         clip = UnityWorldToClipPos(p);
+                        if (clip.w <= 0.0) { sp = -1; break; }
                         float4 sp4 = ComputeScreenPos(clip);
                         sp = sp4.xy / sp4.w;
-                        if (sp.x < 0 || sp.x > 1 || sp.y < 0 || sp.y > 1 || clip.w < 0) { sp = -1; break; }
+                        if (sp.x < 0 || sp.x > 1 || sp.y < 0 || sp.y > 1) { sp = -1; break; }
                         float3 pr = normalize(p - cam);
-                        D = clamp(scene_dist(sp, pr), 4.0, 4000.0);
+                        float sd = scene_dist(sp, pr);
+                        // Preserve the hit height for this UV before advancing the ray.
+                        sceneY = cam.y + pr.y * sd;
+                        D = clamp(sd, 4.0, 4000.0);
                     }
                     if (sp.x >= 0)
                     {
-                        float3 pr = normalize(i.wpos + R * D - cam);
-                        float sceneY = cam.y + pr.y * scene_dist(sp, pr);
                         float above = smoothstep(i.wpos.y - 0.05, i.wpos.y + 0.4, sceneY);
                         float2 edge = smoothstep(0.0, 0.06, sp) * (1.0 - smoothstep(0.94, 1.0, sp));
-                        float wfar = edge.x * edge.y * above * (1.0 - hit);
+                        wfar = edge.x * edge.y * above * (1.0 - hit);
                         float4 g4 = ComputeGrabScreenPos(clip);
-                        float3 farCol = tex2Dlod(_WaterGrab, float4(g4.xy / g4.w, 0, 1.5)).rgb;
-                        reflected = lerp(reflected, farCol, wfar / max(hit + wfar, 0.0001));
-                        hit = max(hit, wfar);
+                        farCol = tex2Dlod(_WaterGrab, float4(g4.xy / g4.w, 0, 1.5)).rgb;
                     }
                 }
+
+                float3 sky = sky_colour(R);
+                float3 reflection = reflected * hit + farCol * wfar + sky * (1.0 - hit - wfar);
+                // Keep the sky as a luminance floor for steeper views into the foreground.
+                // Grazing views keep the full contrast of the reflected shoreline.
+                const float3 luminance = float3(0.2126, 0.7152, 0.0722);
+                float skyLuma = dot(sky, luminance);
+                float missingSky = max(skyLuma - dot(reflection, luminance), 0.0);
+                reflection += sky * (missingSky / max(skyLuma, 1e-5)) * smoothstep(0.08, 0.22, V.y);
 
                 // foam at the shore, white caps in a strong wind
                 float swash = water_height(i.wpos.xz) / max(_WaterAmp, 0.0001);
@@ -240,10 +260,11 @@ Shader "FS/Water"
                 float transmit = 1.0 - fresnel * shore;
                 float3 albedo = lerp(body * (1.0 - seen) * transmit * shore, float3(0.85, 0.88, 0.88), foam);
                 float3 col = albedo * (_LightColor0.rgb * ndl + ambient);
-                col += (refracted * lerp(1.0, through, shore) * transmit + reflected * fresnel * hit * shore) * (1.0 - foam);
-                // the sky's reflection where nothing on screen is mirrored, and the sun's glint
-                col += sky_colour(R) * fresnel * (1.0 - hit) * shore * (1.0 - foam);
-                float rough = lerp(0.035 + _Wind * 0.06 + _Rain * 0.08, 0.8, foam);
+                col += (refracted * lerp(1.0, through, shore) * transmit + reflection * fresnel * shore) * (1.0 - foam);
+                // The sun's glint.
+                float glintFilter = max(smoothstep(15.0, 100.0, dist), smoothstep(0.02, 0.18, footprint));
+                float rough = 0.035 + _Wind * 0.06 + _Rain * 0.08;
+                rough = lerp(lerp(rough, max(rough, 0.24), glintFilter), 0.8, foam);
                 float3 H = normalize(L + V);
                 float a2 = rough * rough * rough * rough;
                 float ndh = saturate(dot(n, H));
