@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Kaminari Kage Finesse 2,3 m · finesse (długa)"
+Kind = 1
+CastMult = 1.18
+MaxLoad = 3.91
+ShockAbsorb = 0.213
+Action = 0.3
+Price = 335
+RequiredLevel = 2
+Description = "Lekki kij do gumek i drop shota na okonie. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy."
+BlankColor = Color(0.1, 0.11, 0.13, 1)
+WhipColor = Color(0.7, 0.72, 0.76, 1)
+FoamGrip = false
+Length = 2.3
+Model = "rods/spin_kaminari"
+ModelTint = Color(0.55, 0.58, 0.62, 1)

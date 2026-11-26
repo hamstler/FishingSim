@@ -1,0 +1,78 @@
+{
+ "$type": "LocationData",
+ "DisplayName": "Jezioro Brzozowe",
+ "Description": "Jasne skarpy opadają do czystej wody. Okonie polują nad kamienistymi krawędziami.",
+ "RequiredLevel": 9,
+ "OutlineRx": 112.0,
+ "OutlineRz": 72.0,
+ "OutlineCz": -70.0,
+ "Slope": 0.11,
+ "MaxDepth": 7,
+ "HolePos": {
+  "X": 19.0,
+  "Y": -42.0
+ },
+ "HoleDepth": 2.0,
+ "HoleRadius": 12.0,
+ "BarPos": {
+  "X": -29.0,
+  "Y": -31.0
+ },
+ "BarHeight": 1.5,
+ "BarRadius": 10.0,
+ "Abundance": {
+  "Okoń": 1.4,
+  "Płoć": 1.1,
+  "Sielawa": 0.7,
+  "Szczupak": 0.7,
+  "Miętus": 0.6,
+  "Jazgarz": 0.9
+ },
+ "Lobes": [
+  "62,-82,26,17"
+ ],
+ "Islands": [
+  "-37,-75,9",
+  "46,-96,12"
+ ],
+ "WaterShallowColor": {
+  "R": 0.06,
+  "G": 0.15,
+  "B": 0.11,
+  "A": 1.0
+ },
+ "WaterDeepColor": {
+  "R": 0.02,
+  "G": 0.055,
+  "B": 0.035,
+  "A": 1.0
+ },
+ "WaterClarity": 3.1,
+ "WaterTemperature": 17.0,
+ "TreeMix": {
+  "birch": 1.0,
+  "oak": 0.35
+ },
+ "TreeDensity": 0.85,
+ "ReedDensity": 0.65,
+ "RimHeight": 30.0,
+ "SnowLine": 999.0,
+ "PlazaCenter": {
+  "X": 0.0,
+  "Y": 18.0
+ },
+ "VillageStyle": "fishing",
+ "Buildings": [
+  "general,18,25",
+  "office,-26,21",
+  "busstop,-5,12",
+  "house,43,31",
+  "house,-54,28",
+  "well,9,24"
+ ],
+ "HillScale": 0.83,
+ "Landmarks": [
+  "chapel,69,7",
+  "platforms,-68,-16,58"
+ ]
+}

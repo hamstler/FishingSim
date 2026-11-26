@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Fjordline Lagoon 3,3 m · spławikowa (krótka)"
+Kind = 0
+CastMult = 1.01
+MaxLoad = 4.69
+ShockAbsorb = 0.285
+Action = 0.35
+Price = 230
+RequiredLevel = 2
+Description = "Lekka spławikówka na staw i jezioro. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy."
+BlankColor = Color(0.15, 0.35, 0.35, 1)
+WhipColor = Color(0.42, 0.26, 0.14, 1)
+FoamGrip = false
+Length = 3.3
+Model = "rods/float_fjordline"
+ModelTint = Color(0.55, 0.85, 0.85, 1)

@@ -1,0 +1,78 @@
+{
+ "$type": "LocationData",
+ "DisplayName": "Starorzecze Wierzbowe",
+ "Description": "Zarośnięte zakola i podwodne półki. Lin i wzdręga trzymają się roślin.",
+ "RequiredLevel": 6,
+ "OutlineRx": 104.0,
+ "OutlineRz": 68.0,
+ "OutlineCz": -66.0,
+ "Slope": 0.11,
+ "MaxDepth": 4.5,
+ "HolePos": {
+  "X": 17.0,
+  "Y": -39.0
+ },
+ "HoleDepth": 2.0,
+ "HoleRadius": 11.0,
+ "BarPos": {
+  "X": -27.0,
+  "Y": -29.0
+ },
+ "BarHeight": 1.5,
+ "BarRadius": 9.0,
+ "Abundance": {
+  "Lin": 1.6,
+  "Wzdręga": 1.2,
+  "Szczupak": 0.8,
+  "Piskorz": 0.7,
+  "Różanka": 0.6,
+  "Karaś złocisty": 0.9
+ },
+ "Lobes": [
+  "-62,-46,21,14"
+ ],
+ "Islands": [
+  "19,-62,10",
+  "-19,-26,9"
+ ],
+ "WaterShallowColor": {
+  "R": 0.1,
+  "G": 0.14,
+  "B": 0.065,
+  "A": 1.0
+ },
+ "WaterDeepColor": {
+  "R": 0.02,
+  "G": 0.055,
+  "B": 0.035,
+  "A": 1.0
+ },
+ "WaterClarity": 1.8,
+ "WaterTemperature": 21.0,
+ "TreeMix": {
+  "willow": 1.0,
+  "birch": 0.35
+ },
+ "TreeDensity": 0.85,
+ "ReedDensity": 1.45,
+ "RimHeight": 30.0,
+ "SnowLine": 999.0,
+ "PlazaCenter": {
+  "X": 0.0,
+  "Y": 18.0
+ },
+ "VillageStyle": "fishing",
+ "Buildings": [
+  "general,-16,29",
+  "office,17,25",
+  "busstop,7,14",
+  "boathouse,-38,8",
+  "smokehouse,28,21",
+  "lamp,-10,17"
+ ],
+ "HillScale": 0.37,
+ "Landmarks": [
+  "bridge,-19,-12,90,28",
+  "stilthouse,-57,-17"
+ ]
+}

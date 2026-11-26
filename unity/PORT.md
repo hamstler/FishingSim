@@ -1,6 +1,6 @@
 # Port gry na Unity 6 (6000.0.64f1 LTS, HDRP)
 
-Stan: etap 1 z 8 zrobiony. Gra Godotowa (główny katalog repozytorium) zostaje, dopóki wersja Unity jej nie zastąpi.
+Stan: wydana wersja 0.9.2 (grywalna podstawa: świat, wędkowanie, sklep, zapis). Dalej: modele Meshy, wioska, łódka, obóz, dźwięk, ręce.
 
 | Etap | Zakres | Stan |
 |---|---|---|

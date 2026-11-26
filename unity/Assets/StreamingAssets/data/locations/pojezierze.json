@@ -1,0 +1,78 @@
+{
+ "$type": "LocationData",
+ "DisplayName": "Jezioro Sosnowe",
+ "Description": "Chłodny akwen pośród sosen. Głębokie rynny są domem sielawy i siei.",
+ "RequiredLevel": 16,
+ "OutlineRx": 127.0,
+ "OutlineRz": 81.0,
+ "OutlineCz": -79.0,
+ "Slope": 0.2,
+ "MaxDepth": 13,
+ "HolePos": {
+  "X": 22.0,
+  "Y": -48.0
+ },
+ "HoleDepth": 4.0,
+ "HoleRadius": 14.0,
+ "BarPos": {
+  "X": -34.0,
+  "Y": -36.0
+ },
+ "BarHeight": 1.5,
+ "BarRadius": 12.0,
+ "Abundance": {
+  "Sielawa": 1.5,
+  "Sieja": 1.25,
+  "Troć jeziorowa": 0.65,
+  "Palia": 0.4,
+  "Miętus": 0.6,
+  "Okoń": 0.85
+ },
+ "Lobes": [
+  "69,-100,33,18"
+ ],
+ "Islands": [
+  "27,-92,11",
+  "-44,-128,9"
+ ],
+ "WaterShallowColor": {
+  "R": 0.06,
+  "G": 0.15,
+  "B": 0.11,
+  "A": 1.0
+ },
+ "WaterDeepColor": {
+  "R": 0.02,
+  "G": 0.055,
+  "B": 0.035,
+  "A": 1.0
+ },
+ "WaterClarity": 3.9,
+ "WaterTemperature": 13.0,
+ "TreeMix": {
+  "pine": 1.0,
+  "birch": 0.35
+ },
+ "TreeDensity": 1.4,
+ "ReedDensity": 0.65,
+ "RimHeight": 55.0,
+ "SnowLine": 999.0,
+ "PlazaCenter": {
+  "X": 0.0,
+  "Y": 18.0
+ },
+ "VillageStyle": "mountain",
+ "Buildings": [
+  "general,-29,24",
+  "office,13,32",
+  "busstop,5,17",
+  "cabin,-53,35",
+  "cabin,51,30",
+  "woodpile,-40,28"
+ ],
+ "HillScale": 0.95,
+ "Landmarks": [
+  "tower,92,-24",
+  "platforms,-45,-7,54"
+ ]
+}

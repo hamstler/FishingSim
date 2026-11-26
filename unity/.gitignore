@@ -7,3 +7,6 @@
 /[Uu]ser[Ss]ettings/
 *.csproj
 *.sln
+Assets/StreamingAssets/Models/
+Assets/StreamingAssets/Models.meta
+Assets/StreamingAssets/Textures/

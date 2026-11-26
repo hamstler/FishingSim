@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ReelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/ReelData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Ironwood Titan 8000 · sumowy, mocny hamulec"
+DragMax = 12.4
+ReelSpeed = 3.96
+LineCapacity = 305.0
+Price = 700
+RequiredLevel = 5
+Description = "Ironwood Titan w rozmiarze 8000: 305 m żyłki 0,25 mm, hamulec do 12.4 kg."
+BodyColor = Color(0.25, 0.25, 0.25, 1)
+TrimColor = Color(0.75, 0.62, 0.3, 1)
+Model = "reels/big_ironwood"
+ModelTint = Color(1, 1, 1, 1)
+ModelScale = 0.874

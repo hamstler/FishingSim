@@ -1,0 +1,80 @@
+{
+ "$type": "LocationData",
+ "DisplayName": "Zbiornik Kamienna Zapora",
+ "Description": "Największy i najgłębszy akwen. Przy dnie żeruje sandacz, a nad stokiem krąży boleń.",
+ "RequiredLevel": 27,
+ "OutlineRx": 146.0,
+ "OutlineRz": 92.0,
+ "OutlineCz": -90.0,
+ "Slope": 0.2,
+ "MaxDepth": 17,
+ "HolePos": {
+  "X": 26.0,
+  "Y": -56.0
+ },
+ "HoleDepth": 4.0,
+ "HoleRadius": 17.0,
+ "BarPos": {
+  "X": -40.0,
+  "Y": -42.0
+ },
+ "BarHeight": 1.5,
+ "BarRadius": 14.0,
+ "Abundance": {
+  "Sandacz": 1.65,
+  "Sum": 1,
+  "Boleń": 1.25,
+  "Leszcz": 1,
+  "Ukleja": 1.4,
+  "Jesiotr ostronosy": 0.3
+ },
+ "Lobes": [
+  "83,-110,35,24"
+ ],
+ "Islands": [
+  "-43,-104,14",
+  "51,-123,11",
+  "32,-26,9"
+ ],
+ "WaterShallowColor": {
+  "R": 0.06,
+  "G": 0.15,
+  "B": 0.11,
+  "A": 1.0
+ },
+ "WaterDeepColor": {
+  "R": 0.02,
+  "G": 0.055,
+  "B": 0.035,
+  "A": 1.0
+ },
+ "WaterClarity": 3.9,
+ "WaterTemperature": 17.0,
+ "TreeMix": {
+  "oak": 1.0,
+  "birch": 0.35
+ },
+ "TreeDensity": 0.85,
+ "ReedDensity": 0.65,
+ "RimHeight": 55.0,
+ "SnowLine": 999.0,
+ "PlazaCenter": {
+  "X": 0.0,
+  "Y": 18.0
+ },
+ "VillageStyle": "fishing",
+ "Buildings": [
+  "general,-32,22",
+  "office,24,29",
+  "busstop,9,10",
+  "fishbuyer,-17,38",
+  "boathouse,46,11",
+  "house,66,31"
+ ],
+ "HillScale": 1.1,
+ "Landmarks": [
+  "dike,0,-186,0,72",
+  "bridge,32,-15,90,32",
+  "rocks,-67,-95"
+ ]
+}

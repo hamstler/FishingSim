@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Ironwood Barbel Specimen 3,3 m · specimen (krótka)"
+Kind = 2
+CastMult = 1.07
+MaxLoad = 16.4
+ShockAbsorb = 0.132
+Action = 0.8
+Price = 685
+RequiredLevel = 6
+Description = "Specjalistyczny kij na duże brzany i liny. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy."
+BlankColor = Color(0.45, 0.35, 0.22, 1)
+WhipColor = Color(0.06, 0.06, 0.06, 1)
+FoamGrip = true
+Length = 3.3
+Model = "rods/feeder_ironwood"
+ModelTint = Color(1, 0.85, 0.65, 1)

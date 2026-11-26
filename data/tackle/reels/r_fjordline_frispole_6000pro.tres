@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ReelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/ReelData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Fjordline Frispole 6000 Pro · z wolnym biegiem"
+DragMax = 11.4
+ReelSpeed = 3.92
+LineCapacity = 235.0
+Price = 720
+RequiredLevel = 6
+Description = "Fjordline Frispole w rozmiarze 6000: 235 m żyłki 0,25 mm, hamulec do 11.4 kg, wzmocniona przekładnia i hamulec."
+BodyColor = Color(0.25, 0.205, 0.138, 1)
+TrimColor = Color(0.75, 0.62, 0.3, 1)
+Model = "reels/baitrunner_fjordline"
+ModelTint = Color(1, 0.82, 0.55, 1)
+ModelScale = 0.909

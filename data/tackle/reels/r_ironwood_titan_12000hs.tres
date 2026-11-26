@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ReelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/ReelData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Ironwood Titan 12000 HS · sumowy, mocny hamulec"
+DragMax = 16.5
+ReelSpeed = 4.85
+LineCapacity = 445.0
+Price = 1210
+RequiredLevel = 9
+Description = "Ironwood Titan w rozmiarze 12000: 445 m żyłki 0,25 mm, hamulec do 16.5 kg, szybkie przełożenie."
+BodyColor = Color(0.138, 0.15, 0.17, 1)
+TrimColor = Color(0.75, 0.62, 0.3, 1)
+Model = "reels/big_ironwood"
+ModelTint = Color(0.55, 0.6, 0.68, 1)
+ModelScale = 1.000

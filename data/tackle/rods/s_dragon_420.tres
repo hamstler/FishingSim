@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Kaminari Dragon Spod 4,2 m · spodówka (długa)"
+Kind = 3
+CastMult = 1.43
+MaxLoad = 15.7
+ShockAbsorb = 0.105
+Action = 0.65
+Price = 945
+RequiredLevel = 7
+Description = "Mocny kij do rakiet zanętowych i bardzo dalekich rzutów. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy."
+BlankColor = Color(0.4, 0.06, 0.05, 1)
+WhipColor = Color(0.85, 0.85, 0.88, 1)
+FoamGrip = true
+Length = 4.2
+Model = "rods/carp_kaminari"
+ModelTint = Color(0.95, 0.45, 0.4, 1)

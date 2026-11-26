@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Borealis Waggler Pro 3,6 m · waggler (krótka)"
+Kind = 0
+CastMult = 1.22
+MaxLoad = 5.1
+ShockAbsorb = 0.284
+Action = 0.42
+Price = 360
+RequiredLevel = 4
+Description = "Szybki match do wagglera na dalekie łowisko. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy."
+BlankColor = Color(0.12, 0.18, 0.4, 1)
+WhipColor = Color(0.78, 0.62, 0.3, 1)
+FoamGrip = false
+Length = 3.6
+Model = "rods/float_borealis"
+ModelTint = Color(0.6, 0.7, 1, 1)

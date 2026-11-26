@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ReelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/ReelData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Hokuto Kaiten 3500 HS · średni z przednim hamulcem"
+DragMax = 6.4
+ReelSpeed = 3.87
+LineCapacity = 148.0
+Price = 320
+RequiredLevel = 4
+Description = "Hokuto Kaiten w rozmiarze 3500: 148 m żyłki 0,25 mm, hamulec do 6.4 kg, szybkie przełożenie."
+BodyColor = Color(0.138, 0.15, 0.17, 1)
+TrimColor = Color(0.75, 0.62, 0.3, 1)
+Model = "reels/medium_hokuto"
+ModelTint = Color(0.55, 0.6, 0.68, 1)
+ModelScale = 0.956

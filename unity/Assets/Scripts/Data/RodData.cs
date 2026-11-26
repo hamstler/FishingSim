@@ -37,4 +37,8 @@ public partial class RodData : TackleItem
 
     /// <summary>Grips of EVA foam (dark) instead of cork.</summary>
     [Export] public bool FoamGrip { get; set; }
+
+    /// <summary>The model's finish: its pictures multiplied by this colour (white = as modelled), so series on the same
+    /// model look apart.</summary>
+    [Export] public Color ModelTint { get; set; } = new(1f, 1f, 1f);
 }

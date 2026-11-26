@@ -1,0 +1,79 @@
+{
+ "$type": "LocationData",
+ "DisplayName": "Rozlewisko Czarne",
+ "Description": "Rozległe, ciemne rozlewisko z wyspami. Po zmroku warto szukać suma.",
+ "RequiredLevel": 21,
+ "OutlineRx": 136.0,
+ "OutlineRz": 86.0,
+ "OutlineCz": -84.0,
+ "Slope": 0.11,
+ "MaxDepth": 8,
+ "HolePos": {
+  "X": 24.0,
+  "Y": -51.0
+ },
+ "HoleDepth": 2.0,
+ "HoleRadius": 16.0,
+ "BarPos": {
+  "X": -36.0,
+  "Y": -38.0
+ },
+ "BarHeight": 1.5,
+ "BarRadius": 12.0,
+ "Abundance": {
+  "Sum": 1.1,
+  "Węgorz": 1.25,
+  "Leszcz": 1.4,
+  "Krąp": 1.2,
+  "Szczupak": 0.9,
+  "Karaś srebrzysty": 0.85
+ },
+ "Lobes": [
+  "-90,-39,28,18"
+ ],
+ "Islands": [
+  "-44,-69,13",
+  "38,-87,14",
+  "-22,-31,11"
+ ],
+ "WaterShallowColor": {
+  "R": 0.1,
+  "G": 0.14,
+  "B": 0.065,
+  "A": 1.0
+ },
+ "WaterDeepColor": {
+  "R": 0.02,
+  "G": 0.055,
+  "B": 0.035,
+  "A": 1.0
+ },
+ "WaterClarity": 1.8,
+ "WaterTemperature": 21.0,
+ "TreeMix": {
+  "willow": 1.0,
+  "birch": 0.35
+ },
+ "TreeDensity": 0.85,
+ "ReedDensity": 1.45,
+ "RimHeight": 30.0,
+ "SnowLine": 999.0,
+ "PlazaCenter": {
+  "X": 0.0,
+  "Y": 18.0
+ },
+ "VillageStyle": "fishing",
+ "Buildings": [
+  "general,-24,31",
+  "office,33,20",
+  "busstop,-10,13",
+  "boathouse,50,7",
+  "dryingrack,26,11",
+  "smokehouse,-39,23"
+ ],
+ "HillScale": 0.3,
+ "Landmarks": [
+  "bridge,-22,-16,90,35",
+  "stilthouse,53,-8"
+ ]
+}

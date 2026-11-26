@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="RodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/Data/RodData.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DisplayName = "Borealis Aurora 3,6 m · karpiówka (średnia)"
+Kind = 3
+CastMult = 1.25
+MaxLoad = 12
+ShockAbsorb = 0.13
+Action = 0.72
+Price = 720
+RequiredLevel = 6
+Description = "Smukła karpiówka z lekkim blankiem: długi hol bez spinki. Krótsza rzuca bliżej, ale jest mocniejsza; dłuższa rzuca dalej i lepiej amortyzuje zrywy."
+BlankColor = Color(0.3, 0.2, 0.45, 1)
+WhipColor = Color(0.82, 0.84, 0.88, 1)
+FoamGrip = false
+Length = 3.6
+Model = "rods/carp_borealis"
+ModelTint = Color(0.75, 0.62, 0.95, 1)

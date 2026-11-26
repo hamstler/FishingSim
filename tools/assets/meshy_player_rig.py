@@ -188,7 +188,7 @@ def fit(rig, ref_P, ref_N, ref_J, ref_W, Q, QN, show):
 
 
 # ------------------------------------------------------------------ weights and rest pose
-def transfer_weights(rig, G, ref_P, ref_N, ref_J, ref_W, P, N, names, I):
+def transfer_weights(rig, G, ref_P, ref_N, ref_J, ref_W, P, N, names, I, fold_fingers=True):
     """Skin weights for the fisherman from the posed reference: inverse-distance blend of the nearest reference
     vertices whose normals face the same way (an arm's inner side never takes the torso's weights), smoothed over the
     welded mesh, fingers folded into the hand, four strongest kept."""
@@ -258,9 +258,9 @@ def transfer_weights(rig, G, ref_P, ref_N, ref_J, ref_W, P, N, names, I):
     print(f"  parts: body {np.sum(my_group == 0)}, left arm {np.sum(my_group == 1)}, right arm {np.sum(my_group == 2)} vertices", flush=True)
     transfer_weights.group = my_group
     transfer_weights.armpit = min(joints[names.index("upperarm_l")][1], joints[names.index("upperarm_r")][1]) - 0.06
-    # Fingers into the hand: the fists stay closed.
+    # Fingers into the hand: the fists stay closed (an open-handed figure keeps its finger weights).
     for j, name in enumerate(names):
-        if name.startswith(FINGERS):
+        if fold_fingers and name.startswith(FINGERS):
             side = name[-1]
             dense[:, names.index(f"hand_{side}")] += dense[:, j]
             dense[:, j] = 0.0

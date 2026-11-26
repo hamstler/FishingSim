@@ -1,0 +1,275 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
+using GLTFast;
+using UnityEngine;
+using Object = UnityEngine.Object;
+
+namespace FishingSim.Game
+{
+    /// <summary>
+    /// The user's Meshy models (fish, buildings, rods, reels), the props and the people, read at run time by glTFast
+    /// from StreamingAssets/Models (CI converts the game's .glb files there with tools/unity/convert_glb.py: WebP
+    /// pictures become JPEG/PNG). Each model is loaded once into a hidden template (Preload, a coroutine) and copied
+    /// from it (Spawn). Missing models give null, so the game falls back to its built shapes.
+    /// </summary>
+    public static class ModelLibrary
+    {
+        private static readonly Dictionary<string, GameObject?> Templates = new();
+        private static readonly Dictionary<string, Task> Loading = new();
+        private static readonly Dictionary<string, Bounds> BoundsCache = new();
+        private static readonly List<GltfImport> Imports = new();
+        private static Transform? _cache;
+
+        public static string Root => Path.Combine(Application.streamingAssetsPath, "Models");
+
+        private static Transform Cache
+        {
+            get
+            {
+                if (_cache != null)
+                    return _cache;
+                var go = new GameObject("ModelCache");
+                go.SetActive(false);
+                Object.DontDestroyOnLoad(go);
+                return _cache = go.transform;
+            }
+        }
+
+        public static string FileOf(string id) => Path.Combine(Root, id + ".glb");
+
+        /// <summary>Every model id in a folder of StreamingAssets/Models ("fish", "rods"...).</summary>
+        public static List<string> IdsIn(string folder)
+        {
+            var list = new List<string>();
+            string dir = Path.Combine(Root, folder);
+            if (Directory.Exists(dir))
+                foreach (var f in Directory.GetFiles(dir, "*.glb"))
+                    list.Add(folder + "/" + Path.GetFileNameWithoutExtension(f));
+            list.Sort(StringComparer.Ordinal);
+            return list;
+        }
+
+        /// <summary>Loads the models not loaded yet (a coroutine: the game keeps drawing meanwhile).</summary>
+        public static IEnumerator Preload(IEnumerable<string> ids)
+        {
+            var waiting = new List<Task>();
+            foreach (var id in ids)
+                if (Start(id) is { } t)
+                    waiting.Add(t);
+            foreach (var t in waiting)
+                while (!t.IsCompleted)
+                    yield return null;
+        }
+
+        /// <summary>Starts loading one model (null when it is loaded, missing or loading already).</summary>
+        public static Task? Start(string id)
+        {
+            if (Templates.ContainsKey(id))
+                return null;
+            if (Loading.TryGetValue(id, out var running))
+                return running;
+            if (!File.Exists(FileOf(id)))
+            {
+                Templates[id] = null;
+                return null;
+            }
+            var task = Load(id);
+            Loading[id] = task;
+            return task;
+        }
+
+        private static async Task Load(string id)
+        {
+            GameObject? template = null;
+            try
+            {
+                var bytes = await Task.Run(() => File.ReadAllBytes(FileOf(id)));
+                var gltf = new GltfImport();
+                var settings = new ImportSettings { AnimationMethod = AnimationMethod.Legacy, GenerateMipMaps = true, AnisotropicFilterLevel = 8 };
+                if (await gltf.LoadGltfBinary(bytes, new Uri(FileOf(id)), settings))
+                {
+                    template = new GameObject(id);
+                    template.transform.SetParent(Cache, false);
+                    if (!await gltf.InstantiateMainSceneAsync(template.transform))
+                    {
+                        Object.Destroy(template);
+                        template = null;
+                    }
+                    else
+                        Imports.Add(gltf);   // keeps the meshes, pictures and materials alive
+                }
+                else
+                    Debug.LogWarning($"Model {id} could not be read");
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"Model {id}: {e.Message}");
+            }
+            Templates[id] = template;
+            Loading.Remove(id);
+        }
+
+        public static bool Has(string id) => Templates.TryGetValue(id, out var t) && t != null;
+
+        /// <summary>The model is loaded or known to be missing (no longer loading).</summary>
+        public static bool Settled(string id) => Templates.ContainsKey(id);
+
+        /// <summary>How many of <paramref name="ids"/> are settled (loaded or missing), for the loading screen.</summary>
+        public static int SettledCount(IReadOnlyList<string> ids)
+        {
+            int n = 0;
+            foreach (var id in ids)
+                if (Templates.ContainsKey(id) || !File.Exists(FileOf(id)))
+                    n++;
+            return n;
+        }
+
+        /// <summary>A copy of a loaded model, or null (not loaded or missing).</summary>
+        public static GameObject? Spawn(string id, Transform? parent = null)
+        {
+            if (!Templates.TryGetValue(id, out var template) || template == null)
+                return null;
+            var go = Object.Instantiate(template, parent, false);
+            go.name = id;
+            go.SetActive(true);
+            foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+            {
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+                r.receiveShadows = true;
+            }
+            return go;
+        }
+
+        /// <summary>The template itself (for reading its animation clips).</summary>
+        public static GameObject? Template(string id) => Templates.TryGetValue(id, out var t) ? t : null;
+
+        /// <summary>The model's bounding box in its own space (all its renderers).</summary>
+        public static Bounds BoundsOf(string id)
+        {
+            if (BoundsCache.TryGetValue(id, out var b))
+                return b;
+            var go = Spawn(id);
+            b = new Bounds(Vector3.zero, Vector3.zero);
+            if (go != null)
+            {
+                go.transform.SetParent(null, false);
+                go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+                go.transform.localScale = Vector3.one;
+                bool first = true;
+                foreach (var r in go.GetComponentsInChildren<Renderer>())
+                {
+                    var rb = r is SkinnedMeshRenderer s ? s.bounds : r.bounds;
+                    if (first) { b = rb; first = false; }
+                    else b.Encapsulate(rb);
+                }
+                Object.Destroy(go);
+                BoundsCache[id] = b;
+            }
+            return b;
+        }
+
+        /// <summary>The JSON written beside a model (reel frames, a fish's nose, a character's pictures), or null.</summary>
+        public static string? Json(string id)
+        {
+            string path = Path.Combine(Root, id + ".json");
+            return File.Exists(path) ? File.ReadAllText(path) : null;
+        }
+
+        private static readonly Dictionary<string, Texture2D?> Pictures = new();
+
+        /// <summary>A loose picture from StreamingAssets/Models (png or jpg), or null; <paramref name="linear"/> for data
+        /// pictures (normal maps, ambient occlusion), which must not be colour-corrected as sRGB.</summary>
+        public static Texture2D? Picture(string pathWithoutExtension, bool linear = false, System.Action<Color32[]>? grade = null)
+        {
+            string key = (linear ? pathWithoutExtension + "#linear" : pathWithoutExtension) + (grade != null ? "#graded" : "");
+            if (Pictures.TryGetValue(key, out var t))
+                return t;
+            t = null;
+            foreach (var ext in new[] { ".png", ".jpg" })
+            {
+                string path = Path.Combine(Root, pathWithoutExtension + ext);
+                if (!File.Exists(path))
+                    continue;
+                // compressed once and kept in TexCache (Texture2D.Compress ran on the main thread for every person)
+                string cacheKey = $"model_{pathWithoutExtension}_{(linear ? "l" : "s")}_{(grade != null ? "g" : "p")}_{TexCache.Stamp(path)}";
+                if (TexCache.Read(cacheKey) is { } cached)
+                {
+                    t = TexCache.Make(cached, pathWithoutExtension, TextureWrapMode.Repeat, 8);
+                    break;
+                }
+                var raw = new Texture2D(2, 2, TextureFormat.RGBA32, false, linear);
+                raw.LoadImage(File.ReadAllBytes(path), false);
+                var px = raw.GetPixels32();
+                int w = raw.width, h = raw.height;
+                Object.Destroy(raw);
+                grade?.Invoke(px);
+                var entry = TexCache.Encode(px, w, h, linear, true);
+                TexCache.WriteLater(cacheKey, entry);
+                t = TexCache.Make(entry, pathWithoutExtension, TextureWrapMode.Repeat, 8);
+                break;
+            }
+            Pictures[key] = t;
+            return t;
+        }
+
+        private static readonly HashSet<Material> Matted = new();
+
+        /// <summary>
+        /// FishAsset.Foreign in the Godot game: the Meshy fish read matt (metallic about 0.1, roughness 0.5) instead of the
+        /// file's own metal/roughness, which made them look like wet plastic or chrome.
+        /// </summary>
+        private static void FishLook(GameObject model)
+        {
+            foreach (var r in model.GetComponentsInChildren<Renderer>(true))
+                foreach (var m in r.sharedMaterials)
+                {
+                    if (m == null || !Matted.Add(m))
+                        continue;
+                    foreach (var name in new[] { "metallicFactor", "_Metallic" })
+                        if (m.HasProperty(name))
+                            m.SetFloat(name, 0.1f);
+                    foreach (var name in new[] { "roughnessFactor", "_Roughness" })
+                        if (m.HasProperty(name))
+                            m.SetFloat(name, 0.5f);
+                    if (m.HasProperty("_Glossiness"))
+                        m.SetFloat("_Glossiness", 0.5f);
+                    foreach (var name in new[] { "metallicRoughnessTexture", "_MetallicGlossMap" })
+                        if (m.HasProperty(name))
+                            m.SetTexture(name, null);
+                }
+        }
+
+        /// <summary>A transform anywhere under <paramref name="root"/> with this name.</summary>
+        public static Transform? Find(Transform root, string name)
+        {
+            if (root.name == name)
+                return root;
+            foreach (Transform c in root)
+                if (Find(c, name) is { } t)
+                    return t;
+            return null;
+        }
+
+        /// <summary>
+        /// A fish model laid along +Z (nose forward) and +Y up, one metre long and centred, under a new holder; null
+        /// without a loaded model for the species (FishMesh is then used).
+        /// </summary>
+        public static GameObject? Fish(string speciesId)
+        {
+            var model = Spawn("fish/" + speciesId);
+            if (model == null)
+                return null;
+            var holder = new GameObject("Fish " + speciesId);
+            var b = BoundsOf("fish/" + speciesId);
+            float length = Mathf.Max(b.size.z, 0.01f);
+            model.transform.SetParent(holder.transform, false);
+            model.transform.localScale = Vector3.one / length;
+            model.transform.localPosition = -b.center / length;
+            FishLook(model);
+            return holder;
+        }
+    }
+}
