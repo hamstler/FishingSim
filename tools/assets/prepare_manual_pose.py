@@ -7,7 +7,8 @@
 * every bone may only rotate (location and scale locked: the rule for this figure);
 * a camera "Widok_z_gry" at the eyes with the game's view (FOV 70 vertical, 16:9), set as the scene's camera:
   Numpad 0 shows what the player sees;
-* the rod, reel, crank and knob are locked against selection (so a click lands on a bone, not on the tackle);
+* the rod, reel and crank are moved by their axis handles (the meshes stay unselectable, so a click on the tackle
+  never moves one piece of it alone);
 * the skeleton is selected and in Pose Mode, its round handles shown; a text "INSTRUKCJA" in the file says how to
   pose and how to hand the file back.
 Afterwards tools/assets/export_untex_grip.py turns the saved file into assets/characters/angler_untex.glb.
@@ -92,13 +93,24 @@ if bpy.data.objects.get("Slonce") is None:
     scene.collection.objects.link(sun)
     sun.hide_select = True
 
-# the tackle: visible, not selectable
+# the tackle: moved and turned by its axis handles (Wedka = the whole rod, Kolowrotek = the reel, Korba = the crank);
+# the meshes stay unselectable (a click on one blank section would move that piece alone)
 for name in ("Wedka", "Kolowrotek", "Korba", "Galka"):
     o = bpy.data.objects.get(name)
-    if o is not None:
-        o.hide_select = True
-        for c in o.children_recursive:
+    if o is None:
+        continue
+    for c in o.children_recursive:
+        if c.type == "MESH":
             c.hide_select = True
+    if name == "Galka":
+        o.hide_select = True
+        continue
+    o.hide_select = False
+    o.empty_display_type = "ARROWS"
+    o.empty_display_size = {"Wedka": 0.12, "Kolowrotek": 0.06, "Korba": 0.035}[name]
+    o.show_in_front = True
+    o.show_name = True
+    o.lock_scale = (True, True, True)
 
 # ready to pose: the skeleton active, in Pose Mode
 for o in scene.objects:
@@ -121,7 +133,9 @@ txt.write("""Ukladanie dloni wedkarza na wedce (FishingSim)
    srodrecze_P/L (dlon), palce: kciuk / wskazujacy / srodkowy / serdeczny / maly _01.._04 _r (prawa) / _l (lewa).
    _01 to nasada palca, _04 koniuszek. P / _r = prawa reka (na rekojesci), L / _l = lewa (na galce korbki).
 3. Numpad 0: widok kamery "Widok_z_gry": z oczu wedkarza w dol na dlonie (jak patrzy na wlasne rece).
-4. Wedka, kolowrotek, korbka i galka sa zablokowane przed zaznaczeniem (klik trafia w kosci).
+4. Wedke, kolowrotek i korbke ustawiasz strzalkami osi z napisami Wedka / Kolowrotek / Korba (w trybie Object
+   Mode: Ctrl+Tab wychodzi z Pose Mode; klik w strzalki, G przesuwa, R obraca). Wedka niesie caly zestaw, Kolowrotek
+   sam kolowrotek, Korba obraca korbke z galka. Siatki sa nieklikalne. Skalowanie zablokowane.
 5. Alt+R na zaznaczonych kosciach wraca je do pozycji spoczynkowej (T-poza), Ctrl+Z cofa.
 6. Zapisz (Ctrl+S) pod ta sama nazwa i napisz Claude'owi, ze gotowe: wyeksportuje to do gry
    (tools/assets/export_untex_grip.py -> assets/characters/angler_untex.glb).
