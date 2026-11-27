@@ -39,7 +39,8 @@ Shader "FS/FishingLine"
                 float4 color : COLOR;
                 float3 tangent : TEXCOORD0;
                 float3 view : TEXCOORD1;
-                float2 cover : TEXCOORD2;       // x = how much of its drawn width the line really covers, y = metres along
+                float2 cover : TEXCOORD2;       // x = the line's strength (how much of a pixel it covers), y = metres along
+                float2 across : TEXCOORD4;      // x = -1..1 across the strip, y = the strip's width in pixels
                 UNITY_FOG_COORDS(3)
             };
 
@@ -54,14 +55,19 @@ Shader "FS/FishingLine"
                 side = dot(side, side) > 1e-8 ? normalize(side) : float3(0, 1, 0);
                 // one pixel in metres at this distance (the projection's vertical scale and the screen's height)
                 float pixel = dist * 2.0 / (unity_CameraProjection[1][1] * _ScreenParams.y);
-                float minWidth = pixel * _MinPixels * (0.8 + 2.5 * _Diameter * 1000.0);
-                float width = max(_Diameter, minWidth);
+                // anti-aliased: the strip is drawn at least 2.5 px wide and fades from its middle to its edges (a hard
+                // one-pixel strip broke into stair-steps and dashes that crawled along the line as it moved)
+                float realPx = _Diameter / pixel;
+                float widthPx = max(realPx + 1.5, 2.5 * _MinPixels);
+                float width = widthPx * pixel;
                 p += side * v.uv.x * width * 0.5;
                 o.pos = mul(UNITY_MATRIX_VP, float4(p, 1));
                 o.color = v.color;
                 o.tangent = t;
                 o.view = toCam / max(dist, 1e-4);
-                o.cover = float2(saturate(_Diameter / width * 0.6 + 0.4), v.uv.y);
+                // a hair-thin line far away keeps at least 45 % of a pixel's strength (it reads as a line, not a ghost)
+                o.cover = float2(saturate(0.45 + 0.55 * realPx), v.uv.y);
+                o.across = float2(v.uv.x, widthPx);
                 UNITY_TRANSFER_FOG(o, o.pos);
                 return o;
             }
@@ -79,7 +85,11 @@ Shader "FS/FishingLine"
                 float th = dot(t, h);
                 float glint = pow(saturate(sqrt(saturate(1.0 - th * th))), 90.0) * _Daylight;
                 col += _SunTint.rgb * glint * 0.8;
-                float4 c = float4(col, i.color.a * i.cover.x);
+                // the profile across the strip: solid over the line's own width, a one-pixel soft edge
+                float d = abs(i.across.x) * i.across.y * 0.5;                 // pixels from the middle
+                float core = max(0.5 * (i.across.y - 1.5), 0.5);
+                float profile = saturate(core + 0.5 - d);
+                float4 c = float4(col, i.color.a * i.cover.x * profile);
                 UNITY_APPLY_FOG(i.fogCoord, c);
                 return c;
             }

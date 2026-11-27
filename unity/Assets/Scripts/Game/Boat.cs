@@ -85,27 +85,74 @@ namespace FishingSim.Game
                     verts[i, j] = new Vector3(x, y, z);
                 }
             }
+            // smooth shells: shared vertices with normals across the neighbours (flat quads showed the inside as a
+            // checkerboard of light and dark squares); the outside, then the inside 2 cm in along the normal, in bare wood
+            var outerIdx = new int[stations + 1, ribs + 1];
+            var innerIdx = new int[stations + 1, ribs + 1];
+            for (int i = 0; i <= stations; i++)
+                for (int j = 0; j <= ribs; j++)
+                {
+                    var du = verts[Mathf.Min(i + 1, stations), j] - verts[Mathf.Max(i - 1, 0), j];
+                    var dv = verts[i, Mathf.Min(j + 1, ribs)] - verts[i, Mathf.Max(j - 1, 0)];
+                    var n = Vector3.Cross(dv, du);
+                    // at the pointed ends the stations meet in one point: lean on the hull's side there
+                    if (n.sqrMagnitude < 1e-10f)
+                        n = new Vector3(verts[i, j].x, -0.3f, 0f);
+                    n.Normalize();
+                    var p = verts[i, j];
+                    outerIdx[i, j] = k.Add(p, n, p.y < 0.22f ? tar : white);
+                    innerIdx[i, j] = k.Add(p - n * 0.02f, -n, inside);
+                }
             for (int i = 0; i < stations; i++)
                 for (int j = 0; j < ribs; j++)
                 {
-                    var a = verts[i, j];
-                    var b = verts[i + 1, j];
-                    var c = verts[i + 1, j + 1];
-                    var d = verts[i, j + 1];
-                    float mid = (a.y + c.y) * 0.5f;
-                    var outer = mid < 0.22f ? tar : white;
-                    // outside, then inside (inset 2 cm) in bare wood
-                    k.Quad(a, d, c, b, outer);
-                    // inset towards the keel line and up (straight up hardly parted the shells on the steep sides: they flickered)
-                    float side = (a.x + c.x) * 0.5f;
-                    var n = new Vector3(-Mathf.Sign(side) * Mathf.Min(Mathf.Abs(side) * 4f, 1f), 0.6f, 0f).normalized * 0.02f;
-                    k.Quad(a + n, b + n, c + n, d + n, inside);
+                    int a = outerIdx[i, j], b = outerIdx[i + 1, j], c = outerIdx[i + 1, j + 1], d = outerIdx[i, j + 1];
+                    k.Tri(a, d, c);
+                    k.Tri(a, c, b);
+                    a = innerIdx[i, j]; b = innerIdx[i + 1, j]; c = innerIdx[i + 1, j + 1]; d = innerIdx[i, j + 1];
+                    k.Tri(a, b, c);
+                    k.Tri(a, c, d);
                 }
-            // thwarts and floorboards
+            // thwarts and floorboards, fitted to the hull: a thwart reaches the planking (between the inner and outer
+            // shells), each floorboard ends where the hull at the floor's height gets narrower than its outer edge (one
+            // straight 0.6 x 3 m board stuck out through both sides towards the ends, where the hull narrows and the
+            // keel rises)
             var thwart = Col.Lin(0.55f, 0.42f, 0.28f);
             foreach (float z in new[] { -0.9f, 0.15f, 1.1f })
-                k.Box(new Vector3(0f, 0.42f, z), new Vector3(1.0f, 0.04f, 0.22f), Quaternion.identity, thwart);
-            k.Box(new Vector3(0f, 0.12f, 0f), new Vector3(0.6f, 0.03f, 3.0f), Quaternion.identity, thwart * 0.8f);
+            {
+                float w = HalfWidthAt(z, 0.42f, half) - 0.006f;
+                k.Box(new Vector3(0f, 0.42f, z), new Vector3(2f * w, 0.04f, 0.22f), Quaternion.identity, thwart);
+            }
+            const float floorY = 0.13f, plank = 0.1f, gap = 0.018f;
+            for (int p = -2; p <= 2; p++)
+            {
+                float x = p * (plank + gap);
+                float edge = Mathf.Abs(x) + plank * 0.5f + 0.03f;      // 2 cm inside the inner shell, a little more
+                float zEnd = 0f;
+                for (float z = 0f; z < half; z += 0.01f)
+                {
+                    if (HalfWidthAt(z, floorY - 0.015f, half) < edge)
+                        break;
+                    zEnd = z;
+                }
+                if (zEnd < 0.3f)
+                    continue;
+                k.Box(new Vector3(x, floorY, 0f), new Vector3(plank, 0.025f, 2f * zEnd), Quaternion.identity, thwart * (p % 2 == 0 ? 0.8f : 0.74f));
+            }
+        }
+
+        /// <summary>The hull's half-width at (z, height y), from the same lines as BuildHull (0 below the keel).</summary>
+        private static float HalfWidthAt(float z, float y, float half)
+        {
+            float t = Mathf.Clamp(z / half, -1f, 1f);
+            float beam = 0.72f * Mathf.Pow(Mathf.Max(1f - t * t, 0f), 0.65f);
+            float sheer = 0.62f + 0.18f * t * t;
+            float keel = 0.02f + 0.16f * t * t;
+            if (y <= keel)
+                return 0f;
+            float f = Mathf.Clamp01((y - keel) / (sheer - keel));
+            float sin = Mathf.Pow(1f - f, 1f / 1.6f);
+            return Mathf.Sqrt(Mathf.Max(0f, 1f - sin * sin)) * beam;
         }
 
         public void ResetToMooring()

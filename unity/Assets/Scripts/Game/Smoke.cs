@@ -364,6 +364,55 @@ namespace FishingSim.Game
                 yield return null;
             }
             Debug.Log($"SMOKE landed {landed} of 2, fps {1f / Mathf.Max(Time.smoothDeltaTime, 0.0001f):0}");
+            // the line's own physics: at rest after a cast, and in the middle of a fast swing of the rod (it must lag
+            // and bow, not swing round as a rigid stick)
+            if (Rod.SmokeTackleReady)
+            {
+                Player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
+                Player.Look(180f, 8f);
+                Rod.SmokeCast(Player.transform.position + Player.transform.forward * 12f);
+                float tw = 0f;
+                while (Rod.State != RodState.Waiting && tw < 20f)
+                {
+                    tw += Time.unscaledDeltaTime;
+                    yield return null;
+                }
+                for (int i = 0; i < 90; i++)
+                    yield return null;
+                yield return new WaitForEndOfFrame();
+                var still = ScreenCapture.CaptureScreenshotAsTexture();
+                SaveFull(still, "line_still");
+                Destroy(still);
+                for (int i = 1; i <= 5; i++)
+                {
+                    Player.Look(180f + i * 9f, 8f - i * 2f);
+                    yield return null;
+                }
+                yield return new WaitForEndOfFrame();
+                var swing = ScreenCapture.CaptureScreenshotAsTexture();
+                SaveFull(swing, "line_swing");
+                Destroy(swing);
+                Player.Look(180f, 8f);
+                Rod.Reset();
+                yield return null;
+            }
+            // the boat close up from the pier (its floor and thwarts inside the hull)
+            if (UnityEngine.Object.FindFirstObjectByType<Boat>() is { } boat)
+            {
+                var bp = boat.transform.position;
+                var eye = new Vector3(bp.x - 1.6f, WorldView.PierDeck, bp.z + 1.2f);
+                float yaw = Mathf.Atan2(bp.x - eye.x, bp.z - eye.z) * Mathf.Rad2Deg;
+                Player.Place(eye, yaw);
+                Player.Look(yaw, 38f);
+                Rod.ShowRod(false);
+                for (int i = 0; i < 20; i++)
+                    yield return null;
+                yield return new WaitForEndOfFrame();
+                var bs = ScreenCapture.CaptureScreenshotAsTexture();
+                SaveFull(bs, "boat");
+                Destroy(bs);
+                Rod.ShowRod(true);
+            }
             Debug.Log(ok ? "SMOKE OK" : "SMOKE FAIL: magenta pixels (a shader failed)");
             Application.Quit(ok ? 0 : 1);
         }

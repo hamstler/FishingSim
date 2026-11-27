@@ -72,7 +72,7 @@ namespace FishingSim.Game
         private float _lineLength, _bailOpen, _drawTight, _bitePull, _crankAngle, _spoolFill = 1f, _section = SegmentLength;
         private readonly List<Transform> _guides = new();
         private readonly Vector3[] _ropePts = new Vector3[Core.Physics.LineRope.Points];
-        private readonly Vector3[] _inRod = new Vector3[16];
+        private readonly Vector3[] _inRod = new Vector3[32];
         private LineRibbon _inRodLine = null!;
         private Transform? _bail, _spoolLine, _lineExit;
         private Transform _builtReel = null!, _builtRotor = null!, _builtCrank = null!, _builtBail = null!, _builtSpoolLine = null!, _builtLineExit = null!;
@@ -531,6 +531,7 @@ namespace FishingSim.Game
                 _shownRodItem = rod?.ItemId ?? "";
                 foreach (Transform c in _rodModel)
                     Destroy(c.gameObject);
+                _modelGuides.Clear();
                 for (int i = 0; i < _segments.Count; i++)
                     foreach (Transform c in _segments[i])
                         if (c.name.StartsWith("Model"))
@@ -558,6 +559,7 @@ namespace FishingSim.Game
                         }
                     foreach (var r in model.GetComponentsInChildren<Renderer>())
                         r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    FindModelGuides();
                 }
                 _procHandle.gameObject.SetActive(!ok);
                 foreach (var p in _procBlank)
@@ -832,10 +834,144 @@ namespace FishingSim.Game
             }
             else
                 into[n++] = exit.position;
-            foreach (var g in _guides)
-                into[n++] = g.position;
+            var guides = _modelGuides.Count > 0 ? _modelGuides : _guides;
+            foreach (var g in guides)
+                if (n < into.Length - 1)
+                    into[n++] = g.position;
             into[n++] = _tip.position;
             return n;
+        }
+
+        /// <summary>The guide rings of the rod model (found in its mesh), from the stripper to the tip-top.</summary>
+        private readonly List<Transform> _modelGuides = new();
+
+        /// <summary>
+        /// Finds the guide rings in the rod model's sections, so the line runs through the model's own rings (the built
+        /// rod's guide places missed them: the line ran beside the rings). In each section's frame (the blank along +Y
+        /// through x = z = 0) the vertices standing well off the blank are the guides; they gather in clusters along the
+        /// blank, one per guide. A ring is the widest part of its guide across the line's direction, symmetric about its
+        /// middle: the band where the guide is at least 55 % of its widest gives the ring's centre. A marker goes there,
+        /// a child of the section, so it bends and scales with it.
+        /// </summary>
+        private void FindModelGuides()
+        {
+            _modelGuides.Clear();
+            var pts = new List<Vector3>();
+            for (int si = 0; si < _segments.Count; si++)
+            {
+                Transform? model = null;
+                foreach (Transform c in _segments[si])
+                    if (c.name.StartsWith("Model"))
+                        model = c;
+                if (model == null)
+                    continue;
+                pts.Clear();
+                var toModel = model.worldToLocalMatrix;
+                foreach (var mf in model.GetComponentsInChildren<MeshFilter>())
+                {
+                    var mesh = mf.sharedMesh;
+                    if (mesh == null || !mesh.isReadable)
+                        continue;
+                    var m = toModel * mf.transform.localToWorldMatrix;
+                    var verts = mesh.vertices;
+                    for (int i = 0; i < verts.Length; i += 1)
+                        pts.Add(m.MultiplyPoint3x4(verts[i]));
+                }
+                if (pts.Count < 50)
+                    continue;
+                // the blank's radius: most of a section's vertices lie on the blank
+                var radii = new float[pts.Count];
+                for (int i = 0; i < pts.Count; i++)
+                    radii[i] = new Vector2(pts[i].x, pts[i].z).magnitude;
+                var sorted = (float[])radii.Clone();
+                System.Array.Sort(sorted);
+                float blankR = sorted[(int)(sorted.Length * 0.35f)];
+                float off = blankR + 0.004f;
+                var guide = new List<int>();
+                for (int i = 0; i < pts.Count; i++)
+                    if (radii[i] > off)
+                        guide.Add(i);
+                if (guide.Count < 20)
+                    continue;
+                guide.Sort((x, y) => pts[x].y.CompareTo(pts[y].y));
+                int start = 0;
+                for (int i = 1; i <= guide.Count; i++)
+                {
+                    if (i < guide.Count && pts[guide[i]].y - pts[guide[i - 1]].y < 0.01f)
+                        continue;
+                    if (i - start >= 20)
+                        AddRing(model, pts, guide, start, i);
+                    start = i;
+                }
+            }
+            Debug.Log($"ROD line guides from the model: {_modelGuides.Count}");
+        }
+
+        private void AddRing(Transform model, List<Vector3> pts, List<int> guide, int from, int to)
+        {
+            // the guide's direction off the blank, and across it
+            Vector2 dir = Vector2.zero;
+            for (int i = from; i < to; i++)
+                dir += new Vector2(pts[guide[i]].x, pts[guide[i]].z);
+            if (dir.sqrMagnitude < 1e-10f)
+                return;
+            dir.Normalize();
+            var across = new Vector2(-dir.y, dir.x);
+            float hMin = float.MaxValue, hMax = float.MinValue;
+            for (int i = from; i < to; i++)
+            {
+                float h = Vector2.Dot(new Vector2(pts[guide[i]].x, pts[guide[i]].z), dir);
+                hMin = Mathf.Min(hMin, h);
+                hMax = Mathf.Max(hMax, h);
+            }
+            const float bin = 0.0005f;
+            int bins = Mathf.Clamp(Mathf.CeilToInt((hMax - hMin) / bin) + 1, 1, 400);
+            var lo = new float[bins];
+            var hi = new float[bins];
+            for (int b = 0; b < bins; b++) { lo[b] = float.MaxValue; hi[b] = float.MinValue; }
+            for (int i = from; i < to; i++)
+            {
+                var q = new Vector2(pts[guide[i]].x, pts[guide[i]].z);
+                int b = Mathf.Clamp((int)((Vector2.Dot(q, dir) - hMin) / bin), 0, bins - 1);
+                float w = Vector2.Dot(q, across);
+                lo[b] = Mathf.Min(lo[b], w);
+                hi[b] = Mathf.Max(hi[b], w);
+            }
+            float widest = 0f;
+            for (int b = 0; b < bins; b++)
+                if (hi[b] > lo[b])
+                    widest = Mathf.Max(widest, hi[b] - lo[b]);
+            if (widest < 0.0015f)
+                return;          // a bare foot or a whipping, no ring
+            int first = -1, last = -1;
+            float wl = float.MaxValue, wh = float.MinValue;
+            for (int b = 0; b < bins; b++)
+                if (hi[b] > lo[b] && hi[b] - lo[b] >= 0.55f * widest)
+                {
+                    if (first < 0) first = b;
+                    last = b;
+                    wl = Mathf.Min(wl, lo[b]);
+                    wh = Mathf.Max(wh, hi[b]);
+                }
+            float hc = hMin + (first + last + 1) * 0.5f * bin;
+            float wc = 0.5f * (wl + wh);
+            float y = 0f;
+            int count = 0;
+            for (int i = from; i < to; i++)
+            {
+                float h = Vector2.Dot(new Vector2(pts[guide[i]].x, pts[guide[i]].z), dir);
+                if (h >= hMin + first * bin && h <= hMin + (last + 1) * bin)
+                {
+                    y += pts[guide[i]].y;
+                    count++;
+                }
+            }
+            y /= Mathf.Max(count, 1);
+            var centre = dir * hc + across * wc;
+            var marker = new GameObject($"Ring{_modelGuides.Count}").transform;
+            marker.SetParent(model, false);
+            marker.localPosition = new Vector3(centre.x, y, centre.y);
+            _modelGuides.Add(marker);
         }
 
         private static void Part(Transform parent, string name, Mesh mesh, Material mat)
@@ -1915,33 +2051,19 @@ namespace FishingSim.Game
                 _rope.Reset(C(a), C(b));
                 _ropeLive = true;
             }
-            _rope.Length = Mathf.Max(_lineLength, 0.05f);
+            // the line's own physics shapes it: a retrieve only takes the slack out of the rope (a light line's sag stays),
+            // the fight keeps it at the distance (above); no pulling of the points onto a straight line (that glued the
+            // line to the rod: a fast swing whipped it round as a rigid stick)
+            float dist = Vector3.Distance(a, b);
+            float ropeLength = Mathf.Max(_lineLength, 0.05f);
+            if (_drawTight > 0f)
+                ropeLength = Mathf.Lerp(ropeLength, Mathf.Min(ropeLength, dist * 1.006f), _drawTight);
+            _rope.Length = ropeLength;
             _rope.Wind = C(new Vector3(0.8f, 0f, 0.6f) * (Day != null ? Day.Wind * 3f : 0.6f));
             _rope.Step(dt, C(a), C(b));
             var pts = _rope.Positions;
-            float dist = Vector3.Distance(a, b);
-            float hold = 0f, sag = 0f;
-            if (State == RodState.Fight)
-            {
-                hold = 0.92f + 0.08f * ratio;
-                sag = dist * 0.008f * (1f - ratio) * (1f - ratio);
-            }
-            else if (_drawTight > 0f)
-            {
-                hold = 0.95f * _drawTight;
-                sag = dist * 0.006f;
-            }
             for (int i = 0; i < pts.Length; i++)
-            {
-                var p = U(pts[i]);
-                if (hold > 0f)
-                {
-                    float t = i / (float)(pts.Length - 1);
-                    var straight = Vector3.Lerp(a, b, t) + Vector3.down * (sag * 4f * t * (1f - t));
-                    p = Vector3.Lerp(p, straight, hold);
-                }
-                _ropePts[i] = p;
-            }
+                _ropePts[i] = U(pts[i]);
             var c = LineItem?.LineColor ?? new Compat.Color(0.9f, 0.9f, 0.86f);
             _line.Color = Color.Lerp(new Color(c.R, c.G, c.B), new Color(1f, 0.2f, 0.15f), Mathf.Clamp01((ratio - 0.5f) * 2f));
             _line.SetPositions(_ropePts, pts.Length);

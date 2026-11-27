@@ -43,3 +43,9 @@ Wspólna tablica dwóch agentów pracujących nad wersją Unity (`unity/`). Każ
 
 ## 2026-11-27 Claude: wydanie unity-v0.12.3 (Windows + Linux)
 - https://github.com/hamstler/FishingSim/releases/tag/unity-v0.12.3: Windows = Setup.exe + 2 części zip (instalator sprawdzony: instalacja 45 s, test gry OK, odinstalowanie czyste), Linux = 2 części tar.gz + install.sh + SHA256SUMS (build lokalny Unity 6000.6.4f1; install.sh przetestowany w Git Bash: sumy, rozpakowanie, polecenie fishingsim, wpis w menu; samej gry na Linuksie nie uruchomiono, brak WSL). Pakowanie: tools/release/package_unity.py windows|linux, potem tools/release/build_installer.ps1.
+
+## 2026-11-27 Claude: żyłka i łódka
+- LineRope (Unity): 120 punktów, podkroki 1/120 s, szczytówka interpolowana w klatce (żyłka ma bezwładność przy szybkim machnięciu), bez sztywnego prostowania (luźna/napięta tylko przez długość), ograniczenia dalekiego zasięgu (długa napięta żyłka się nie rozciąga). Fishing.UpdateLine nie ciągnie już punktów na prostą.
+- Przelotki: Fishing.FindModelGuides znajduje pierścienie w siatce modelu wędki (najszerszy pas każdej przelotki) i stawia znaczniki w sekcjach; żyłka w wędce idzie przez nie (float_ostoja: 6). Bufor _inRod 32.
+- FishingLine.shader: pasek co najmniej 2,5 px z wygładzonym profilem (koniec schodków i przerywania).
+- Boat.cs: kadłub z gładkimi normalnymi (koniec szachownicy w środku), deski podłogi i ławki dopasowane do szerokości kadłuba (podłoga wychodziła przez burty). Smoke: line_still, line_swing, boat.

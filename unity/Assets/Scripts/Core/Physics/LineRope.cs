@@ -11,11 +11,17 @@ namespace FishingSim.Core.Physics;
 /// surface, and never through the bottom. Its length is the line paid out: when it is longer than the straight
 /// distance the slack lies on the water; reeling shortens it, so the slack is taken up before the end moves (see
 /// <see cref="Slack"/>). The endpoints are pinned to the tip and the end.
+/// The line is always simulated (never snapped onto the straight segment, which made it a rigid stick glued to the tip
+/// that whipped round with the rod): 120 points, fixed sub-steps of 1/120 s, the tip moved smoothly through each frame so
+/// a fast swing leaves the line lagging with its own inertia, and long-range attachments (no point farther from either
+/// end than its share of the line) so a long taut line neither stretches nor sags from slow convergence.
 /// </summary>
 public sealed class LineRope
 {
-    public const int Points = 40;
-    private const int Iterations = 14;
+    public const int Points = 120;
+    private const int Iterations = 12;
+    private const float SubStep = 1f / 120f;
+    private const int MaxSubSteps = 6;
 
     private readonly Vector3[] _p = new Vector3[Points];
     private readonly Vector3[] _prev = new Vector3[Points];
@@ -53,36 +59,46 @@ public sealed class LineRope
             _p[i] = _prev[i] = tip.Lerp(end, i / (float)(Points - 1));
         _started = true;
         _lastLength = 0f;      // the next step starts from this length, it reels nothing in
+        _lastTip = tip;
+        _lastEnd = end;
     }
 
-    /// <summary>One step of the line's motion with the ends where they are now.</summary>
+    private Vector3 _lastTip, _lastEnd;
+
+    /// <summary>One frame of the line's motion with the ends where they are now (fixed sub-steps; the ends move
+    /// smoothly from where they were at the last frame).</summary>
     public void Step(float dt, Vector3 tip, Vector3 end)
     {
         if (!_started)
             Reset(tip, end);
-        dt = Math.Clamp(dt, 1e-4f, 1f / 30f);
-        float straight = tip.DistanceTo(end);
+        dt = Math.Clamp(dt, 1e-4f, MaxSubSteps * SubStep);
         // Reeled in since the last step: the line goes in through the tip ring, so it is taken from the rod's end of the
         // rope (the sag in the air rises, the line lying on the water slides towards the rod) and the end tackle stays
         // where it is until the slack is gone.
         if (_lastLength > 0f && Length < _lastLength - 1e-4f)
-            ReelIn(_lastLength - Length, tip);
+            ReelIn(_lastLength - Length, _lastTip);
         _lastLength = Length;
-        // Taut (or nearly): the line runs straight between the ends.
-        if (Length <= straight * 1.002f)
-        {
-            for (int i = 0; i < Points; i++)
-            {
-                var q = tip.Lerp(end, i / (float)(Points - 1));
-                _prev[i] = _p[i] = q;
-            }
-            return;
-        }
-        float seg = Length / (Points - 1);
-        var gravity = new Vector3(0f, -9.8f, 0f);
-        // The bottom under each point, read once a step.
+        int n = Math.Clamp((int)MathF.Ceiling(dt / SubStep - 1e-3f), 1, MaxSubSteps);
+        float h = dt / n;
+        // The bottom under each point, read once a frame.
         for (int i = 1; i < Points - 1; i++)
             _bed[i] = BottomY != null ? BottomY(_p[i].X, _p[i].Z) + 0.01f : float.NegativeInfinity;
+        for (int k = 1; k <= n; k++)
+        {
+            float t = k / (float)n;
+            SubStepOnce(h, _lastTip.Lerp(tip, t), _lastEnd.Lerp(end, t));
+        }
+        _lastTip = tip;
+        _lastEnd = end;
+    }
+
+    private void SubStepOnce(float dt, Vector3 tip, Vector3 end)
+    {
+        float straight = tip.DistanceTo(end);
+        // a line shorter than the distance (the end pulled away faster than line pays out) stretches to reach
+        float length = MathF.Max(Length, straight);
+        float seg = length / (Points - 1);
+        var gravity = new Vector3(0f, -9.8f, 0f);
         for (int i = 1; i < Points - 1; i++)
         {
             var p = _p[i];
@@ -116,9 +132,12 @@ public sealed class LineRope
         _p[Points - 1] = _prev[Points - 1] = end;
         for (int k = 0; k < Iterations; k++)
         {
-            // Rope constraints: a segment can be shorter than its share of the line, never longer.
-            for (int i = 0; i < Points - 1; i++)
+            // Rope constraints: a segment can be shorter than its share of the line, never longer (sweeping both ways
+            // so neither end lags behind).
+            bool forward = (k & 1) == 0;
+            for (int s = 0; s < Points - 1; s++)
             {
+                int i = forward ? s : Points - 2 - s;
                 var d = _p[i + 1] - _p[i];
                 float len = d.Length();
                 if (len <= seg || len < 1e-6f)
@@ -134,8 +153,22 @@ public sealed class LineRope
                     _p[i + 1] -= corr * 0.5f;
                 }
             }
+            // Long-range attachments: a point is never farther from the tip, nor from the end, than the line between
+            // them (this is what holds a long line taut without hundreds of iterations)
             for (int i = 1; i < Points - 1; i++)
-                _p[i] = Contain(_p[i], _bed[i]);
+            {
+                var p = _p[i];
+                float toTip = i * seg, toEnd = (Points - 1 - i) * seg;
+                var a = p - tip;
+                float la = a.Length();
+                if (la > toTip)
+                    p = tip + a * (toTip / la);
+                var b = p - end;
+                float lb = b.Length();
+                if (lb > toEnd)
+                    p = end + b * (toEnd / lb);
+                _p[i] = Contain(p, _bed[i]);
+            }
         }
     }
 
