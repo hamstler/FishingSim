@@ -74,7 +74,8 @@ jobs:
         with:
           projectPath: unity
           targetPlatform: StandaloneLinux64
-          unityVersion: 6000.0.64f1
+          # the editor the project was saved with (ProjectSettings/ProjectVersion.txt: 6000.6.4f1 since 0.12)
+          unityVersion: auto
           buildName: FishingSim
           buildMethod: FishingSim.EditorTools.BuildGame.Build
           versioning: None
