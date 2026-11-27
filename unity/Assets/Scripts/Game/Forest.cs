@@ -18,7 +18,11 @@ namespace FishingSim.Game
     public sealed class Forest : MonoBehaviour
     {
         private const float Cell = 64f, TreeNearRange = 130f;
+        private const float TreeModelCell = 16f;
+        private static readonly float[] ModelHeights = { 4.9f, 5.1f, 5.6f, 7f, 4.8f };
+        private static readonly Dictionary<string, (Mesh Mesh, Material Material)> TreeModels = new();
         private static readonly string[] Kinds = { "spruce", "oak", "birch", "pine", "willow" };
+        private static readonly string[] TreeIds = Array.ConvertAll(Kinds, kind => "trees/" + kind);
 
         /// <summary>The small plants: mesh, drawn up to (m, x FoliageRange), floating on the water.</summary>
         private static readonly (string Kind, float Range, bool Floating)[] SmallKinds =
@@ -38,6 +42,9 @@ namespace FishingSim.Game
             public Material Mat = null!;
             public Bounds Box;
             public float Range, MaxRange;
+            public float ModelRange;
+            public Vector2 CellCentre;
+            public bool CloseModel;
             public bool Shadows;
             public readonly List<Matrix4x4[]> Chunks = new();
             public readonly List<int> Counts = new();
@@ -45,6 +52,7 @@ namespace FishingSim.Game
         }
 
         private readonly List<Batch> _batches = new();
+        internal readonly Dictionary<string, Vector3> ShowcaseTrees = new();
         private readonly Plane[] _planes = new Plane[6];
         private Lake _lake = null!;
         private Material? _foliage, _needles, _rock, _grassMat;
@@ -81,9 +89,11 @@ namespace FishingSim.Game
         {
             Ready = false;
             Clear();
+            ShowcaseTrees.Clear();
             _lake = lake;
             foreach (var kind in Kinds)
                 Plants.Get(kind);   // meshes are made on the main thread; the worker only reads their lifts
+            yield return ModelLibrary.Preload(TreeIds);
             WeedBeds.Clear();
             SunkenWood.Clear();
             foreach (var (kind, _, _) in SmallKinds)
@@ -107,9 +117,50 @@ namespace FishingSim.Game
                 var near = Plants.Get(Kinds[k]);
                 var far = Plants.GetFar(Kinds[k]);
                 float range = TreeNearRange * FoliageRange * ViewFactor;
+                var trunks = groups[k];
+                var crowns = groups[5 + k];
+                var crownMat = near.Needles ? NeedleMaterial() : LeafMaterial();
+                if (near.Trunk != null && trunks.Count == crowns.Count && TryTreeModel(Kinds[k], out var tree))
+                {
+                    var models = new List<Item>();
+                    var modelTrunks = new List<Item>();
+                    var modelCrowns = new List<Item>();
+                    var remainingTrunks = new List<Item>();
+                    var remainingCrowns = new List<Item>();
+                    for (int i = 0; i < trunks.Count; i++)
+                    {
+                        var trunk = trunks[i];
+                        var p = (Vector3)trunk.M.GetColumn(3);
+                        if (i % 3 == 0 && lake.InsideMetres(p.x, p.z) >= -27f)
+                        {
+                            var m = trunk.M;
+                            p.y -= near.TrunkLift * m.lossyScale.y;
+                            for (int axis = 0; axis < 3; axis++)
+                                m.SetColumn(axis, m.GetColumn(axis) * ModelHeights[k]);
+                            m.SetColumn(3, new Vector4(p.x, p.y, p.z, 1f));
+                            models.Add(new Item(k, m, Vector4.one));
+                            if (!ShowcaseTrees.TryGetValue(Kinds[k], out var sample) || p.sqrMagnitude < sample.sqrMagnitude)
+                                ShowcaseTrees[Kinds[k]] = p;
+                            modelTrunks.Add(trunk);
+                            modelCrowns.Add(crowns[i]);
+                        }
+                        else
+                        {
+                            remainingTrunks.Add(trunk);
+                            remainingCrowns.Add(crowns[i]);
+                        }
+                    }
+                    trunks = remainingTrunks;
+                    crowns = remainingCrowns;
+                    float cutoff = (Kinds[k] == "willow" ? 22f : 28f) * Mathf.Clamp(ViewFactor, .7f, 1.25f);
+                    AddCells(models, tree.Mesh, null, tree.Material, cutoff, cutoff, true, TreeModelCell, cutoff, true);
+                    AddCells(modelTrunks, near.Trunk, far.Trunk, BarkMaterial(Kinds[k]), range, float.MaxValue, true, TreeModelCell, cutoff);
+                    AddCells(modelCrowns, near.Crown, far.Crown, crownMat, range, float.MaxValue, true, TreeModelCell, cutoff);
+                    Debug.Log($"TREE {Kinds[k]}: {models.Count} close-range placements");
+                }
                 if (near.Trunk != null)
-                    AddCells(groups[k], near.Trunk, far.Trunk, BarkMaterial(Kinds[k]), range, float.MaxValue, true);
-                AddCells(groups[5 + k], near.Crown, far.Crown, near.Needles ? NeedleMaterial() : LeafMaterial(), range, float.MaxValue, true);
+                    AddCells(trunks, near.Trunk, far.Trunk, BarkMaterial(Kinds[k]), range, float.MaxValue, true);
+                AddCells(crowns, near.Crown, far.Crown, crownMat, range, float.MaxValue, true);
                 yield return null;
             }
             AddCells(groups[10], Plants.Get("bush").Crown, null, LeafMaterial(), 220f * FoliageRange, 0f, true);
@@ -131,7 +182,27 @@ namespace FishingSim.Game
             _grassCentre = new Vector2(1e9f, 1e9f);
         }
 
-        private void AddCells(List<Item> items, Mesh near, Mesh? far, Material mat, float range, float maxRange, bool shadows, float cellSize = Cell)
+        private static bool TryTreeModel(string kind, out (Mesh Mesh, Material Material) tree)
+        {
+            if (TreeModels.TryGetValue(kind, out tree))
+                return true;
+            var model = ModelLibrary.Spawn("trees/" + kind);
+            if (model == null)
+                return false;
+            var mesh = model.GetComponentInChildren<MeshFilter>();
+            var renderer = mesh != null ? mesh.GetComponent<MeshRenderer>() : null;
+            if (mesh != null && mesh.sharedMesh != null && renderer != null && renderer.sharedMaterial != null)
+            {
+                var material = new Material(renderer.sharedMaterial) { enableInstancing = true };
+                tree = TreeModels[kind] = (mesh.sharedMesh, material);
+            }
+            model.SetActive(false);
+            Destroy(model);
+            return tree.Mesh != null;
+        }
+
+        private void AddCells(List<Item> items, Mesh near, Mesh? far, Material mat, float range, float maxRange,
+            bool shadows, float cellSize = Cell, float modelRange = 0f, bool closeModel = false)
         {
             float Cell = cellSize;
             var cells = new Dictionary<(int, int), List<Item>>();
@@ -143,9 +214,11 @@ namespace FishingSim.Game
                     cells[key] = list = new List<Item>();
                 list.Add(it);
             }
-            foreach (var list in cells.Values)
+            foreach (var (key, list) in cells)
             {
-                var b = new Batch { Near = near, Far = far, Mat = mat, Range = range, MaxRange = far == null ? range : maxRange, Shadows = shadows };
+                var b = new Batch { Near = near, Far = far, Mat = mat, Range = range, MaxRange = far == null ? range : maxRange,
+                    Shadows = shadows, ModelRange = modelRange, CloseModel = closeModel,
+                    CellCentre = new Vector2((key.Item1 + .5f) * Cell, (key.Item2 + .5f) * Cell) };
                 Fill(b, list);
                 _batches.Add(b);
             }
@@ -155,6 +228,8 @@ namespace FishingSim.Game
         {
             bool first = true;
             float reach = Mathf.Max(b.Near.bounds.extents.magnitude, b.Far != null ? b.Far.bounds.extents.magnitude : 0f);
+            if (b.CloseModel)
+                reach += b.Near.bounds.center.magnitude;
             for (int start = 0; start < list.Count; start += 1023)
             {
                 int n = Mathf.Min(1023, list.Count - start);
@@ -884,6 +959,9 @@ namespace FishingSim.Game
 
         private void Draw(Batch b, Vector3 eye)
         {
+            if (b.ModelRange > 0f &&
+                ((new Vector2(eye.x, eye.z) - b.CellCentre).sqrMagnitude < b.ModelRange * b.ModelRange) != b.CloseModel)
+                return;
             if (!GeometryUtility.TestPlanesAABB(_planes, b.Box))
                 return;
             float d = Mathf.Sqrt(b.Box.SqrDistance(eye));

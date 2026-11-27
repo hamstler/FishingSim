@@ -1,5 +1,9 @@
 # Zmiany
 
+## 0.12.1 (Unity 6)
+- Nowe teksturowane modele brzozy, dębu, sosny, świerku i wierzby w pobliżu gracza. W oddali las korzysta z uproszczonej geometrii.
+- Sklep i ekwipunek z miniaturami sprzętu, galeria łowisk i dziennik połowów z obrotowym podglądem ryb.
+
 ## 0.12.0 (Unity 6)
 - Nowy wędkarz: widoczne ręce trzymają wędkę i kołowrotek (prawa dłoń na rękojeści, lewa na gałce korbki, kręci się z nią przy zwijaniu). Poza ułożona w Blenderze pomiarem: palce zgięte do kontaktu ze skórą rękojeści i gałki, tylko obroty kości.
 - Dopracowana skóra rąk: wagi palców bez ciągnięcia sąsiednich palców, kość skrętu przedramienia, gładkie mankiety.

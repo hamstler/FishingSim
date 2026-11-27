@@ -106,6 +106,54 @@ namespace FishingSim.Game
                 show(false);
             }
             EnterPlay();
+            if (FindFirstObjectByType<Forest>() is { } forest && forest.ShowcaseTrees.Count > 0)
+            {
+                Day.SetWeatherNow(Core.Weather.Clear);
+                Day.Hour = 12f;
+                Day.Apply();
+                GameRoot.HideHud = true;
+                Rod.ShowRod(false);
+                foreach (var (kind, tree) in forest.ShowcaseTrees)
+                {
+                    var offset = new Vector3(4f, 0f, 4f);
+                    float bestClearance = float.NegativeInfinity;
+                    for (int direction = 0; direction < 12; direction++)
+                    {
+                        float angle = direction * Mathf.PI / 6f;
+                        var candidate = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * 7f;
+                        if (Player.World.Lake.DepthAt(tree.x + candidate.x, tree.z + candidate.z) > .4f)
+                            continue;
+                        float clearance = 20f;
+                        foreach (var (at, radius) in Player.World.Solids)
+                        {
+                            var relative = new Vector3(at.x - tree.x, 0f, at.z - tree.z);
+                            if (relative.sqrMagnitude < .2f)
+                                continue;
+                            float t = Mathf.Clamp(Vector3.Dot(relative, candidate) / candidate.sqrMagnitude, .14f, 1f);
+                            clearance = Mathf.Min(clearance, (relative - t * candidate).magnitude - radius);
+                        }
+                        if (clearance > bestClearance)
+                        {
+                            offset = candidate;
+                            bestClearance = clearance;
+                        }
+                    }
+                    var point = tree + offset;
+                    point.y = Mathf.Max(0f, Player.World.Lake.HeightAt(point.x, point.z));
+                    float yaw = Mathf.Atan2(-offset.x, -offset.z) * Mathf.Rad2Deg;
+                    Player.Place(point, yaw);
+                    Player.Look(yaw, -13f);
+                    for (int i = 0; i < 12; i++)
+                        yield return null;
+                    yield return new WaitForEndOfFrame();
+                    var shot = ScreenCapture.CaptureScreenshotAsTexture();
+                    SaveFull(shot, "tree_" + kind);
+                    Destroy(shot);
+                }
+                Rod.ShowRod(true);
+                GameRoot.HideHud = false;
+                Player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
+            }
             foreach (var (tab, shot) in new[] { (0, "gui_inventory"), (1, "gui_inventory_reel") })
             {
                 InventoryForShot(tab);

@@ -156,6 +156,8 @@ namespace FishingSim.Game
             if (noSave || Smoke.Enabled)
             {
                 _user = "gość";
+                if (Smoke.Enabled && _locations.Count > 0 && int.TryParse(Environment.GetEnvironmentVariable("FISHSIM_SMOKE_LOCATION"), out int location))
+                    _profile.Location = Mathf.Clamp(location, 0, _locations.Count - 1);
                 guess = _profile;
             }
             else
