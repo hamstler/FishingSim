@@ -2212,7 +2212,9 @@ namespace FishingSim.Game
                     RodData rod => new[] { ("Typ", KindName(rod.Kind)), ("Długość", $"{(rod.Length > 0 ? rod.Length : 3.58f):0.00} m"),
                         ("Udźwig", $"{rod.MaxLoad:0.0} kg"), ("Zasięg rzutu", $"×{rod.CastMult:0.00}") },
                     ReelData reel => new[] { ("Hamulec", $"{reel.DragMax:0.0} kg"), ("Nawój na obrót", $"{reel.ReelSpeed * 24:0} cm"),
-                        ("Pojemność", $"{reel.LineCapacity:0} m") },
+                        ("Pojemność", Tackle.Line(_profile.Line) is { } spooled
+                            ? $"{Fishing.CapacityFor(reel, spooled.Diameter):0} m żyłki {spooled.Diameter:0.00} mm"
+                            : $"{Fishing.CapacityFor(reel, 0.2f):0} m żyłki 0,20 mm") },
                     LineData line => new[] { ("Średnica", $"{line.Diameter:0.00} mm"), ("Wytrzymałość", $"{line.Strength:0.0} kg") },
                     HookData hook => new[] { ("Masa", $"{hook.WeightG:0.00} g"), ("Wytrzymałość", $"{hook.Strength:0.0} kg") },
                     BaitData bait when bait.Reusable => new[] { ("Długość", $"{bait.SizeCm:0.#} cm"), ("Masa", $"{bait.WeightG:0.#} g") },
@@ -2691,7 +2693,7 @@ namespace FishingSim.Game
         private static string Stats(TackleItem item) => item switch
         {
             RodData r => $"{KindName(r.Kind)} · {(r.Length > 0 ? r.Length : 3.58f):0.00} m · udźwig {r.MaxLoad:0.0} kg · rzut ×{r.CastMult:0.00}",
-            ReelData r => $"hamulec do {r.DragMax:0.0} kg · {r.ReelSpeed * 0.24f * 100f:0} cm żyłki na obrót korby · {r.LineCapacity:0} m żyłki",
+            ReelData r => $"hamulec do {r.DragMax:0.0} kg · {r.ReelSpeed * 0.24f * 100f:0} cm żyłki na obrót korby · {Fishing.CapacityFor(r, 0.2f):0} m żyłki 0,20 / {Fishing.CapacityFor(r, 0.3f):0} m 0,30",
             LineData l => $"{l.Diameter:0.00} mm · wytrzymałość {l.Strength:0.0} kg · widoczność {l.Visibility:0.00}",
             HookData k => $"{k.DisplayName} · wytrzymałość {k.Strength:0.0} kg · {k.WeightG:0.00} g",
             AccessoryData a => a.Description.Length > 90 ? a.Description.Substring(0, 90) + "…" : a.Description,

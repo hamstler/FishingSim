@@ -383,6 +383,7 @@ namespace FishingSim.Game
                 var still = ScreenCapture.CaptureScreenshotAsTexture();
                 SaveFull(still, "line_still");
                 Destroy(still);
+                Debug.Log($"SMOKE spool: {Rod.ReelItem?.DisplayName}, capacity {Rod.SpoolCapacityNow:0} m of this line, {Rod.SpoolLeft:0.0} m left after the cast");
                 // the float close up: a camera half a metre off it, just above the water
                 {
                     var fl = GameObject.Find("FloatModel");
@@ -671,6 +672,27 @@ namespace FishingSim.Game
             var fs = ScreenCapture.CaptureScreenshotAsTexture();
             SaveFull(fs, "fight");
             Destroy(fs);
+            if (Rod.State == RodState.Fight && FindFirstObjectByType<HookedFishPose>() is { } pose)
+            {
+                var side = new GameObject("Fish fight inspection").AddComponent<Camera>();
+                side.depth = Player.Camera.depth + 1f;
+                side.nearClipPlane = .015f;
+                for (int i = 0; i < 3; i++)
+                {
+                    yield return new WaitForSecondsRealtime(.11f);
+                    var fish = pose.transform;
+                    float length = fish.lossyScale.z;
+                    var centre = fish.position + fish.forward * length * .04f;
+                    var offset = (fish.right * .85f + fish.up * .12f + fish.forward * .23f) * length;
+                    side.transform.SetPositionAndRotation(centre + offset, Quaternion.LookRotation(-offset, fish.up));
+                    yield return new WaitForEndOfFrame();
+                    var frame = ScreenCapture.CaptureScreenshotAsTexture();
+                    SaveFull(frame, "fish_struggle_" + i);
+                    Destroy(frame);
+                    Debug.Log($"SMOKE fish lip gap {pose.MeasureLipGap() * 1000f:0.000} mm");
+                }
+                Destroy(side.gameObject);
+            }
             Rod.SmokeReel = false;
             Debug.Log($"SMOKE fight: state {Rod.State}, load {Rod.LoadKg:0.00} kg of {Rod.EffectiveLimit:0.0}, line out {Rod.Fight?.LineOut ?? 0f:0.0} m, bow {Rod.SmokeLineBow() * 100f:0.0} cm");
         }

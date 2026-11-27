@@ -86,7 +86,8 @@ namespace FishingSim.Game
         public float Slack => State is RodState.Waiting or RodState.Nibble or RodState.Bite ? Mathf.Max(0f, _lineLength - TipDistance()) : 0f;
 
         /// <summary>The wound line's radius on an empty spool, as a share of the full one (RodRig.SpoolCore).</summary>
-        private const float SpoolCore = 0.62f;
+        private const float SpoolCore = 0.62f;     // (the built reel's look before a size is known)
+        private float _fillSize = -1f;
 
         /// <summary>A float of a few grams with its split shot; a filled feeder.</summary>
         private const float FloatRigGrams = 4.5f, FeederGrams = 40f;
@@ -288,7 +289,7 @@ namespace FishingSim.Game
         public float LoadKg => State == RodState.Fight && Fight != null ? Fight.Tension : BendLoad();
 
         /// <summary>Line still on the spool (m).</summary>
-        public float SpoolLeft => Mathf.Max(0f, (Reel?.LineCapacity ?? 100f) - (State is RodState.Idle or RodState.Charging or RodState.Landed ? 0f : (Fight?.LineOut ?? _lineLength)));
+        public float SpoolLeft => Mathf.Max(0f, SpoolCapacityNow - (State is RodState.Idle or RodState.Charging or RodState.Landed ? 0f : (Fight?.LineOut ?? _lineLength)));
 
         /// <summary>Where a cast at the power held now would land, without wind (m).</summary>
         public float AimDistance => Mathf.Lerp(5f, CastReach(), Mathf.Max(CastPower, 0.08f));
@@ -303,6 +304,35 @@ namespace FishingSim.Game
         private RodData? Rod => Tackle.Rod(Profile.Rod);
         private ReelData? Reel => Tackle.Reel(Profile.Reel);
         private LineData? LineItem => Tackle.Line(Profile.Line);
+
+        private ReelData? _capReel;
+        private LineData? _capLine;
+        private float _capMetres = 100f, _capSize = 2500f;
+
+        /// <summary>
+        /// Metres of the mounted line the mounted reel holds filled to the lip (Core.Physics.SpoolCapacity: the spool's
+        /// volume by the reel's size over the line's cross-section): a bigger reel holds more, a thicker line fewer metres.
+        /// </summary>
+        public float SpoolCapacityNow
+        {
+            get
+            {
+                var r = Reel;
+                var l = LineItem;
+                if (r != _capReel || l != _capLine)
+                {
+                    _capReel = r;
+                    _capLine = l;
+                    _capSize = r != null ? Core.Physics.SpoolCapacity.SizeFromName(r.DisplayName, r.LineCapacity) : 2500f;
+                    _capMetres = Core.Physics.SpoolCapacity.Metres(_capSize, l?.Diameter ?? 0.2f);
+                }
+                return _capMetres;
+            }
+        }
+
+        /// <summary>Metres of line of <paramref name="diameterMm"/> this reel holds (for the shop and the gear panel).</summary>
+        public static float CapacityFor(ReelData reel, float diameterMm) =>
+            Core.Physics.SpoolCapacity.Metres(Core.Physics.SpoolCapacity.SizeFromName(reel.DisplayName, reel.LineCapacity), diameterMm);
         private HookData? Hook => Tackle.Hook(Profile.Hook);
         private BaitData? Bait => Tackle.Bait(Profile.Bait);
 
@@ -792,16 +822,16 @@ namespace FishingSim.Game
             _builtBail.localRotation = Quaternion.Euler(_bailOpen * 2.7f * Mathf.Rad2Deg, 0f, 0f);
         }
 
-        private static float WoundRadius(float fill) =>
-            Mathf.Sqrt(Mathf.Lerp(SpoolCore * SpoolCore, 1f, fill));
+        private float WoundRadius(float fill) => Core.Physics.SpoolCapacity.WoundRatio(_capSize, fill);
 
         /// <summary>At constant spool width, the amount of wound line is proportional to its annular area.</summary>
         private void SetSpoolFill(float fill)
         {
             fill = Mathf.Clamp01(fill);
-            if (Mathf.Abs(fill - _spoolFill) < 0.002f)
+            if (Mathf.Abs(fill - _spoolFill) < 0.0005f && _capSize == _fillSize)
                 return;
             _spoolFill = fill;
+            _fillSize = _capSize;
             float k = WoundRadius(fill);
             _builtSpoolLine.localScale = new Vector3(k, 1f, k);
             if (_spoolLine != null)
@@ -1289,6 +1319,7 @@ namespace FishingSim.Game
             var (degrees, speedFactor) = Casting.Scatter(power, _rng);     // a soft bell round the aim, wider at full power
             dir = Quaternion.Euler(0f, degrees, 0f) * dir;
             float distance = Mathf.Lerp(5f, reach, power) * speedFactor;
+            distance = Mathf.Min(distance, SpoolCapacityNow * 0.95f);     // the line on the spool ends the cast
             _baitFresh = 1f;          // a fresh bait on every cast
             _baitOn = true;
             // a twisted line can throw a bird's nest: the cast dies short, half the twist comes out, the line wears
@@ -1696,7 +1727,7 @@ namespace FishingSim.Game
             var line = LineItem!;
             var rod = Rod!;
             float shock = Mathf.Min(rod.ShockAbsorb + 0.12f * line.Stretch, 0.5f);
-            var gear = new FightGear(reel.DragMax, EffectiveLimit, shock, reel.ReelSpeed, reel.LineCapacity);
+            var gear = new FightGear(reel.DragMax, EffectiveLimit, shock, reel.ReelSpeed, SpoolCapacityNow);
             var to = Flat(_bobber.position - Player.transform.position);
             _origin = Player.transform.position;
             _hookHold = hold;
@@ -1780,6 +1811,7 @@ namespace FishingSim.Game
                 swim = Mathf.Max(swim, 0.9f * Mathf.Sin(Mathf.Clamp01(1f - _jump) * Mathf.PI) - 0.1f);     // the leap's arc
             _fish.position = new Vector3(pos.x, surface + swim, pos.z);
             _fish.rotation = Quaternion.Euler(0f, fight.Heading * Mathf.Rad2Deg, Mathf.Sin(Time.time * 9f) * 8f);
+            _fishPose?.Swim(dt, fight.Motion.Length(), fight.Stamina, fight.Bursting, _tip.position);
             _bobber.position = Vector3.Lerp(_bobber.position, new Vector3(pos.x, surface, pos.z) + (_origin - pos).normalized * 0.4f, 1f - Mathf.Exp(-dt * 10f));
             _lineSlack = fight.LineSlack ? 0.6f : 0f;
             switch (outcome)
@@ -1796,6 +1828,7 @@ namespace FishingSim.Game
                         Shoal.Add(Species.SpeciesName, _hookedAt.x, _hookedAt.z, Profile.Clock);
                     Profile.UseBait();
                     Set(RodState.Landed);
+                    _fishPose?.Unhook();
                     _bobber.gameObject.SetActive(false);
                     _line.gameObject.SetActive(false);
                     Landed?.Invoke();
@@ -1817,10 +1850,12 @@ namespace FishingSim.Game
         }
 
         private GameObject? _fishModel;
+        private HookedFishPose? _fishPose;
 
         /// <summary>The species' Meshy model when there is one (assets/fish/meshy), else the built fish.</summary>
         private void ShowFishModel(FishSpecies sp)
         {
+            _fishPose?.Release();
             if (_fishModel != null)
                 Destroy(_fishModel);
             string id = System.IO.Path.GetFileNameWithoutExtension(sp.ResourcePath);
@@ -1830,6 +1865,9 @@ namespace FishingSim.Game
             else
                 _fishMesh.sharedMesh = FishMesh.For(sp);
             _fishMesh.gameObject.SetActive(_fishModel == null);
+            _fishPose = new GameObject("Hooked fish rig").AddComponent<HookedFishPose>();
+            _fishPose.transform.SetParent(_fish, false);
+            _fishPose.Bind(_fishModel != null ? _fishModel.transform : _fishMesh.transform, Hook?.RealSize ?? 10);
         }
 
         /// <summary>How many predators the lake holds (tendency x abundance of PreyAttack.Predators).</summary>
@@ -1882,7 +1920,7 @@ namespace FishingSim.Game
             var rod = Rod!;
             var line = LineItem!;
             float shock = Mathf.Min(rod.ShockAbsorb + 0.12f * line.Stretch, 0.5f);
-            var gear = new FightGear(reel.DragMax, EffectiveLimit, shock, reel.ReelSpeed, reel.LineCapacity);
+            var gear = new FightGear(reel.DragMax, EffectiveLimit, shock, reel.ReelSpeed, SpoolCapacityNow);
             Fight = new FightModel(FishProfile.From(predator, Weight), gear, _rng, Mathf.Max(old.Distance, 2.5f), old.FishAngle, DragSetting)
             {
                 HookHold = PreyAttack.Hold,
@@ -2012,7 +2050,7 @@ namespace FishingSim.Game
                 SetCrank(_crankAngle + dt * CrankTurns * 2f * Mathf.PI);     // the crank at the turns the line comes in by
 
             // the spool empties as the line goes out and fills as it is wound back
-            float capacity = Mathf.Max(Reel?.LineCapacity ?? 100f, 10f);
+            float capacity = Mathf.Max(SpoolCapacityNow, 10f);
             bool outside = State is not (RodState.Idle or RodState.Charging or RodState.Landed);
             SetSpoolFill(1f - (outside ? Mathf.Min(Fight?.LineOut ?? _lineLength, capacity) : 0f) / capacity);
 
@@ -2091,7 +2129,7 @@ namespace FishingSim.Game
 
         private static Compat.Vector3 C(Vector3 v) => new(v.x, v.y, v.z);
         private static Vector3 U(Compat.Vector3 v) => new(v.X, v.Y, v.Z);
-        private Vector3 HookPosition => _fish.TransformPoint(Vector3.forward * .50f);
+        private Vector3 HookPosition => _fishPose != null ? _fishPose.EyePosition : _fish.position;
 
         internal float SmokeLineBow()
         {

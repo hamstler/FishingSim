@@ -56,3 +56,7 @@ Wspólna tablica dwóch agentów pracujących nad wersją Unity (`unity/`). Każ
 - ModelFit.Place/PlaceBox: model Meshy w prawdziwym wymiarze (obrót, skala jednolita lub na osie, kotwica dół/środek/góra). glTFast odbija oś X pliku: obroty są lustrem widoku z Blendera.
 - Boat.UseModel: kadłub dopasowany do pudełka 1,45 x 0,8 x 4,3 m, wiosła w dulkach; zbudowany kadłub zostaje jako zapas. Fishing.TackleModels: spławik waggler 20 cm, koszyk przy gruncie. WorldView.PierGear: siatka do wody, podbierak z koszem nad wodą, rod pod, widełki przy brzegu. GameRoot.MeshyGear ładuje je z łowiskiem.
 - Nieużyte jeszcze: float_stick, float_slider, feeder_method. Zbliżenie spławika w teście nie wyszło (gracz przestawia kamerę).
+
+## 2026-11-27 Claude: pojemność szpuli i plan do 1.0
+- Core/Physics/SpoolCapacity: pojemność z objętości szpuli (R, rdzeń, szerokość wg rozmiaru kołowrotka z nazwy, interpolacja logarytmiczna 1000..10000, upakowanie 0,85) przez przekrój żyłki; promień nawoju rho(l) z tej samej objętości. Fishing.SpoolCapacityNow (zapamiętane dla pary kołowrotek+żyłka) zastępuje stałe ReelData.LineCapacity: nawój na modelu, na szpuli X m, koniec żyłki w holu (FightGear), limit rzutu; sklep i panel pokazują pojemność dla żyłki. Test: Hokuto Sora 1000 + 0,16 mm = 306 m, po rzucie 295,6 m.
+- Plan do 1.0 dla innych AI: dokument Claude Docs 'FishingSim: plan do wersji 1.0 (wytyczne dla AI)' (https://claude.ai/artifact/8sF5dn2HkMTyuijVQMCmtm).
