@@ -40,3 +40,6 @@ Wspólna tablica dwóch agentów pracujących nad wersją Unity (`unity/`). Każ
 
 ## 2026-11-27 Claude: 0.12.3 Codexa dokończone
 - Codex skończył tokeny przed commitem: nowe krajobrazy 10 łowisk (dane .tres i json, LocationData.BankSummit/SecondBankSummit/ShoreMix + BankRelief w Lake.cs i LakeBed.cs, kamera obrazów menu na głęboczek w Smoke.cs, obrazy menu) sprawdzone: build i test OK (Bledzka Toń, 2 ryby, 144 fps), obrazy 10 łowisk bez usterek; zacommitowane. assets/characters/angler_grip.glb (stara zmiana Codexa) dalej poza commitem.
+
+## 2026-11-27 Claude: wydanie unity-v0.12.3 (Windows + Linux)
+- https://github.com/hamstler/FishingSim/releases/tag/unity-v0.12.3: Windows = Setup.exe + 2 części zip (instalator sprawdzony: instalacja 45 s, test gry OK, odinstalowanie czyste), Linux = 2 części tar.gz + install.sh + SHA256SUMS (build lokalny Unity 6000.6.4f1; install.sh przetestowany w Git Bash: sumy, rozpakowanie, polecenie fishingsim, wpis w menu; samej gry na Linuksie nie uruchomiono, brak WSL). Pakowanie: tools/release/package_unity.py windows|linux, potem tools/release/build_installer.ps1.
