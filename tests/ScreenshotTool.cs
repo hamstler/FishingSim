@@ -1323,10 +1323,10 @@ public partial class ScreenshotTool : Node
             var bream = GD.Load<FishSpecies>("res://data/fish/leszcz.tres");
             var carp = GD.Load<FishSpecies>("res://data/fish/karp.tres");
             var p = rod.Profile;
-            p.AddCatch(roach, 0.45f, new CatchContext("Jezioro Zielone", "Chleb", "Hak #5 (średni)", 1.8f, "07:12"));
-            p.AddCatch(bream, 1.9f, new CatchContext("Jezioro Zielone", "Robak", "Hak #5 (średni)", 3.4f, "08:40"));
-            p.AddCatch(carp, 5.3f, new CatchContext("Staw Karpiowy", "Kukurydza", "Hak #8 (duży)", 2.1f, "19:05"));
-            p.AddCatch(roach, 0.7f, new CatchContext("Jezioro Zielone", "Chleb", "Hak #2 (mały)", 2.6f, "09:20"));
+            p.AddCatch(roach, 0.45f, new CatchContext("Bledzka Toń", "Chleb", "Hak #5 (średni)", 1.8f, "07:12"));
+            p.AddCatch(bream, 1.9f, new CatchContext("Bledzka Toń", "Robak", "Hak #5 (średni)", 3.4f, "08:40"));
+            p.AddCatch(carp, 5.3f, new CatchContext("Przesmyk Windermere", "Kukurydza", "Hak #8 (duży)", 2.1f, "19:05"));
+            p.AddCatch(roach, 0.7f, new CatchContext("Bledzka Toń", "Chleb", "Hak #2 (mały)", 2.6f, "09:20"));
             var ui = main.GetChildren().OfType<GameUI>().First();
             ui.Open(arg);
             ui.EnsureMap();

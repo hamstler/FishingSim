@@ -1,4 +1,49 @@
-# Rozwój: pełnoprawny symulator wędkarski
+# Plan rozwoju FishingSim
+
+## Punkt wyjścia · Unity 0.12.3
+
+Gracz ma lokalny profil, ekwipunek pod I, montaż zestawu, zakupy, dziennik, mapę pod M, łódź i dziesięć odblokowywanych łowisk. Każde dostało obrys wody, głęboczki, roślinność i brzegi inspirowane rzeczywistym jeziorem. Ukształtowanie jest interpretacją w skali gry. Populacje ryb i ekonomia nadal wynikają z wcześniejszych danych rozgrywki. Po wydaniu 0.12.3 na wspólną gałąź trafiły też zmiany fizyki żyłki i łodzi oraz narzędzia do pozowania postaci. Pierwszy etap obejmuje ich osobną ocenę w grze.
+
+**Cel wersji 1.0:** na każdym z dziesięciu łowisk gracz potrafi wybrać stanowisko na podstawie widocznego terenu i mapy, uzasadnić dobór zestawu oraz rozpoznać przyczynę udanego albo nieudanego holu. Podstawą planu jest gra jednoosobowa w FPP. Horyzont 9–12 miesięcy zakłada regularne małe wydania i dostępność osób testujących. Terminy są orientacyjne. O przejściu dalej decyduje wynik prób.
+
+| Etap | Co otrzymuje gracz | Jak sprawdzamy, że można iść dalej |
+|---|---|---|
+| **1 · tygodnie 1–4. Rzut i zwijanie** | Spójne zachowanie szpuli, hamulca i żyłki od rzutu po podebranie. Dopracowanie ujęcia dłoni z oczu gracza. | Na tym samym zestawie powtarzamy rzut przy ciszy i pod wiatr, powolne zwijanie, odjazd ryby i zerwanie. Rejestrujemy dystans, ilość wysnutej żyłki i obciążenie. Powtarzamy przy 30, 60 i 120 kl./s. Właściciel gry zatwierdza ujęcie FPP z pełnego obrotu korby. |
+| **2 · miesiące 2–3. Łowisko wpływa na połów** | Na próbę trzy odmienne wody: trzciny Tihany, skalna rynna Rotoiti i przesmyki Inari. Głębokość, osłona i pora dnia wpływają na wybór stanowiska. Potem te same zasady obejmują pozostałe siedem map. | Dla każdej wody przygotowujemy trzy opisane stanowiska, typowe gatunki i metodę połowu. Serie prób ze stałym ziarnem porównują brania w siedlisku i poza nim. Brzeg, głębokość i wyspy w widoku M zgadzają się z miejscem rzutu. Przed zmianą obsady sprawdzamy wykonalność zawodów i zleceń. |
+| **3 · miesiące 3–5. Sprzęt i nauka gry** | Porównanie dwóch przedmiotów w ekwipunku, zapis własnych zestawów, widoczne zużycie i wyjaśnienie najsłabszego elementu. Krótkie pierwsze zadanie prowadzi od montażu do sprzedaży lub wypuszczenia ryby. | Pięciu nowych graczy zaczyna od pustego profilu. Celem jest, aby co najmniej czterech samodzielnie zmontowało zestaw i złowiło pierwszą rybę w 15 minut. Zapis z 0.12.3 zachowuje sprzęt, pieniądze, rekordy oraz dostęp do łowisk po aktualizacji. |
+| **4 · miesiące 5–7. Krajobraz, dźwięk i płynność** | Charakterystyczne skały, rośliny brzegowe i odgłosy na każdym łowisku. Dalekie korony, odbicia i mgła zachowują spójność w ruchu. Każdy dodany materiał ma zapisane źródło i licencję komercyjną. | Z tego samego stanowiska porównujemy poranek, południe, deszcz i zmierzch na wszystkich mapach. Rejestrujemy czas klatki podczas marszu, rzutu i obrotu kamery. Wstępny cel dla obecnej karty testowej RTX 3080 to 1080p/High, 95% klatek poniżej 16,7 ms. Słabszy komputer dostaje osobny pomiar przed ustaleniem wymagań. |
+| **5 · miesiące 7–9. Powody do powrotu** | Lokalne zlecenia, zawody na poszczególnych wodach oraz dziennik z miejscem, zestawem i warunkami rekordowego połowu. Naprawa i ulepszenia nadają sens zarobkom. | Test świeżego profilu i trzech poziomów zaawansowania. Każde zlecenie ma dostępne stanowisko i gatunek docelowy. Powtórne uruchomienie gry zachowuje wynik i przyznaje nagrodę tylko raz. Weryfikujemy, ile wypraw potrzeba na kolejny użyteczny zakup. |
+| **6 · miesiące 9–12. Beta i 1.0** | Kompletna kariera na dziesięciu łowiskach, czytelne sterowanie oraz sprawdzona instalacja i aktualizacja na Windows i Linuksie. | Pełny przebieg od utworzenia konta do ostatniego akwenu, aktualizacja starszego profilu, 90-minutowa sesja z podróżami i holami oraz test instalacji obu paczek na czystym systemie. Warunek premiery: zero znanych błędów powodujących utratę zapisu lub blokadę kariery. |
+
+### Pierwszy cykl prac
+
+1. **Tydzień 1.** Zachować wzorcowy profil 0.12.3 oraz nagrania rzutu, zwijania i holu na trzech kontrastowych wodach. Sprawdzić, czy każde istniejące zawody prowadzą na właściwe łowisko po zmianie nazw.
+2. **Tydzień 2.** Zmierzyć pracę żyłki przy luzie i skrajnym naciągu. Nałożyć w czasie obrót korby, nawój i drogę przynęty. Poprawić największą zmierzoną rozbieżność.
+3. **Tydzień 3.** Przetestować z brzegu i z łodzi trzy zestawy o różnych parametrach. Pokazać właścicielowi gry krótkie ujęcia FPP przy lekkim i ciężkim holu. Dopiero po ocenie chwytu przenieść poprawki na kolejne modele.
+4. **Tydzień 4.** Przygotować grywalną paczkę, porównanie z 0.12.3 i krótką sesję z graczami. Ich najczęstsza trudność wyznacza pierwszą poprawkę kolejnego cyklu.
+
+### Organizacja i decyzje
+
+Jedna osoba prowadzi dany cykl fizyki, druga przygotowuje pomiary, ujęcia i próby na mapach. Właściciel gry akceptuje chwyt FPP i kierunek wizualny. Wspólne pliki oraz kolejność merge zapisujemy w [dzienniku współpracy](WSPOLPRACA.md). Co dwa tygodnie przygotowujemy grywalnego kandydata, krótkie nagranie zmiany i porównanie wyników. Jeżeli szczegółowe modele przekroczą budżet klatki, najpierw dostrajamy zasięg i poziomy szczegółowości. Jeżeli nowy rozkład gatunków zablokuje karierę, aktualizujemy wymagania zleceń i sprawdzamy starszy zapis przed publikacją.
+
+Po becie warto osobno ocenić wspólne łowienie online. Pierwsza decyzja dotyczy tego, czy gracze wracają na te same wody i chcą dzielić stanowisko. Dopiero wtedy można oszacować synchronizację holu, hosting i obsługę kont sieciowych.
+
+### Pierwowzory krajobrazów w 0.12.3
+
+| Łowisko w grze | Cecha przewodnia i materiały źródłowe |
+|---|---|
+| Bledzka Toń | Wyspa z kaplicą i skalisty brzeg. [Bled Castle](https://www.blejski-grad.si/en/discover-bled-castle/location/) |
+| Przesmyk Windermere | Dwa baseny i grupa wysp na przewężeniu. [Raport o Windermere](https://lovewindermere.co.uk/wp-content/uploads/2025/03/State_of_Windermere_Report_FINAL.pdf) |
+| Szuwary Tihany | Osłonięta zatoka trzcinowa przy półwyspie nad Balatonem. [Gmina Tihany](https://www.tihany.hu/index.php/en/attractions/the-shore-of-the-lake-balaton-and-the-bozsai-bay) |
+| Dolina Rotoiti | Rynna polodowcowa i zalesione zbocza. [Department of Conservation](https://www.doc.govt.nz/parks-and-recreation/places-to-go/nelson-tasman/places/nelson-lakes-national-park/things-to-do/tracks/lake-rotoiti-circuit/) |
+| Wyspy Górnej Erne | Zalane wzgórza polodowcowe tworzą archipelag wśród mokradeł. [DAERA](https://www.daera-ni.gov.uk/protected-areas/upper-lough-erne-spa) |
+| Wrota Lomond | Szeroka płytsza misa przechodzi w wąski, głęboki odcinek. [Park Narodowy Loch Lomond](https://www.lochlomond-trossachs.org/park-authority/blog/fault-lines-of-the-trossachs-ecologist-alan-bell-speaks-to-hidden-scotland/) |
+| Brama Gardy | Rozszerzenie południowego basenu i strome zbocza nad przewężeniem. [VisitGarda](https://www.visitgarda.com/en/download-Lake-Garda-map-Visitgarda/) |
+| Sosnowe Szkiery Inari | Kręte cieśniny i skaliste wyspy z sosnami. [Przewodnik Nationalparks.fi, kopia archiwalna](https://gtsvn.uit.no/freecorpus/orig/eng/facta/lundui.fi/activities_inheritredirect%3Dtrue.html) |
+| Ramiona Yellowstone | Rozgałęziony brzeg i głęboka zatoka West Thumb. [National Park Service](https://home.nps.gov/yell/learn/nature/yellowstone-lake.htm) |
+| Dolina Minnewanki | Zbiornik w górskiej dolinie w Banff. [Banff & Lake Louise Tourism](https://www.banfflakelouise.com/experiences/lake-minnewanka) |
+
+## Dokumentacja wcześniejszej wersji Godot
 
 Ten dokument opisuje strukturę rozbudowy gry do pełnego symulatora: co już działa, gdzie to leży w kodzie i co
 jest następne w kolejce. Zasada pozostaje ta sama co w reszcie projektu: **reguły gry są czystą logiką w `src/Core`**

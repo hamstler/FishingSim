@@ -69,7 +69,7 @@ public sealed class GameSuite : ITestSuite
         t.Check(atlas.Listed.Any(s => s.SpeciesName == "Karp lustrzeń") && atlas.Listed.All(s => s.SpeciesName != "Głowacica"),
             "the map filter shows only the fish of that ground");
         atlas.Select(atlas.Listed.First(s => s.SpeciesName == "Karp lustrzeń"));
-        t.Check(atlas.FactsText.Contains("Cyprinus carpio") && atlas.FactsText.Contains("Staw Karpiowy") && atlas.FactsText.Contains("kg"),
+        t.Check(atlas.FactsText.Contains("Cyprinus carpio") && atlas.FactsText.Contains("Przesmyk Windermere") && atlas.FactsText.Contains("kg"),
             "the selected fish shows its Latin name, sizes and where it lives");
         atlas.Close();
         await t.NextFrame();
@@ -309,8 +309,8 @@ public sealed class GameSuite : ITestSuite
 
     private async Task InGame(TestContext t)
     {
-        int zatoka = Array.FindIndex(LakeBed.LocationPaths, p => GD.Load<LocationData>(p).DisplayName == "Zatoka Szuwarowa");
-        int staw = Array.FindIndex(LakeBed.LocationPaths, p => GD.Load<LocationData>(p).DisplayName == "Staw Karpiowy");
+        int zatoka = Array.FindIndex(LakeBed.LocationPaths, p => GD.Load<LocationData>(p).DisplayName == "Szuwary Tihany");
+        int staw = Array.FindIndex(LakeBed.LocationPaths, p => GD.Load<LocationData>(p).DisplayName == "Przesmyk Windermere");
 
         t.Section("map selection reaches the game");
         var main = await StartMain(t, staw);
@@ -327,7 +327,7 @@ public sealed class GameSuite : ITestSuite
         var shop = main.GetChildren().OfType<Shop>().First();
         var profile = rod.Profile;
         var loadout = rod.Loadout;
-        t.Check(lake.Location.DisplayName == "Zatoka Szuwarowa", "the picked map is the one that loads");
+        t.Check(lake.Location.DisplayName == "Szuwary Tihany", "the picked map is the one that loads");
         t.Check(profile.Username == "admin", "the game runs as the logged-in user");
 
         t.Section("minimap and clock");
@@ -719,7 +719,7 @@ public sealed class GameSuite : ITestSuite
         await t.NextFrame();
         t.Check(!rod.AwaitingDecision && profile.Keepnet.Count == netBeforeChoice + 1 && !hud.CatchPanel.Visible,
             $"\"Do siatki\" puts it into the keepnet and closes the panel (awaiting {rod.AwaitingDecision}, net {profile.Keepnet.Count}/{netBeforeChoice}, visible {hud.CatchPanel.Visible}, banner {rod.BannerText})");
-        t.Check(profile.Journal.Count > 0 && profile.Journal[^1].Location == "Zatoka Szuwarowa" && profile.Journal[^1].Bait != null, "the journal notes where and on what it was caught");
+        t.Check(profile.Journal.Count > 0 && profile.Journal[^1].Location == "Szuwary Tihany" && profile.Journal[^1].Bait != null, "the journal notes where and on what it was caught");
         t.Check(baitBefore >= 0 && rod.Tension == 0f, "tension is cleared after the fight");
         rod.ResetToIdle();
 

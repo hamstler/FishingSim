@@ -6,7 +6,7 @@
 script = ExtResource("1")
 DisplayName = "Zatoka Szczupaka"
 Description = "Krótkie zawody w szuwarach: trzy największe ryby decydują o wszystkim. Szczupaki lubią świt."
-LocationName = "Zatoka Szuwarowa"
+LocationName = "Szuwary Tihany"
 RequiredLevel = 2
 EntryFee = 25
 DurationMinutes = 7.0

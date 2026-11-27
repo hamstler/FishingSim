@@ -1,8 +1,8 @@
 {
  "$type": "TournamentData",
  "DisplayName": "Poranny Puchar Płoci",
- "Description": "Szybkie zawody na Jeziorze Zielonym: liczy się suma pięciu najcięższych ryb. Dobre na rozgrzewkę.",
- "LocationName": "Jezioro Zielone",
+ "Description": "Szybkie zawody na Bledzkiej Toni: liczy się suma pięciu najcięższych ryb. Dobre na rozgrzewkę.",
+ "LocationName": "Bledzka Toń",
  "RequiredLevel": 1,
  "EntryFee": 10,
  "DurationMinutes": 6.0,

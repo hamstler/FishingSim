@@ -108,9 +108,9 @@ public sealed class VillageSuite : ITestSuite
         t.Check(locations.Select(l => l.GrassColor).Distinct().Count() == locations.Count, "each map has its own grass colour");
         t.Check(locations.Select(l => l.WaterShallowColor).Distinct().Count() == locations.Count, "each map has its own water colour");
         t.Check(locations.Select(l => string.Join(",", l.Buildings)).Distinct().Count() == locations.Count, "each map has its own village layout");
-        var gory = locations.First(l => l.DisplayName == "Górskie Jezioro");
-        var jez = locations.First(l => l.DisplayName == "Jezioro Zielone");
-        t.Check(gory.HillScale > jez.HillScale * 1.5f && gory.TreeShare("pine") > gory.TreeShare("oak"), "the mountain map is hillier and pine-forested");
+        var gory = locations.First(l => l.DisplayName == "Dolina Rotoiti");
+        var jez = locations.First(l => l.DisplayName == "Bledzka Toń");
+        t.Check(gory.HillScale > jez.HillScale * 1.5f && gory.TreeShare("oak") > gory.TreeShare("pine"), "the mountain map is hillier and broadleaf-forested");
 
         t.Section("walking limits");
         bed.SelectInitial(0);
@@ -177,23 +177,23 @@ public sealed class VillageSuite : ITestSuite
             }
         }
         int Get(string map, string key) => stats[map].GetValueOrDefault(key);
-        t.Check(Get("Zatoka Szuwarowa", "tree_willow") > 5 && Get("Jezioro Zielone", "tree_willow") == 0, "willows grow only in the marsh");
-        t.Check(Get("Górskie Jezioro", "tree_pine") > Get("Górskie Jezioro", "tree_oak") && Get("Jezioro Zielone", "tree_pine") < Get("Górskie Jezioro", "tree_pine"), "the mountains are pine country");
-        t.Check(Get("Staw Karpiowy", "flower") > Get("Jezioro Zielone", "flower") * 1.5f, "the farm pond is a flowery meadow");
-        t.Check(Get("Zatoka Szuwarowa", "reed") > Get("Jezioro Zielone", "reed") && Get("Górskie Jezioro", "rock") > Get("Jezioro Zielone", "rock"),
-            $"reeds fill the bay and rocks fill the mountains (reeds {Get("Zatoka Szuwarowa", "reed")} vs {Get("Jezioro Zielone", "reed")}, rocks {Get("Górskie Jezioro", "rock")} vs {Get("Jezioro Zielone", "rock")})");
-        t.Check(Get("Staw Karpiowy", "tree_oak") + Get("Staw Karpiowy", "tree_spruce") + Get("Staw Karpiowy", "tree_birch")
-            < Get("Jezioro Zielone", "tree_oak") + Get("Jezioro Zielone", "tree_spruce") + Get("Jezioro Zielone", "tree_birch"), "the pond meadow has fewer trees than the forest lake");
-        t.Check(Get("Staw Karpiowy", "building_windmill") == 1 && Get("Staw Karpiowy", "building_barn") == 1, "the farm has a windmill and a barn");
+        t.Check(Get("Szuwary Tihany", "tree_willow") > 5 && Get("Bledzka Toń", "tree_willow") == 0, "willows grow only in the marsh");
+        t.Check(Get("Dolina Rotoiti", "tree_oak") > Get("Dolina Rotoiti", "tree_spruce") && Get("Dolina Rotoiti", "tree_birch") > 0, "Rotoiti has broadleaf woodland");
+        t.Check(Get("Przesmyk Windermere", "flower") > Get("Bledzka Toń", "flower") * 1.5f, "the farm pond is a flowery meadow");
+        t.Check(Get("Szuwary Tihany", "reed") > Get("Bledzka Toń", "reed") && Get("Dolina Rotoiti", "rock") > Get("Bledzka Toń", "rock"),
+            $"reeds fill the bay and rocks fill the mountains (reeds {Get("Szuwary Tihany", "reed")} vs {Get("Bledzka Toń", "reed")}, rocks {Get("Dolina Rotoiti", "rock")} vs {Get("Bledzka Toń", "rock")})");
+        t.Check(Get("Przesmyk Windermere", "tree_oak") + Get("Przesmyk Windermere", "tree_spruce") + Get("Przesmyk Windermere", "tree_birch")
+            < Get("Bledzka Toń", "tree_oak") + Get("Bledzka Toń", "tree_spruce") + Get("Bledzka Toń", "tree_birch"), "the pond meadow has fewer trees than the forest lake");
+        t.Check(Get("Przesmyk Windermere", "building_windmill") == 1 && Get("Przesmyk Windermere", "building_barn") == 1, "the farm has a windmill and a barn");
         foreach (var (map, counts) in stats)
             GD.Print($"  plants on {map}: " + string.Join(", ", new[] { "tree_", "bush", "hazel", "fern", "tuft", "flower", "reed", "rush", "iris", "lily", "lily_flower", "pondweed" }
                 .Select(k => $"{k.TrimEnd('_')} {(k.EndsWith('_') ? counts.Where(kv => kv.Key.StartsWith(k)).Sum(kv => kv.Value) : counts.GetValueOrDefault(k))}")));
         t.Check(stats.Values.All(c => c.GetValueOrDefault("fern") > 50 && c.GetValueOrDefault("tuft") > 1000 && c.GetValueOrDefault("rush") > 100),
             "every map has a forest floor of ferns, grassy meadows and rushes at the water's edge");
-        t.Check(Get("Zatoka Szuwarowa", "lily") > Get("Jezioro Zielone", "lily") && Get("Jezioro Zielone", "lily") > Get("Górskie Jezioro", "lily") * 3
-            && Get("Jezioro Zielone", "lily_flower") > 0 && Get("Staw Karpiowy", "pondweed") > 0,
-            $"water lilies cover the warm bay more than the cold mountain lake (bay {Get("Zatoka Szuwarowa", "lily")}, lake {Get("Jezioro Zielone", "lily")}, mountains {Get("Górskie Jezioro", "lily")})");
-        t.Check(Get("Jezioro Zielone", "hazel") > 30 && Get("Jezioro Zielone", "iris") > 20, "hazel shrubs under the trees and yellow irises on the banks");
+        t.Check(Get("Szuwary Tihany", "lily") > Get("Bledzka Toń", "lily") && Get("Bledzka Toń", "lily") > Get("Dolina Rotoiti", "lily") * 3
+            && Get("Bledzka Toń", "lily_flower") > 0 && Get("Przesmyk Windermere", "pondweed") > 0,
+            $"water lilies cover the warm bay more than the cold mountain lake (bay {Get("Szuwary Tihany", "lily")}, lake {Get("Bledzka Toń", "lily")}, mountains {Get("Dolina Rotoiti", "lily")})");
+        t.Check(Get("Bledzka Toń", "hazel") > 30 && Get("Bledzka Toń", "iris") > 20, "hazel shrubs under the trees and yellow irises on the banks");
 
         // main is now the mountain map (last in the loop); go back to the first map for the rest.
         main!.QueueFree();
