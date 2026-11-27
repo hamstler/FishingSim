@@ -157,7 +157,7 @@ namespace FishingSim.Game
                 GameRoot.HideHud = false;
                 Player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
             }
-            foreach (var (tab, shot) in new[] { (0, "gui_inventory"), (1, "gui_inventory_reel") })
+            foreach (var (tab, shot) in new[] { (0, "gui_inventory"), (1, "gui_inventory_reel"), (2, "gui_inventory_list") })
             {
                 InventoryForShot(tab);
                 yield return null;

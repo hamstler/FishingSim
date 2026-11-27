@@ -1,5 +1,10 @@
 # Zmiany
 
+## 0.12.2 (Unity 6)
+- M otwiera plan bieżącego łowiska z pozycją i kierunkiem patrzenia gracza, głębokością wody, pomostami i zabudową.
+- Drzewa przy brzegu korzystają z tekstur źródłowych do 4K. Udział żwiru, piasku i ściółki zależy od łowiska.
+- Ekwipunek ma gęstszą siatkę miniaturek i przełączany widok listy.
+
 ## 0.12.1 (Unity 6)
 - Nowe teksturowane modele brzozy, dębu, sosny, świerku i wierzby w pobliżu gracza. W oddali las korzysta z uproszczonej geometrii.
 - Sklep i ekwipunek z miniaturami sprzętu, galeria łowisk i dziennik połowów z obrotowym podglądem ryb.

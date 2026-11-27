@@ -184,7 +184,8 @@ namespace FishingSim.Game
                     else
                     {
                         OpenInventory();
-                        SelectInventoryTab(tab == 0 ? -1 : tab);
+                        _inventoryList = tab == 2;
+                        SelectInventoryTab(tab == 1 ? 1 : -1);
                     }
                 };
                 smoke.LoadMap = index => StartCoroutine(LoadMap(index, true));
@@ -2186,6 +2187,36 @@ namespace FishingSim.Game
         private Dictionary<string, Rect>? _gearRegions;
         private string _inventoryQuery = "";
         private bool _inventorySortByName;
+        private bool _inventoryList;
+        private TackleItem? _detailItem;
+        private (string Label, string Value)[] _detailRows = Array.Empty<(string, string)>();
+
+        private void DrawItemDetails(Rect area, TackleItem item)
+        {
+            if (_detailItem != item)
+            {
+                _detailItem = item;
+                _detailRows = item switch
+                {
+                    RodData rod => new[] { ("Typ", KindName(rod.Kind)), ("Długość", $"{(rod.Length > 0 ? rod.Length : 3.58f):0.00} m"),
+                        ("Udźwig", $"{rod.MaxLoad:0.0} kg"), ("Zasięg rzutu", $"×{rod.CastMult:0.00}") },
+                    ReelData reel => new[] { ("Hamulec", $"{reel.DragMax:0.0} kg"), ("Nawój na obrót", $"{reel.ReelSpeed * 24:0} cm"),
+                        ("Pojemność", $"{reel.LineCapacity:0} m") },
+                    LineData line => new[] { ("Średnica", $"{line.Diameter:0.00} mm"), ("Wytrzymałość", $"{line.Strength:0.0} kg") },
+                    HookData hook => new[] { ("Masa", $"{hook.WeightG:0.00} g"), ("Wytrzymałość", $"{hook.Strength:0.0} kg") },
+                    BaitData bait when bait.Reusable => new[] { ("Długość", $"{bait.SizeCm:0.#} cm"), ("Masa", $"{bait.WeightG:0.#} g") },
+                    _ => Array.Empty<(string, string)>()
+                };
+            }
+            if (_detailRows.Length == 0) GUI.Label(area, Stats(item), _text);
+            float row = Mathf.Min(S(39), area.height / Mathf.Max(1, _detailRows.Length));
+            foreach (var (label, value) in _detailRows)
+            {
+                GUI.Label(new Rect(area.x, area.y, area.width * .52f, row), label, _small);
+                GUI.Label(new Rect(area.x + area.width * .52f, area.y, area.width * .48f, row), value, _text);
+                area.y += row;
+            }
+        }
 
         private void InventoryIcon(Rect rect, TackleItem? item, int category)
         {
@@ -2353,7 +2384,7 @@ namespace FishingSim.Game
                 DrawGearGlyph(new Rect(tab.center.x - S(13), tab.y + S(3), S(26), S(26)), i < 0 ? 5 : i, selected ? Accent : Muted);
                 GUI.Label(new Rect(tab.x + S(4), tab.y + S(31), tab.width - S(8), S(29)), i < 0 ? "Wszystko" : ShopTabs[i], _small);
             }
-            var search = new Rect(grid.x + pad, y + S(86), grid.width - pad * 2f - S(139), S(38));
+            var search = new Rect(grid.x + pad, y + S(86), grid.width - pad * 2f - S(224), S(38));
             GUI.SetNextControlName("InventorySearch");
             string query = GUI.TextField(search, _inventoryQuery, 60, _field);
             if (query != _inventoryQuery)
@@ -2377,19 +2408,30 @@ namespace FishingSim.Game
             var owned = (_inventorySortByName ? items.OrderBy(item => item.DisplayName) :
                 items.OrderBy(EquipmentCategory).ThenBy(item => item.DisplayName)).ToList();
             var view = new Rect(grid.x + pad, y + S(143), grid.width - pad * 2f, height - S(155));
-            const int columns = 7;
+            if (GUI.Button(new Rect(search.xMax + S(146), search.y, S(78), search.height),
+                _inventoryList ? "Siatka" : "Lista", _button))
+            {
+                _inventoryList = !_inventoryList;
+                _scroll = Vector2.zero;
+            }
+            int columns = _inventoryList ? 1 : Mathf.Clamp(Mathf.FloorToInt((view.width - S(18)) / S(77)), 5, 10);
             float cell = (view.width - S(18)) / columns;
-            _scroll = GUI.BeginScrollView(view, _scroll, new Rect(0, 0, cell * columns, Mathf.CeilToInt(owned.Count / (float)columns) * cell));
+            float rowHeight = _inventoryList ? S(53) : cell * .88f;
+            _scroll = GUI.BeginScrollView(view, _scroll, new Rect(0, 0, cell * columns, Mathf.CeilToInt(owned.Count / (float)columns) * rowHeight));
             for (int i = 0; i < owned.Count; i++)
             {
-                var tile = new Rect(i % columns * cell, i / columns * cell, cell - S(6), cell - S(6));
+                var tile = new Rect(i % columns * cell, i / columns * rowHeight, cell - S(4), rowHeight - S(4));
                 if (tile.yMax < _scroll.y || tile.y > _scroll.y + view.height)
                     continue;
                 var item = owned[i];
                 bool active = _inventoryInspect?.ItemId == item.ItemId;
                 if (GUI.Button(tile, new GUIContent("", item.DisplayName), active ? _inventorySelected : _inventoryCard))
                     _inventoryInspect = item;
-                InventoryIcon(new Rect(tile.x + S(5), tile.y + S(5), tile.width - S(10), tile.height - S(10)), item, EquipmentCategory(item));
+                float icon = tile.height - S(8);
+                float iconX = _inventoryList ? tile.x + S(6) : tile.center.x - icon / 2;
+                InventoryIcon(new Rect(iconX, tile.y + S(4), icon, icon), item, EquipmentCategory(item));
+                if (_inventoryList)
+                    GUI.Label(new Rect(iconX + icon + S(10), tile.y + S(9), tile.width - icon - S(64), tile.height), item.DisplayName, _text);
                 if (item is BaitData { Reusable: false })
                     GUI.Label(new Rect(tile.xMax - S(34), tile.yMax - S(21), S(32), S(19)), $"{_profile.BaitCount(item.ItemId)}", _small);
             }
@@ -2416,7 +2458,7 @@ namespace FishingSim.Game
                     GUI.Label(new Rect(preview.x, preview.yMax, preview.width, S(40)), "Przeciągnij, aby obrócić", _small);
                 var name = new Rect(preview.x, preview.yMax + S(40), preview.width, S(106));
                 GUI.Label(name, selectedItem.DisplayName, _title);
-                GUI.Label(new Rect(name.x, name.yMax + S(3), name.width, S(100)), Stats(selectedItem), _text);
+                DrawItemDetails(new Rect(name.x, name.yMax + S(3), name.width, bottom - S(60) - name.yMax), selectedItem);
                 if (category < _rigDraft.Length)
                 {
                     bool inDraft = _rigDraft[category]?.ItemId == selectedItem.ItemId;

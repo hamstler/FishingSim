@@ -30,6 +30,7 @@ Shader "FS/Terrain"
         UNITY_DECLARE_TEX2DARRAY(_GroundNrm);
         sampler2D _Noise, _Caustics;
         float4 _LayerTint[7];
+        float4 _ShoreMix; // gravel and leaf litter fractions of the sandy shore
         float _LayerRough[7];
         float4 _DarkGrassTint;
         float _Tile, _Bump, _Wetness, _SnowLine, _RockLine, _Daylight;
@@ -89,6 +90,10 @@ Shader "FS/Terrain"
             w[2] = g.x;
             w[3] = g.y;
             w[4] = g.w;
+            float2 shore = g.x * _ShoreMix.xy * lerp(0.68, 1.0, mid);
+            w[2] -= shore.x + shore.y;
+            w[4] += shore.x;
+            w[1] += shore.y;
             [unroll] for (int a = 0; a < 5; a++) w[a] *= (1.0 - rock) * (1.0 - snow);
             w[5] = rock * (1.0 - snow);
             w[6] = snow;
