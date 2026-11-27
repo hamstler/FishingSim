@@ -14,7 +14,7 @@ namespace FishingSim.Game
         private static readonly Dictionary<string, Material?> Mats = new();
 
         /// <summary>The Textures setting: Low 1K, Medium 2K, High and up 4K.</summary>
-        public static int Limit => Settings.Quality <= 1 ? 1024 : Settings.Quality == 2 ? 2048 : 4096;
+        public static int Limit => 1024 << Settings.Textures;
 
         public static Texture2D? Picture(string id, string name, bool linear)
         {

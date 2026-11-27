@@ -42,7 +42,7 @@ namespace FishingSim.Game
         public static bool Ready(int size) => Albedo != null && _builtSize == size;
 
         /// <summary>The Textures setting: Low 1K, Medium 2K, High and up 4K (as in Godot).</summary>
-        public static int SizeForQuality => Settings.Quality <= 1 ? 1024 : Settings.Quality == 2 ? 2048 : 4096;
+        public static int SizeForQuality => 1024 << Settings.Textures;
 
         private static string Key(string id, int size, string part) =>
             $"ground_{id}_{size}_{part}_{TexCache.Stamp(TexCache.Find(System.IO.Path.Combine(Dir(id), "diff")) ?? "")}_{TexCache.Stamp(TexCache.Find(System.IO.Path.Combine(Dir(id), "nor")) ?? "")}_{TexCache.Stamp(TexCache.Find(System.IO.Path.Combine(Dir(id), "disp")) ?? "")}";

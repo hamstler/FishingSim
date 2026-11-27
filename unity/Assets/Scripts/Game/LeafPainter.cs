@@ -14,7 +14,7 @@ namespace FishingSim.Game
         public const int LeafOak = 0, LeafBirch = 1, LeafWillow = 2, LeafHazel = 3;
         // ProceduralTextures.LK: designs in 1024-px units, painted at the Textures setting's size (Godot paints a 4096 atlas
         // on worker threads; here 2048 at most: the painting runs on the main thread when a map first loads)
-        private static readonly float LK = Settings.Quality >= 3 ? 2f : 1f;
+        private static readonly float LK = Settings.Textures >= 2 ? 2f : 1f;
         private static readonly int LeafCell = (int)(512 * LK);
         private static Texture2D? _leaves, _needles;
 

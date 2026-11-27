@@ -3,8 +3,10 @@ using UnityEngine;
 namespace FishingSim.Game
 {
     /// <summary>
-    /// The camera's finish (GraphicsQuality.ApplyEnvironment in the Godot game): AO from Medium up, glow from Medium up,
-    /// ACES tonemapping, contrast, saturation and the Nordic grade always. The camera renders in HDR.
+    /// The camera's finish (GraphicsQuality.ApplyEnvironment in the Godot game), each part switched by its own option in
+    /// Settings: ambient occlusion (half or full resolution), glow, sun shafts, height fog lit by the sun, sharpening,
+    /// ACES tonemapping, contrast, saturation, the colour grade (realistic = mostly neutral, or the Nordic one) and a
+    /// soft vignette. The camera renders in HDR.
     /// </summary>
     [RequireComponent(typeof(Camera))]
     public sealed class PostFx : MonoBehaviour
@@ -65,11 +67,17 @@ namespace FishingSim.Game
                 _logged = true;
                 Debug.Log($"POSTFX source {src.format} {src.width}x{src.height}, camera HDR {GetComponent<Camera>().allowHDR}, msaa {src.antiAliasing}");
             }
-            int q = Settings.Quality;
+            bool nordic = Settings.Colours == 1;
             _mat.SetFloat("_Threshold", Threshold);
-            _mat.SetFloat("_GlowIntensity", q >= 2 ? GlowIntensity : 0f);
-            _mat.SetFloat("_Contrast", Contrast);
-            _mat.SetFloat("_Saturation", Saturation);
+            _mat.SetFloat("_GlowIntensity", Settings.Bloom ? GlowIntensity : 0f);
+            // realistic: a gentle contrast, true saturation and a quarter of the Nordic grade (it only warms the light)
+            _mat.SetFloat("_Contrast", nordic ? Contrast : 1.05f);
+            _mat.SetFloat("_Saturation", nordic ? Saturation : 1.0f);
+            _mat.SetFloat("_GradeScale", nordic ? 1f : 0.25f);
+            _mat.SetFloat("_Vignette", Settings.Vignette ? 1f : 0f);
+            _mat.SetFloat("_Sharpen", Settings.Sharpen ? 0.35f : 0f);
+            var camera = GetComponent<Camera>();
+            _mat.SetMatrix("_CamToWorld", camera.cameraToWorldMatrix);
             _mat.SetFloat("_White", White);
             _mat.SetTexture("_Grade", _grade);
 
@@ -78,7 +86,7 @@ namespace FishingSim.Game
             int w = src.width / 2, h = src.height / 2;
             RenderTexture? bloom = null;
             int levels = 0;
-            if (q >= 2)
+            if (Settings.Bloom)
             {
                 for (int i = 0; i < Levels && w >= 8 && h >= 8; i++, w /= 2, h /= 2)
                 {
@@ -93,10 +101,11 @@ namespace FishingSim.Game
             _mat.SetTexture("_Bloom", bloom != null ? bloom : Texture2D.blackTexture);
 
             RenderTexture? ao = null;
-            if (q >= 2)
+            if (Settings.AO > 0)
             {
+                int div = Settings.AO >= 2 ? 1 : 2;
                 // linear: an sRGB R8 target does not exist (Unity fell back to RGBA8 sRGB and logged it every frame)
-                ao = RenderTexture.GetTemporary(src.width / 2, src.height / 2, 0, RenderTextureFormat.R8, RenderTextureReadWrite.Linear);
+                ao = RenderTexture.GetTemporary(src.width / div, src.height / div, 0, RenderTextureFormat.R8, RenderTextureReadWrite.Linear);
                 _mat.SetFloat("_AORadius", AORadius);
                 _mat.SetFloat("_AOStrength", AOStrength);
                 Graphics.Blit(src, ao, _mat, 3);
@@ -115,7 +124,7 @@ namespace FishingSim.Game
             var sunDir = (Vector3)Shader.GetGlobalVector("_SunDirection");
             var sp = cam.WorldToViewportPoint(cam.transform.position + sunDir * 1000f);
             bool facing = sp.z > 0f && sp.x > -0.3f && sp.x < 1.3f && sp.y > -0.3f && sp.y < 1.3f;
-            if (q >= 2 && strength > 0.01f && facing)
+            if (Settings.SunShafts && strength > 0.01f && facing)
             {
                 _mat.SetVector("_SunScreen", new Vector4(sp.x, sp.y, 0f, 0f));
                 var mask = RenderTexture.GetTemporary(src.width / 4, src.height / 4, 0, fmt);

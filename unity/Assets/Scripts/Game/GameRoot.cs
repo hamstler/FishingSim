@@ -18,14 +18,14 @@ namespace FishingSim.Game
     /// The game: makes the world, the angler, the rod and the day, runs the menu, loading, play and pause, and draws the
     /// interface (immediate-mode GUI: menu, HUD, catch panel, shop, settings). Created by the bootstrap scene's only object.
     /// </summary>
-    public sealed class GameRoot : MonoBehaviour
+    public sealed partial class GameRoot : MonoBehaviour
     {
         public static string Version => Application.version;
 
         // the account first (a still picture: nothing of the world is drawn), then the fishery's loading screen (still
         // too), then play; another fishery is chosen in the game (Panel.Travel), like in modern fishing games
         private enum Screen { Login, Loading, Play }
-        private enum Panel { None, Pause, Shop, Settings, Help, Keepnet, Records, Smokehouse, Cooking, Notices, Travel, Inventory }
+        private enum Panel { None, Pause, Shop, Settings, Help, Keepnet, Records, Smokehouse, Cooking, Notices, Travel, Inventory, Map }
 
         private Screen _screen = Screen.Login;
         private Panel _panel = Panel.None;
@@ -59,6 +59,8 @@ namespace FishingSim.Game
         private string _shopSearch = "";
         private Vector2 _scroll;
         private Panel _settingsBack = Panel.None;
+        private int _settingsTab;
+        private bool _rowClicked;
         private float _autosave;
 
         // the still screens: a camera that only clears (the world's camera is off), the fisheries' pictures
@@ -317,6 +319,7 @@ namespace FishingSim.Game
         {
             Application.logMessageReceived -= OnLog;
             _tacklePreview?.Dispose();
+            if (_lakeChart != null) Destroy(_lakeChart);
         }
 
         /// <summary>Errors go to logs/errors.txt in the game's user folder (beside Unity's own Player.log).</summary>
@@ -421,6 +424,7 @@ namespace FishingSim.Game
                     yield return step;
                 }
                 LoadLog.Mark("world built");
+                yield return BakeLakeChart(_world.Lake);
                 // the village's buildings and its people (not for the smoke test's hands-only run: only the rod matters)
                 _loadStep = "Wioska i ludzie";
                 _loadProgress = 0.78f;
@@ -667,10 +671,13 @@ namespace FishingSim.Game
                     OpenPanel(Panel.Help);
                 if (Input.GetKeyDown(KeyCode.J))
                     OpenPanel(Panel.Records);
-                if (Input.GetKeyDown(KeyCode.M))
-                    OpenPanel(Panel.Travel);
                 if (Input.GetMouseButtonDown(0) && Cursor.lockState != CursorLockMode.Locked)
                     SetCursor(true);
+            }
+            if (Input.GetKeyDown(KeyCode.M))
+            {
+                if (_panel == Panel.Map) ClosePanel();
+                else if (_panel == Panel.None && _rod.State != RodState.Landed) OpenPanel(Panel.Map);
             }
             if (_rod.State == RodState.Landed)
             {
@@ -1091,6 +1098,8 @@ namespace FishingSim.Game
         public static int ShopShotTab { get; set; } = -1;
         public static bool ShowTravelForShot { get; set; }
         public static bool ShowJournalForShot { get; set; }
+        /// <summary>The smoke test's picture of the settings (tab index; -1 = none).</summary>
+        public static int SettingsShotTab { get; set; } = -1;
 
         private void OnGUI()
         {
@@ -1125,6 +1134,17 @@ namespace FishingSim.Game
                 DrawShop(w, h - S(64));
                 GUI.EndGroup();
                 DrawWorkshopNav(w);
+                return;
+            }
+            if (SettingsShotTab >= 0)
+            {
+                _settingsTab = SettingsShotTab;
+                DrawSettings(w, h);
+                return;
+            }
+            if (ShowMapForShot)
+            {
+                DrawLakeChart(w, h);
                 return;
             }
             if (ShowTravelForShot || ShowJournalForShot)
@@ -1175,6 +1195,7 @@ namespace FishingSim.Game
                         case Panel.Cooking: DrawCooking(w, h); break;
                         case Panel.Notices: DrawNotices(w, h); break;
                         case Panel.Travel: DrawTravel(w, h); break;
+                        case Panel.Map: DrawLakeChart(w, h); break;
                     }
                     if (workshop)
                     {
@@ -1478,7 +1499,7 @@ namespace FishingSim.Game
             GUI.Label(new Rect(x, y, S(600), S(40)), "PAUZA", _title);
             GUI.Label(new Rect(x, y + S(38), S(600), S(24)), $"{_user}  ·  poziom {_profile.Level}  ·  {_profile.Money} zł", _small);
             y += S(86);
-            string[] labels = { "Wróć do gry", "Łowiska (M)", "Sklep wędkarski (T)", "Siatka z rybami (K)", "Rekordy (J)", "Sterowanie (F1)", "Ustawienia", "Wyloguj", "Wyjdź z gry" };
+            string[] labels = { "Wróć do gry", "Wybór łowiska", "Sklep wędkarski (T)", "Siatka z rybami (K)", "Rekordy (J)", "Sterowanie (F1)", "Ustawienia", "Wyloguj", "Wyjdź z gry" };
             for (int i = 0; i < labels.Length; i++)
             {
                 if (i == 7)
@@ -1510,20 +1531,58 @@ namespace FishingSim.Game
 
         private void DrawSettings(float w, float h)
         {
-            var r = Centre(w, h, S(680), S(600));
+            var r = Centre(w, h, S(760), S(820));
             GUI.Label(new Rect(r.x, r.y, r.width, S(40)), "USTAWIENIA", _title);
-            float y = r.y + S(64);
-            Row(ref y, r, "Jakość grafiki", Settings.QualityNames[Settings.Quality], d => Settings.Quality = Mathf.Clamp(Settings.Quality + d, 0, 4));
-            Row(ref y, r, "Zasięg widzenia", Settings.ViewNames[Settings.View], d => Settings.View = Mathf.Clamp(Settings.View + d, 0, 2));
-            Row(ref y, r, "Limit FPS", Settings.FpsLimits[Settings.Fps] == 0 ? "bez limitu" : Settings.FpsLimits[Settings.Fps].ToString(), d => Settings.Fps = Mathf.Clamp(Settings.Fps + d, 0, Settings.FpsLimits.Length - 1));
-            Row(ref y, r, "Synchronizacja pionowa", Settings.VSync ? "włączona" : "wyłączona", _ => Settings.VSync = !Settings.VSync);
-            Row(ref y, r, "Pełny ekran", Settings.Fullscreen ? "tak" : "nie (okno)", _ => Settings.Fullscreen = !Settings.Fullscreen);
-            Row(ref y, r, "Czułość myszy", Settings.Mouse.ToString("0.0"), d => Settings.Mouse = Mathf.Clamp(Settings.Mouse + d * 0.2f, 0.4f, 6f));
-            GUI.Label(new Rect(r.x, y + S(4), r.width, S(44)), "Jakość tekstur zmienia się przy następnym wczytaniu łowiska.", _small);
+            string[] tabs = { "GRAFIKA", "EFEKTY", "EKRAN I STEROWANIE" };
+            float tw = (r.width - S(16)) / 3f;
+            for (int i = 0; i < tabs.Length; i++)
+                if (GUI.Button(new Rect(r.x + i * (tw + S(8)), r.y + S(52), tw, S(38)), tabs[i], i == _settingsTab ? _tabOn : _tab))
+                    _settingsTab = i;
+            float y = r.y + S(108);
+            string hint = "";
+            static int Step(int v, int d, int max) => Mathf.Clamp(v + d, 0, max);
+            static string OnOff(bool b) => b ? "włączone" : "wyłączone";
+            switch (_settingsTab)
+            {
+                case 0:
+                    Row(ref y, r, "Ustawienia wstępne", Settings.Custom ? "Własne" : Settings.QualityNames[Settings.Quality],
+                        d => Settings.Quality = Step(Settings.Quality, d, 4));
+                    Row(ref y, r, "Tekstury", Settings.TextureNames[Settings.Textures], d => Settings.Textures = Step(Settings.Textures, d, 2));
+                    Row(ref y, r, "Cienie", Settings.ShadowNames[Settings.Shadows], d => Settings.Shadows = Step(Settings.Shadows, d, 4));
+                    Row(ref y, r, "Miękkie cienie", OnOff(Settings.SoftShadows), _ => Settings.SoftShadows = !Settings.SoftShadows);
+                    Row(ref y, r, "Wygładzanie krawędzi", Settings.AANames[Settings.AntiAliasing], d => Settings.AntiAliasing = Step(Settings.AntiAliasing, d, 3));
+                    Row(ref y, r, "Roślinność", Settings.PlantNames[Settings.Plants], d => Settings.Plants = Step(Settings.Plants, d, 3));
+                    Row(ref y, r, "Zasięg widzenia", Settings.ViewNames[Settings.View], d => Settings.View = Step(Settings.View, d, 2));
+                    hint = "Ustawienia wstępne ustawiają wszystkie opcje grafiki i efektów. Tekstury i roślinność zmieniają się przy następnym wczytaniu łowiska.";
+                    break;
+                case 1:
+                    Row(ref y, r, "Okluzja otoczenia (AO)", Settings.AONames[Settings.AO], d => Settings.AO = Step(Settings.AO, d, 2));
+                    Row(ref y, r, "Mgła i zamglenie", Settings.FogNames[Settings.Fog], d => Settings.Fog = Step(Settings.Fog, d, 3));
+                    Row(ref y, r, "Mgła wolumetryczna", OnOff(Settings.VolumetricFog), _ => Settings.VolumetricFog = !Settings.VolumetricFog);
+                    Row(ref y, r, "Promienie słońca", OnOff(Settings.SunShafts), _ => Settings.SunShafts = !Settings.SunShafts);
+                    Row(ref y, r, "Poświata (bloom)", OnOff(Settings.Bloom), _ => Settings.Bloom = !Settings.Bloom);
+                    Row(ref y, r, "Odbicia na wodzie", Settings.ReflectionNames[Settings.Reflections], d => Settings.Reflections = Step(Settings.Reflections, d, 3));
+                    Row(ref y, r, "Kolory", Settings.ColourNames[Settings.Colours], d => Settings.Colours = Step(Settings.Colours, d, 1));
+                    Row(ref y, r, "Wyostrzanie", OnOff(Settings.Sharpen), _ => Settings.Sharpen = !Settings.Sharpen);
+                    Row(ref y, r, "Winieta", OnOff(Settings.Vignette), _ => Settings.Vignette = !Settings.Vignette);
+                    hint = "Mgła wolumetryczna leży nisko nad wodą i w zagłębieniach, rano gęstnieje i świeci od słońca. Efekty widać od razu po kliknięciu.";
+                    break;
+                default:
+                    Row(ref y, r, "Limit FPS", Settings.FpsLimits[Settings.Fps] == 0 ? "bez limitu" : Settings.FpsLimits[Settings.Fps].ToString(), d => Settings.Fps = Step(Settings.Fps, d, Settings.FpsLimits.Length - 1));
+                    Row(ref y, r, "Synchronizacja pionowa", Settings.VSync ? "włączona" : "wyłączona", _ => Settings.VSync = !Settings.VSync);
+                    Row(ref y, r, "Pełny ekran", Settings.Fullscreen ? "tak" : "nie (okno)", _ => Settings.Fullscreen = !Settings.Fullscreen);
+                    Row(ref y, r, "Czułość myszy", Settings.Mouse.ToString("0.0"), d => Settings.Mouse = Mathf.Clamp(Settings.Mouse + d * 0.2f, 0.4f, 6f));
+                    break;
+            }
+            if (hint.Length > 0)
+                GUI.Label(new Rect(r.x, y + S(4), r.width, S(60)), hint, _small);
+            if (_rowClicked && _settingsTab < 2)
+                ApplyGraphics();
+            _rowClicked = false;   // the effects show at once behind the panel
             if (GUI.Button(new Rect(r.x, r.yMax - S(48), r.width, S(46)), "Gotowe", _accentButton))
             {
                 Settings.Save();
-                Settings.Apply(_player.Camera);
+                ApplyGraphics();
                 _player.Sensitivity = Settings.Mouse;
                 FrameRod();
                 if (_screen == Screen.Play)
@@ -1537,14 +1596,27 @@ namespace FishingSim.Game
             }
         }
 
+        private void ApplyGraphics()
+        {
+            Settings.Apply(_player.Camera);
+            if (_world.WaterMaterial != null)
+                _world.WaterMaterial.SetFloat("_SsrSteps", Settings.SsrSteps);
+        }
+
         private void Row(ref float y, Rect r, string label, string value, Action<int> change)
         {
             GUI.Label(new Rect(r.x, y + S(10), r.width * 0.5f, S(30)), label, _text);
             if (GUI.Button(new Rect(r.x + r.width * 0.5f, y, S(44), S(44)), "‹", _button))
+            {
                 change(-1);
+                _rowClicked = true;
+            }
             GUI.Label(new Rect(r.x + r.width * 0.5f + S(44), y + S(10), r.width * 0.5f - S(88), S(30)), value, new GUIStyle(_text!) { alignment = TextAnchor.UpperCenter });
             if (GUI.Button(new Rect(r.x + r.width - S(44), y, S(44), S(44)), "›", _button))
+            {
                 change(1);
+                _rowClicked = true;
+            }
             y += S(56);
         }
 
@@ -1561,7 +1633,7 @@ namespace FishingSim.Game
                 "Spinning: <b>PPM</b> – podszarpnięcie przynęty, <b>Shift+LPM</b> – szybciej; zaczep: <b>PPM</b> szarpnij, <b>LPM</b> ciągnij\n" +
                 "<b>Ctrl+kółko</b> – grunt spławika (przed rzutem), <b>V</b> – garść zanęty przy spławiku, <b>B</b> – ostrzenie haczyka (osełka)\n" +
                 "Złowiona ryba: <b>E</b> – do siatki, <b>R</b> – wypuść\n" +
-                "<b>I</b> – ekwipunek i montaż zestawu, <b>T</b> – sklep, <b>K</b> – siatka, <b>J</b> – rekordy, <b>M</b> – łowiska, <b>Tab</b> – szczegóły, <b>Esc</b> – pauza\n" +
+                "<b>I</b> – ekwipunek i montaż zestawu, <b>T</b> – sklep, <b>K</b> – siatka, <b>J</b> – rekordy, <b>M</b> – mapa łowiska, <b>Tab</b> – szczegóły, <b>Esc</b> – pauza\n" +
                 "<b>E</b> – sklepy, skup, wędzarnia, łódka, ognisko, tablica ogłoszeń, grzyby i jagody\n" +
                 "<b>G</b> – kopanie łopatą, <b>H</b> – siatka na owady, <b>L</b> – podrywka (akcesoria ze sklepu)\n" +
                 "Łódka: <b>W/S</b> wiosła, <b>A/D</b> skręt, <b>X</b> kotwica\n\n" +

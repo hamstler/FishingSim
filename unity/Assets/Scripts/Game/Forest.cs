@@ -72,8 +72,8 @@ namespace FishingSim.Game
         /// <summary>The sunken wood spots (x, z, radius): snags for lures and fish.</summary>
         public static List<(float X, float Z, float Radius)> SunkenWood { get; } = new();
 
-        public static float FoliageRange => Settings.Quality switch { 0 => 0.45f, 1 => 0.65f, 2 => 0.85f, _ => 1f };
-        public static float GrassRadius => Settings.Quality switch { 0 => 0f, 1 => 18f, 2 => 28f, _ => 40f } * (Settings.View switch { 0 => 0.75f, 1 => 1f, _ => 1.2f });
+        public static float FoliageRange => Settings.Plants switch { 0 => 0.45f, 1 => 0.65f, 2 => 0.85f, _ => 1f };
+        public static float GrassRadius => Settings.Plants switch { 0 => 0f, 1 => 18f, 2 => 28f, _ => 40f } * (Settings.View switch { 0 => 0.75f, 1 => 1f, _ => 1.2f });
         public static float ViewFactor => Settings.View switch { 0 => 0.6f, 1 => 0.85f, _ => 1.1f };
 
         // ---------------------------------------------------------------- building
@@ -936,7 +936,7 @@ namespace FishingSim.Game
                 return;
             _grassCentre = here;
             var lake = _lake;
-            float spacing = (Settings.Quality >= 3 ? 0.42f : 0.5f) * 0.78f;
+            float spacing = (Settings.Plants >= 3 ? 0.42f : 0.5f) * 0.78f;
             _grassJob = Task.Run(() => GrassField(lake, here, radius, spacing));
         }
 

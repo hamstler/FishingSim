@@ -2,7 +2,7 @@
 // fog's light shafts: bright sky behind the trees smeared away from the sun, strongest at the golden hour),
 // screen-space ambient occlusion from the
 // depth buffer, glow over an HDR threshold of 1.15 blended as soft light, ACES tonemapping with white 6 (Godot's
-// formula), contrast 1.12, saturation 1.1 and the Nordic colour correction (per channel through a 1D gradient: teal
+// formula), contrast 1.12, saturation 1.1 (the realistic colours: 1.05 / 1.0 and a quarter of the grade) and the Nordic colour correction (per channel through a 1D gradient: teal
 // shadows, warm highlights), the time of day's exposure (SkyController: 1.9 at night .. 1.05 by day), in Godot's order (tonemap -> sRGB -> adjustments -> correction).
 Shader "Hidden/FS/Post"
 {
@@ -16,6 +16,12 @@ Shader "Hidden/FS/Post"
     UNITY_DECLARE_DEPTH_TEXTURE(_CameraDepthTexture);
     float _SceneExposure, _Threshold, _GlowIntensity, _AOStrength, _AORadius, _Contrast, _Saturation, _White, _UseAO;
     float _GradeStrength;   // DayCycle: 1 on a clear day .. about 0.3 under a grey sky (the warm highlights turned overcast beige)
+    float _GradeScale, _Vignette, _Sharpen;   // PostFx from Settings: colours, vignette, sharpening
+    float4x4 _CamToWorld;
+    // height fog (DayCycle): x = density at the water level (y 0), y = how fast it thins per metre up; colour = the haze
+    // lit by the sky, sun = the sun's light scattered forwards (strongest at the golden hour and in the morning mist)
+    float _HFOn;
+    float4 _HFParams, _HFColor, _HFSun, _SunDirection;
 
     struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
     v2f vert(appdata_img v) { v2f o; o.pos = UnityObjectToClipPos(v.vertex); o.uv = v.texcoord; return o; }
@@ -146,19 +152,57 @@ Shader "Hidden/FS/Post"
         return float4(sum / 12.0, 1);
     }
 
+    // exponential height fog along the ray from the camera: optical depth = a e^(-b y0) L (1 - e^(-b dy L)) / (b dy L)
+    float3 HeightFog(float3 c, float2 uv)
+    {
+        float raw = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv);
+        bool sky = Linear01Depth(raw) > 0.999;
+        float3 vp = ViewPos(uv);
+        float3 world = mul(_CamToWorld, float4(vp.x, vp.y, -vp.z, 1)).xyz;
+        float3 cam = _WorldSpaceCameraPos;
+        float3 ray = world - cam;
+        float L = length(ray);
+        float3 dir = ray / max(L, 1e-4);
+        if (sky) L = 1500;
+        // the water is not in the depth buffer (transparent): the ray ends at its surface, not on the bed below
+        if (!sky && world.y < 0 && cam.y > 0 && dir.y < 0) L = min(L, cam.y / -dir.y);
+        float a = _HFParams.x, b = max(_HFParams.y, 1e-3);
+        float k = b * dir.y * L;
+        float spread = abs(k) > 1e-3 ? (1 - exp(-k)) / k : 1;
+        float od = a * exp(-b * max(cam.y, -2)) * L * spread;
+        float fog = 1 - exp(-od);
+        if (sky) fog *= 0.8;
+        // Henyey-Greenstein, g 0.6: the haze glows round the sun
+        float cosT = dot(dir, normalize(_SunDirection.xyz));
+        float phase = 0.64 / pow(1.36 - 1.2 * cosT, 1.5);
+        float3 lit = _HFColor.rgb + _HFSun.rgb * phase;
+        return lerp(c, lit, saturate(fog));
+    }
+
     // 4: composite
     float4 Composite(v2f i) : SV_Target
     {
         float exposure = _SceneExposure > 0 ? _SceneExposure : 1.0;
         float3 c = tex2D(_MainTex, i.uv).rgb;
-        if (_ShaftStrength > 0.001)
-            c += tex2D(_Shafts, i.uv).rgb * _ShaftTint.rgb * _ShaftStrength;
-        c *= exposure;
+        if (_Sharpen > 0.001)
+        {
+            // contrast-limited sharpening: the detail the mips and MSAA soften, never past the neighbours' range (no halos)
+            float2 t = _MainTex_TexelSize.xy;
+            float3 a = tex2D(_MainTex, i.uv + float2(t.x, 0)).rgb, b = tex2D(_MainTex, i.uv - float2(t.x, 0)).rgb;
+            float3 d = tex2D(_MainTex, i.uv + float2(0, t.y)).rgb, e = tex2D(_MainTex, i.uv - float2(0, t.y)).rgb;
+            float3 lo = min(c, min(min(a, b), min(d, e))), hi = max(c, max(max(a, b), max(d, e)));
+            c = clamp(c + (c - (a + b + d + e) * 0.25) * _Sharpen * 2, lo, hi);
+        }
         if (_UseAO > 0.5)
         {
             float ao = tex2D(_AO, i.uv).r;
             c *= lerp(1, ao, 0.85);
         }
+        if (_HFOn > 0.5)
+            c = HeightFog(c, i.uv);
+        if (_ShaftStrength > 0.001)
+            c += tex2D(_Shafts, i.uv).rgb * _ShaftTint.rgb * _ShaftStrength;
+        c *= exposure;
         c = Aces(max(c, 0), _White);
         float3 g = saturate(Aces(tex2D(_Bloom, i.uv).rgb * _GlowIntensity * exposure, _White));
         c = saturate(LinearToGammaSpace(saturate(c)));
@@ -168,7 +212,10 @@ Shader "Hidden/FS/Post"
         c = lerp(dot(c, 1) / 3.0, c, _Saturation);
         c = saturate(c);
         float3 graded = float3(tex2D(_Grade, float2(c.r, 0.5)).r, tex2D(_Grade, float2(c.g, 0.5)).g, tex2D(_Grade, float2(c.b, 0.5)).b);
-        c = lerp(c, graded, _GradeStrength);
+        c = lerp(c, graded, _GradeStrength * _GradeScale);
+        // a soft vignette, as a lens shows it
+        float2 v = i.uv - 0.5;
+        c *= lerp(1, saturate(1 - dot(v, v) * 0.4), _Vignette);
         // debanding (Godot's use_debanding): a triangular dither of one 8-bit step before the output is quantised, so
         // the sky's gentle gradients do not break into flat sheets with stepped edges
         float2 px = i.uv * _ScreenParams.xy;
@@ -202,6 +249,7 @@ Shader "Hidden/FS/Post"
         Pass { CGPROGRAM
             #pragma vertex vert
             #pragma fragment Composite
+            #pragma target 3.5
             ENDCG }
         Pass { CGPROGRAM
             #pragma vertex vert

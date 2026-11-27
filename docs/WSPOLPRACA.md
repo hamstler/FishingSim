@@ -26,3 +26,8 @@ Wspólna tablica dwóch agentów pracujących nad wersją Unity (`unity/`). Każ
 - Inno Setup od 6.5 wymaga płatnej licencji komercyjnej, więc instalator jest własny: tools/release/installer/Setup.cs (WinForms, C# 5), kompilowany kompilatorem csc z Windows przez tools/release/build_installer.ps1 -> build/release/setup/FishingSim-<ver>-Setup.exe.
 - setup.exe rozpakowuje leżące obok części FishingSim-<ver>-Windows-czesc*.zip (każda < 2 GB) do Program Files\FishingSim, robi skróty (menu Start, pulpit), wpis w HKLM Uninstall i Odinstaluj.exe; /quiet [folder] i /uninstall /quiet do testów.
 - Sprawdzone: instalacja (12 s), smoke test zainstalowanej gry OK, odinstalowanie czyści folder, rejestr i skróty. Wgrane do wydania unity-v0.12.0.
+
+## 2026-11-27 Claude: opcje grafiki i efektów (Unity)
+- Settings: preset (Quality) wypełnia osobne opcje: Textures, Shadows, SoftShadows, AntiAliasing, Plants, AO (wył/pół/pełna rozdzielczość), Fog (wył/lekka/realistyczna/gęsta = FogFactor), VolumetricFog, SunShafts, Bloom, Reflections (SsrSteps), Colours (realistyczne = 1/4 gradacji nordyckiej, kontrast 1.05, nasycenie 1.0 / nordyckie), Sharpen, Vignette; zapis w PlayerPrefs g_*; Settings.Changed -> DayCycle przelicza mgłę.
+- Post.shader Composite: mgła wysokościowa (gęstość przy y 0 _HFParams.x, zanik _HFParams.y; kolor _HFColor + słońce _HFSun x Henyey-Greenstein g 0.6; promień kończy się na powierzchni wody, bo woda nie jest w buforze głębi), wyostrzanie ograniczone sąsiadami, winieta. DayCycle: przy mgle wolumetrycznej płaska mgła x0.45, poranna mgła gęstnieje nisko.
+- Ustawienia mają zakładki GRAFIKA / EFEKTY / EKRAN I STEROWANIE; efekty widać od razu. Smoke: dawn vs dawn_flatfog, golden_a/b 17.3 h, gui_settings_graphics/effects.

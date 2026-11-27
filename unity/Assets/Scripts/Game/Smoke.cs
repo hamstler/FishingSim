@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using System;
 using System.Collections;
 using System.Text;
@@ -90,7 +90,10 @@ namespace FishingSim.Game
                          ("gui_login", on => GameRoot.ShowLoginForShot = on),
                          ("gui_loading", on => GameRoot.ShowLoadingForShot = on),
                          ("gui_travel", on => GameRoot.ShowTravelForShot = on),
+                         ("gui_map", on => GameRoot.ShowMapForShot = on),
                          ("gui_journal", on => GameRoot.ShowJournalForShot = on),
+                         ("gui_settings_graphics", on => GameRoot.SettingsShotTab = on ? 0 : -1),
+                         ("gui_settings_effects", on => GameRoot.SettingsShotTab = on ? 1 : -1),
                          ("gui_play", _ => { }),
                      })
             {
@@ -190,10 +193,17 @@ namespace FishingSim.Game
                 (12f, "pier", new Vector3(0f, WorldView.PierDeck, 4.5f), 180f),
                 (12f, "village", new Vector3(-2f, 0f, 9f), 0f),
                 (7f, "dawn", new Vector3(0f, WorldView.PierDeck, 4.5f), 180f),
+                (7f, "dawn_flatfog", new Vector3(0f, WorldView.PierDeck, 4.5f), 180f),
+                (17.3f, "golden_a", new Vector3(0f, WorldView.PierDeck, 4.5f), 180f),
+                (17.3f, "golden_b", new Vector3(0f, WorldView.PierDeck, 4.5f), 60f),
                 (20.5f, "night", new Vector3(-2f, 0f, 9f), 0f),
             };
             foreach (var (hour, name, at0, yaw) in views)
             {
+                // the same dawn without the height fog (the flat haze only), to compare
+                Settings.VolumetricFog = name != "dawn_flatfog";
+                Day.SetWeatherNow(Core.Weather.Clear);
+                Settings.Apply(Player.Camera);
                 var at = at0;
                 if (at.y == 0f)
                     at.y = Player.World.Lake.HeightAt(at.x, at.z);

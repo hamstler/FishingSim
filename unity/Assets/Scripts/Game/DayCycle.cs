@@ -51,7 +51,13 @@ namespace FishingSim.Game
             _moon.color = new Color(0.55f, 0.65f, 0.9f);
             RenderSettings.sun = _sun;
             Shader.SetGlobalFloat("_GradeStrength", 1f);
+            Settings.Changed += Invalidate;
         }
+
+        private void OnDestroy() => Settings.Changed -= Invalidate;
+
+        /// <summary>The graphics options changed: the fog and the mist are worked out again.</summary>
+        private void Invalidate() => _applied = (float.NaN, 0f, 0f);
 
         private Light MakeLight(string name, float intensity, LightShadows shadows)
         {
@@ -255,23 +261,38 @@ namespace FishingSim.Game
             // fog: haze lit by the sky; denser with cloud, rain and the morning mist
             float mist = MistAt(hour, Wind, _rain);
             float hazeLight = Mathf.Clamp(day + 0.3f * twilight, 0.06f, 1f);
-            RenderSettings.fog = true;
+            float fogFactor = Settings.FogFactor;
+            RenderSettings.fog = fogFactor > 0f;
             RenderSettings.fogMode = FogMode.Exponential;
             // (Godot: density 0.0016 with aerial perspective 0.75, which blends the far land towards the sky's darker blue
             // above the horizon, not its pale band: the mountains kept their brown slopes. Faded to the pale horizon here
             // they went bleached beige, so the clear-day haze is thinner and a deeper blue-grey.)
-            RenderSettings.fogDensity = Mathf.Lerp(0.0011f, 0.004f, _cloud) + _rain * 0.006f + 0.0006f * mist;
+            float density = (Mathf.Lerp(0.0011f, 0.004f, _cloud) + _rain * 0.006f + 0.0006f * mist) * fogFactor;
+            bool heightFog = Settings.VolumetricFog && fogFactor > 0f;
+            // with the height fog the flat haze keeps only the far aerial look; the rest lies low over the water and in
+            // the hollows (PostFx: exponential height fog, the sun scattered forwards through it)
+            RenderSettings.fogDensity = heightFog ? density * 0.45f : density;
             var haze = Color.Lerp(Color.Lerp(hor, new Color(0.42f, 0.53f, 0.63f), 0.55f), sunColour * 0.85f, 0.2f * golden);
             RenderSettings.fogColor = Color.Lerp(haze * 0.82f, haze, _cloud) * hazeLight;
             // under a grey sky the haze is a neutral grey (the blue haze stood apart from the grey sky above the hills)
             float fogGrey = RenderSettings.fogColor.grayscale;
             RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, new Color(fogGrey * 0.98f, fogGrey, fogGrey * 1.03f), Mathf.Clamp01(_cloud * 1.1f - 0.2f) * 0.8f);
 
+            Shader.SetGlobalFloat("_HFOn", heightFog ? 1f : 0f);
+            if (heightFog)
+            {
+                // density at the water level (y 0) and how fast it thins upwards: the morning mist is a thick low layer
+                Shader.SetGlobalVector("_HFParams", new Vector4(density * 0.75f + 0.022f * mist * fogFactor, Mathf.Lerp(0.04f, 0.32f, mist), 0f, 0f));
+                Shader.SetGlobalColor("_HFColor", RenderSettings.fogColor.linear);
+                float sunScatter = el > -0.05f ? (0.035f + 0.05f * mist + 0.04f * golden) * (1f - _cloud * 0.75f) * (1f - _rain * 0.6f) : 0f;
+                Shader.SetGlobalColor("_HFSun", sunColour.linear * _sun.intensity * sunScatter);
+            }
+
             // mist banks (dawn mist glows with the low sun; at dusk it goes blue-grey)
             if (_mistMat != null && _mistRenderer != null)
             {
                 float shown = Mathf.Round(mist * 40f) / 40f;
-                _mistRenderer.enabled = shown > 0.02f;
+                _mistRenderer.enabled = shown > 0.02f && fogFactor > 0f;
                 _mistMat.SetFloat("_Density", shown * 0.9f);
                 _mistMat.SetColor("_MistColor", Color.Lerp(SunColour(Mathf.Clamp01(el)), new Color(0.75f, 0.8f, 0.86f), 0.6f) * Mathf.Clamp(0.18f + el * 2.2f, 0.18f, 0.85f));
             }

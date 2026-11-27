@@ -211,6 +211,17 @@ namespace FishingSim.Game
             m.SetTexture("_GroundNrm", GroundLayers.Normal);
             m.SetTexture("_Noise", ProcTextures.NoiseField);
             m.SetTexture("_Caustics", ProcTextures.Caustics);
+            // Reuse the photographed materials for gravel banks, damp leaf litter and sandy spits.
+            var shore = System.IO.Path.GetFileNameWithoutExtension(loc.ResourcePath) switch
+            {
+                "wyrobisko" => new Vector2(.94f, .02f),
+                "gory" or "zapora" => new Vector2(.79f, .04f),
+                "jezioro_brzosz" or "pojezierze" => new Vector2(.53f, .18f),
+                "rozlewisko" or "starorzecze" => new Vector2(.08f, .76f),
+                "zatoka" or "staw" => new Vector2(.07f, .44f),
+                _ => new Vector2(.18f, .15f)
+            };
+            m.SetVector("_ShoreMix", new Vector4(shore.x, shore.y, 0f, 0f));
             var tints = new Vector4[GroundLayers.Count];
             tints[GroundLayers.Grass] = GroundLayers.Photo(GroundLayers.Calm(Gamma(loc.GrassColor)), GroundLayers.Grass, 0.45f);
             tints[GroundLayers.Forest] = GroundLayers.Photo(Color.Lerp(Gamma(loc.DarkGrassColor), Gamma(loc.PathColor), 0.6f) * 0.75f, GroundLayers.Forest, 0.15f);
@@ -304,7 +315,7 @@ namespace FishingSim.Game
             WaterMaterial.SetVector("_Extinction", new Vector4(Mathf.Clamp(gg / Mathf.Max(shallow.r, 0.02f), 1.2f, 3.2f), 1f, Mathf.Clamp(gg / Mathf.Max(shallow.b, 0.02f), 0.6f, 2.2f), 0f));
             WaterMaterial.SetTexture("_Ripples", ProcTextures.Ripples);
             WaterMaterial.SetTexture("_FoamNoise", ProcTextures.Foam);
-            WaterMaterial.SetFloat("_SsrSteps", Settings.Quality switch { 0 => 0f, 1 => 0f, 2 => 12f, 3 => 20f, _ => 32f });
+            WaterMaterial.SetFloat("_SsrSteps", Settings.SsrSteps);
             // the lake's depth over the map (Water.BuildDepthMap: 1.5 m cells, depth / 16 m)
             const float cell = 1.5f;
             int dw = Mathf.CeilToInt((Lake.XMax - Lake.XMin) / cell), dh = Mathf.CeilToInt((Lake.ZMax - Lake.ZMin) / cell);
