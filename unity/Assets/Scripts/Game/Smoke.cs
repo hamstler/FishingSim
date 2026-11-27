@@ -571,6 +571,15 @@ namespace FishingSim.Game
             // the cast: held (the rod rises to 60 degrees), let go (it swings back and the float flies): cast_0..5
             Player.Place(new Vector3(0f, WorldView.PierDeck, 4.5f), 180f);
             Player.Look(180f, 8f);
+            Rod.SmokeCast(Player.transform.position + Player.transform.forward * 40f);
+            yield return new WaitForSecondsRealtime(.4f);
+            yield return new WaitForEndOfFrame();
+            var distantFloat = ScreenCapture.CaptureScreenshotAsTexture();
+            SaveFull(distantFloat, "float_40m");
+            Destroy(distantFloat);
+            if (GameObject.Find("WagglerAntenna") is { } antenna)
+                Debug.Log($"SMOKE distant antenna screen {Player.Camera.WorldToScreenPoint(antenna.transform.TransformPoint(Vector3.up * .11f))}");
+            Rod.Reset();
             Rod.SmokeCharge = true;
             string[] castShots = { "cast_0_rest", "cast_1_up", "cast_2_swing", "cast_3_swing", "cast_4_fly", "cast_5_land" };
             for (int i = 0; i < 2; i++)
@@ -663,7 +672,7 @@ namespace FishingSim.Game
             SaveFull(fs, "fight");
             Destroy(fs);
             Rod.SmokeReel = false;
-            Debug.Log($"SMOKE fight: state {Rod.State}, load {Rod.LoadKg:0.00} kg of {Rod.EffectiveLimit:0.0}, line out {Rod.Fight?.LineOut ?? 0f:0.0} m");
+            Debug.Log($"SMOKE fight: state {Rod.State}, load {Rod.LoadKg:0.00} kg of {Rod.EffectiveLimit:0.0}, line out {Rod.Fight?.LineOut ?? 0f:0.0} m, bow {Rod.SmokeLineBow() * 100f:0.0} cm");
         }
 
         private static Texture2D Downscale(Texture2D src, int w, int h)

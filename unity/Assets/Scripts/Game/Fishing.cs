@@ -997,6 +997,16 @@ namespace FishingSim.Game
             _bobberRenderer = go.AddComponent<MeshRenderer>();
             _bobberRenderer.sharedMaterial = Materials.Lit(0.4f, 0f);
             _bobber = go.transform;
+            // A painted waggler antenna. Only its width is compensated at distance, so bite depth and tilt stay legible.
+            var antenna = new MeshKit();
+            var orange = Col.Lin(1f, .31f, .025f);
+            antenna.Tube(Vector3.up * .052f, Vector3.up * .074f, .004f, .004f, 12, white, white, true);
+            antenna.Tube(Vector3.up * .074f, Vector3.up * .089f, .004f, .004f, 12, Color.black, Color.black, true);
+            antenna.Tube(Vector3.up * .089f, Vector3.up * .205f, .004f, .004f, 12, orange, orange, true);
+            _antenna = new GameObject("WagglerAntenna").transform;
+            _antenna.SetParent(_bobber, false);
+            _antennaPaint = Materials.Unlit(Color.white);
+            Part(_antenna, "Paint", antenna.ToMesh("Painted antenna"), _antennaPaint);
             go.SetActive(false);
         }
 
@@ -1549,7 +1559,7 @@ namespace FishingSim.Game
             float surface = Waves.HeightAt(p.x, p.z, Time.time);
             float y = Method switch
             {
-                FishingMethod.Float => surface - 0.01f - _dip * 0.09f,
+                FishingMethod.Float => surface - 0.01f - _dip * 0.21f,
                 FishingMethod.Spinning => Lure != null ? Mathf.Max(surface - Lure.Depth, -DepthHere + 0.03f) : Mathf.Max(surface - 0.5f, -DepthHere + 0.1f),
                 _ => -DepthHere + 0.05f,
             };
@@ -1975,7 +1985,8 @@ namespace FishingSim.Game
             if (_bendModel != null)
             {
                 float load = BendLoad();
-                Vector3 target = lineOut ? _bobber.position : _frame.position + Vector3.down * 10f;
+                Vector3 target = State == RodState.Fight ? HookPosition :
+                    lineOut ? _bobber.position : _frame.position + Vector3.down * 10f;
                 var straightTip = new Vector3(0f, BlankStart + _bendModel.Length, 0f);
                 var dir = (_frame.InverseTransformPoint(target) - straightTip).normalized;
                 var perp = dir - Vector3.up * dir.y;
@@ -2031,6 +2042,8 @@ namespace FishingSim.Game
         }
 
         private Transform? _floatModel, _feederModel;
+        private Transform _antenna = null!;
+        private Material _antennaPaint = null!;
 
         /// <summary>
         /// The user's Meshy float (a waggler, 20 cm, riding with its body at the waterline and the antenna up) replaces
@@ -2050,6 +2063,18 @@ namespace FishingSim.Game
                 _feederModel = ModelFit.Place("tackle/feeder_cage", _bobber, 0.06f, Quaternion.Euler(90f, 0f, 0f), ModelFit.Anchor.Bottom, "FeederModel");
             }
             bool floatShown = _bobberRenderer.enabled && _line.gameObject.activeSelf;
+            if (_antenna.gameObject.activeSelf != floatShown) _antenna.gameObject.SetActive(floatShown);
+            if (floatShown)
+            {
+                var cam = Player.Camera;
+                float depth = Vector3.Dot(_bobber.position - cam.transform.position, cam.transform.forward);
+                float metresPerPixel = 2f * Mathf.Max(0f, depth) * Mathf.Tan(cam.fieldOfView * .5f * Mathf.Deg2Rad)
+                    / Mathf.Max(1, cam.scaledPixelHeight);
+                float width = Mathf.Clamp(3.3f * metresPerPixel / .008f, 1f, 18f);
+                _antenna.localScale = new Vector3(width, 1f, width);
+                float light = Mathf.Lerp(.018f, 1f, Day.Light);
+                _antennaPaint.color = new Color(light, light, light, 1f);
+            }
             if (_floatModel != null)
             {
                 _bobberRenderer.forceRenderingOff = true;
@@ -2066,6 +2091,17 @@ namespace FishingSim.Game
 
         private static Compat.Vector3 C(Vector3 v) => new(v.x, v.y, v.z);
         private static Vector3 U(Compat.Vector3 v) => new(v.X, v.Y, v.Z);
+        private Vector3 HookPosition => _fish.TransformPoint(Vector3.forward * .50f);
+
+        internal float SmokeLineBow()
+        {
+            var a = _ropePts[0];
+            var chord = _ropePts[_ropePts.Length - 1] - a;
+            float most = 0f;
+            foreach (var point in _ropePts)
+                most = Mathf.Max(most, Vector3.Cross(point - a, chord).magnitude);
+            return most / Mathf.Max(.001f, chord.magnitude);
+        }
 
         /// <summary>
         /// FishingRod.UpdateLine: the line paid out is a rope (Core's LineRope: hangs in the air, lies on the surface film,
@@ -2075,20 +2111,32 @@ namespace FishingSim.Game
         private void UpdateLine(float dt)
         {
             var a = _tip.position;
-            var b = _bobber.position + Vector3.up * (Method == FishingMethod.Float ? 0.09f : 0f);
+            var b = Method == FishingMethod.Float ? _bobber.TransformPoint(Vector3.down * .07f) : _bobber.position;
             bool drawing = Reeling && State is RodState.Waiting or RodState.Nibble or RodState.Bite && Slack < 0.08f;
             _drawTight = Mathf.MoveTowards(_drawTight, drawing ? 1f : 0f, dt * (drawing ? 6f : 1.5f));
             float ratio = State == RodState.Fight && Fight != null ? Mathf.Clamp01(Fight.Tension / Mathf.Max(EffectiveLimit, 0.1f)) : 0f;
-            if (State == RodState.Fight)
-                _lineLength = Vector3.Distance(a, b) * (1f + 0.004f * (1f - ratio));
+            _rope.LoadedSag = float.PositiveInfinity;
+            if (State == RodState.Fight && Fight is { } fight)
+            {
+                b = HookPosition;
+                float span = Vector3.Distance(a, b);
+                float excess = Mathf.Max(0f, fight.LineOut - fight.Distance);
+                _lineLength = span + excess;
+                if (excess <= .3f && fight.Tension > .06f * fight.PeakPull)
+                {
+                    // Small-deflection sag wL²/(8T), with an effective wet line mass and tension expressed in kgf.
+                    float diameter = (LineItem?.Diameter ?? .25f) * .001f;
+                    float massPerMetre = Mathf.PI * diameter * diameter * .25f * 1150f;
+                    _rope.LoadedSag = Mathf.Max(.005f, massPerMetre * span * span / (8f * fight.Tension));
+                    _lineLength = span;
+                }
+            }
             if (!_ropeLive)
             {
                 _rope.Reset(C(a), C(b));
                 _ropeLive = true;
             }
-            // the line's own physics shapes it: a retrieve only takes the slack out of the rope (a light line's sag stays),
-            // the fight keeps it at the distance (above); no pulling of the points onto a straight line (that glued the
-            // line to the rod: a fast swing whipped it round as a rigid stick)
+            // Outside a loaded fight, the rope retains the excess paid out and moves under wind and gravity.
             float dist = Vector3.Distance(a, b);
             float ropeLength = Mathf.Max(_lineLength, 0.05f);
             if (_drawTight > 0f)
@@ -2099,6 +2147,20 @@ namespace FishingSim.Game
             var pts = _rope.Positions;
             for (int i = 0; i < pts.Length; i++)
                 _ropePts[i] = U(pts[i]);
+            if (State == RodState.Fight && Method == FishingMethod.Float)
+            {
+                float remaining = FloatDepth;
+                for (int i = pts.Length - 1; i > 0; i--)
+                {
+                    float segment = Vector3.Distance(_ropePts[i], _ropePts[i - 1]);
+                    if (remaining <= segment || i == 1)
+                    {
+                        _bobber.position = Vector3.Lerp(_ropePts[i], _ropePts[i - 1], remaining / Mathf.Max(.0001f, segment));
+                        break;
+                    }
+                    remaining -= segment;
+                }
+            }
             var c = LineItem?.LineColor ?? new Compat.Color(0.9f, 0.9f, 0.86f);
             _line.Color = Color.Lerp(new Color(c.R, c.G, c.B), new Color(1f, 0.2f, 0.15f), Mathf.Clamp01((ratio - 0.5f) * 2f));
             _line.SetPositions(_ropePts, pts.Length);

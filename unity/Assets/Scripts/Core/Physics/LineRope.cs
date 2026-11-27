@@ -33,6 +33,8 @@ public sealed class LineRope
 
     /// <summary>The line paid out between the tip and the end (m).</summary>
     public float Length { get; set; } = 1f;
+    // Maximum midpoint sag of a loaded span, in metres. An unloaded rope follows the normal Verlet solve.
+    public float LoadedSag { get; set; } = float.PositiveInfinity;
 
     /// <summary>The water's surface height.</summary>
     public float WaterY { get; set; }
@@ -167,8 +169,24 @@ public sealed class LineRope
                 float lb = b.Length();
                 if (lb > toEnd)
                     p = end + b * (toEnd / lb);
-                _p[i] = Contain(p, _bed[i]);
+                float fraction = i / (float)(Points - 1);
+                float film = MathF.Min(WaterY, tip.Y + (end.Y - tip.Y) * fraction);
+                _p[i] = Contain(p, _bed[i], film);
             }
+        }
+        if (float.IsPositiveInfinity(LoadedSag)) return;
+        for (int i = 1; i < Points - 1; i++)
+        {
+            float t = i / (float)(Points - 1);
+            var chord = tip.Lerp(end, t);
+            var offset = _p[i] - chord;
+            float limit = 4f * t * (1f - t) * LoadedSag;
+            float distance = offset.Length();
+            if (distance <= limit) continue;
+            var constrained = chord + offset * (limit / distance);
+            constrained.Y = MathF.Max(constrained.Y, _bed[i]);
+            _prev[i] += constrained - _p[i];
+            _p[i] = constrained;
         }
     }
 
@@ -210,10 +228,10 @@ public sealed class LineRope
     }
 
     /// <summary>Keeps a point on or above the floating line's surface film and above the bottom.</summary>
-    private Vector3 Contain(Vector3 p, float bed)
+    private Vector3 Contain(Vector3 p, float bed, float film)
     {
-        if (Floats && p.Y < WaterY && SinkSpeed <= 0f)
-            p.Y = WaterY;
+        if (Floats && p.Y < film && SinkSpeed <= 0f)
+            p.Y = film;
         if (p.Y < bed)
             p.Y = bed;
         return p;
