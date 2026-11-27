@@ -1,5 +1,10 @@
 # Zmiany
 
+## 0.13.0 (Unity 6)
+- Nowe modele z Meshy AI: łódka wiosłowa z wiosłami, spławik (waggler), koszyk zanętowy przy metodzie gruntowej, a na pomoście siatka na ryby zwisająca do wody, podbierak, rod pod z dzwonkiem i widełki z leszczyny przy brzegu.
+- Żyłka ma własną fizykę: 120 punktów, bezwładność przy szybkim machnięciu wędką, bez sztywnego prostowania. Przechodzi przez pierścienie przelotek modelu wędki i jest rysowana bez schodków i przerywania.
+- Łódka: podłoga i ławki mieszczą się w kadłubie, wnętrze bez szachownicy.
+
 ## 0.12.3 (Unity 6)
 - Dziesięć dotychczasowych łowisk otrzymało nowe krajobrazy inspirowane rzeczywistymi jeziorami. Zmieniono obrys wody, zatoki, wyspy, głęboczki, roślinność i ukształtowanie brzegu. Poziomy dostępu i identyfikatory zapisów pozostają zgodne z 0.12.2.
 - Ustawienia grafiki w zakładkach (Grafika, Efekty, Ekran i sterowanie): osobno tekstury, cienie i miękkie cienie, wygładzanie krawędzi, roślinność, okluzja otoczenia, mgła, mgła wolumetryczna (nisko nad wodą, świeci od słońca), promienie słońca, poświata, odbicia na wodzie, kolory realistyczne lub nordyckie, wyostrzanie i winieta. Ustawienia wstępne wypełniają wszystkie opcje.

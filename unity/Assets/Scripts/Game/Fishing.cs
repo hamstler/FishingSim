@@ -2027,6 +2027,41 @@ namespace FishingSim.Game
             }
             UpdateLine(dt);
             _bobberRenderer.enabled = Method == FishingMethod.Float || State == RodState.Fight && Method == FishingMethod.Float;
+            TackleModels();
+        }
+
+        private Transform? _floatModel, _feederModel;
+
+        /// <summary>
+        /// The user's Meshy float (a waggler, 20 cm, riding with its body at the waterline and the antenna up) replaces
+        /// the built float once loaded, and a cage feeder (6 cm, lying on its side) shows on the bottom rig; each follows
+        /// the built float's visibility.
+        /// </summary>
+        private void TackleModels()
+        {
+            if (_floatModel == null && ModelLibrary.Has("tackle/float_waggler"))
+            {
+                _floatModel = ModelFit.Place("tackle/float_waggler", _bobber, 0.2f, Quaternion.identity, ModelFit.Anchor.Centre, "FloatModel");
+                if (_floatModel != null)
+                    _floatModel.localPosition = new Vector3(0f, 0.03f, 0f);
+            }
+            if (_feederModel == null && ModelLibrary.Has("tackle/feeder_cage"))
+            {
+                _feederModel = ModelFit.Place("tackle/feeder_cage", _bobber, 0.06f, Quaternion.Euler(90f, 0f, 0f), ModelFit.Anchor.Bottom, "FeederModel");
+            }
+            bool floatShown = _bobberRenderer.enabled && _line.gameObject.activeSelf;
+            if (_floatModel != null)
+            {
+                _bobberRenderer.forceRenderingOff = true;
+                if (_floatModel.gameObject.activeSelf != floatShown)
+                    _floatModel.gameObject.SetActive(floatShown);
+            }
+            if (_feederModel != null)
+            {
+                bool feeder = Method == FishingMethod.Bottom && _line.gameObject.activeSelf && State != RodState.Fight;
+                if (_feederModel.gameObject.activeSelf != feeder)
+                    _feederModel.gameObject.SetActive(feeder);
+            }
         }
 
         private static Compat.Vector3 C(Vector3 v) => new(v.x, v.y, v.z);

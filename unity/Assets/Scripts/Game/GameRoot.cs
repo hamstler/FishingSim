@@ -217,6 +217,15 @@ namespace FishingSim.Game
             }
         }
 
+        /// <summary>The user's Meshy models of the boat and the tackle (assets/models/props and tackle).</summary>
+        public static readonly string[] MeshyGear =
+        {
+            "props/rowboat", "props/oar", "tackle/float_waggler", "tackle/feeder_cage",
+            "tackle/keepnet", "tackle/landing_net", "tackle/rodpod_bell", "tackle/rodrest_fork",
+            // (float_stick, float_slider and feeder_method are in assets/models/tackle too, for later float and feeder
+            // choices; not loaded until something shows them)
+        };
+
         /// <summary>The models a fishery needs: its village and people, the camp, the other anglers, its fish.</summary>
         private List<string> ModelsFor(int index)
         {
@@ -235,6 +244,8 @@ namespace FishingSim.Game
             foreach (var sp in Tackle.AllSpecies)
                 if (loc.AbundanceOf(sp.SpeciesName) > 0f)
                     ids.Add("fish/" + Path.GetFileNameWithoutExtension(sp.ResourcePath));
+            // the Meshy gear: the rowboat and oars, the float and feeder, the pier's keepnet, landing net and rests
+            ids.AddRange(MeshyGear);
             return ids;
         }
 

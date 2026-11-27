@@ -50,3 +50,9 @@ Wspólna tablica dwóch agentów pracujących nad wersją Unity (`unity/`). Każ
 - Przelotki: Fishing.FindModelGuides znajduje pierścienie w siatce modelu wędki (najszerszy pas każdej przelotki) i stawia znaczniki w sekcjach; żyłka w wędce idzie przez nie (float_ostoja: 6). Bufor _inRod 32.
 - FishingLine.shader: pasek co najmniej 2,5 px z wygładzonym profilem (koniec schodków i przerywania).
 - Boat.cs: kadłub z gładkimi normalnymi (koniec szachownicy w środku), deski podłogi i ławki dopasowane do szerokości kadłuba (podłoga wychodziła przez burty). Smoke: line_still, line_swing, boat.
+
+## 2026-11-27 Claude: modele Meshy w grze, 0.13.0
+- 11 modeli z Meshy (Test/meshy, surowe do 4,6 mln trójkątów i 8K) zmniejszone meshy_fish.py --file ... --keep-mr --keep-seams do assets/models/props (rowboat 150k, oar 30k) i assets/models/tackle (spławiki, koszyki 20k; podbierak, siatka, rod pod 60k; widełki 30k), sprawdzone prop_qa.py (Test/meshy/qa).
+- ModelFit.Place/PlaceBox: model Meshy w prawdziwym wymiarze (obrót, skala jednolita lub na osie, kotwica dół/środek/góra). glTFast odbija oś X pliku: obroty są lustrem widoku z Blendera.
+- Boat.UseModel: kadłub dopasowany do pudełka 1,45 x 0,8 x 4,3 m, wiosła w dulkach; zbudowany kadłub zostaje jako zapas. Fishing.TackleModels: spławik waggler 20 cm, koszyk przy gruncie. WorldView.PierGear: siatka do wody, podbierak z koszem nad wodą, rod pod, widełki przy brzegu. GameRoot.MeshyGear ładuje je z łowiskiem.
+- Nieużyte jeszcze: float_stick, float_slider, feeder_method. Zbliżenie spławika w teście nie wyszło (gracz przestawia kamerę).

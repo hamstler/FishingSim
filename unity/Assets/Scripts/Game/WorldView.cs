@@ -95,6 +95,7 @@ namespace FishingSim.Game
             LoadLog.Begin("water and pier");
             MakeWater(location);
             MakePier();
+            PierGear();
             LoadLog.End("water and pier");
             Progress = 0.5f;
             yield return null;
@@ -331,6 +332,33 @@ namespace FishingSim.Game
         /// colour wander, rain streaks, moss in patches), darker posts and rails soaked from the waterline up, festoon
         /// lights on masts behind the casting spot and a lantern post at the shore end. Painted boards without the set.
         /// </summary>
+        /// <summary>
+        /// The angler's gear on and by the pier (Meshy models, when present): the keepnet hung from the pier's end into
+        /// the water, the landing net lying on the deck with its hoop over the water, a rod pod with a bell near the end
+        /// and two hazel rod rests in the bank at the pier's root.
+        /// </summary>
+        private void PierGear()
+        {
+            float deck = PierDeck;
+            // keepnet: its top ring at the deck's edge, slanting down and out into the water (glTFast mirrors the file's
+            // x on import, so the turns are the mirror of what Blender shows)
+            if (ModelFit.Place("tackle/keepnet", transform, 2.0f, Quaternion.Euler(0f, 0f, 55f), ModelFit.Anchor.Centre, "Keepnet") is { } keepnet)
+                keepnet.position = new Vector3(2.3f, deck - 0.6f, -3.4f);
+            // landing net: the handle along the deck, the hoop and bag hanging over the water past the pier's left edge
+            if (ModelFit.Place("tackle/landing_net", transform, 2.5f, Quaternion.identity, ModelFit.Anchor.Top, "LandingNet") is { } net)
+                net.position = new Vector3(-0.95f, deck + 0.035f, -2.6f);
+            // rod pod: standing on the deck near the end, pointing out over the water
+            if (ModelFit.Place("tackle/rodpod_bell", transform, 1.2f, Quaternion.Euler(0f, 90f, 0f), ModelFit.Anchor.Bottom, "RodPod") is { } pod)
+                pod.position = new Vector3(0.75f, deck, -3.0f);
+            // hazel rests pushed 20 cm into the bank either side of the pier's root
+            for (int i = 0; i < 2; i++)
+            {
+                float x = i == 0 ? -2.3f : 2.3f, z = 6.9f;
+                if (ModelFit.Place("tackle/rodrest_fork", transform, 1.0f, Quaternion.Euler(0f, i * 70f + 20f, 0f), ModelFit.Anchor.Bottom, $"RodRest{i}") is { } rest)
+                    rest.position = new Vector3(x, Lake.HeightAt(x, z) - 0.2f, z);
+            }
+        }
+
         private void MakePier()
         {
             var wood = Photos.Weathered("weathered_brown_planks", new Color(0.92f, 0.9f, 0.86f), 0.85f, moss: 0.22f);

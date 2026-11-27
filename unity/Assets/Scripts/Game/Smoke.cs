@@ -383,6 +383,24 @@ namespace FishingSim.Game
                 var still = ScreenCapture.CaptureScreenshotAsTexture();
                 SaveFull(still, "line_still");
                 Destroy(still);
+                // the float close up: a camera half a metre off it, just above the water
+                {
+                    var fl = GameObject.Find("FloatModel");
+                    var cam = Player.Camera;
+                    var keep = (cam.transform.position, cam.transform.rotation);
+                    if (fl != null)
+                    {
+                        var fp = fl.transform.position;
+                        cam.transform.position = fp + new Vector3(0.45f, 0.12f, 0.25f);
+                        cam.transform.LookAt(fp + Vector3.up * 0.03f);
+                        yield return new WaitForEndOfFrame();
+                        var fs = ScreenCapture.CaptureScreenshotAsTexture();
+                        SaveFull(fs, "float_close");
+                        Destroy(fs);
+                        cam.transform.SetPositionAndRotation(keep.Item1, keep.Item2);
+                    }
+                    Debug.Log($"SMOKE float model {(fl != null ? "shown" : "missing")}");
+                }
                 for (int i = 1; i <= 5; i++)
                 {
                     Player.Look(180f + i * 9f, 8f - i * 2f);
@@ -412,6 +430,20 @@ namespace FishingSim.Game
                 SaveFull(bs, "boat");
                 Destroy(bs);
                 Rod.ShowRod(true);
+            }
+            // the angler's gear at the pier's end (keepnet into the water, landing net, rod pod)
+            {
+                Player.Place(new Vector3(-0.3f, WorldView.PierDeck, 0.8f), 165f);
+                Player.Look(165f, 28f);
+                Rod.ShowRod(false);
+                for (int i = 0; i < 20; i++)
+                    yield return null;
+                yield return new WaitForEndOfFrame();
+                var gs = ScreenCapture.CaptureScreenshotAsTexture();
+                SaveFull(gs, "pier_gear");
+                Destroy(gs);
+                Rod.ShowRod(true);
+                Debug.Log($"SMOKE meshy gear: {string.Join(", ", System.Array.ConvertAll(GameRoot.MeshyGear, id => id + (ModelLibrary.Has(id) ? " ok" : " MISSING")))}");
             }
             Debug.Log(ok ? "SMOKE OK" : "SMOKE FAIL: magenta pixels (a shader failed)");
             Application.Quit(ok ? 0 : 1);

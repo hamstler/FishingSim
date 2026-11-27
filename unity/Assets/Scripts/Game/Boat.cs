@@ -43,6 +43,38 @@ namespace FishingSim.Game
             _hull.gameObject.AddComponent<MeshRenderer>().sharedMaterial = mat;
             _oarL = Oar(-1f, mat);
             _oarR = Oar(1f, mat);
+            UseModel();
+        }
+
+        private bool _modelled;
+
+        /// <summary>
+        /// The user's Meshy rowboat and oars when they are loaded: the hull fitted per axis to the built hull's box
+        /// (4.3 m long, 1.45 m beam, 0.8 m to the stem heads: the oars, the seat and the collisions keep their places),
+        /// the oars in their rowlock pivots, blade outwards. The built hull stays as the fallback.
+        /// </summary>
+        public void UseModel()
+        {
+            if (_modelled || !ModelLibrary.Has("props/rowboat"))
+                return;
+            // the model lies along x: turned to run along the hull's z
+            var hull = ModelFit.PlaceBox("props/rowboat", _hull, new Vector3(1.45f, 0.8f, 4.3f), Quaternion.Euler(0f, 90f, 0f), ModelFit.Anchor.Bottom, "HullModel");
+            if (hull == null)
+                return;
+            _modelled = true;
+            if (_hull.GetComponent<MeshRenderer>() is { } built)
+                built.enabled = false;
+            foreach (var pivot in new[] { _oarL, _oarR })
+            {
+                float side = pivot == _oarL ? -1f : 1f;
+                // the model's blade is at its +x end: the right oar as it is, the left turned round
+                var oar = ModelFit.Place("props/oar", pivot, 2.4f, Quaternion.Euler(0f, side < 0f ? 180f : 0f, 0f), ModelFit.Anchor.Centre, "OarModel");
+                if (oar == null)
+                    continue;
+                oar.localPosition = new Vector3(side * 0.55f, 0f, 0f);     // the handle inboard, the loom through the rowlock
+                if (pivot.Find("Shaft") is { } shaft && shaft.GetComponent<MeshRenderer>() is { } r)
+                    r.enabled = false;
+            }
         }
 
         private Transform Oar(float side, Material mat)
@@ -157,6 +189,7 @@ namespace FishingSim.Game
 
         public void ResetToMooring()
         {
+            UseModel();
             Aboard = false;
             Anchored = false;
             _velocity = Vector3.zero;
