@@ -40,8 +40,10 @@ for pb in arm.pose.bones:
     pb.scale = (1.0, 1.0, 1.0)
     pb.lock_location = (True, True, True)
     pb.lock_scale = (True, True, True)
-    # small wire handles: full-size spheres hid the arm and the fingers being posed
-    pb.custom_shape_scale_xyz = (0.15, 0.15, 0.15)
+    # barely visible wire beads, 1.5-6 mm (the shape's size is in metres here: use_custom_shape_bone_size is off, so
+    # a "scale" of 0.15 made 15 cm spheres that hid the arm and the fingers being posed)
+    r = min(0.006, max(0.0015, 0.08 * pb.bone.length))
+    pb.custom_shape_scale_xyz = (r, r, r)
     pb.bone.show_wire = True
 scene.frame_start = scene.frame_end = scene.frame_current = 1
 # the skin follows the bones in the viewport (the automatic posing switched that off while it computed)
