@@ -15,7 +15,14 @@ Writes Test/Fisherman_Untex_chwyt/wedkarz_chwyt.blend (bones named: ramie_P, prz
 kciuk_01_r.., wskazujacy_01_r, srodkowy_01_r, serdeczny_01_r, maly_01_r; left _L/_l; the rod "Wedka", reel
 "Kolowrotek", crank "Korba", knob "Galka") and renders: the eye's view, both hands from four sides.
 
-    blender -b --python tools/assets/untex_grip.py -- [--no-render]
+    blender -b --python tools/assets/untex_grip.py -- [--no-render] [--src FIGURE.glb --out FOLDER]
+
+Any SmartRig figure works (e.g. X:/Gra/Model_postaci/Meshy_AI_Rugged_Outdoorsman_..._character.glb): the bones are
+recognised by the skeleton's shape, not by their numbers (the spine up from the root, the arms off the chest's top to
+either side, the thumb as the finger standing apart, the other fingers by their distance from it, the legs down). At the
+end an anatomy report compares the pose with the textbook spinning grip (elbow 70-100 deg, wrist near neutral, forearm
+between pronation and supination, upper arm close to the trunk, thumb opposed, the reel's foot between the middle and
+ring fingers).
 """
 import json
 import math
@@ -32,7 +39,13 @@ OUT = os.path.join(ROOT, "Test", "Fisherman_Untex_chwyt")
 ROD_ID, REEL_ID = "rods/float_ostoja", "reels/small_hokuto"
 ROD_LENGTH = 2.4          # the starter rod (s_jesion_240): its tip decides the framing
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+if "--src" in argv:
+    SRC = os.path.abspath(argv[argv.index("--src") + 1])
+if "--out" in argv:
+    OUT = os.path.abspath(argv[argv.index("--out") + 1])
 RENDER = "--no-render" not in argv
+PART = "--no-part" not in argv          # cut the scan's strips between welded fingers (Fisherman_Untex needs it)
+ARMS_ONLY = "--full-body" not in argv   # the game shows only the arms: the rest is cut away before saving
 CLEAR = 0.0012            # skin to tackle when a finger stops (m)
 os.makedirs(OUT, exist_ok=True)
 
@@ -67,29 +80,83 @@ arm = next(o for o in scene.objects if o.type == "ARMATURE")
 body = next(o for o in scene.objects if o.type == "MESH" and not o.name.startswith("Icosphere"))
 arm.name, body.name = "Szkielet", "Wedkarz"
 
-# SmartRig's numbered bones -> names (the figure faces -Y: its right is -X)
-NAMES = {
-    "Bone_000": "biodra", "Bone_001": "miednica", "Bone_008": "kregoslup_01", "Bone_007": "kregoslup_02",
-    "Bone_006": "kregoslup_03", "Bone_005": "kregoslup_04", "Bone_004": "kregoslup_05", "Bone_003": "klatka",
-    "Bone_002": "szyja_dol", "Bone_019": "szyja", "Bone_018": "glowa", "Bone_017": "glowa_czubek",
-    "Bone_024": "obojczyk_P", "Bone_023": "ramie_P", "Bone_022": "przedramie_P", "Bone_021": "dlon_P", "Bone_020": "srodrecze_P",
-    "Bone_029": "obojczyk_L", "Bone_028": "ramie_L", "Bone_027": "przedramie_L", "Bone_026": "dlon_L", "Bone_025": "srodrecze_L",
-    "Bone_012": "udo_P", "Bone_011": "lydka_P", "Bone_010": "stopa_P", "Bone_009": "palce_stopy_P",
-    "Bone_016": "udo_L", "Bone_015": "lydka_L", "Bone_014": "stopa_L", "Bone_013": "palce_stopy_L",
-}
-FINGERS = {  # first bone of each chain (four bones each, parent to child)
-    "r": {"kciuk": "Bone_033", "wskazujacy": "Bone_041", "srodkowy": "Bone_049", "serdeczny": "Bone_045", "maly": "Bone_037"},
-    "l": {"kciuk": "Bone_053", "wskazujacy": "Bone_061", "srodkowy": "Bone_069", "serdeczny": "Bone_065", "maly": "Bone_057"},
-}
-for side, chains in FINGERS.items():
-    for finger, first in chains.items():
-        b = arm.data.bones[first]
-        for i in range(4):
-            NAMES[b.name] = f"{finger}_{i + 1:02d}_{side}"
+# SmartRig's numbered bones -> names (the figure faces -Y: its right is -X). The numbers differ from figure to figure,
+# so the bones are recognised by the skeleton's shape.
+def skeleton_names(bones):
+    names = {}
+    up = lambda b: b.tail_local.z - b.head_local.z
+
+    def run(b, labels):
+        """b and its single-child descendants named by labels (extra bones get a numbered last label)."""
+        out = []
+        i = 0
+        while b is not None:
+            lab = labels[i] if i < len(labels) else f"{labels[-1]}_{i - len(labels) + 2}"
+            names[b.name] = lab
+            out.append(b)
             kids = list(b.children)
-            if not kids:
-                break
-            b = kids[0]
+            if len(kids) != 1:
+                return out, kids
+            b, i = kids[0], i + 1
+        return out, []
+
+    root = next(b for b in bones if b.parent is None)
+    names[root.name] = "biodra"
+    # the pelvis: the root's only child, else the root itself carries the legs and the spine
+    pelvis = root.children[0] if len(root.children) == 1 else root
+    if pelvis.name != root.name:
+        names[pelvis.name] = "miednica"
+    # the spine: the child going up, followed to the bone where the arms branch off (three children)
+    spine = max(pelvis.children, key=up)
+    chain = []
+    b = spine
+    while b is not None and len(b.children) == 1:
+        chain.append(b)
+        b = b.children[0]
+    top = b                       # the chest's top: the neck and the two clavicles hang on it
+    if chain:
+        *verts, klatka = chain
+        for i, v in enumerate(verts):
+            names[v.name] = f"kregoslup_{i + 1:02d}"
+        names[klatka.name] = "klatka"
+    names[top.name] = "szyja_dol"
+    neck = max(top.children, key=lambda c: c.tail_local.z)
+    run(neck, ["szyja", "glowa", "glowa_czubek"])
+    hands = {}
+    for c in top.children:
+        if c.name == neck.name:
+            continue
+        side = "P" if c.tail_local.x < 0 else "L"
+        arm_bones, fingers = run(c, [f"obojczyk_{side}", f"ramie_{side}", f"przedramie_{side}", f"dlon_{side}", f"srodrecze_{side}"])
+        hands[side] = (arm_bones[-1], fingers)
+    for side, (palm, fingers) in hands.items():
+        def tip(f):
+            while f.children:
+                f = f.children[0]
+            return f.tail_local
+
+        tips = {f.name: tip(f) for f in fingers}
+
+        # the thumb stands apart: its tip is farthest from the other fingers' tips
+        def apart(f):
+            return sum((tips[f.name] - tips[g.name]).length for g in fingers if g.name != f.name)
+
+        thumb = max(fingers, key=apart)
+        rest = sorted((f for f in fingers if f.name != thumb.name), key=lambda f: (f.head_local - thumb.head_local).length)
+        lower = "r" if side == "P" else "l"
+        for finger, first in zip(["kciuk", "wskazujacy", "srodkowy", "serdeczny", "maly"], [thumb] + rest):
+            run(first, [f"{finger}_{i:02d}_{lower}" for i in range(1, 5)])
+    for c in pelvis.children:
+        if c.name == spine.name:
+            continue
+        side = "P" if c.tail_local.x < 0 else "L"
+        run(c, [f"udo_{side}", f"lydka_{side}", f"stopa_{side}", f"palce_stopy_{side}"])
+    return names
+
+
+NAMES = skeleton_names(list(arm.data.bones))
+FINGER_NAMES = ("kciuk", "wskazujacy", "srodkowy", "serdeczny", "maly")
+FINGERS = {"r": FINGER_NAMES, "l": FINGER_NAMES}   # each finger's four bones: <finger>_01.._04_<side>
 # the game's grip code looks the middle finger's knuckle up as middle_01_<side>: named so too via an alias below
 for old, new in NAMES.items():
     if old in arm.data.bones:
@@ -284,7 +351,7 @@ for v in bm.verts:
         lvl = 2 if u > 0.4 else 1
     dom[v.index] = (fid, lvl)
 bridges = []
-for fc in bm.faces:
+for fc in (bm.faces if PART else []):
     owners = {dom[v.index][0] for v in fc.verts if dom[v.index][0]}
     level = max(dom[v.index][1] for v in fc.verts)
     if len(owners) >= 2 and level >= 2 and not any(o.startswith("kciuk") for o in owners):
@@ -294,7 +361,7 @@ bmesh.ops.delete(bm, geom=bridges, context="FACES")
 # of one finger's vertices beyond the web (never at the knuckles, never across two fingers), small runs only, fanned
 # to the run's middle with that finger's own weights
 nexts = {}
-for e in bm.edges:
+for e in (bm.edges if PART else []):
     if not e.is_boundary:
         continue
     a_, b_ = e.verts
@@ -606,6 +673,18 @@ log("handle radius by z:", " ".join(f"{z:+.2f}:{r * 1000:.1f}" for z, r in zip(z
 INV_ROD = np.array(inv_rod)
 
 
+def cork_clearance(points, pct=2.0):
+    """The skin's distance to the handle's cork cylinder alone (no reel parts), the closest pct % ignored: soft tissue
+    squashes a little where it presses, and one finger brushing the reel's stem must not push the whole hand away."""
+    if len(points) == 0:
+        return 1.0
+    loc = (INV_ROD @ np.c_[points, np.ones(len(points))].T).T[:, :3]
+    r = np.hypot(loc[:, 0], loc[:, 1])
+    rad = np.interp(loc[:, 2], zbins, rprof, left=0.0, right=0.0)
+    d = (r - rad)[rad > 0]
+    return float(np.percentile(d, pct)) if len(d) else 1.0
+
+
 def clearance(points, tree=None):
     """Smallest distance (m) from points to the tackle; negative inside the handle."""
     if len(points) == 0:
@@ -716,9 +795,22 @@ def chain(s, finger):
     return [f"{finger}_{i:02d}_{s}" for i in range(1, 5)]
 
 
+FLEX_LOCAL = {}
+
+
 def flex_axis(name, palm_n):
-    d = (tail(name) - head(name)).normalized()
-    return d.cross(palm_n).normalized()
+    """The joint's hinge axis. Taken once, while the finger is still straight (bone direction x palm normal), in the
+    bone's own frame, then turned with the bone: recomputed from the bent finger it fell apart (past ~60 deg at the
+    knuckle the next bone points along the palm's normal, the cross product vanished and the joint twisted the finger
+    sideways instead of bending it)."""
+    rot = (AW @ pose[name].matrix).to_3x3().normalized()
+    if name not in FLEX_LOCAL:
+        d = (tail(name) - head(name)).normalized()
+        FLEX_LOCAL[name] = rot.inverted() @ d.cross(palm_n).normalized()
+    return (rot @ FLEX_LOCAL[name]).normalized()
+
+
+CLOSED = {"r": set(), "l": set()}
 
 
 def close_finger(s, finger, palm_n, limits=(85, 100, 80, 40), couple=(1.0, 1.1, 0.8, 0.4), start=0, extra=None, toward=None):
@@ -736,11 +828,12 @@ def close_finger(s, finger, palm_n, limits=(85, 100, 80, 40), couple=(1.0, 1.1, 
 
     # the neighbouring fingers and the palm are obstacles too (curled fingers went through each other): their skin as
     # it lies now, in a tree of its own
+    # (only neighbours already closed: a straight finger not yet curled blocked the ring finger at its first joint)
     others = set()
     order = ("kciuk", "wskazujacy", "srodkowy", "serdeczny", "maly")
     i_ = order.index(finger)
     for j in (i_ - 1, i_ + 1):
-        if 0 <= j < len(order) and order[j] != "kciuk" and finger != "kciuk":
+        if 0 <= j < len(order) and order[j] != "kciuk" and finger != "kciuk" and order[j] in CLOSED[s]:
             others |= set(chain(s, order[j]))
     opts = skinned(s, others) if others else np.zeros((0, 3))
     kd_o = kdtree.KDTree(max(len(opts), 1))
@@ -781,6 +874,7 @@ def close_finger(s, finger, palm_n, limits=(85, 100, 80, 40), couple=(1.0, 1.1, 
             else:
                 hi = mid
         apply([base_ang[i] + (target[i] - base_ang[i]) * lo for i in range(4)])
+    CLOSED[s].add(finger)
     pts = skinned(s, owned)
     c = clearance(pts, TREE[s])
     log(f"  {finger}_{s}: angles {', '.join(f'{a:.0f}' for a in total)} deg, clearance {c * 1000:.1f} mm")
@@ -810,6 +904,8 @@ def twist_angle(lower, hand):
     rest_rel = arm.data.bones[lower].matrix_local.to_3x3().inverted() @ arm.data.bones[hand].matrix_local.to_3x3()
     delta = ((fore.inverted() @ hand_world) @ rest_rel.inverted()).to_quaternion()
     tw = Quaternion((delta.w, 0.0, delta.y, 0.0)).normalized()
+    if tw.w < 0:
+        tw = -tw                     # the short way round (q and -q are the same turn)
     return 2 * math.atan2(tw.y, tw.w)
 
 
@@ -824,6 +920,8 @@ def untwist(lower, hand, share=1.0):
     now_rel = fore.inverted() @ hand_world
     delta = (now_rel @ rest_rel.inverted()).to_quaternion()      # in the forearm's frame
     twist = Quaternion((delta.w, 0.0, delta.y, 0.0)).normalized()
+    if twist.w < 0:
+        twist = -twist
     angle = 2 * math.atan2(twist.y, twist.w)
     axis_world = (tail(lower) - head(lower)).normalized()
     rotate_world(twist_bone, Quaternion(axis_world, angle * share))
@@ -883,8 +981,10 @@ def stages():
     f, a, n, knuckles, w = hand_frame(s, S)
     four = ("wskazujacy", "srodkowy", "serdeczny", "maly")
     saved = {nm: pose[nm].matrix.copy() for f_ in four for nm in chain(s, f_)}
+    # each finger curled to the middle of its textbook range (MCP, PIP, DIP, tip): the hook the handle lies in
+    HOOK = {"wskazujacy": (48, 62, 28, 10), "srodkowy": (58, 78, 35, 12), "serdeczny": (60, 82, 40, 12), "maly": (65, 82, 42, 14)}
     for f_ in four:
-        for i, ang in enumerate((40, 75, 50, 15)):
+        for i, ang in enumerate(HOOK[f_]):
             nm = f"{f_}_{i + 1:02d}_r"
             rotate_world(nm, Quaternion(flex_axis(nm, n), math.radians(ang)))
     centres = {}
@@ -892,13 +992,16 @@ def stages():
         joints = [head(f"{f_}_{i:02d}_r") for i in (2, 3, 4)]
         mid = sum(joints, Vector()) / 3
         inward = ((head(f"{f_}_01_r") + n * 0.012) - mid).normalized()
-        centres[f_] = mid + inward * (R_HANDLE + 0.008)
+        centres[f_] = mid + inward * (R_HANDLE + 0.009)     # a finger's half thickness and the cork's radius
     for f_ in four:
         for nm in chain(s, f_):
             pose[nm].matrix = saved[nm]
             update()
     # the handle lies across the palm's diagonal: from inside the index finger's hook to the heel of the hand on the
     # little finger's side (the hypothenar), as a rod's handle does, so the forearm can run along the rod
+    # the handle across the palm's diagonal: from inside the index finger's hook to the heel of the hand on the little
+    # finger's side (the hypothenar). (A line fitted through all four hooks was tried: measured from the bone axes, the
+    # hooks missed a thick hand's skin by centimetres.)
     width = (head("wskazujacy_01_r") - head("maly_01_r")).length
     heel = w + (knuckles - w) * 0.3 + n * (R_HANDLE + 0.011) - a * (0.35 * width)
     u = (centres["wskazujacy"] - heel).normalized()
@@ -930,8 +1033,7 @@ def stages():
     f, a, n, knuckles, w = hand_frame(s, S)
     hand_rot = (AW @ pose["dlon_P"].matrix).to_3x3().normalized()
     base_wrist = head("dlon_P")
-    touch = {"srodrecze_P"}            # the palm itself (the wrist's skin now eases into the hand and lies by the handle's diagonal)
-
+    touch = {"srodrecze_P"}            # the palm itself
 
     def slide(off):
         two_bone_ik("ramie_P", "przedramie_P", "dlon_P", base_wrist - n * off, POLE["P"])
@@ -939,10 +1041,11 @@ def stages():
         return clearance(skinned(s, touch), KD_GRIP)
 
 
-    lo_, hi_ = 0.0, 0.05            # lo touching or inside, hi clear: find the boundary
-    if slide(lo_) >= CLEAR:
-        lo_, hi_ = -0.05, 0.0
-        lo_, hi_ = hi_, lo_
+    # lo touching or inside, hi clear: find the boundary (towards the cork when the palm stands off it, away when in it)
+    if slide(0.0) >= CLEAR:
+        lo_, hi_ = 0.0, 0.0              # standing off the cork: left where the grip line put it
+    else:
+        lo_, hi_ = 0.0, 0.05
     for _ in range(14):
         mid = (lo_ + hi_) / 2
         if slide(mid) >= CLEAR:
@@ -953,8 +1056,77 @@ def stages():
     log(f"  right palm on the cork: moved {hi_ * 1000:.1f} mm off the handle, clearance {c * 1000:.1f} mm")
     yield "dlon dosunieta do korka"
     f, a, n, knuckles, w = hand_frame(s, S)
+
+    # ---- the hand seated by search: every finger round the cork, none in it
+    # Pressing the palm along its normal stopped at the first touch and left a thick hand 1.5 cm off the cork (the ring
+    # and little fingers and the thumb could not reach). Here the hand is moved towards / away from the cork and rolled
+    # about the rod's axis; at each place the fingers take the middle of their textbook ranges and each finger's (and
+    # the palm's) distance to the cork is measured. The place where all four are closest without going in wins.
+    fingers4 = ("wskazujacy", "srodkowy", "serdeczny", "maly")
+    MIDCURL = {"wskazujacy": (48, 62, 28, 10), "srodkowy": (58, 78, 35, 12), "serdeczny": (60, 82, 40, 12), "maly": (65, 82, 42, 14)}
+    straight = {nm: pose[nm].matrix_basis.copy() for f_ in fingers4 for nm in chain(s, f_)}
+    seat_wrist = head("dlon_P")
+    seat_rot = (AW @ pose["dlon_P"].matrix).to_3x3().normalized()
+
+    def cork_d(pts, pct=1.0):
+        loc = (INV_ROD @ np.c_[pts, np.ones(len(pts))].T).T[:, :3]
+        rad = np.interp(loc[:, 2], zbins, rprof, left=0.0, right=0.0)
+        d = (np.hypot(loc[:, 0], loc[:, 1]) - rad)[rad > 0]
+        return float(np.percentile(d, pct)) if len(d) else 0.05     # off the cork's length: as if far
+
+    def seat(off, roll, k=1.0):
+        rq = Quaternion(Zr, math.radians(roll))
+        wt = on_axis + rq @ (seat_wrist - n * off - on_axis)
+        two_bone_ik("ramie_P", "przedramie_P", "dlon_P", wt, POLE["P"])
+        set_world_rotation("dlon_P", rq.to_matrix() @ seat_rot)
+        for nm, mb in straight.items():
+            pose[nm].matrix_basis = mb
+        update()
+        fr = hand_frame(s, S)
+        for f_ in fingers4:
+            for i, ang in enumerate(MIDCURL[f_]):
+                nm = f"{f_}_{i + 1:02d}_r"
+                rotate_world(nm, Quaternion(flex_axis(nm, fr[2]), math.radians(ang * k)))
+        pts_f = {f_: skinned(s, set(chain(s, f_))) for f_ in fingers4}
+        pts_f["dlon"] = skinned(s, {"srodrecze_P", "dlon_P"})        # (the forearm lies along the butt in this grip)
+        per = {k_: cork_d(p_) for k_, p_ in pts_f.items()}               # the reach (1 % closest)
+        worst = {k_: cork_d(p_, 0.0) for k_, p_ in pts_f.items()}        # the deepest point
+        gap = sum(max(0.0, per[f_]) for f_ in fingers4) + 1.5 * max(0.0, per["dlon"])   # the palm on the cork too
+        deep = sum(max(0.0, -worst[k_] - 0.001) for k_ in worst)       # skin in the cork: never, beyond 1 mm
+        return gap + 25.0 * deep, worst
+
+    best = None
+    for k in (0.6, 0.8, 1.0):                       # how far the fingers curl (share of the ranges' middles)
+        for roll in (-60, -45, -30, -15, 0, 15):
+            for off_mm in range(-30, 51, 5):
+                score, per = seat(off_mm / 1000.0, roll, k)
+                if best is None or score < best[0]:
+                    best = (score, off_mm, roll, k, per)
+    # finer round the best
+    _, off0, roll0, k0, _ = best
+    for roll in (roll0 - 7, roll0, roll0 + 7):
+        for off_mm in range(off0 - 4, off0 + 5, 2):
+            score, per = seat(off_mm / 1000.0, roll, k0)
+            if score < best[0]:
+                best = (score, off_mm, roll, k0, per)
+    score, off_mm, roll, kc, per = best
+    seat(off_mm / 1000.0, roll, kc)
+    MIDCURL = {f_: tuple(a_ * kc for a_ in v_) for f_, v_ in MIDCURL.items()}
+    log(f"  right hand seated: {off_mm:+d} mm along the palm's normal, rolled {roll:+d} deg about the rod, fingers at "
+        f"{kc:.0%} of the ranges' middles; " + ", ".join(f"{k_} {v_ * 1000:+.1f} mm" for k_, v_ in per.items()))
+    yield "dlon osadzona na rekojesci"
+    f, a, n, knuckles, w = hand_frame(s, S)
+    # the fingers first take the hook the handle's line was measured in (it lies inside them, not in the straight
+    # fingers), the reel's foot between the middle and ring fingers (the ring finger steps aside off the stem), then
+    # each closes on to the cork
+    spread(s, "serdeczny", n, head("maly_01_r") - head("serdeczny_01_r"), max_deg=12.0)
+    # the upper ends of the textbook ranges (MCP, PIP, DIP; the tip bone follows the DIP): index 35-60/45-80/15-40,
+    # middle 45-70/60-95/20-50, ring 45-75/65-100/25-55, little 50-80/65-100/25-60
+    LIMITS = {"wskazujacy": (60, 80, 40, 15), "srodkowy": (70, 95, 50, 20), "serdeczny": (75, 100, 55, 20), "maly": (80, 100, 60, 25)}
     for finger in four:
-        close_finger(s, finger, n)
+        # (limits counted from the hook already taken)
+        close_finger(s, finger, n, limits=tuple(max(0, l_ - m_) for l_, m_ in zip(LIMITS[finger], MIDCURL[finger])),
+                     couple=(1.0, 1.0, 1.0, 1.0))
         yield f"palec {finger}"
     # the thumb: turned to lie along the top of the handle towards the tip, then closed onto it
     tb = "kciuk_01_r"
@@ -1019,7 +1191,10 @@ def stages():
         bend = straight_wrist_pole("L", wrist_new, q.to_matrix() @ hand_rest_l, apply=True, step=20, quiet=True)
         twist = abs(math.degrees(twist_angle("przedramie_L", "dlon_L")))
         # the palm away from the reel's body (on the outside of the knob); little twist (the sleeve folds past ~60 deg)
-        score = -bend - 0.8 * max(0.0, twist - 40.0) + 25.0 * (q @ n).dot(Xr)
+        # and the elbow bent 70-100 deg (the textbook spinning stance)
+        el_ = head("przedramie_L")
+        flex_ = 180.0 - math.degrees((head("ramie_L") - el_).angle(head("dlon_L") - el_))
+        score = -bend - 4.0 * max(0.0, twist - 30.0) + 25.0 * (q @ n).dot(Xr) - 1.5 * max(0.0, 70.0 - flex_, flex_ - 100.0)
         if best is None or score > best[0]:
             best = (score, q, wrist_new, deg)
     _, q, wrist_new, deg = best
@@ -1029,9 +1204,15 @@ def stages():
     log(f"  left hand: turned {deg} deg about the knob, wrist {tuple(round(c, 3) for c in head('dlon_L'))}, off by {(head('dlon_L') - wrist_new).length * 1000:.1f} mm")
     yield "lewa dlon przy galce"
     f, a, n, knuckles, w = hand_frame(s, S)
+    # the ring and little fingers loosely curled first (a relaxed hand), then closed on whatever they meet
+    for f_ in ("serdeczny", "maly"):
+        for i, ang in enumerate((55, 70, 45, 15)):
+            nm = f"{f_}_{i + 1:02d}_l"
+            rotate_world(nm, Quaternion(flex_axis(nm, n), math.radians(ang)))
     spread(s, "wskazujacy", n, a, max_deg=6.0)      # off the crank's arm, towards the thumb side (more opened the web)
-    for finger in ("wskazujacy", "srodkowy", "serdeczny", "maly"):
-        close_finger(s, finger, n, limits=((90, 100, 80, 40) if finger == "wskazujacy" else (60, 70, 55, 25) if finger == "srodkowy" else (50, 65, 45, 20)), toward=knob if finger in ("wskazujacy", "srodkowy") else None)
+    for finger in ("wskazujacy", "srodkowy"):
+        # the ring and little fingers curl round beside the knob (a relaxed fist), never left hanging open
+        close_finger(s, finger, n, limits=((90, 100, 80, 40) if finger == "wskazujacy" else (85, 100, 70, 30) if finger == "srodkowy" else (40, 35, 25, 15)), toward=knob if finger in ("wskazujacy", "srodkowy") else None)
         yield f"palec {finger}"
     # the thumb over the knob from the other side
     close_finger(s, "kciuk", n, limits=(40, 60, 60, 30), couple=(0.6, 1.0, 0.9, 0.5), start=0, toward=knob)
@@ -1069,7 +1250,64 @@ def stages():
     yield "gotowe"
 
 
+def anatomy_report():
+    """The pose against the textbook spinning grip (right-handed, standing, fixed-spool reel under the rod)."""
+    def ang(a, b):
+        return math.degrees(a.angle(b)) if a.length > 1e-6 and b.length > 1e-6 else 0.0
+
+    down = Vector((0, 0, -1))
+    fwd = Vector((0, -1, 0))
+    lines = []
+    for side, s_ in (("P", "r"), ("L", "l")):
+        sh, el, wr = head(f"ramie_{side}"), head(f"przedramie_{side}"), head(f"dlon_{side}")
+        upper, fore = el - sh, wr - el
+        hand = head(f"srodkowy_01_{s_}") - wr
+        flex = 180.0 - ang(-upper, fore)                 # elbow flexion: 0 = a straight arm
+        out = Vector((-1, 0, 0)) if side == "P" else Vector((1, 0, 0))
+        # shoulder: flexion = the upper arm swung forwards from hanging, abduction = swung out sideways
+        sh_flex = math.degrees(math.atan2(upper.dot(fwd), upper.dot(down)))
+        sh_abd = math.degrees(math.atan2(upper.dot(out), upper.dot(down)))
+        wrist = ang(fore, hand)                          # the hand's line off the forearm's line
+        f_ = fore.normalized()
+        # forearm rotation: the thumb side of the hand against "up" about the forearm (0 = mid position, thumb up)
+        thumb_dir = head(f"wskazujacy_01_{s_}") - head(f"maly_01_{s_}")
+        tb = (thumb_dir - f_ * thumb_dir.dot(f_)).normalized()
+        upr = (Vector((0, 0, 1)) - f_ * f_.z).normalized()
+        rot = ang(upr, tb)
+        lines.append(f"{'prawa' if side == 'P' else 'lewa'} reka: lokiec zgiety {flex:.0f} st (opis: 70-100), "
+                     f"bark: zgiecie {sh_flex:.0f} st, odwiedzenie {sh_abd:.0f} st (opis: niewielkie, ramie blisko tulowia), "
+                     f"nadgarstek {wrist:.0f} st od osi przedramienia (opis: blisko neutralnej), "
+                     f"przedramie obrocone {rot:.0f} st od pozycji posredniej (kciuk do gory)")
+    th = tail(next(n for n in ("kciuk_04_r", "kciuk_03_r") if n in arm.data.bones))
+    lines.append(f"kciuk prawej: koniuszek {(th - head('wskazujacy_02_r')).length * 100:.1f} cm od palca wskazujacego (opozycja, oba na rekojesci)")
+    for l_ in lines:
+        log("ANATOMIA", l_)
+    with open(os.path.join(OUT, "anatomia.txt"), "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+
+
+def cut_to_arms():
+    """Only what follows the arms stays (the game shows the arms and hands alone)."""
+    keys = ("ramie", "przedramie", "dlon", "srodrecze", "kciuk", "wskazujacy", "srodkowy", "serdeczny", "maly")
+    names_ = {g.index: g.name for g in body.vertex_groups}
+    armw = np.zeros(len(body.data.vertices))
+    for v in body.data.vertices:
+        armw[v.index] = sum(g.weight for g in v.groups if names_.get(g.group, "").startswith(keys))
+    bm_ = bmesh.new()
+    bm_.from_mesh(body.data)
+    bm_.verts.ensure_lookup_table()
+    bmesh.ops.delete(bm_, geom=[f_ for f_ in bm_.faces if any(armw[v.index] < 0.5 for v in f_.verts)], context="FACES")
+    bmesh.ops.delete(bm_, geom=[v for v in bm_.verts if not v.link_faces], context="VERTS")
+    bm_.to_mesh(body.data)
+    bm_.free()
+    body.data.update()
+    log(f"cut to the arms: {len(body.data.vertices)} vertices left")
+
+
 def finish(render):
+    anatomy_report()
+    if ARMS_ONLY:
+        cut_to_arms()
     # ------------------------------------------------------------------ the skin back on, the scene saved
     armmod.show_viewport = True
     update()
@@ -1132,8 +1370,9 @@ def finish(render):
                             ("gora", -Yr + outside * 0.25 + Zr * 0.1), ("dol", Yr * 0.8 + outside * 0.7 - Zr * 0.3),
                             ("tyl", -Zr + outside * 0.5 - Yr * 0.4)):
                 shot(f"{nm}_{view}", centre + d.normalized() * 0.3, centre, lens=45)
-        shot("calosc", seat_world + Vector((-1.4, -2.0, 0.35)), seat_world + Vector((0, 0, 0.2)), lens=35)
-        shot("calosc_bok", seat_world + Vector((-2.3, 0.2, 0.25)), seat_world + Vector((0, 0, 0.15)), lens=40)
+        far = 0.45 if ARMS_ONLY else 1.0     # the arms alone: closer
+        shot("calosc", seat_world + Vector((-1.4, -2.0, 0.35)) * far, seat_world + Vector((0, 0, 0.2 * far)), lens=35)
+        shot("calosc_bok", seat_world + Vector((-2.3, 0.2, 0.25)) * far, seat_world + Vector((0, 0, 0.15 * far)), lens=40)
 
 
 # ------------------------------------------------------------------ run: at once, or live in Blender's window
