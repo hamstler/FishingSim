@@ -115,10 +115,8 @@ def linux():
         print(f"PACK {os.path.basename(n)}: {os.path.getsize(n) / 1048576:.0f} MB")
     with open(os.path.join(OUT, "SHA256SUMS"), "w", newline="\n") as fh:
         fh.write("\n".join(sums) + "\n")
-    # Unix line endings whatever the checkout did (bash stops at the first )
-    script = open(os.path.join(ROOT, "tools", "release", "linux", "install.sh"), "rb").read().replace(b"
-", b"
-")
+    # Unix line endings whatever the checkout did (bash stops at the first carriage return)
+    script = open(os.path.join(ROOT, "tools", "release", "linux", "install.sh"), "rb").read().replace(b"\r\n", b"\n")
     with open(os.path.join(OUT, "install.sh"), "wb") as fh:
         fh.write(script)
     print("PACK SHA256SUMS, install.sh")
