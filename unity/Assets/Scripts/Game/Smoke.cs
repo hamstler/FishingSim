@@ -388,13 +388,15 @@ namespace FishingSim.Game
                 while (!Ready() && Time.realtimeSinceStartup - t0 < 300f)
                     yield return null;
                 string id = System.IO.Path.GetFileNameWithoutExtension(Player.World.Lake.Location.ResourcePath);
+                var basin = Player.World.Lake.Location.HolePos;
+                float yaw = Mathf.Atan2(basin.X, basin.Y + 3.5f) * Mathf.Rad2Deg;
                 Day.SetWeatherNow(Core.Weather.Clear);
                 GameRoot.HideHud = true;
                 Rod.ShowRod(false);
                 foreach (var (hour, suffix) in new[] { (17.3f, "17"), (10f, "10") })
                 {
-                    Player.Place(new Vector3(0f, WorldView.PierDeck + 7f, -3.5f), 210f);
-                    Player.Look(210f, 6f);
+                    Player.Place(new Vector3(0f, WorldView.PierDeck + 7f, -3.5f), yaw);
+                    Player.Look(yaw, 6f);
                     Day.Hour = hour;
                     Day.Apply();
                     for (int i = 0; i < 40; i++)

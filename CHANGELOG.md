@@ -1,5 +1,10 @@
 # Zmiany
 
+## 0.12.3 (Unity 6)
+- Dziesięć dotychczasowych łowisk otrzymało nowe krajobrazy inspirowane rzeczywistymi jeziorami. Zmieniono obrys wody, zatoki, wyspy, głęboczki, roślinność i ukształtowanie brzegu. Poziomy dostępu i identyfikatory zapisów pozostają zgodne z 0.12.2.
+- Ustawienia grafiki w zakładkach (Grafika, Efekty, Ekran i sterowanie): osobno tekstury, cienie i miękkie cienie, wygładzanie krawędzi, roślinność, okluzja otoczenia, mgła, mgła wolumetryczna (nisko nad wodą, świeci od słońca), promienie słońca, poświata, odbicia na wodzie, kolory realistyczne lub nordyckie, wyostrzanie i winieta. Ustawienia wstępne wypełniają wszystkie opcje.
+- Wersja dla Windows z instalatorem (skróty, odinstalowanie) i wersja dla Linuksa (skrypt instalacji bez uprawnień administratora).
+
 ## 0.12.2 (Unity 6)
 - M otwiera plan bieżącego łowiska z pozycją i kierunkiem patrzenia gracza, głębokością wody, pomostami i zabudową.
 - Drzewa przy brzegu korzystają z tekstur źródłowych do 4K. Udział żwiru, piasku i ściółki zależy od łowiska.

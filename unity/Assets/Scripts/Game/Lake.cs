@@ -375,7 +375,8 @@ public sealed class Lake
         h += KnollsAt(x, z) * Smooth(4f, 12f, sd) * (0.35f + 0.65f * free);
         float hollow = HollowsAt(x, z) * Smooth(9f, 22f, sd) * free * (1f - 0.4f * village);
         h = MathF.Max(h - hollow, MathF.Min(h, 0.9f));
-        return h + (1.8f - h) * Smooth(22f, 48f, sd);
+        return h + (1.8f - h) * Smooth(22f, 48f, sd)
+            + loc.BankRelief(x, z) * Smooth(0f, 5f, sd) * free;
     }
 
     public static bool OnPier(float x, float z) => MathF.Abs(x) <= 1.6f && z >= -4.2f && z <= 6.2f;

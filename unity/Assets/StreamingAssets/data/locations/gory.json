@@ -1,18 +1,18 @@
 {
  "$type": "LocationData",
- "DisplayName": "Górskie Jezioro",
- "Description": "Chłodne jezioro wśród sosen i skał. Głębokie, czyste, z dużymi szczupakami.",
+ "DisplayName": "Dolina Rotoiti",
+ "Description": "Nowa Zelandia · Nelson Lakes. Rynna polodowcowa wchodzi między zalesione stoki. Z bocznej zatoki widać strome zbocze nad głęboką wodą.",
  "RequiredLevel": 4,
- "OutlineCz": -62.0,
- "OutlineRx": 98.0,
- "OutlineRz": 64.0,
- "Slope": 0.2,
- "MaxDepth": 12.0,
+ "OutlineCz": -65,
+ "OutlineRx": 43,
+ "OutlineRz": 67,
+ "Slope": 0.27,
+ "MaxDepth": 16.0,
  "HolePos": {
-  "X": 10.0,
-  "Y": -45.0
+  "X": -9.0,
+  "Y": -104.0
  },
- "HoleDepth": 4.0,
+ "HoleDepth": 6.0,
  "HoleRadius": 10.0,
  "BarPos": {
   "X": -20.0,
@@ -77,33 +77,33 @@
   "A": 1.0
  },
  "WaterShallowColor": {
-  "R": 0.06,
-  "G": 0.23,
-  "B": 0.25,
+  "R": 0.1373,
+  "G": 0.3373,
+  "B": 0.2941,
   "A": 1.0
  },
  "WaterDeepColor": {
-  "R": 0.012,
-  "G": 0.06,
-  "B": 0.1,
+  "R": 0.0235,
+  "G": 0.098,
+  "B": 0.1098,
   "A": 1.0
  },
  "FogBoost": 0.0015,
- "RimHeight": 130.0,
- "SnowLine": 34.0,
- "RockLine": 12.0,
+ "RimHeight": 0,
+ "SnowLine": 999,
+ "RockLine": 15.5,
  "HillScale": 1.45,
- "TreeDensity": 0.9,
+ "TreeDensity": 1.25,
  "TreeMix": {
-  "pine": 1.0,
-  "spruce": 0.8,
-  "birch": 0.3
+  "oak": 1.0,
+  "birch": 0.32,
+  "spruce": 0.09
  },
  "BushDensity": 0.6,
  "FlowerDensity": 0.5,
  "LilyDensity": 0.15,
- "ReedDensity": 0.3,
- "RockDensity": 2.6,
+ "ReedDensity": 0.22,
+ "RockDensity": 1.18,
  "PlazaCenter": {
   "X": 0.0,
   "Y": 26.0
@@ -147,17 +147,28 @@
   "villager,6,50"
  ],
  "Lobes": [
-  "-38,-85,15,22"
+  "-11,-117,34,38",
+  "35,-38,21,22"
  ],
- "Islands": [
-  "22,-88,9",
-  "38,-76,5"
- ],
+ "Islands": [],
  "Landmarks": [
-  "waterfall,-52,-145,0",
-  "rocks,22,-88",
-  "rocks,38,-76"
+  "rocks,-36,-79",
+  "rocks,38,-103"
  ],
  "WaterClarity": 6.0,
- "WaterTemperature": 11.5
+ "WaterTemperature": 11.5,
+ "BankSummit": {
+  "X": -54.0,
+  "Y": 31.0,
+  "Z": -87.0
+ },
+ "SecondBankSummit": {
+  "X": 48.0,
+  "Y": 22.0,
+  "Z": -115.0
+ },
+ "ShoreMix": {
+  "X": 0.72,
+  "Y": 0.13
+ }
 }

@@ -1,18 +1,18 @@
 {
  "$type": "LocationData",
- "DisplayName": "Rozlewisko Czarne",
- "Description": "Rozległe, ciemne rozlewisko z wyspami. Po zmroku warto szukać suma.",
+ "DisplayName": "Ramiona Yellowstone",
+ "Description": "USA · Yellowstone Lake. Szeroką misę jeziora przecinają dwa długie ramiona. Na zachodzie osobna, głęboka zatoka wcina się w sosnowy brzeg.",
  "RequiredLevel": 21,
- "OutlineRx": 136.0,
- "OutlineRz": 86.0,
- "OutlineCz": -84.0,
- "Slope": 0.11,
- "MaxDepth": 8,
+ "OutlineRx": 105,
+ "OutlineRz": 58,
+ "OutlineCz": -56,
+ "Slope": 0.2,
+ "MaxDepth": 15.0,
  "HolePos": {
-  "X": 24.0,
-  "Y": -51.0
+  "X": -96.0,
+  "Y": -57.0
  },
- "HoleDepth": 2.0,
+ "HoleDepth": 9.0,
  "HoleRadius": 16.0,
  "BarPos": {
   "X": -36.0,
@@ -29,35 +29,36 @@
   "Karaś srebrzysty": 0.85
  },
  "Lobes": [
-  "-90,-39,28,18"
+  "-96,-55,43,36",
+  "-53,-121,34,54",
+  "52,-132,31,60"
  ],
  "Islands": [
-  "-44,-69,13",
-  "38,-87,14",
-  "-22,-31,11"
+  "23,-74,5"
  ],
  "WaterShallowColor": {
-  "R": 0.1,
-  "G": 0.14,
-  "B": 0.065,
+  "R": 0.1529,
+  "G": 0.298,
+  "B": 0.2627,
   "A": 1.0
  },
  "WaterDeepColor": {
-  "R": 0.02,
-  "G": 0.055,
-  "B": 0.035,
+  "R": 0.0275,
+  "G": 0.1059,
+  "B": 0.1255,
   "A": 1.0
  },
  "WaterClarity": 1.8,
  "WaterTemperature": 21.0,
  "TreeMix": {
-  "willow": 1.0,
-  "birch": 0.35
+  "pine": 1.0,
+  "spruce": 0.43,
+  "birch": 0.12
  },
- "TreeDensity": 0.85,
- "ReedDensity": 1.45,
- "RimHeight": 30.0,
- "SnowLine": 999.0,
+ "TreeDensity": 0.92,
+ "ReedDensity": 0.36,
+ "RimHeight": 0,
+ "SnowLine": 999,
  "PlazaCenter": {
   "X": 0.0,
   "Y": 18.0
@@ -73,7 +74,23 @@
  ],
  "HillScale": 0.3,
  "Landmarks": [
-  "bridge,-22,-16,90,35",
-  "stilthouse,53,-8"
- ]
+  "rocks,-121,-76",
+  "platforms,61,-8"
+ ],
+ "BankSummit": {
+  "X": -89.0,
+  "Y": 13.0,
+  "Z": -127.0
+ },
+ "SecondBankSummit": {
+  "X": 87.0,
+  "Y": 16.0,
+  "Z": -139.0
+ },
+ "ShoreMix": {
+  "X": 0.55,
+  "Y": 0.08
+ },
+ "RockDensity": 0.85,
+ "RockLine": 8.0
 }

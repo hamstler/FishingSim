@@ -212,16 +212,7 @@ namespace FishingSim.Game
             m.SetTexture("_Noise", ProcTextures.NoiseField);
             m.SetTexture("_Caustics", ProcTextures.Caustics);
             // Reuse the photographed materials for gravel banks, damp leaf litter and sandy spits.
-            var shore = System.IO.Path.GetFileNameWithoutExtension(loc.ResourcePath) switch
-            {
-                "wyrobisko" => new Vector2(.94f, .02f),
-                "gory" or "zapora" => new Vector2(.79f, .04f),
-                "jezioro_brzosz" or "pojezierze" => new Vector2(.53f, .18f),
-                "rozlewisko" or "starorzecze" => new Vector2(.08f, .76f),
-                "zatoka" or "staw" => new Vector2(.07f, .44f),
-                _ => new Vector2(.18f, .15f)
-            };
-            m.SetVector("_ShoreMix", new Vector4(shore.x, shore.y, 0f, 0f));
+            m.SetVector("_ShoreMix", new Vector4(loc.ShoreMix.X, loc.ShoreMix.Y, 0f, 0f));
             var tints = new Vector4[GroundLayers.Count];
             tints[GroundLayers.Grass] = GroundLayers.Photo(GroundLayers.Calm(Gamma(loc.GrassColor)), GroundLayers.Grass, 0.45f);
             tints[GroundLayers.Forest] = GroundLayers.Photo(Color.Lerp(Gamma(loc.DarkGrassColor), Gamma(loc.PathColor), 0.6f) * 0.75f, GroundLayers.Forest, 0.15f);

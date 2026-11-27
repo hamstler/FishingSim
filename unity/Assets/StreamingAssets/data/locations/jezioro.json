@@ -1,14 +1,14 @@
 {
  "$type": "LocationData",
- "DisplayName": "Jezioro Zielone",
- "OutlineCz": -50.0,
- "OutlineRx": 74.0,
- "OutlineRz": 52.0,
- "Slope": 0.15,
+ "DisplayName": "Bledzka Toń",
+ "OutlineCz": -40,
+ "OutlineRx": 61,
+ "OutlineRz": 42,
+ "Slope": 0.19,
  "MaxDepth": 8.0,
  "HolePos": {
-  "X": 12.0,
-  "Y": -40.0
+  "X": -12.0,
+  "Y": -46.0
  },
  "HoleDepth": 4.0,
  "HoleRadius": 9.0,
@@ -66,7 +66,7 @@
   "Troć wędrowna": 0.15
  },
  "RequiredLevel": 1,
- "Description": "Duże jezioro z głębokim dołem i podwodną górką. Dobre na początek, dużo płoci i leszczy.",
+ "Description": "Słowenia · Bled. Kaplica na samotnej wyspie stoi naprzeciw skalnego cypla z wieżą.",
  "GrassColor": {
   "R": 0.26,
   "G": 0.42,
@@ -92,34 +92,33 @@
   "A": 1.0
  },
  "WaterShallowColor": {
-  "R": 0.1,
-  "G": 0.165,
-  "B": 0.11,
+  "R": 0.0627,
+  "G": 0.2039,
+  "B": 0.1451,
   "A": 1.0
  },
  "WaterDeepColor": {
-  "R": 0.02,
-  "G": 0.05,
-  "B": 0.045,
+  "R": 0.0118,
+  "G": 0.1255,
+  "B": 0.098,
   "A": 1.0
  },
  "FogBoost": 0.0,
- "RimHeight": 70.0,
- "SnowLine": 60.0,
- "RockLine": 38.0,
+ "RimHeight": 0,
+ "SnowLine": 999,
+ "RockLine": 9.0,
  "HillScale": 0.9,
  "TreeDensity": 1.0,
  "TreeMix": {
   "oak": 1.0,
-  "birch": 0.8,
-  "spruce": 0.7,
-  "pine": 0.1
+  "birch": 0.45,
+  "spruce": 0.5
  },
  "BushDensity": 1.0,
  "FlowerDensity": 1.0,
  "LilyDensity": 1.0,
- "ReedDensity": 1.0,
- "RockDensity": 0.5,
+ "ReedDensity": 0.45,
+ "RockDensity": 0.6,
  "PlazaCenter": {
   "X": 0.0,
   "Y": 28.0
@@ -180,18 +179,30 @@
   "villager,40,50"
  ],
  "Lobes": [
-  "-39,-46,12,11",
-  "35,-52,13,8"
+  "22,-42,48,30"
  ],
  "Islands": [
-  "-18,-42,8",
-  "8,-24,9"
+  "-19,-42,7"
  ],
  "Landmarks": [
-  "tower,-41,-101",
-  "chapel,83,6",
-  "bridge,8,-10,90,24"
+  "chapel,-19,-42",
+  "tower,-65,-38",
+  "rocks,-57,-40"
  ],
  "WaterClarity": 3.5,
- "WaterTemperature": 17
+ "WaterTemperature": 17,
+ "BankSummit": {
+  "X": -65.0,
+  "Y": 18.0,
+  "Z": -38.0
+ },
+ "SecondBankSummit": {
+  "X": 33.0,
+  "Y": 7.0,
+  "Z": -83.0
+ },
+ "ShoreMix": {
+  "X": 0.38,
+  "Y": 0.12
+ }
 }

@@ -67,6 +67,23 @@ public partial class LocationData : Resource
 
     /// <summary>Multiplier for how tall the surrounding hills are.</summary>
     [Export] public float HillScale { get; set; } = 1f;
+    /// <summary>Local shoreline summits in world metres (X, elevation, Z).</summary>
+    [Export] public Vector3 BankSummit { get; set; }
+    [Export] public Vector3 SecondBankSummit { get; set; }
+    [Export] public Vector2 ShoreMix { get; set; } = new(0.18f, 0.15f);
+
+    public float BankRelief(float x, float z)
+    {
+        static float Dome(Vector3 peak, float dx, float dz)
+        {
+            if (peak.Y <= 0f) return 0f;
+            float radius = 9f + peak.Y * 1.3f;
+            float u = (dx - peak.X) / radius, v = (dz - peak.Z) / (radius * 1.35f);
+            float t = System.MathF.Max(0f, 1f - u * u - v * v);
+            return peak.Y * t * t;
+        }
+        return Dome(BankSummit, x, z) + Dome(SecondBankSummit, x, z);
+    }
 
     /// <summary>
     /// How the village is built: "timber" (half-timbered plaster, thatch), "farm" (painted board houses, clay tiles),

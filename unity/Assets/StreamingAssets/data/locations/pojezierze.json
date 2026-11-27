@@ -1,18 +1,18 @@
 {
  "$type": "LocationData",
- "DisplayName": "Jezioro Sosnowe",
- "Description": "Chłodny akwen pośród sosen. Głębokie rynny są domem sielawy i siei.",
+ "DisplayName": "Sosnowe Szkiery Inari",
+ "Description": "Finlandia · Inarijärvi. Sosny wyrastają z kamienistych wysepek. Między nimi biegną głębokie przejścia, a przy cyplach dno znów jest płytkie.",
  "RequiredLevel": 16,
- "OutlineRx": 127.0,
- "OutlineRz": 81.0,
- "OutlineCz": -79.0,
+ "OutlineRx": 101,
+ "OutlineRz": 62,
+ "OutlineCz": -60,
  "Slope": 0.2,
- "MaxDepth": 13,
+ "MaxDepth": 13.0,
  "HolePos": {
-  "X": 22.0,
-  "Y": -48.0
+  "X": 15.0,
+  "Y": -98.0
  },
- "HoleDepth": 4.0,
+ "HoleDepth": 6.0,
  "HoleRadius": 14.0,
  "BarPos": {
   "X": -34.0,
@@ -29,34 +29,43 @@
   "Okoń": 0.85
  },
  "Lobes": [
-  "69,-100,33,18"
+  "-83,-84,46,36",
+  "68,-122,44,36",
+  "16,-127,44,40"
  ],
  "Islands": [
-  "27,-92,11",
-  "-44,-128,9"
+  "-45,-34,9",
+  "-25,-65,12",
+  "2,-76,6",
+  "33,-89,13",
+  "59,-115,8",
+  "-79,-82,9",
+  "19,-128,7",
+  "64,-45,5"
  ],
  "WaterShallowColor": {
-  "R": 0.06,
-  "G": 0.15,
-  "B": 0.11,
+  "R": 0.1294,
+  "G": 0.2392,
+  "B": 0.2,
   "A": 1.0
  },
  "WaterDeepColor": {
-  "R": 0.02,
-  "G": 0.055,
-  "B": 0.035,
+  "R": 0.0235,
+  "G": 0.0824,
+  "B": 0.0863,
   "A": 1.0
  },
  "WaterClarity": 3.9,
  "WaterTemperature": 13.0,
  "TreeMix": {
   "pine": 1.0,
-  "birch": 0.35
+  "birch": 0.25,
+  "spruce": 0.12
  },
- "TreeDensity": 1.4,
- "ReedDensity": 0.65,
- "RimHeight": 55.0,
- "SnowLine": 999.0,
+ "TreeDensity": 0.86,
+ "ReedDensity": 0.33,
+ "RimHeight": 0,
+ "SnowLine": 999,
  "PlazaCenter": {
   "X": 0.0,
   "Y": 18.0
@@ -72,7 +81,24 @@
  ],
  "HillScale": 0.95,
  "Landmarks": [
-  "tower,92,-24",
-  "platforms,-45,-7,54"
- ]
+  "rocks,-45,-34",
+  "rocks,34,-89",
+  "rocks,17,-128"
+ ],
+ "BankSummit": {
+  "X": -25.0,
+  "Y": 5.0,
+  "Z": -65.0
+ },
+ "SecondBankSummit": {
+  "X": 33.0,
+  "Y": 6.0,
+  "Z": -89.0
+ },
+ "ShoreMix": {
+  "X": 0.85,
+  "Y": 0.08
+ },
+ "RockDensity": 1.5,
+ "RockLine": 5
 }

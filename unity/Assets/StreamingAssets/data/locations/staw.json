@@ -1,16 +1,16 @@
 {
  "$type": "LocationData",
- "DisplayName": "Staw Karpiowy",
- "OutlineCz": -54.0,
- "OutlineRx": 84.0,
- "OutlineRz": 56.0,
- "Slope": 0.08,
- "MaxDepth": 3.5,
+ "DisplayName": "Przesmyk Windermere",
+ "OutlineCz": -33,
+ "OutlineRx": 40,
+ "OutlineRz": 35,
+ "Slope": 0.16,
+ "MaxDepth": 9.0,
  "HolePos": {
-  "X": 0.0,
-  "Y": -28.0
+  "X": -6.0,
+  "Y": -88.0
  },
- "HoleDepth": 1.5,
+ "HoleDepth": 4.0,
  "HoleRadius": 6.0,
  "BarPos": {
   "X": 10.0,
@@ -43,7 +43,7 @@
   "Pstrąg tęczowy": 0.3
  },
  "RequiredLevel": 2,
- "Description": "Mały, płytki staw pełen karpi. Spokojne łowisko dla cierpliwych.",
+ "Description": "Anglia · Windermere. Dwa podłużne baseny łączy płytszy przesmyk. Wyspa naprzeciw zatoki rozdziela drogę na otwartą wodę.",
  "GrassColor": {
   "R": 0.4,
   "G": 0.54,
@@ -69,33 +69,33 @@
   "A": 1.0
  },
  "WaterShallowColor": {
-  "R": 0.105,
-  "G": 0.16,
-  "B": 0.1,
+  "R": 0.1569,
+  "G": 0.2275,
+  "B": 0.1608,
   "A": 1.0
  },
  "WaterDeepColor": {
-  "R": 0.03,
-  "G": 0.05,
-  "B": 0.035,
+  "R": 0.0353,
+  "G": 0.098,
+  "B": 0.0745,
   "A": 1.0
  },
  "FogBoost": 0.0,
- "RimHeight": 50.0,
- "SnowLine": 999.0,
- "RockLine": 30.0,
+ "RimHeight": 0,
+ "SnowLine": 999,
+ "RockLine": 5,
  "HillScale": 0.42,
- "TreeDensity": 0.45,
+ "TreeDensity": 1.0,
  "TreeMix": {
   "oak": 1.0,
-  "birch": 0.4,
-  "spruce": 0.1
+  "birch": 0.6,
+  "pine": 0.24
  },
  "BushDensity": 1.2,
  "FlowerDensity": 2.5,
  "LilyDensity": 1.4,
- "ReedDensity": 1.5,
- "RockDensity": 0.3,
+ "ReedDensity": 0.65,
+ "RockDensity": 0.48,
  "PlazaCenter": {
   "X": 0.0,
   "Y": 22.0
@@ -148,16 +148,31 @@
  ],
  "Squareness": 3.0,
  "Lobes": [
-  "-53,-45,14,18"
+  "-5,-88,34,44",
+  "25,-44,27,16"
  ],
  "Landmarks": [
-  "dike,0,-113,0,64",
-  "platforms,69,-58,-90",
-  "bridge,24,-16,90,36"
+  "platforms,36,-22",
+  "rocks,-32,-89"
  ],
  "WaterClarity": 2.2,
  "WaterTemperature": 21.5,
  "Islands": [
-  "24,-29,9"
- ]
+  "-3,-62,8",
+  "10,-65,4"
+ ],
+ "BankSummit": {
+  "X": -47.0,
+  "Y": 9.0,
+  "Z": -87.0
+ },
+ "SecondBankSummit": {
+  "X": 48.0,
+  "Y": 6.0,
+  "Z": -56.0
+ },
+ "ShoreMix": {
+  "X": 0.36,
+  "Y": 0.29
+ }
 }

@@ -1,18 +1,18 @@
 {
  "$type": "LocationData",
- "DisplayName": "Starorzecze Wierzbowe",
- "Description": "Zarośnięte zakola i podwodne półki. Lin i wzdręga trzymają się roślin.",
+ "DisplayName": "Wyspy Górnej Erne",
+ "Description": "Irlandia Północna · Upper Lough Erne. Niskie, zaokrąglone wyspy dzielą wodę na odnogi. Za wierzbami otwierają się zaciszne, trzcinowe zatoczki.",
  "RequiredLevel": 6,
- "OutlineRx": 104.0,
- "OutlineRz": 68.0,
- "OutlineCz": -66.0,
- "Slope": 0.11,
- "MaxDepth": 4.5,
+ "OutlineRx": 65,
+ "OutlineRz": 49,
+ "OutlineCz": -47,
+ "Slope": 0.098,
+ "MaxDepth": 6.0,
  "HolePos": {
-  "X": 17.0,
-  "Y": -39.0
+  "X": 6.0,
+  "Y": -77.0
  },
- "HoleDepth": 2.0,
+ "HoleDepth": 2.6,
  "HoleRadius": 11.0,
  "BarPos": {
   "X": -27.0,
@@ -29,34 +29,40 @@
   "Karaś złocisty": 0.9
  },
  "Lobes": [
-  "-62,-46,21,14"
+  "-67,-48,41,24",
+  "48,-87,42,34",
+  "-28,-103,32,25"
  ],
  "Islands": [
-  "19,-62,10",
-  "-19,-26,9"
+  "-21,-31,11",
+  "20,-57,13",
+  "-58,-50,9",
+  "40,-88,9",
+  "-26,-88,7"
  ],
  "WaterShallowColor": {
-  "R": 0.1,
-  "G": 0.14,
-  "B": 0.065,
+  "R": 0.1608,
+  "G": 0.2157,
+  "B": 0.1255,
   "A": 1.0
  },
  "WaterDeepColor": {
-  "R": 0.02,
-  "G": 0.055,
-  "B": 0.035,
+  "R": 0.0431,
+  "G": 0.0902,
+  "B": 0.051,
   "A": 1.0
  },
  "WaterClarity": 1.8,
  "WaterTemperature": 21.0,
  "TreeMix": {
   "willow": 1.0,
-  "birch": 0.35
+  "oak": 0.75,
+  "birch": 0.17
  },
  "TreeDensity": 0.85,
- "ReedDensity": 1.45,
- "RimHeight": 30.0,
- "SnowLine": 999.0,
+ "ReedDensity": 1.85,
+ "RimHeight": 0,
+ "SnowLine": 999,
  "PlazaCenter": {
   "X": 0.0,
   "Y": 18.0
@@ -72,7 +78,23 @@
  ],
  "HillScale": 0.37,
  "Landmarks": [
-  "bridge,-19,-12,90,28",
-  "stilthouse,-57,-17"
- ]
+  "stilthouse,-61,-25",
+  "bridge,-21,-15,90,22"
+ ],
+ "BankSummit": {
+  "X": -21.0,
+  "Y": 3.0,
+  "Z": -31.0
+ },
+ "SecondBankSummit": {
+  "X": 20.0,
+  "Y": 4.0,
+  "Z": -57.0
+ },
+ "ShoreMix": {
+  "X": 0.06,
+  "Y": 0.77
+ },
+ "RockDensity": 0.18,
+ "RockLine": 5
 }

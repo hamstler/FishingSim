@@ -37,3 +37,6 @@ Wspólna tablica dwóch agentów pracujących nad wersją Unity (`unity/`). Każ
 - Błąd naprawiony: oś zgięcia stawu liczona z już zgiętego palca rozpadała się powyżej ~60 st w MCP (palec skręcał się w bok); teraz brana raz z prostego palca w układzie kości. Dotyczyło też Fisherman_Untex.
 - Prawa dłoń: limity stawów z opisu anatomicznego (np. mały MCP 80, PIP 100, DIP 60), dłoń osadzana przeszukaniem (odsunięcie, obrót wokół wędki, ugięcie palców) tak, by palce obejmowały korek bez wchodzenia w niego; sąsiedni palec blokuje tylko, gdy już zgięty.
 - Zostaje: dłoń 2.8 cm od korka (chwyt hakowy), koniuszek serdecznego 4 mm w korku, lewa ręka: łokieć 60 st i duży skręt przedramienia. Wynik w Test/Outdoorsman_chwyt (nieśledzony).
+
+## 2026-11-27 Claude: 0.12.3 Codexa dokończone
+- Codex skończył tokeny przed commitem: nowe krajobrazy 10 łowisk (dane .tres i json, LocationData.BankSummit/SecondBankSummit/ShoreMix + BankRelief w Lake.cs i LakeBed.cs, kamera obrazów menu na głęboczek w Smoke.cs, obrazy menu) sprawdzone: build i test OK (Bledzka Toń, 2 ryby, 144 fps), obrazy 10 łowisk bez usterek; zacommitowane. assets/characters/angler_grip.glb (stara zmiana Codexa) dalej poza commitem.

@@ -400,6 +400,7 @@ public partial class LakeBed : Node3D
         // A dip never takes the ground down to the lake's level (no puddles of lake water inland).
         h = MathF.Max(h - hollow, MathF.Min(h, 0.9f));
         h += RimAt(loc, x, z);
+        h += loc.BankRelief(x, z) * Smooth(0f, 5f, sd) * free;
         return h;
     }
 

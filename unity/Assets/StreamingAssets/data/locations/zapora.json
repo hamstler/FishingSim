@@ -1,18 +1,18 @@
 {
  "$type": "LocationData",
- "DisplayName": "Zbiornik Kamienna Zapora",
- "Description": "Największy i najgłębszy akwen. Przy dnie żeruje sandacz, a nad stokiem krąży boleń.",
+ "DisplayName": "Dolina Minnewanki",
+ "Description": "Kanada · Banff. Za zaporą woda skręca w długą dolinę. Głęboki tor biegnie u stóp skalnych stoków, a żwirowa półka przy brzegu daje miejsce do rzutu.",
  "RequiredLevel": 27,
- "OutlineRx": 146.0,
- "OutlineRz": 92.0,
- "OutlineCz": -90.0,
- "Slope": 0.2,
- "MaxDepth": 17,
+ "OutlineRx": 85,
+ "OutlineRz": 51,
+ "OutlineCz": -49,
+ "Slope": 0.28,
+ "MaxDepth": 21.0,
  "HolePos": {
-  "X": 26.0,
-  "Y": -56.0
+  "X": 57.0,
+  "Y": -123.0
  },
- "HoleDepth": 4.0,
+ "HoleDepth": 9.0,
  "HoleRadius": 17.0,
  "BarPos": {
   "X": -40.0,
@@ -29,35 +29,34 @@
   "Jesiotr ostronosy": 0.3
  },
  "Lobes": [
-  "83,-110,35,24"
+  "35,-101,57,57",
+  "76,-141,46,46",
+  "100,-164,34,30"
  ],
- "Islands": [
-  "-43,-104,14",
-  "51,-123,11",
-  "32,-26,9"
- ],
+ "Islands": [],
  "WaterShallowColor": {
-  "R": 0.06,
-  "G": 0.15,
-  "B": 0.11,
+  "R": 0.1373,
+  "G": 0.3216,
+  "B": 0.2706,
   "A": 1.0
  },
  "WaterDeepColor": {
-  "R": 0.02,
-  "G": 0.055,
-  "B": 0.035,
+  "R": 0.0196,
+  "G": 0.1059,
+  "B": 0.1255,
   "A": 1.0
  },
  "WaterClarity": 3.9,
  "WaterTemperature": 17.0,
  "TreeMix": {
-  "oak": 1.0,
-  "birch": 0.35
+  "spruce": 1.0,
+  "pine": 0.82,
+  "birch": 0.12
  },
- "TreeDensity": 0.85,
- "ReedDensity": 0.65,
- "RimHeight": 55.0,
- "SnowLine": 999.0,
+ "TreeDensity": 1.0,
+ "ReedDensity": 0.19,
+ "RimHeight": 0,
+ "SnowLine": 999,
  "PlazaCenter": {
   "X": 0.0,
   "Y": 18.0
@@ -73,8 +72,24 @@
  ],
  "HillScale": 1.1,
  "Landmarks": [
-  "dike,0,-186,0,72",
-  "bridge,32,-15,90,32",
-  "rocks,-67,-95"
- ]
+  "dike,-71,-22,55,36",
+  "rocks,62,-157",
+  "rocks,107,-99"
+ ],
+ "BankSummit": {
+  "X": -50.0,
+  "Y": 32.0,
+  "Z": -100.0
+ },
+ "SecondBankSummit": {
+  "X": 110.0,
+  "Y": 36.0,
+  "Z": -104.0
+ },
+ "ShoreMix": {
+  "X": 0.9,
+  "Y": 0.035
+ },
+ "RockDensity": 1.32,
+ "RockLine": 18.0
 }
