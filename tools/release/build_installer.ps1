@@ -17,7 +17,9 @@ $exe = Join-Path $out "FishingSim-$Version-Setup.exe"
     "/win32manifest:$(Join-Path $src 'setup.manifest')" /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll `
     /r:System.Windows.Forms.dll /r:System.Drawing.dll (Join-Path $src "Setup.cs") $ver
 if ($LASTEXITCODE -ne 0) { throw "csc failed" }
-foreach ($part in Get-ChildItem (Join-Path $root "build\release") -Filter "FishingSim-$Version-Windows-czesc*.zip") {
+$parts = @(Get-ChildItem (Join-Path $root "build\release\$Version") -Filter "FishingSim-$Version-Windows-czesc*.zip" -ErrorAction SilentlyContinue)
+if ($parts.Count -eq 0) { $parts = @(Get-ChildItem (Join-Path $root "build\release") -Filter "FishingSim-$Version-Windows-czesc*.zip") }
+foreach ($part in $parts) {
     $link = Join-Path $out $part.Name
     if (-not (Test-Path $link)) { New-Item -ItemType HardLink -Path $link -Target $part.FullName | Out-Null }
 }
